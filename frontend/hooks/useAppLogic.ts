@@ -475,35 +475,56 @@ export const useAppLogic = () => {
       // Сохраняем задачу
       taskSlice.actions.saveTask(taskData, targetTableId);
       
-      // Если задача процесса только что выполнена - переходим к следующему шагу
+      // Если задача процесса только что выполнена - переходим к следующему шагу или ожидаем выбор ветки
       if (oldTask && oldTask.processId && oldTask.processInstanceId && oldTask.stepId && !wasCompleted && isNowCompleted) {
-          const process = bpmSlice.state.businessProcesses.find(p => p.id === oldTask.processId);
+          const process = bpmSlice.state.businessProcesses.find(p =>
+              p.id === oldTask.processId && p.instances?.some(i => i.id === oldTask.processInstanceId)
+          );
           if (process) {
-              const instance = process.instances?.find(i => i.id === oldTask.processInstanceId);
+              const instance = process.instances!.find(i => i.id === oldTask.processInstanceId);
               if (instance && instance.status === 'active') {
+                  const currentStep = process.steps.find(s => s.id === instance.currentStepId);
+                  if (!currentStep) return;
+
+                  // Шаг с вариантами: ожидаем выбор ветки (UI покажет модалку)
+                  if (currentStep.stepType === 'variant' && currentStep.branches && currentStep.branches.length > 0) {
+                      const updatedInstance = {
+                          ...instance,
+                          currentStepId: null,
+                          pendingBranchSelection: { stepId: currentStep.id }
+                      };
+                      const updatedProcess: BusinessProcess = {
+                          ...process,
+                          instances: process.instances?.map(i => i.id === instance.id ? updatedInstance : i) || [updatedInstance]
+                      };
+                      bpmSlice.actions.saveProcess(updatedProcess);
+                      showNotification('Выберите вариант перехода в карточке экземпляра процесса');
+                      return;
+                  }
+
+                  // Определяем следующий шаг: nextStepId или линейный порядок
                   const currentStepIndex = process.steps.findIndex(s => s.id === instance.currentStepId);
-                  const nextStepIndex = currentStepIndex + 1;
-                  
-                  if (nextStepIndex < process.steps.length) {
-                      // Есть следующий шаг - создаем задачу для него
-                      const nextStep = process.steps[nextStepIndex];
+                  let nextStep = currentStep.nextStepId
+                      ? process.steps.find(s => s.id === currentStep.nextStepId)
+                      : process.steps[currentStepIndex + 1];
+
+                  if (nextStep) {
                       const tasksTable = settingsSlice.state.tables.find(t => t.type === 'tasks');
                       if (tasksTable) {
-                          // Находим исполнителя для следующего шага
                           let nextAssigneeId: string | null = null;
-                          if (nextStep.assigneeType === 'position') {
-                              const position = bpmSlice.state.orgPositions.find(p => p.id === nextStep.assigneeId);
+                          if (nextStep!.assigneeType === 'position') {
+                              const position = bpmSlice.state.orgPositions.find(p => p.id === nextStep!.assigneeId);
                               nextAssigneeId = position?.holderUserId || null;
                           } else {
-                              nextAssigneeId = nextStep.assigneeId || null;
+                              nextAssigneeId = nextStep!.assigneeId || null;
                           }
-                          
+
                           if (nextAssigneeId) {
                               const nextTask: Partial<Task> = {
                                   id: `task-${Date.now()}`,
                                   tableId: tasksTable.id,
-                                  title: `${process.title}: ${nextStep.title}`,
-                                  description: nextStep.description || '',
+                                  title: `${process.title}: ${nextStep!.title}`,
+                                  description: nextStep!.description || '',
                                   status: 'Не начато',
                                   priority: 'Средний',
                                   assigneeId: nextAssigneeId,
@@ -511,46 +532,102 @@ export const useAppLogic = () => {
                                   endDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
                                   processId: process.id,
                                   processInstanceId: instance.id,
-                                  stepId: nextStep.id
+                                  stepId: nextStep!.id
                               };
-                              
+
                               taskSlice.actions.saveTask(nextTask, tasksTable.id);
-                              
-                              // Обновляем экземпляр процесса
+
                               const updatedInstance = {
                                   ...instance,
-                                  currentStepId: nextStep.id,
+                                  currentStepId: nextStep!.id,
                                   taskIds: [...instance.taskIds, nextTask.id!]
                               };
-                              
+
                               const updatedProcess: BusinessProcess = {
                                   ...process,
                                   instances: process.instances?.map(i => i.id === instance.id ? updatedInstance : i) || [updatedInstance]
                               };
-                              
+
                               bpmSlice.actions.saveProcess(updatedProcess);
-                              showNotification(`Процесс перешел к шагу ${nextStepIndex + 1}: ${nextStep.title}`);
+                              showNotification(`Процесс перешел к шагу: ${nextStep!.title}`);
                           }
                       }
                   } else {
-                      // Все шаги выполнены - завершаем процесс
                       const updatedInstance = {
                           ...instance,
                           status: 'completed' as const,
                           completedAt: new Date().toISOString(),
                           currentStepId: null
                       };
-                      
+
                       const updatedProcess: BusinessProcess = {
                           ...process,
                           instances: process.instances?.map(i => i.id === instance.id ? updatedInstance : i) || [updatedInstance]
                       };
-                      
+
                       bpmSlice.actions.saveProcess(updatedProcess);
                       showNotification(`Процесс "${process.title}" завершен!`);
                   }
               }
           }
+      }
+  };
+
+  /** Завершить шаг с вариантами — создать задачу для выбранной ветки */
+  const completeProcessStepWithBranch = (instanceId: string, nextStepId: string) => {
+      const allProcs = bpmSlice.state.businessProcesses;
+      for (const process of allProcs) {
+          const instance = process.instances?.find(i => i.id === instanceId);
+          if (!instance || !instance.pendingBranchSelection) continue;
+
+          const nextStep = process.steps.find(s => s.id === nextStepId);
+          if (!nextStep) return;
+
+          const tasksTable = settingsSlice.state.tables.find(t => t.type === 'tasks');
+          if (!tasksTable) return;
+
+          let assigneeId: string | null = null;
+          if (nextStep.assigneeType === 'position') {
+              const position = bpmSlice.state.orgPositions.find(p => p.id === nextStep.assigneeId);
+              assigneeId = position?.holderUserId || null;
+          } else {
+              assigneeId = nextStep.assigneeId || null;
+          }
+
+          if (!assigneeId) return;
+
+          const nextTask: Partial<Task> = {
+              id: `task-${Date.now()}`,
+              tableId: tasksTable.id,
+              title: `${process.title}: ${nextStep.title}`,
+              description: nextStep.description || '',
+              status: 'Не начато',
+              priority: 'Средний',
+              assigneeId,
+              startDate: new Date().toISOString().split('T')[0],
+              endDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+              processId: process.id,
+              processInstanceId: instanceId,
+              stepId: nextStep.id
+          };
+
+          taskSlice.actions.saveTask(nextTask, tasksTable.id);
+
+          const updatedInstance = {
+              ...instance,
+              currentStepId: nextStep.id,
+              pendingBranchSelection: undefined,
+              taskIds: [...instance.taskIds, nextTask.id!]
+          };
+
+          const updatedProcess: BusinessProcess = {
+              ...process,
+              instances: process.instances?.map(i => i.id === instanceId ? updatedInstance : i) || [updatedInstance]
+          };
+
+          bpmSlice.actions.saveProcess(updatedProcess);
+          showNotification(`Процесс перешел к шагу: ${nextStep.title}`);
+          return;
       }
   };
 
@@ -671,7 +748,7 @@ export const useAppLogic = () => {
       },
       deletePurchaseRequest: financeSlice.actions.deletePurchaseRequest, saveFinancialPlanDocument: financeSlice.actions.saveFinancialPlanDocument, deleteFinancialPlanDocument: financeSlice.actions.deleteFinancialPlanDocument, saveFinancialPlanning: financeSlice.actions.saveFinancialPlanning, deleteFinancialPlanning: financeSlice.actions.deleteFinancialPlanning,
       saveWarehouse: inventorySlice.actions.saveWarehouse, deleteWarehouse: inventorySlice.actions.deleteWarehouse, saveInventoryItem: inventorySlice.actions.saveItem, deleteInventoryItem: inventorySlice.actions.deleteItem, createInventoryMovement: inventorySlice.actions.createMovement, createInventoryRevision: inventorySlice.actions.createRevision, updateInventoryRevision: inventorySlice.actions.updateRevision, postInventoryRevision: inventorySlice.actions.postRevision,
-      savePosition: bpmSlice.actions.savePosition, deletePosition: bpmSlice.actions.deletePosition, saveProcess: bpmSlice.actions.saveProcess, deleteProcess: bpmSlice.actions.deleteProcess,
+      savePosition: bpmSlice.actions.savePosition, deletePosition: bpmSlice.actions.deletePosition, saveProcess: bpmSlice.actions.saveProcess, deleteProcess: bpmSlice.actions.deleteProcess, completeProcessStepWithBranch,
       saveSalesFunnel: async (funnel: SalesFunnel) => {
           try {
               // Проверяем, существует ли воронка с таким id

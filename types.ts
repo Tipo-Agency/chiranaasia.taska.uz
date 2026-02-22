@@ -191,13 +191,26 @@ export interface OrgPosition {
     order?: number; // Порядок для определения позиции слева/справа (меньше = левее)
 }
 
+/** Вариант перехода для шага типа variant (ветвление) */
+export interface ProcessStepBranch {
+    id: string;
+    label: string;       // Название варианта (например "Одобрено" / "Отклонено")
+    nextStepId: string;  // ID следующего шага
+}
+
 export interface ProcessStep {
     id: string;
     title: string;
     description?: string;
     assigneeType: 'user' | 'position';
-    assigneeId: string; 
+    assigneeId: string;
     order: number;
+    /** Тип шага: normal — линейный переход, variant — ветвление (выбор варианта) */
+    stepType?: 'normal' | 'variant';
+    /** Для normal: ID следующего шага (если нет — берётся steps[order+1]) */
+    nextStepId?: string;
+    /** Для variant: варианты перехода после завершения шага */
+    branches?: ProcessStepBranch[];
 }
 
 export interface ProcessInstance {
@@ -209,6 +222,8 @@ export interface ProcessInstance {
     startedAt: string;
     completedAt?: string;
     taskIds: string[]; // ID задач, созданных для этого экземпляра
+    /** Шаг с вариантами завершён — ожидание выбора ветки пользователем */
+    pendingBranchSelection?: { stepId: string };
 }
 
 export interface BusinessProcess {

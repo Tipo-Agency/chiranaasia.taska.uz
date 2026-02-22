@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { BusinessProcess, ProcessStep, OrgPosition, User, Task, ProcessInstance, TableCollection } from '../types';
+import { BusinessProcess, ProcessStep, ProcessStepBranch, OrgPosition, User, Task, ProcessInstance, TableCollection } from '../types';
 import { Network, Plus, Edit2, Trash2, ChevronRight, User as UserIcon, Building2, Save, X, ArrowDown, Play, CheckCircle2, Clock, FileText, ArrowLeft, Calendar, Users } from 'lucide-react';
 import { TaskSelect } from './TaskSelect';
 import { FiltersPanel, FilterConfig } from './FiltersPanel';
@@ -17,11 +17,12 @@ interface BusinessProcessesViewProps {
   onDeleteProcess: (id: string) => void;
   onSaveTask: (task: Partial<Task>) => void;
   onOpenTask: (task: Task) => void;
-  autoOpenCreateModal?: boolean; // Автоматически открыть модалку создания
+  onCompleteProcessStepWithBranch?: (instanceId: string, nextStepId: string) => void;
+  autoOpenCreateModal?: boolean;
 }
 
 const BusinessProcessesView: React.FC<BusinessProcessesViewProps> = ({ 
-    processes, orgPositions, users, tasks, tables, currentUser, onSaveProcess, onDeleteProcess, onSaveTask, onOpenTask, autoOpenCreateModal = false
+    processes, orgPositions, users, tasks, tables, currentUser, onSaveProcess, onDeleteProcess, onSaveTask, onOpenTask, onCompleteProcessStepWithBranch, autoOpenCreateModal = false
 }) => {
   const [selectedProcessId, setSelectedProcessId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'processes' | 'instances'>('processes');
@@ -32,6 +33,7 @@ const BusinessProcessesView: React.FC<BusinessProcessesViewProps> = ({
   // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingProcess, setEditingProcess] = useState<BusinessProcess | null>(null);
+  const [editModalTab, setEditModalTab] = useState<'steps' | 'schema'>('steps');
   
   // Form State
   const [title, setTitle] = useState('');
@@ -71,16 +73,17 @@ const BusinessProcessesView: React.FC<BusinessProcessesViewProps> = ({
   const handleOpenCreate = () => {
       setEditingProcess(null);
       setTitle(''); setDescription(''); setSteps([]);
+      setEditModalTab('steps');
       setIsModalOpen(true);
   };
 
   const handleOpenEdit = (proc: BusinessProcess) => {
-      // Находим последнюю версию процесса для редактирования
       const latestVersion = processes
         .filter(p => p.id === proc.id)
         .sort((a, b) => (b.version || 1) - (a.version || 1))[0] || proc;
       setEditingProcess(latestVersion);
       setTitle(latestVersion.title); setDescription(latestVersion.description || ''); setSteps(latestVersion.steps || []);
+      setEditModalTab('steps');
       setIsModalOpen(true);
   };
 
@@ -102,6 +105,32 @@ const BusinessProcessesView: React.FC<BusinessProcessesViewProps> = ({
 
   const handleRemoveStep = (id: string) => {
       setSteps(steps.filter(s => s.id !== id));
+  };
+
+  const handleAddBranch = (stepId: string) => {
+      const step = steps.find(s => s.id === stepId);
+      if (!step) return;
+      const branches = step.branches || [];
+      const newBranch: ProcessStepBranch = {
+          id: `br-${Date.now()}`,
+          label: '',
+          nextStepId: steps[0]?.id || ''
+      };
+      handleUpdateStep(stepId, { branches: [...branches, newBranch] });
+  };
+
+  const handleUpdateBranch = (stepId: string, branchId: string, updates: Partial<ProcessStepBranch>) => {
+      const step = steps.find(s => s.id === stepId);
+      if (!step?.branches) return;
+      const branches = step.branches.map(b => b.id === branchId ? { ...b, ...updates } : b);
+      handleUpdateStep(stepId, { branches });
+  };
+
+  const handleRemoveBranch = (stepId: string, branchId: string) => {
+      const step = steps.find(s => s.id === stepId);
+      if (!step?.branches) return;
+      const branches = step.branches.filter(b => b.id !== branchId);
+      handleUpdateStep(stepId, { branches: branches.length ? branches : undefined });
   };
 
   const handleSubmit = (e?: React.FormEvent) => {
@@ -247,15 +276,16 @@ const BusinessProcessesView: React.FC<BusinessProcessesViewProps> = ({
       return tasks.filter(t => t.processInstanceId === instanceId);
   };
 
-  const getStepStatus = (stepId: string, instance: ProcessInstance | null): 'pending' | 'active' | 'completed' => {
+  const getStepStatus = (stepId: string, instance: ProcessInstance | null, instanceTasks: Task[]): 'pending' | 'active' | 'completed' => {
       if (!instance) return 'pending';
-      if (instance.status === 'completed') return 'completed';
-      
-      const stepIndex = selectedProcess?.steps.findIndex(s => s.id === stepId) ?? -1;
-      const currentStepIndex = selectedProcess?.steps.findIndex(s => s.id === instance.currentStepId) ?? -1;
-      
-      if (stepIndex < currentStepIndex) return 'completed';
-      if (stepIndex === currentStepIndex) return 'active';
+      if (instance.status === 'completed') {
+          const stepTask = instanceTasks.find(t => t.stepId === stepId);
+          return stepTask && (stepTask.status === 'Выполнено' || stepTask.status === 'Done') ? 'completed' : 'pending';
+      }
+      const stepTask = instanceTasks.find(t => t.stepId === stepId);
+      if (stepTask && (stepTask.status === 'Выполнено' || stepTask.status === 'Done')) return 'completed';
+      if (instance.currentStepId === stepId) return 'active';
+      if (instance.pendingBranchSelection?.stepId === stepId) return 'active';
       return 'pending';
   };
 
@@ -357,26 +387,43 @@ const BusinessProcessesView: React.FC<BusinessProcessesViewProps> = ({
               {/* Content */}
               <div className="flex-1 overflow-y-auto custom-scrollbar min-h-0">
                   <div className="max-w-7xl mx-auto px-6 py-6">
-                      {/* Process Steps Overview */}
+                      {/* Process Steps Overview - Схема */}
                       <div className="mb-6 bg-white dark:bg-[#252525] border border-gray-200 dark:border-[#333] rounded-xl p-6 shadow-sm">
                           <h2 className="text-sm font-bold text-gray-500 dark:text-gray-400 uppercase mb-4">Схема процесса</h2>
                           <div className="space-y-3">
                               {selectedProcess.steps.map((step, idx) => {
+                                  const nextSteps: { label?: string; step: ProcessStep }[] = [];
+                                  if (step.stepType === 'variant' && step.branches?.length) {
+                                      step.branches.forEach(br => {
+                                          const ns = selectedProcess.steps.find(s => s.id === br.nextStepId);
+                                          if (ns) nextSteps.push({ label: br.label, step: ns });
+                                      });
+                                  } else {
+                                      const next = step.nextStepId
+                                          ? selectedProcess.steps.find(s => s.id === step.nextStepId)
+                                          : selectedProcess.steps[idx + 1];
+                                      if (next) nextSteps.push({ step: next });
+                                  }
                                   return (
                                       <div key={step.id} className="relative">
-                                          <div className="bg-gray-50 dark:bg-[#2a2a2a] border border-gray-200 dark:border-[#333] rounded-lg p-4 flex items-center justify-between">
+                                          <div className={`bg-gray-50 dark:bg-[#2a2a2a] border rounded-lg p-4 flex items-center justify-between ${step.stepType === 'variant' ? 'border-amber-400 dark:border-amber-600' : 'border-gray-200 dark:border-[#333]'}`}>
                                               <div className="flex items-center gap-3 flex-1">
-                                                  <div className="w-8 h-8 rounded-full bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 flex items-center justify-center text-xs font-bold">
+                                                  <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${step.stepType === 'variant' ? 'bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400' : 'bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400'}`}>
                                                       {idx + 1}
                                                   </div>
-                                                  <div className="flex-1">
-                                                      <div className="font-medium text-gray-900 dark:text-white text-sm">{step.title}</div>
+                                                  <div className="flex-1 min-w-0">
+                                                      <div className="flex items-center gap-2">
+                                                          <span className="font-medium text-gray-900 dark:text-white text-sm">{step.title}</span>
+                                                          {step.stepType === 'variant' && (
+                                                              <span className="px-2 py-0.5 bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 rounded text-xs font-bold">Вариант</span>
+                                                          )}
+                                                      </div>
                                                       {step.description && (
-                                                          <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{step.description}</div>
+                                                          <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 truncate">{step.description}</div>
                                                       )}
                                                   </div>
                                               </div>
-                                              <div className="flex items-center gap-2 bg-white dark:bg-[#333] px-3 py-1.5 rounded-lg text-xs">
+                                              <div className="flex items-center gap-2 bg-white dark:bg-[#333] px-3 py-1.5 rounded-lg text-xs shrink-0">
                                                   {step.assigneeType === 'position' ? (
                                                       <Building2 size={14} className="text-purple-500"/>
                                                   ) : (
@@ -387,9 +434,15 @@ const BusinessProcessesView: React.FC<BusinessProcessesViewProps> = ({
                                                   </span>
                                               </div>
                                           </div>
-                                          {idx < selectedProcess.steps.length - 1 && (
-                                              <div className="flex justify-center py-2">
-                                                  <ArrowDown size={16} className="text-gray-300 dark:text-gray-600"/>
+                                          {nextSteps.length > 0 && (
+                                              <div className="flex flex-wrap gap-2 justify-center py-2">
+                                                  {nextSteps.map((n, i) => (
+                                                      <div key={i} className="flex items-center gap-1">
+                                                          {n.label && <span className="text-xs text-gray-500 dark:text-gray-400 px-1">{n.label}:</span>}
+                                                          <ArrowDown size={16} className="text-gray-300 dark:text-gray-600"/>
+                                                          <span className="text-xs text-gray-500 dark:text-gray-400">→ {n.step.title}</span>
+                                                      </div>
+                                                  ))}
                                               </div>
                                           )}
                                       </div>
@@ -525,6 +578,14 @@ const BusinessProcessesView: React.FC<BusinessProcessesViewProps> = ({
                               <h3 className="font-bold text-gray-800 dark:text-white">{editingProcess ? 'Редактировать процесс' : 'Новый процесс'}</h3>
                               <button onClick={() => setIsModalOpen(false)} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 p-1 rounded-full hover:bg-gray-100 dark:hover:bg-[#333]"><X size={18} /></button>
                           </div>
+                          <div className="flex border-b border-gray-100 dark:border-[#333] px-4">
+                              <button type="button" onClick={() => setEditModalTab('steps')} className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${editModalTab === 'steps' ? 'border-indigo-600 text-indigo-600 dark:text-indigo-400' : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'}`}>
+                                  Шаги
+                              </button>
+                              <button type="button" onClick={() => setEditModalTab('schema')} className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${editModalTab === 'schema' ? 'border-indigo-600 text-indigo-600 dark:text-indigo-400' : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'}`}>
+                                  Схема
+                              </button>
+                          </div>
                           
                           <form onSubmit={handleSubmit} className="flex-1 overflow-hidden flex flex-col">
                               <div className="p-6 overflow-y-auto custom-scrollbar space-y-6">
@@ -539,7 +600,45 @@ const BusinessProcessesView: React.FC<BusinessProcessesViewProps> = ({
                                       </div>
                                   </div>
 
-                                  <div className="border-t border-gray-200 dark:border-[#333] pt-4">
+                                  {editModalTab === 'schema' && (
+                                      <div className="border border-gray-200 dark:border-[#333] rounded-lg p-4 bg-gray-50 dark:bg-[#202020]">
+                                          {steps.length > 0 ? (
+                                          <>
+                                          <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">Визуализация процесса. Редактируйте шаги и связи во вкладке «Шаги».</p>
+                                          <div className="space-y-2">
+                                              {steps.map((step, idx) => {
+                                                  const nextSteps: { label?: string; step: ProcessStep }[] = [];
+                                                  if (step.stepType === 'variant' && step.branches?.length) {
+                                                      step.branches.forEach(br => {
+                                                          const ns = steps.find(s => s.id === br.nextStepId);
+                                                          if (ns) nextSteps.push({ label: br.label, step: ns });
+                                                      });
+                                                  } else {
+                                                      const next = step.nextStepId ? steps.find(s => s.id === step.nextStepId) : steps[idx + 1];
+                                                      if (next) nextSteps.push({ step: next });
+                                                  }
+                                                  return (
+                                                      <div key={step.id} className="flex items-center gap-2">
+                                                          <div className={`w-7 h-7 rounded flex items-center justify-center text-xs font-bold shrink-0 ${step.stepType === 'variant' ? 'bg-amber-200 dark:bg-amber-800 text-amber-800 dark:text-amber-200' : 'bg-indigo-200 dark:bg-indigo-800 text-indigo-800 dark:text-indigo-200'}`}>{idx + 1}</div>
+                                                          <span className="text-sm font-medium text-gray-800 dark:text-gray-200 truncate flex-1">{step.title || '(без названия)'}</span>
+                                                          {step.stepType === 'variant' && <span className="text-xs text-amber-600 dark:text-amber-400">вариант</span>}
+                                                          {nextSteps.length > 0 && (
+                                                              <span className="text-xs text-gray-500 dark:text-gray-400">
+                                                                  → {nextSteps.map(n => n.label ? `${n.label}: ${n.step.title}` : n.step.title).join('; ')}
+                                                              </span>
+                                                          )}
+                                                      </div>
+                                                  );
+                                              })}
+                                          </div>
+                                          </>
+                                          ) : (
+                                              <p className="text-sm text-gray-500 dark:text-gray-400">Добавьте шаги во вкладке «Шаги», чтобы увидеть схему процесса.</p>
+                                          )}
+                                      </div>
+                                  )}
+
+                                  {editModalTab === 'steps' && <div className="border-t border-gray-200 dark:border-[#333] pt-4">
                                       <div className="flex justify-between items-center mb-4">
                                           <h4 className="font-bold text-gray-700 dark:text-gray-200 text-sm">Шаги процесса</h4>
                                           <button type="button" onClick={handleAddStep} className="text-indigo-600 hover:text-indigo-700 text-xs font-medium flex items-center gap-1"><Plus size={14}/> Добавить шаг</button>
@@ -589,10 +688,52 @@ const BusinessProcessesView: React.FC<BusinessProcessesViewProps> = ({
                                                           className="flex-1 text-xs"
                                                       />
                                                   </div>
+                                                  <div className="mt-3 pt-3 border-t border-gray-200 dark:border-[#444]">
+                                                      <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 mb-2">Тип шага</label>
+                                                      <TaskSelect
+                                                          value={step.stepType || 'normal'}
+                                                          onChange={(val) => handleUpdateStep(step.id, { stepType: val as 'normal' | 'variant', branches: val === 'variant' ? (step.branches || [{ id: `br-${Date.now()}`, label: 'Вариант 1', nextStepId: steps[0]?.id || '' }]) : undefined })}
+                                                          options={[
+                                                              { value: 'normal', label: 'Обычный (линейный переход)' },
+                                                              { value: 'variant', label: 'Вариант (ветвление процесса)' }
+                                                          ]}
+                                                          className="w-full text-xs"
+                                                      />
+                                                      {step.stepType === 'variant' && (
+                                                          <div className="mt-3 space-y-2">
+                                                              <div className="flex justify-between items-center">
+                                                                  <span className="text-xs font-medium text-gray-600 dark:text-gray-400">Варианты перехода</span>
+                                                                  <button type="button" onClick={() => handleAddBranch(step.id)} className="text-indigo-600 hover:text-indigo-700 text-xs flex items-center gap-1">
+                                                                      <Plus size={12}/> Добавить
+                                                                  </button>
+                                                              </div>
+                                                              {(step.branches || []).map(br => (
+                                                                  <div key={br.id} className="flex gap-2 items-center bg-white dark:bg-[#252525] p-2 rounded border border-gray-200 dark:border-[#444]">
+                                                                      <input
+                                                                          value={br.label}
+                                                                          onChange={e => handleUpdateBranch(step.id, br.id, { label: e.target.value })}
+                                                                          placeholder="Название варианта"
+                                                                          className="flex-1 px-2 py-1 text-xs border border-gray-200 dark:border-[#555] rounded bg-transparent text-gray-800 dark:text-gray-200"
+                                                                      />
+                                                                      <TaskSelect
+                                                                          value={br.nextStepId}
+                                                                          onChange={(val) => handleUpdateBranch(step.id, br.id, { nextStepId: val })}
+                                                                          options={[
+                                                                              { value: '', label: 'След. шаг...' },
+                                                                              ...steps.filter(s => s.id !== step.id).map(s => ({ value: s.id, label: s.title || '(без названия)' }))
+                                                                          ]}
+                                                                          className="w-40 text-xs"
+                                                                      />
+                                                                      <button type="button" onClick={() => handleRemoveBranch(step.id, br.id)} className="p-1 text-gray-400 hover:text-red-500"><Trash2 size={12}/></button>
+                                                                  </div>
+                                                              ))}
+                                                          </div>
+                                                      )}
+                                                  </div>
                                               </div>
                                           ))}
                                       </div>
-                                  </div>
+                                  </div>}
                               </div>
 
                               <div className="p-4 border-t border-gray-100 dark:border-[#333] bg-white dark:bg-[#252525] flex justify-between items-center shrink-0">
@@ -656,12 +797,39 @@ const BusinessProcessesView: React.FC<BusinessProcessesViewProps> = ({
               {/* Content */}
               <div className="flex-1 overflow-y-auto custom-scrollbar min-h-0">
                   <div className="max-w-7xl mx-auto px-6 py-6">
+                      {/* Выбор ветки при варианте */}
+                      {inst.pendingBranchSelection && onCompleteProcessStepWithBranch && (() => {
+                          const step = (processVersion || process).steps.find(s => s.id === inst.pendingBranchSelection!.stepId);
+                          if (!step || step.stepType !== 'variant' || !step.branches?.length) return null;
+                          return (
+                              <div className="mb-6 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 rounded-xl p-6">
+                                  <h3 className="text-sm font-bold text-amber-800 dark:text-amber-200 uppercase mb-2">Выберите вариант перехода</h3>
+                                  <p className="text-xs text-amber-700 dark:text-amber-300 mb-4">Шаг «{step.title}» завершён. Выберите, куда направить процесс:</p>
+                                  <div className="flex flex-wrap gap-2">
+                                      {step.branches.map(b => {
+                                          const nextStep = (processVersion || process).steps.find(s => s.id === b.nextStepId);
+                                          return (
+                                              <button
+                                                  key={b.id}
+                                                  onClick={() => onCompleteProcessStepWithBranch(inst.id, b.nextStepId)}
+                                                  className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white text-sm font-medium rounded-lg transition-colors"
+                                              >
+                                                  {b.label}
+                                                  {nextStep && <span className="ml-1 opacity-80">→ {nextStep.title}</span>}
+                                              </button>
+                                          );
+                                      })}
+                                  </div>
+                              </div>
+                          );
+                      })()}
+
                       {/* Process Steps with Status */}
                       <div className="mb-6 bg-white dark:bg-[#252525] border border-gray-200 dark:border-[#333] rounded-xl p-6 shadow-sm">
                           <h2 className="text-sm font-bold text-gray-500 dark:text-gray-400 uppercase mb-4">Шаги процесса (версия {inst.processVersion || process.version || 1})</h2>
                           <div className="space-y-3">
                               {(processVersion || process).steps.map((step, idx) => {
-                                  const stepStatus = getStepStatus(step.id, inst);
+                                  const stepStatus = getStepStatus(step.id, inst, instanceTasks);
                                   const stepTask = instanceTasks.find(t => t.stepId === step.id);
                                   
                                   return (

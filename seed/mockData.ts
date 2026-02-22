@@ -362,12 +362,21 @@ export function runSeed(): void {
   ];
   localStoreService.setAll('financialPlannings', financialPlannings);
 
-  // BPM: оргструктура и 3–4 бизнес‑процесса с запущенными экземплярами
+  // BPM: оргструктура с 2 уровнями подчинённых (руководитель → подчинённые → их подчинённые)
   localStoreService.setAll('orgPositions', [
-    { id: 'pos1', title: 'Менеджер по продажам', departmentId: 'd1' },
-    { id: 'pos2', title: 'Руководитель отдела продаж', departmentId: 'd1', managerPositionId: undefined },
-    { id: 'pos3', title: 'Маркетолог', departmentId: 'd2' },
-    { id: 'pos4', title: 'Руководитель разработки', departmentId: 'd3' },
+    // Уровень 0: топ
+    { id: 'pos_ceo', title: 'Генеральный директор', departmentId: 'd1', order: 0 },
+    // Уровень 1: руководители отделов (подчинены CEO)
+    { id: 'pos2', title: 'Руководитель отдела продаж', departmentId: 'd1', managerPositionId: 'pos_ceo', order: 1 },
+    { id: 'pos_marketing', title: 'Руководитель маркетинга', departmentId: 'd2', managerPositionId: 'pos_ceo', order: 2 },
+    { id: 'pos4', title: 'Руководитель разработки', departmentId: 'd3', managerPositionId: 'pos_ceo', order: 3 },
+    // Уровень 2: подчинённые руководителей
+    { id: 'pos1', title: 'Менеджер по продажам', departmentId: 'd1', managerPositionId: 'pos2', order: 4 },
+    { id: 'pos_sales_junior', title: 'Стажёр по продажам', departmentId: 'd1', managerPositionId: 'pos1', order: 5 },
+    { id: 'pos3', title: 'Маркетолог', departmentId: 'd2', managerPositionId: 'pos_marketing', order: 6 },
+    { id: 'pos_smm', title: 'SMM-специалист', departmentId: 'd2', managerPositionId: 'pos3', order: 7 },
+    { id: 'pos_dev_lead', title: 'Тимлид', departmentId: 'd3', managerPositionId: 'pos4', order: 8 },
+    { id: 'pos_dev_junior', title: 'Junior разработчик', departmentId: 'd3', managerPositionId: 'pos_dev_lead', order: 9 },
   ]);
   const bp1Steps = [
     { id: 'bp1_s1', title: 'Подготовка КП', assigneeType: 'user', assigneeId: demoUserId, order: 1 },
