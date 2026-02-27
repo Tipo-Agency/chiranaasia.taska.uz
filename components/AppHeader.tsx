@@ -48,7 +48,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
 
   const getPageHeader = (view: string) => {
     switch(view) {
-      case 'home': return { title: 'Главная', icon: <Home size={20} /> };
+      case 'home': return { title: 'Рабочий стол', icon: <Home size={20} /> };
       case 'tasks': return { title: 'Задачи', icon: <CheckSquare size={20} /> };
       case 'inbox': return { title: 'Входящие', icon: <Bell size={20} /> };
       case 'search': return { title: 'Поиск', icon: <Search size={20} /> };

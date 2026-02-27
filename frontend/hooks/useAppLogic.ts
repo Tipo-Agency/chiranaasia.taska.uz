@@ -3,7 +3,6 @@ import { useState, useEffect, useRef } from 'react';
 import { api } from '../../backend/api';
 import { FAVICON_SVG_DATA_URI } from '../../components/AppIcons';
 import { storageService } from '../../services/storageService';
-// import { pollTelegramUpdates } from '../../services/telegramService'; // Отключено - polling делается только на сервере
 import { 
   notifyDealCreated, 
   notifyDealStatusChanged, 
@@ -14,9 +13,9 @@ import {
   notifyPurchaseRequestCreated,
   NotificationContext 
 } from '../../services/notificationService';
-import { leadSyncService } from '../../services/leadSyncService';
-import { Comment, Deal, Task, BusinessProcess, Client, Contract, PurchaseRequest, Doc, Meeting, SalesFunnel } from '../../types';
+import { Comment, Deal, Task, BusinessProcess, Client, Contract, PurchaseRequest, Doc, Meeting, SalesFunnel, Role } from '../../types';
 import { createDeleteHandler } from '../../utils/crudUtils';
+import { chatLocalService } from '../../services/chatLocalService';
 
 import { useAuthLogic } from './slices/useAuthLogic';
 import { useTaskLogic } from './slices/useTaskLogic';
@@ -251,43 +250,7 @@ export const useAppLogic = () => {
   // Данные хранятся локально, загружаются по требованию
 
   // Instagram синхронизация для воронок с подключенным Instagram
-  useEffect(() => {
-    if (!loadedModulesRef.current.has('crm')) return; // Работает только если CRM модуль загружен
-    
-    const instagramSyncInterval = setInterval(async () => {
-      try {
-        const result = await leadSyncService.syncAllInstagramFunnels();
-        
-        // Сохраняем новые сделки
-        if (result.newDeals.length > 0) {
-          const currentDeals = await api.deals.getAll();
-          const mergedDeals = [...currentDeals, ...result.newDeals];
-          crmSlice.setters.setDeals(mergedDeals);
-          await api.deals.updateAll(mergedDeals);
-          showNotification(`Новых лидов из Instagram: ${result.newDeals.length}`);
-        }
-        
-        // Обновляем существующие сделки
-        if (result.updatedDeals.length > 0) {
-          const currentDeals = await api.deals.getAll();
-          const updatedDealsMap = new Map(result.updatedDeals.map(d => [d.id, d]));
-          const mergedDeals = currentDeals.map(d => updatedDealsMap.get(d.id) || d);
-          crmSlice.setters.setDeals(mergedDeals);
-          await api.deals.updateAll(mergedDeals);
-          showNotification(`Обновлено сделок из Instagram: ${result.updatedDeals.length}`);
-        }
-        
-        // Показываем ошибки, если есть
-        if (result.errors.length > 0) {
-          console.warn('Instagram sync errors:', result.errors);
-        }
-      } catch (error) {
-        console.error('Error syncing Instagram leads:', error);
-      }
-    }, 60000); // Синхронизация каждую минуту (Instagram API имеет лимиты)
-
-    return () => clearInterval(instagramSyncInterval);
-  }, [loadedModules]); // Зависимость от loadedModules для пересоздания эффекта при загрузке CRM
+  // Внешняя синхронизация лидов (Instagram и т.п.) отключена в локальной демо-версии
 
   // Ленивая загрузка данных при открытии разделов (Уровень 2)
   useEffect(() => {
@@ -474,6 +437,17 @@ export const useAppLogic = () => {
       
       // Сохраняем задачу
       taskSlice.actions.saveTask(taskData, targetTableId);
+
+      // Новая задача для другого пользователя — системное сообщение в чат
+      if (!oldTask && authSlice.state.currentUser && taskData.assigneeId && taskData.assigneeId !== authSlice.state.currentUser.id) {
+          chatLocalService.addSystemMessageForEntity({
+              actorId: authSlice.state.currentUser.id,
+              targetUserId: taskData.assigneeId,
+              text: `Я поставил тебе задачу: ${taskData.title || 'без названия'}`,
+              entityType: 'task',
+              entityId: taskData.id,
+          });
+      }
       
       // Если задача процесса только что выполнена - переходим к следующему шагу или ожидаем выбор ветки
       if (oldTask && oldTask.processId && oldTask.processInstanceId && oldTask.stepId && !wasCompleted && isNowCompleted) {
@@ -486,12 +460,17 @@ export const useAppLogic = () => {
                   const currentStep = process.steps.find(s => s.id === instance.currentStepId);
                   if (!currentStep) return;
 
+                  // Отмечаем шаг как выполненный в истории экземпляра
+                  const completedSet = new Set(instance.completedStepIds || []);
+                  completedSet.add(currentStep.id);
+
                   // Шаг с вариантами: ожидаем выбор ветки (UI покажет модалку)
                   if (currentStep.stepType === 'variant' && currentStep.branches && currentStep.branches.length > 0) {
                       const updatedInstance = {
                           ...instance,
                           currentStepId: null,
-                          pendingBranchSelection: { stepId: currentStep.id }
+                          pendingBranchSelection: { stepId: currentStep.id },
+                          completedStepIds: Array.from(completedSet)
                       };
                       const updatedProcess: BusinessProcess = {
                           ...process,
@@ -540,7 +519,8 @@ export const useAppLogic = () => {
                               const updatedInstance = {
                                   ...instance,
                                   currentStepId: nextStep!.id,
-                                  taskIds: [...instance.taskIds, nextTask.id!]
+                                  taskIds: [...instance.taskIds, nextTask.id!],
+                                  completedStepIds: Array.from(completedSet)
                               };
 
                               const updatedProcess: BusinessProcess = {
@@ -596,6 +576,8 @@ export const useAppLogic = () => {
 
           if (!assigneeId) return;
 
+          const fromStepId = instance.pendingBranchSelection.stepId;
+
           const nextTask: Partial<Task> = {
               id: `task-${Date.now()}`,
               tableId: tasksTable.id,
@@ -613,11 +595,23 @@ export const useAppLogic = () => {
 
           taskSlice.actions.saveTask(nextTask, tasksTable.id);
 
+          const completedSet = new Set(instance.completedStepIds || []);
+          completedSet.add(fromStepId);
+
+          const chosenBranch = process.steps
+            .find(s => s.id === fromStepId)
+            ?.branches?.find(b => b.nextStepId === nextStep.id);
+
           const updatedInstance = {
               ...instance,
               currentStepId: nextStep.id,
               pendingBranchSelection: undefined,
-              taskIds: [...instance.taskIds, nextTask.id!]
+              taskIds: [...instance.taskIds, nextTask.id!],
+              completedStepIds: Array.from(completedSet),
+              branchHistory: [
+                ...(instance.branchHistory || []),
+                { stepId: fromStepId, branchId: chosenBranch?.id, nextStepId: nextStep.id },
+              ],
           };
 
           const updatedProcess: BusinessProcess = {
@@ -689,6 +683,16 @@ export const useAppLogic = () => {
             notificationPrefs: settingsSlice.state.notificationPrefs
           };
           notifyDealCreated(deal, assignee, { context }).catch(() => {});
+          // Новая сделка для менеджера — системное сообщение в чат
+          if (deal.assigneeId && deal.assigneeId !== authSlice.state.currentUser.id) {
+            chatLocalService.addSystemMessageForEntity({
+              actorId: authSlice.state.currentUser.id,
+              targetUserId: deal.assigneeId,
+              text: `Я создал для тебя сделку: ${deal.title}`,
+              entityType: 'deal',
+              entityId: deal.id,
+            });
+          }
         } else if (existing && oldStage !== deal.stage && authSlice.state.currentUser) {
           const context: NotificationContext = {
             currentUser: authSlice.state.currentUser,
@@ -744,6 +748,18 @@ export const useAppLogic = () => {
             department?.name || 'Не указан',
             { context }
           ).catch(() => {});
+          // Новая заявка на средства — отправляем системное сообщение первому администратору
+          const admins = authSlice.state.users.filter(u => u.role === Role.ADMIN);
+          const admin = admins.find(u => u.id !== authSlice.state.currentUser!.id) || admins[0];
+          if (admin) {
+            chatLocalService.addSystemMessageForEntity({
+              actorId: authSlice.state.currentUser.id,
+              targetUserId: admin.id,
+              text: `Я создал заявку на ${request.amount?.toLocaleString() || 0} UZS: ${request.description || ''}`,
+              entityType: 'request',
+              entityId: request.id,
+            });
+          }
         }
       },
       deletePurchaseRequest: financeSlice.actions.deletePurchaseRequest, saveFinancialPlanDocument: financeSlice.actions.saveFinancialPlanDocument, deleteFinancialPlanDocument: financeSlice.actions.deleteFinancialPlanDocument, saveFinancialPlanning: financeSlice.actions.saveFinancialPlanning, deleteFinancialPlanning: financeSlice.actions.deleteFinancialPlanning,

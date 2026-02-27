@@ -224,6 +224,10 @@ export interface ProcessInstance {
     taskIds: string[]; // ID задач, созданных для этого экземпляра
     /** Шаг с вариантами завершён — ожидание выбора ветки пользователем */
     pendingBranchSelection?: { stepId: string };
+    /** История выполненных шагов (по мере прохождения процесса) */
+    completedStepIds?: string[];
+    /** История выбранных веток для шагов типа variant */
+    branchHistory?: { stepId: string; branchId?: string; nextStepId: string }[];
 }
 
 export interface BusinessProcess {

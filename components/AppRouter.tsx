@@ -3,7 +3,7 @@ import React from 'react';
 import { 
   Task, User, Project, StatusOption, PriorityOption, ActivityLog, 
   Deal, Client, Contract, EmployeeInfo, Meeting, ContentPost, 
-  Doc, Folder, TableCollection,   Department, FinanceCategory, Fund,
+  Doc, Folder, TableCollection, Department, FinanceCategory, Fund,
   FinancePlan, PurchaseRequest, FinancialPlanDocument, FinancialPlanning, OrgPosition, BusinessProcess, SalesFunnel,
   ViewMode, AutomationRule, Warehouse, InventoryItem, StockBalance, StockMovement, InventoryRevision, OneTimeDeal, AccountsReceivable,
   NotificationPreferences
@@ -174,7 +174,17 @@ export const AppRouter: React.FC<AppRouterProps> = (props) => {
   }
 
   if (view === 'inbox') {
-      return <InboxPage activities={props.activities} users={props.users} onMarkAllRead={actions.markAllRead} />;
+      return (
+          <InboxPage
+              activities={props.activities}
+              users={props.users}
+              currentUser={props.currentUser}
+              tasks={props.allTasks}
+              deals={props.deals}
+              purchaseRequests={props.purchaseRequests}
+              onMarkAllRead={actions.markAllRead}
+          />
+      );
   }
 
   if (view === 'settings') {

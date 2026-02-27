@@ -127,15 +127,15 @@ const Sidebar: React.FC<SidebarProps> = ({
             )}
         </div>
 
-        {/* Standard Links - Порядок согласно TЗ */}
+        {/* Standard Links - Порядок согласно ТЗ */}
         <div className={`${isCollapsed ? 'px-2' : 'px-2'} py-1 space-y-0.5 mb-4 shrink-0`} style={{ overflow: 'visible' }}>
-            {/* 1. Главная */}
+            {/* 1. Рабочий стол */}
             <div 
                 onClick={() => handleNav(() => onNavigate('home'))}
                 className={`flex items-center ${isCollapsed ? 'justify-center' : 'gap-2'} ${isCollapsed ? 'px-2' : 'px-3'} py-1.5 rounded cursor-pointer transition-colors ${currentView === 'home' ? 'bg-notion-hover dark:bg-[#252525] text-notion-text dark:text-white font-medium' : 'text-notion-text/70 dark:text-gray-400 hover:bg-notion-hover dark:hover:bg-[#252525] hover:text-notion-text dark:hover:text-gray-200'}`}
-                title={isCollapsed ? "Главная" : ""}
+                title={isCollapsed ? "Рабочий стол" : ""}
             >
-            <Home size={18} /> {!isCollapsed && <span className="text-sm">Главная</span>}
+            <Home size={18} /> {!isCollapsed && <span className="text-sm">Рабочий стол</span>}
             </div>
             
             {/* 2. Задачи */}

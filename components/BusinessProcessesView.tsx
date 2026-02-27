@@ -278,6 +278,12 @@ const BusinessProcessesView: React.FC<BusinessProcessesViewProps> = ({
 
   const getStepStatus = (stepId: string, instance: ProcessInstance | null, instanceTasks: Task[]): 'pending' | 'active' | 'completed' => {
       if (!instance) return 'pending';
+
+      // Если шаг есть в истории выполненных — считаем completed
+      if (instance.completedStepIds && instance.completedStepIds.includes(stepId)) {
+          return 'completed';
+      }
+
       if (instance.status === 'completed') {
           const stepTask = instanceTasks.find(t => t.stepId === stepId);
           return stepTask && (stepTask.status === 'Выполнено' || stepTask.status === 'Done') ? 'completed' : 'pending';
@@ -831,13 +837,23 @@ const BusinessProcessesView: React.FC<BusinessProcessesViewProps> = ({
                               {(processVersion || process).steps.map((step, idx) => {
                                   const stepStatus = getStepStatus(step.id, inst, instanceTasks);
                                   const stepTask = instanceTasks.find(t => t.stepId === step.id);
+                                  const isOnPath =
+                                    (inst.completedStepIds?.includes(step.id) ||
+                                      stepStatus === 'active' ||
+                                      !!stepTask ||
+                                      inst.pendingBranchSelection?.stepId === step.id);
+                                  const chosenBranch = inst.branchHistory?.find(b => b.stepId === step.id);
                                   
                                   return (
                                       <div key={step.id} className="relative">
-                                          <div className={`bg-gray-50 dark:bg-[#2a2a2a] border rounded-lg p-4 flex items-center justify-between ${
-                                              stepStatus === 'completed' ? 'border-green-300 dark:border-green-700' :
-                                              stepStatus === 'active' ? 'border-blue-300 dark:border-blue-700' :
-                                              'border-gray-200 dark:border-[#333]'
+                                          <div className={`border rounded-lg p-4 flex items-center justify-between ${
+                                              stepStatus === 'completed'
+                                                ? 'bg-green-50 dark:bg-green-900/10 border-green-300 dark:border-green-700'
+                                                : stepStatus === 'active'
+                                                ? 'bg-blue-50 dark:bg-blue-900/10 border-blue-300 dark:border-blue-700'
+                                                : isOnPath
+                                                ? 'bg-gray-50 dark:bg-[#2a2a2a] border-gray-300 dark:border-[#444]'
+                                                : 'bg-gray-50/60 dark:bg-[#1f1f1f] border-gray-200/70 dark:border-[#333] opacity-70'
                                           }`}>
                                               <div className="flex items-center gap-3 flex-1">
                                                   <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold ${
@@ -851,6 +867,11 @@ const BusinessProcessesView: React.FC<BusinessProcessesViewProps> = ({
                                                       <div className="font-medium text-gray-900 dark:text-white text-sm">{step.title}</div>
                                                       {step.description && (
                                                           <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{step.description}</div>
+                                                      )}
+                                                      {chosenBranch && (
+                                                          <div className="text-[11px] text-amber-700 dark:text-amber-300 mt-1">
+                                                              Выбран вариант: {chosenBranch.branchId ? `ветка ${chosenBranch.branchId}` : 'без названия'}
+                                                          </div>
                                                       )}
                                                       {stepTask && (
                                                           <div className="mt-2">

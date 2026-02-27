@@ -2,8 +2,9 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Deal, Client, User, Comment, Task, Project, SalesFunnel, Meeting } from '../types';
 import { Plus, KanbanSquare, List as ListIcon, X, Send, MessageSquare, Instagram, Globe, UserPlus, Bot, Edit2, TrendingUp, CheckSquare, CheckCircle2, XCircle, Trash2, Calendar, Clock, Users } from 'lucide-react';
-import { sendClientMessage } from '../services/telegramService';
-import { instagramService } from '../services/instagramService';
+// Telegram / Instagram интеграции отключены в локальной демо-версии
+// import { sendClientMessage } from '../services/telegramService';
+// import { instagramService } from '../services/instagramService';
 import { DynamicIcon } from './AppIcons';
 import { TaskSelect } from './TaskSelect';
 import { Button } from './ui';
@@ -210,51 +211,18 @@ const SalesFunnelView: React.FC<SalesFunnelViewProps> = ({ deals, clients, users
       if (!chatMessage.trim() || !editingDeal) return;
       
       const deal = editingDeal;
-      let messageSent = false;
-
-      // Отправка через Telegram
-      if (deal.source === 'telegram' && deal.telegramChatId) {
-          await sendClientMessage(deal.telegramChatId, chatMessage);
-          messageSent = true;
-      }
-      
-      // Отправка через Instagram
-      if (deal.source === 'instagram' && deal.telegramChatId && deal.funnelId) {
-          const funnel = salesFunnels.find(f => f.id === deal.funnelId);
-          const instagramConfig = funnel?.sources?.instagram;
-          
-          if (instagramConfig?.enabled && instagramConfig?.instagramAccountId && instagramConfig?.accessToken) {
-              try {
-                  // telegramChatId для Instagram содержит conversation ID
-                  // Нужно извлечь user ID из conversation
-                  const conversationId = deal.telegramChatId;
-                  // Для Instagram нужно отправить через account ID и user ID
-                  // Пока используем conversation ID как есть
-                  await instagramService.sendMessage(
-                      instagramConfig.instagramAccountId,
-                      conversationId.split('_')[1] || conversationId, // User ID из conversation
-                      chatMessage,
-                      instagramConfig.accessToken
-                  );
-                  messageSent = true;
-              } catch (error) {
-                  console.error('Error sending Instagram message:', error);
-              }
-          }
-      }
-
-      if (messageSent || deal.source === 'manual' || deal.source === 'site' || deal.source === 'vk' || deal.source === 'recommendation') {
-          const c: Comment = { 
-              id: `c-${Date.now()}`, 
-              text: chatMessage, 
-              authorId: 'u1', 
-              createdAt: new Date().toISOString(), 
-              type: deal.source === 'instagram' ? 'telegram_out' : 'telegram_out' 
-          };
-          setComments([...comments, c]);
-          onSaveDeal({ ...deal, comments: [...comments, c] });
-          setChatMessage('');
-      }
+      // Локальный демо-режим: просто добавляем комментарий в сделку, без внешних API
+      const c: Comment = { 
+          id: `c-${Date.now()}`, 
+          text: chatMessage, 
+          authorId: currentUser?.id || 'demo-user', 
+          createdAt: new Date().toISOString(), 
+          type: 'comment' 
+      };
+      const nextComments = [...(comments || []), c];
+      setComments(nextComments);
+      onSaveDeal({ ...deal, comments: nextComments });
+      setChatMessage('');
   };
 
   const onDragStart = (e: React.DragEvent, id: string) => { setDraggedDealId(id); e.dataTransfer.effectAllowed = 'move'; };
