@@ -21,6 +21,7 @@ import {
   Project,
   StatusOption,
   PriorityOption,
+  Role,
 } from '../../types';
 import {
   HomeHeader,
@@ -119,6 +120,33 @@ export const HomePage: React.FC<HomePageProps> = ({
       (t.assigneeId === currentUser?.id || t.assigneeIds?.includes(currentUser?.id))
   );
 
+  // Агрегированные счётчики для центра коммуникаций
+  const incomingRequests =
+    currentUser.role === Role.ADMIN
+      ? (purchaseRequests || []).filter(r => r && r.status === 'pending').length
+      : 0;
+
+  const incomingDeals = (deals || []).filter(
+    d => d && d.assigneeId === currentUser.id && !d.isArchived
+  ).length;
+
+  const outgoingTasks = (tasks || []).filter(
+    t =>
+      t &&
+      t.createdByUserId === currentUser.id &&
+      !t.isArchived &&
+      t.assigneeId &&
+      t.assigneeId !== currentUser.id
+  ).length;
+
+  const outgoingRequests = (purchaseRequests || []).filter(
+    r => r && r.requesterId === currentUser.id
+  ).length;
+
+  const unreadNotifications = (recentActivity || []).filter(a => !a.read).length;
+  const incomingTotal = myTasks.length + incomingRequests + incomingDeals;
+  const outgoingTotal = outgoingTasks + outgoingRequests;
+
   if (!currentUser) {
     return (
       <PageLayout>
@@ -159,7 +187,58 @@ export const HomePage: React.FC<HomePageProps> = ({
               accountsReceivable={accountsReceivable}
             />
 
-            {/* Main Content: задачи и сделки/встречи (без блока последней активности) */}
+            {/* Мини-дашборд по коммуникациям + переход в центр коммуникаций */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="bg-white dark:bg-[#252525] border border-gray-200 dark:border-[#333] rounded-xl p-4 flex flex-col justify-between">
+                <div>
+                  <div className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase mb-1">
+                    Входящие
+                  </div>
+                  <div className="text-2xl font-bold text-gray-900 dark:text-white mb-1">
+                    {incomingTotal}
+                  </div>
+                  <div className="text-[11px] text-gray-500 dark:text-gray-400">
+                    Задачи, заявки и сделки, где ты ответственный
+                  </div>
+                </div>
+              </div>
+              <div className="bg-white dark:bg-[#252525] border border-gray-200 dark:border-[#333] rounded-xl p-4 flex flex-col justify-between">
+                <div>
+                  <div className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase mb-1">
+                    Исходящие
+                  </div>
+                  <div className="text-2xl font-bold text-gray-900 dark:text-white mb-1">
+                    {outgoingTotal}
+                  </div>
+                  <div className="text-[11px] text-gray-500 dark:text-gray-400">
+                    То, что ты создал для других (задачи и заявки)
+                  </div>
+                </div>
+              </div>
+              <div className="bg-white dark:bg-[#252525] border border-gray-200 dark:border-[#333] rounded-xl p-4 flex flex-col justify-between">
+                <div>
+                  <div className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase mb-1">
+                    Уведомления
+                  </div>
+                  <div className="text-2xl font-bold text-gray-900 dark:text-white mb-1">
+                    {unreadNotifications}
+                  </div>
+                  <div className="text-[11px] text-gray-500 dark:text-gray-400 mb-2">
+                    События по связанным с тобой сущностям
+                  </div>
+                </div>
+                <div className="flex justify-end">
+                  <button
+                    onClick={onNavigateToInbox}
+                    className="px-3 py-1.5 text-xs font-medium rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition-colors"
+                  >
+                    Открыть центр коммуникаций
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Основной контент: задачи и сделки/встречи */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
               <div className="flex flex-col">
                 <MyTasksSection
