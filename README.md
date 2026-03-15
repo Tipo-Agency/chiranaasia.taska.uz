@@ -2,7 +2,7 @@
 
 ## Структура
 
-- `apps/web` — frontend (Vite + React)
+- `apps/web` — frontend (Vite + React, статический SPA; в проде nginx раздаёт билд из `/var/www/frontend`, не Next.js)
 - `apps/api` — backend (FastAPI + PostgreSQL + Alembic)
 - `apps/bot` — Telegram bot
 - `ops` — деплой/инфра (nginx, скрипты)
@@ -39,6 +39,7 @@
 | `BACKEND_URL` | рекомендуется | URL API для бота (например `https://ваш-домен.uz/api` или `http://127.0.0.1:8000`) |
 | `RUN_MIGRATE_FIRESTORE` | нет | Значение `1` — при деплое запускать миграцию Firestore → Postgres |
 | `FIREBASE_CREDENTIALS` | если миграция | Путь на сервере к JSON ключа Firebase (например `/var/www/tipa.taska.uz/firebase-key.json`). Файл нужно один раз положить на сервер вручную. |
+| `NGINX_SITE_NAME` | нет | Имя сайта nginx (по умолчанию `tipa.taska.uz`). Конфиг из репо копируется в `/etc/nginx/sites-available/$NGINX_SITE_NAME` при каждом деплое. |
 
 **После первого деплоя:**  
 1. Убедиться, что backend и БД подняты: `docker compose ps` (или `docker-compose ps`).  

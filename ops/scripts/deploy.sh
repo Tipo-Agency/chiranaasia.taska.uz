@@ -200,11 +200,20 @@ else
   echo "ℹ️  Миграция Firestore не запущена (задайте RUN_MIGRATE_FIRESTORE и FIREBASE_CREDENTIALS для автозапуска или выполните вручную после деплоя)"
 fi
 
-# 5. Перезагружаем nginx
+# 5. Деплой конфига nginx и перезагрузка (статика + /api/ на 8003)
 echo ""
-echo "🔄 Step 5: Reloading nginx..."
-nginx -t || echo "⚠️ nginx config test failed"
-systemctl reload nginx || echo "⚠️ nginx reload failed"
+echo "🌐 Step 5: Deploying nginx config and reloading..."
+NGINX_SITE_NAME="${NGINX_SITE_NAME:-tipa.taska.uz}"
+if [ -f "ops/nginx/nginx.conf" ]; then
+  sudo cp ops/nginx/nginx.conf "/etc/nginx/sites-available/$NGINX_SITE_NAME" || true
+  sudo ln -sf "/etc/nginx/sites-available/$NGINX_SITE_NAME" "/etc/nginx/sites-enabled/$NGINX_SITE_NAME" 2>/dev/null || true
+  echo "   Config: ops/nginx/nginx.conf → /etc/nginx/sites-available/$NGINX_SITE_NAME"
+fi
+if sudo nginx -t 2>/dev/null; then
+  sudo systemctl reload nginx && echo "✅ Nginx reloaded (root=/var/www/frontend, /api/ → 8003)"
+else
+  echo "⚠️ nginx -t failed, reload skipped"
+fi
 
 # Финальный статус
 echo ""
