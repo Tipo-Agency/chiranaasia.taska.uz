@@ -21,7 +21,8 @@ import {
   Users,
   Archive,
   Layers,
-  Globe
+  Globe,
+  ShieldCheck
 } from 'lucide-react';
 import { TableCollection, User, Role } from '../types';
 import { LogoIcon, DynamicIcon } from './AppIcons';
@@ -32,7 +33,7 @@ interface SidebarProps {
   tables: TableCollection[];
   activeTableId: string;
   onSelectTable: (id: string) => void;
-  onNavigate: (view: 'home' | 'tasks' | 'inbox' | 'search' | 'clients' | 'employees' | 'sales-funnel' | 'finance' | 'business-processes' | 'analytics' | 'settings' | 'sites' | 'inventory') => void;
+  onNavigate: (view: 'home' | 'tasks' | 'inbox' | 'search' | 'clients' | 'employees' | 'sales-funnel' | 'finance' | 'business-processes' | 'analytics' | 'settings' | 'sites' | 'inventory' | 'admin') => void;
   currentView: string;
   currentUser: User;
   onCreateTable: () => void;
@@ -229,6 +230,17 @@ const Sidebar: React.FC<SidebarProps> = ({
             >
                 <PieChart size={18} /> {!isCollapsed && <span className="text-sm">Аналитика и отчеты</span>}
             </div>
+
+            {/* Админ-панель (только для администраторов) */}
+            {currentUser.role === Role.ADMIN && (
+                <div 
+                    onClick={() => handleNav(() => onNavigate('admin'))}
+                    className={`flex items-center ${isCollapsed ? 'justify-center' : 'gap-2'} ${isCollapsed ? 'px-2' : 'px-3'} py-1.5 rounded cursor-pointer transition-colors ${currentView === 'admin' ? 'bg-notion-hover dark:bg-[#252525] text-notion-text dark:text-white font-medium' : 'text-notion-text/70 dark:text-gray-400 hover:bg-notion-hover dark:hover:bg-[#252525] hover:text-notion-text dark:hover:text-gray-200'}`}
+                    title={isCollapsed ? "Админ-панель" : ""}
+                >
+                    <ShieldCheck size={18} /> {!isCollapsed && <span className="text-sm">Админ-панель</span>}
+                </div>
+            )}
         </div>
 
         {/* Tables List with Grouping */}

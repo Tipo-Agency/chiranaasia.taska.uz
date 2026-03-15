@@ -18,17 +18,9 @@ jobs:
           key: ${{ secrets.SERVER_SSH_KEY }}
           script: |
             cd ${{ secrets.SERVER_PATH }}
-            # Сначала обновляем код, чтобы скрипт был доступен
-            git fetch origin
-            git reset --hard origin/main
-            # Теперь вызываем скрипт деплоя
             chmod +x ops/scripts/deploy.sh
             SERVER_PATH="${{ secrets.SERVER_PATH }}" \
             TELEGRAM_BOT_TOKEN="${{ secrets.TELEGRAM_BOT_TOKEN }}" \
             BACKEND_URL="${{ secrets.BACKEND_URL }}" \
-            RUN_MIGRATE_FIRESTORE="${{ secrets.RUN_MIGRATE_FIRESTORE }}" \
-            FIREBASE_CREDENTIALS="${{ secrets.FIREBASE_CREDENTIALS }}" \
-            ADMIN_LOGIN="${{ secrets.ADMIN_LOGIN }}" \
-            ADMIN_PASSWORD="${{ secrets.ADMIN_PASSWORD }}" \
             NGINX_SITE_NAME="${{ secrets.NGINX_SITE_NAME }}" \
             ./ops/scripts/deploy.sh

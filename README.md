@@ -15,7 +15,10 @@
 2. **REFACTORING.md** — что уже отрефакторено во фронте (утилиты, хуки, константы).
 3. **docs/MIGRATION_FROM_FIRESTORE_TO_POSTGRES.md** — пошаговая миграция данных с Firestore на Postgres.
 4. **docs/ARCHITECTURE.md** — актуальная архитектура (Postgres, API, бот).
-5. Остальное в `docs/` и `docs/tz/` — legacy и частные ТЗ по мере надобности.
+5. **docs/ADMIN_PANEL.md** — админ-панель (БД, логи, нагрузка, тесты).
+6. **docs/DEPLOY_FLOW.md** — как работает автодеплой (пошагово, что трогается, что сохраняется).
+7. **docs/WORKFLOW_AND_ENTITIES.md** — рабочий процесс (кто что меняет), список сущностей и идея ТЗ по каждой.
+8. Остальное в `docs/` и `docs/tz/` — legacy и частные ТЗ по мере надобности.
 
 ## Папка .auto-claude
 
@@ -25,7 +28,7 @@
 
 При пуше в `main` срабатывает GitHub Actions: SSH на сервер и выполняется `ops/scripts/deploy.sh`.
 
-**Что нужно на сервере:** Docker (для Postgres + backend), Node.js (для сборки фронта), nginx. Конфиг nginx — `ops/nginx/nginx.conf` (проксирование `/api` и `/health` на `127.0.0.1:8000`).
+**Что нужно на сервере:** Docker (Postgres — порт 5433, backend — 8003), Node.js (для сборки фронта), nginx. Конфиг — `ops/nginx/nginx.conf`: статика из `/var/www/frontend`, проксирование `/api/` и `/health` на `127.0.0.1:8003`. HTTP (80) и HTTPS (443) с сертификатами Certbot, `server_name tipa.taska.uz`.
 
 **Secrets в GitHub (Settings → Secrets and variables → Actions):**
 
@@ -36,36 +39,14 @@
 | `SERVER_SSH_KEY` | да | Приватный SSH-ключ |
 | `SERVER_PATH` | да | Путь к репо на сервере (например `/var/www/tipa.taska.uz`) |
 | `TELEGRAM_BOT_TOKEN` | да | Токен Telegram-бота |
-| `BACKEND_URL` | рекомендуется | URL API для бота (например `https://ваш-домен.uz/api` или `http://127.0.0.1:8000`) |
-| `RUN_MIGRATE_FIRESTORE` | нет | Значение `1` — при деплое запускать миграцию Firestore → Postgres |
-| `FIREBASE_CREDENTIALS` | если миграция | Путь на сервере к JSON ключа Firebase (например `/var/www/tipa.taska.uz/firebase-key.json`). Файл нужно один раз положить на сервер вручную. |
-| `ADMIN_LOGIN` | нет | Логин админа для автосоздания при деплое (например `donskikhas`). Работает вместе с `ADMIN_PASSWORD`. |
-| `ADMIN_PASSWORD` | нет | Пароль админа для автосоздания/обновления при деплое. Задайте вместе с `ADMIN_LOGIN`. |
-| `NGINX_SITE_NAME` | нет | Имя сайта nginx (по умолчанию `tipa.taska.uz`). Конфиг из репо копируется в `/etc/nginx/sites-available/$NGINX_SITE_NAME` при каждом деплое. |
+| `BACKEND_URL` | рекомендуется | URL API для бота (например `http://127.0.0.1:8003` или полный URL) |
+| `NGINX_SITE_NAME` | нет | Имя сайта nginx (по умолчанию `tipa.taska.uz`). Конфиг копируется в `/etc/nginx/sites-available/$NGINX_SITE_NAME`, затем `nginx -t` и `reload`. |
 
-**После первого деплоя:**  
-1. Убедиться, что backend и БД подняты: `docker compose ps` (или `docker-compose ps`).  
-2. Если миграция не запускалась автоматически — один раз выполнить миграцию (см. ниже).  
-3. Проверить сайт, логин, задачи, CRM; при появлении багов — чинить по логам (Настройки → Логи, или `GET /api/system/logs`).
-
-**Если при входе 401 «Invalid login or password»:** проверьте, что в GitHub Secrets заданы `ADMIN_LOGIN` и `ADMIN_PASSWORD` и что в логе деплоя (Step 4c) нет ошибки от `create_admin.py`. Если админ не создаётся при деплое — создайте вручную на сервере: `cd $SERVER_PATH && export DATABASE_URL="postgresql+asyncpg://taska:taska@127.0.0.1:5433/taska" ADMIN_LOGIN=donskikhas ADMIN_PASSWORD=ваш_пароль python3 scripts/create_admin.py`.
+**После деплоя:** убедиться, что backend и БД подняты (`docker compose ps`), проверить сайт и логи (Настройки → Логи или `GET /api/system/logs`). Админа и пользователей создают вручную на сервере или через приложение (если есть регистрация).
 
 Подробный чеклист и устранение неполадок: [docs/DEPLOY_AND_MIGRATION.md](docs/DEPLOY_AND_MIGRATION.md).
 
-## Миграция Firestore → Postgres (однократно после деплоя)
-
-Чтобы перенести данные из Firebase Firestore в новую БД Postgres, после первой установки бэкенда на сервере запустите скрипт миграции. Подробности и переменные окружения — в [scripts/README.md](scripts/README.md) и [docs/MIGRATION_FROM_FIRESTORE_TO_POSTGRES.md](docs/MIGRATION_FROM_FIRESTORE_TO_POSTGRES.md).
-
-Кратко:
-
-```bash
-pip install -r scripts/requirements-migrate.txt
-export BACKEND_URL=http://localhost:8000
-export FIREBASE_CREDENTIALS=/path/to/firebase-service-account.json
-python scripts/migrate_firestore_to_postgres.py
-```
-
-Опция `--from-json ./export` — если данные уже экспортированы в JSON. Опция `--dry-run` — только подсчёт записей без записи в API.
+Миграция Firestore → Postgres уже выполнена. Скрипты в `scripts/` и описание в [docs/MIGRATION_FROM_FIRESTORE_TO_POSTGRES.md](docs/MIGRATION_FROM_FIRESTORE_TO_POSTGRES.md) сохранены для справки.
 
 ## Запуск локально (быстро)
 

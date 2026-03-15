@@ -32,6 +32,11 @@ export const useAuthLogic = (showNotification: (msg: string) => void) => {
   const logout = () => {
     setCurrentUser(null);
     storageService.clearActiveUserId();
+    try {
+      sessionStorage.removeItem('access_token');
+    } catch {
+      // ignore
+    }
   };
 
   const updateUsers = (newUsers: User[]) => {

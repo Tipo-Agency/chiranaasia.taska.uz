@@ -34,6 +34,13 @@ import { getTodayLocalDate } from '../../utils/dateUtils';
 
 type InboxTab = 'incoming' | 'outgoing' | 'messages';
 
+function formatWeekLabel(weekStart: string): string {
+  const d = new Date(weekStart + 'T12:00:00');
+  const end = new Date(d);
+  end.setDate(end.getDate() + 6);
+  return `${d.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' })} – ${end.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short', year: 'numeric' })}`;
+}
+
 interface HomePageProps {
   currentUser: User;
   tasks: Task[];
@@ -61,6 +68,7 @@ interface HomePageProps {
   onNavigateToTasks: () => void;
   onNavigateToMeetings: () => void;
   onNavigateToDeals?: () => void;
+  onNavigateToDocs?: () => void;
   onSendMessage?: (payload: { text: string; attachments?: MessageAttachment[]; recipientId?: string | null }) => void;
   onLoadMessages?: () => void;
 }
@@ -91,10 +99,22 @@ export const HomePage: React.FC<HomePageProps> = ({
   onNavigateToTasks,
   onNavigateToMeetings,
   onNavigateToDeals,
+  onNavigateToDocs,
   onSendMessage,
 }) => {
   const [showBirthdayModal, setShowBirthdayModal] = useState(false);
   const [inboxTab, setInboxTab] = useState<InboxTab>('incoming');
+  const [latestWeeklyPlan, setLatestWeeklyPlan] = useState<{ weekStart: string; taskCount: number } | null>(null);
+
+  React.useEffect(() => {
+    if (!currentUser?.id) return;
+    import('../../backend/api').then(({ api }) => {
+      api.weeklyPlans.getMyLatest(currentUser.id).then((plan) => {
+        if (plan) setLatestWeeklyPlan({ weekStart: plan.weekStart, taskCount: (plan.taskIds || []).length });
+        else setLatestWeeklyPlan(null);
+      }).catch(() => setLatestWeeklyPlan(null));
+    });
+  }, [currentUser?.id]);
 
   React.useEffect(() => {
     const info = employeeInfos.find((e) => e.userId === currentUser?.id);
@@ -199,6 +219,31 @@ export const HomePage: React.FC<HomePageProps> = ({
                 </p>
               </div>
             </div>
+
+            {/* Последний недельный план */}
+            {onNavigateToDocs && (
+              <div className="bg-white dark:bg-[#252525] border border-gray-200 dark:border-[#333] rounded-2xl shadow-sm p-4">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <h3 className="font-semibold text-gray-900 dark:text-white">Мой недельный план</h3>
+                    {latestWeeklyPlan ? (
+                      <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
+                        {formatWeekLabel(latestWeeklyPlan.weekStart)} · {latestWeeklyPlan.taskCount} задач
+                      </p>
+                    ) : (
+                      <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">План на неделю не создан</p>
+                    )}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={onNavigateToDocs}
+                    className="px-4 py-2 rounded-lg bg-[#3337AD] text-white text-sm font-medium hover:bg-[#292b8a]"
+                  >
+                    {latestWeeklyPlan ? 'Открыть' : 'Создать'}
+                  </button>
+                </div>
+              </div>
+            )}
 
             {/* Обзор: метрики, задачи, сделки, встречи */}
             <StatsCards

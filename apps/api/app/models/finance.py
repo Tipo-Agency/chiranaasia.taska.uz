@@ -95,3 +95,36 @@ class FinancialPlanning(Base):
     approved_at = Column(String(50), nullable=True)
     notes = Column(String(500), nullable=True)
     is_archived = Column(Boolean, default=False)
+
+
+class BankStatement(Base):
+    """Выписка банка (загруженный файл / период)."""
+    __tablename__ = "bank_statements"
+
+    id = Column(String(36), primary_key=True, default=gen_id)
+    name = Column(String(255), nullable=True)  # имя файла или подпись
+    period = Column(String(20), nullable=True)  # например YYYY-MM
+    created_at = Column(String(50), nullable=False)
+
+
+class BankStatementLine(Base):
+    """Строка выписки: дата, описание, сумма (приход/расход)."""
+    __tablename__ = "bank_statement_lines"
+
+    id = Column(String(36), primary_key=True, default=gen_id)
+    statement_id = Column(String(36), nullable=False)  # FK → bank_statements.id
+    line_date = Column(String(20), nullable=False)  # YYYY-MM-DD
+    description = Column(String(500), nullable=True)
+    amount = Column(String(50), nullable=False)  # число как строка
+    line_type = Column(String(10), nullable=False)  # 'in' | 'out'
+
+
+class IncomeReport(Base):
+    """Отчёт по приходам (сводка по дням для сверки с выписками)."""
+    __tablename__ = "income_reports"
+
+    id = Column(String(36), primary_key=True, default=gen_id)
+    period = Column(String(20), nullable=False)  # YYYY-MM
+    data = Column(JSONB, default=dict)  # например {"2024-01-15": 1000.5, ...} — дата -> сумма прихода
+    created_at = Column(String(50), nullable=False)
+    updated_at = Column(String(50), nullable=True)

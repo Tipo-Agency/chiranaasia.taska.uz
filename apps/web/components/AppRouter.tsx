@@ -29,6 +29,7 @@ import { MeetingsModule } from './modules/MeetingsModule';
 import { DocumentsModule } from './modules/DocumentsModule';
 import { SitesView } from './sites/SitesView';
 import InventoryView from './InventoryView';
+import { AdminView } from './admin/AdminView';
 
 interface AppRouterProps {
   currentView: string;
@@ -137,6 +138,7 @@ export const AppRouter: React.FC<AppRouterProps> = (props) => {
               onNavigateToTasks={() => actions.setCurrentView('tasks')}
               onNavigateToMeetings={() => actions.setCurrentView('meetings')}
               onNavigateToDeals={() => actions.setCurrentView('sales-funnel')}
+              onNavigateToDocs={() => actions.setCurrentView('docs')}
               clients={props.clients}
               accountsReceivable={props.accountsReceivable}
           />
@@ -193,6 +195,10 @@ export const AppRouter: React.FC<AppRouterProps> = (props) => {
               onMarkAllRead={actions.markAllRead}
           />
       );
+  }
+
+  if (view === 'admin') {
+      return <AdminView />;
   }
 
   if (view === 'settings') {
@@ -343,7 +349,7 @@ export const AppRouter: React.FC<AppRouterProps> = (props) => {
           // Добавляем в таблицы, но не сохраняем (чтобы не показывалась в настройках)
           // Модуль будет работать с этой фиктивной таблицей
       }
-      return <DocumentsModule table={docsTable} docs={props.docs} folders={props.folders} tables={props.tables} tasks={props.allTasks} actions={actions} />;
+      return <DocumentsModule table={docsTable} docs={props.docs} folders={props.folders} tables={props.tables} tasks={props.allTasks} users={props.users} currentUser={props.currentUser} actions={actions} />;
   }
 
   if (view === 'sites') {
@@ -407,6 +413,7 @@ export const AppRouter: React.FC<AppRouterProps> = (props) => {
           }}
           onNavigateToTasks={() => actions.setCurrentView('tasks')}
           onNavigateToMeetings={() => actions.setCurrentView('meetings')}
+          onNavigateToDocs={() => actions.setCurrentView('docs')}
       />
   );
 };

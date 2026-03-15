@@ -22,6 +22,7 @@ import {
   accountsReceivableEndpoint,
   docsEndpoint,
   foldersEndpoint,
+  weeklyPlansEndpoint,
   meetingsEndpoint,
   contentPostsEndpoint,
   departmentsEndpoint,
@@ -60,6 +61,7 @@ export const api = {
 
   docs: docsEndpoint,
   folders: foldersEndpoint,
+  weeklyPlans: weeklyPlansEndpoint,
   meetings: meetingsEndpoint,
   contentPosts: contentPostsEndpoint,
 

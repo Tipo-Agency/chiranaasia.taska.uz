@@ -23,13 +23,14 @@ export const LoginView: React.FC<LoginViewProps> = ({ users, onLogin }) => {
         }
 
         try {
-            console.log('Login attempt (backend):', { login: trimmedLogin, usersCount: users.length });
             const result = await authEndpoint.login(trimmedLogin, trimmedPassword);
             const user = result.user as User;
+            if (typeof result.access_token === 'string') {
+                sessionStorage.setItem('access_token', result.access_token);
+            }
             setError('');
             onLogin(user);
-        } catch (e) {
-            console.error('Login error:', e);
+        } catch {
             setError('Неверный логин или пароль');
         }
     };

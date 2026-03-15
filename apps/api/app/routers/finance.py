@@ -1,12 +1,13 @@
-"""Finance router - categories, funds, plan, requests, etc."""
+"""Finance router - categories, funds, plan, requests, bank statements, income reports."""
 from fastapi import APIRouter, Depends
-from sqlalchemy import select
+from sqlalchemy import select, delete
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
 from app.models.finance import (
     FinanceCategory, Fund, FinancePlan, PurchaseRequest,
     FinancialPlanDocument, FinancialPlanning,
+    BankStatement, BankStatementLine, IncomeReport,
 )
 
 router = APIRouter(prefix="/finance", tags=["finance"])
@@ -313,6 +314,128 @@ async def update_financial_plannings(plannings: list[dict], db: AsyncSession = D
                 approved_at=p.get("approvedAt"),
                 notes=p.get("notes"),
                 is_archived=p.get("isArchived", False),
+            ))
+    await db.commit()
+    return {"ok": True}
+
+
+# --- Bank statements (выписки) ---
+
+def _row_to_statement(row, lines=None):
+    return {
+        "id": row.id,
+        "name": row.name,
+        "period": row.period,
+        "createdAt": row.created_at,
+        "lines": lines or [],
+    }
+
+
+def _row_to_statement_line(row):
+    return {
+        "id": row.id,
+        "statementId": row.statement_id,
+        "lineDate": row.line_date,
+        "description": row.description,
+        "amount": float(row.amount) if row.amount and str(row.amount).replace(".", "").replace("-", "").isdigit() else row.amount,
+        "lineType": row.line_type,
+    }
+
+
+@router.get("/bank-statements")
+async def get_bank_statements(db: AsyncSession = Depends(get_db)):
+    result = await db.execute(select(BankStatement).order_by(BankStatement.created_at))
+    statements = result.scalars().all()
+    out = []
+    for st in statements:
+        lines_r = await db.execute(select(BankStatementLine).where(BankStatementLine.statement_id == st.id))
+        lines = [_row_to_statement_line(l) for l in lines_r.scalars().all()]
+        out.append(_row_to_statement(st, lines))
+    return out
+
+
+@router.put("/bank-statements")
+async def update_bank_statements(payload: list[dict], db: AsyncSession = Depends(get_db)):
+    for s in payload:
+        sid = s.get("id")
+        if not sid:
+            continue
+        existing = await db.get(BankStatement, sid)
+        if existing:
+            existing.name = s.get("name", existing.name)
+            existing.period = s.get("period", existing.period)
+            existing.created_at = s.get("createdAt", existing.created_at)
+        else:
+            db.add(BankStatement(
+                id=sid,
+                name=s.get("name"),
+                period=s.get("period"),
+                created_at=s.get("createdAt", ""),
+            ))
+        await db.flush()
+        lines = s.get("lines", [])
+        await db.execute(delete(BankStatementLine).where(BankStatementLine.statement_id == sid))
+        for ln in lines:
+            lid = ln.get("id") or __import__("uuid").uuid4().__str__()
+            db.add(BankStatementLine(
+                id=lid,
+                statement_id=sid,
+                line_date=ln.get("lineDate", ""),
+                description=ln.get("description"),
+                amount=str(ln.get("amount", 0)),
+                line_type=ln.get("lineType", "in"),
+            ))
+    await db.commit()
+    return {"ok": True}
+
+
+@router.delete("/bank-statements/{statement_id}")
+async def delete_bank_statement(statement_id: str, db: AsyncSession = Depends(get_db)):
+    await db.execute(delete(BankStatementLine).where(BankStatementLine.statement_id == statement_id))
+    st = await db.get(BankStatement, statement_id)
+    if st:
+        await db.delete(st)
+    await db.commit()
+    return {"ok": True}
+
+
+# --- Income reports (отчёты по приходам) ---
+
+def _row_to_income_report(row):
+    return {
+        "id": row.id,
+        "period": row.period,
+        "data": row.data or {},
+        "createdAt": row.created_at,
+        "updatedAt": row.updated_at,
+    }
+
+
+@router.get("/income-reports")
+async def get_income_reports(db: AsyncSession = Depends(get_db)):
+    result = await db.execute(select(IncomeReport))
+    return [_row_to_income_report(r) for r in result.scalars().all()]
+
+
+@router.put("/income-reports")
+async def update_income_reports(payload: list[dict], db: AsyncSession = Depends(get_db)):
+    for r in payload:
+        rid = r.get("id")
+        if not rid:
+            continue
+        existing = await db.get(IncomeReport, rid)
+        if existing:
+            existing.period = r.get("period", existing.period)
+            existing.data = r.get("data", existing.data or {})
+            existing.created_at = r.get("createdAt", existing.created_at)
+            existing.updated_at = r.get("updatedAt")
+        else:
+            db.add(IncomeReport(
+                id=rid,
+                period=r.get("period", ""),
+                data=r.get("data", {}),
+                created_at=r.get("createdAt", ""),
+                updated_at=r.get("updatedAt"),
             ))
     await db.commit()
     return {"ok": True}

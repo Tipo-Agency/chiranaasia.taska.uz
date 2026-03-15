@@ -11,7 +11,8 @@
     "types:api": "openapi-typescript http://localhost:8000/openapi.json -o apps/web/types/api.d.ts",
     "docker:up": "docker-compose up -d",
     "docker:tools": "docker-compose --profile tools up -d",
-    "deploy": "git push origin main"
+    "deploy": "git push origin main",
+    "push": "git push origin main"
   },
   "devDependencies": {
     "openapi-typescript": "^7.13.0"

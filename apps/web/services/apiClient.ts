@@ -6,11 +6,22 @@
 const env = typeof import.meta !== 'undefined' && (import.meta as { env?: Record<string, string> }).env;
 const API_BASE = (env?.VITE_API_URL ?? '/api').replace(/\/$/, '');
 
+function getAuthHeaders(): Record<string, string> {
+  try {
+    const token = typeof window !== 'undefined' ? sessionStorage.getItem('access_token') : null;
+    if (token) return { Authorization: `Bearer ${token}` };
+  } catch {
+    // ignore
+  }
+  return {};
+}
+
 async function fetchJson<T>(url: string, options?: RequestInit): Promise<T> {
   const res = await fetch(`${API_BASE}${url}`, {
     ...options,
     headers: {
       'Content-Type': 'application/json',
+      ...getAuthHeaders(),
       ...(options?.headers || {}),
     },
     credentials: 'include',
@@ -52,6 +63,19 @@ export const systemEndpoint = {
     const q = sp.toString();
     return get<Array<{ id: number; created_at: string; level: string; message: string; logger_name?: string; path?: string; request_id?: string; payload?: string }>>(`/system/logs${q ? `?${q}` : ''}`);
   },
+};
+
+// Admin (requires ADMIN role + JWT)
+export const adminEndpoint = {
+  getTables: () => get<Array<{ name: string; row_count?: number }>>('/admin/tables'),
+  getTableData: (tableName: string, offset = 0, limit = 100) =>
+    get<{ table: string; columns: string[]; rows: Record<string, unknown>[]; total: number; offset: number; limit: number }>(
+      `/admin/tables/${encodeURIComponent(tableName)}?offset=${offset}&limit=${limit}`
+    ),
+  getHealth: () => get<{ status: string; version: string; db: string; db_error?: string }>('/admin/health'),
+  getStats: () =>
+    get<{ tables: Array<{ table_name: string; row_count: number }>; db_size_mb?: number }>('/admin/stats'),
+  runTests: () => post<{ ok: boolean; output: string; exit_code: number }>('/admin/tests/run'),
 };
 
 // Auth / Users
@@ -171,6 +195,46 @@ export const foldersEndpoint = {
   updateAll: (folders: unknown[]) => put<{ ok: boolean }>('/folders', folders),
 };
 
+// Weekly plans and protocols
+export interface WeeklyPlanApi {
+  id: string;
+  userId: string;
+  weekStart: string;
+  taskIds: string[];
+  notes?: string;
+  createdAt: string;
+  updatedAt?: string;
+}
+
+export interface ProtocolApi {
+  id: string;
+  title: string;
+  weekStart: string;
+  participantIds: string[];
+  createdAt: string;
+  updatedAt?: string;
+}
+
+export const weeklyPlansEndpoint = {
+  getPlans: (params?: { userId?: string; weekStart?: string }) => {
+    const sp = new URLSearchParams();
+    if (params?.userId) sp.set('user_id', params.userId);
+    if (params?.weekStart) sp.set('week_start', params.weekStart);
+    const q = sp.toString();
+    return get<WeeklyPlanApi[]>(`/weekly-plans${q ? `?${q}` : ''}`);
+  },
+  updatePlans: (plans: WeeklyPlanApi[]) => put<{ ok: boolean }>('/weekly-plans', plans),
+  getMyLatest: (userId: string) => get<WeeklyPlanApi | null>(`/weekly-plans/mine/latest?user_id=${encodeURIComponent(userId)}`),
+  deletePlan: (id: string) => del<{ ok: boolean }>(`/weekly-plans/${id}`),
+  getProtocols: () => get<ProtocolApi[]>('/weekly-plans/protocols'),
+  updateProtocols: (protocols: ProtocolApi[]) => put<{ ok: boolean }>('/weekly-plans/protocols', protocols),
+  getProtocolAggregated: (protocolId: string) =>
+    get<{ protocol: ProtocolApi; plans: WeeklyPlanApi[]; taskIdsByUser: Record<string, string[]> }>(
+      `/weekly-plans/protocols/${protocolId}/aggregated`
+    ),
+  deleteProtocol: (id: string) => del<{ ok: boolean }>(`/weekly-plans/protocols/${id}`),
+};
+
 // Meetings
 export const meetingsEndpoint = {
   getAll: () => get<unknown[]>('/meetings'),
@@ -189,7 +253,32 @@ export const departmentsEndpoint = {
   updateAll: (departments: unknown[]) => put<{ ok: boolean }>('/departments', departments),
 };
 
-// Finance
+// Finance (types for bank statements and income reports)
+export interface BankStatementLineApi {
+  id?: string;
+  statementId?: string;
+  lineDate: string;
+  description?: string;
+  amount: number;
+  lineType: 'in' | 'out';
+}
+
+export interface BankStatementApi {
+  id: string;
+  name?: string;
+  period?: string;
+  createdAt: string;
+  lines: BankStatementLineApi[];
+}
+
+export interface IncomeReportApi {
+  id: string;
+  period: string;
+  data: Record<string, number>;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
 export const financeEndpoint = {
   getCategories: () => get<unknown[]>('/finance/categories'),
   updateCategories: (categories: unknown[]) => put<{ ok: boolean }>('/finance/categories', categories),
@@ -203,6 +292,11 @@ export const financeEndpoint = {
   updateFinancialPlanDocuments: (docs: unknown[]) => put<{ ok: boolean }>('/finance/financial-plan-documents', docs),
   getFinancialPlannings: () => get<unknown[]>('/finance/financial-plannings'),
   updateFinancialPlannings: (plannings: unknown[]) => put<{ ok: boolean }>('/finance/financial-plannings', plannings),
+  getBankStatements: () => get<BankStatementApi[]>('/finance/bank-statements'),
+  updateBankStatements: (statements: BankStatementApi[]) => put<{ ok: boolean }>('/finance/bank-statements', statements),
+  deleteBankStatement: (id: string) => del<{ ok: boolean }>(`/finance/bank-statements/${id}`),
+  getIncomeReports: () => get<IncomeReportApi[]>('/finance/income-reports'),
+  updateIncomeReports: (reports: IncomeReportApi[]) => put<{ ok: boolean }>('/finance/income-reports', reports),
 };
 
 // BPM

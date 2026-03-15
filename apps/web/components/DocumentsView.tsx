@@ -1,10 +1,12 @@
 
 import React, { useState, useMemo } from 'react';
-import { Doc, Folder, TableCollection, Task, TaskAttachment } from '../types';
+import { Doc, Folder, TableCollection, Task, TaskAttachment, User } from '../types';
 import { FileText, Folder as FolderIcon, Plus, LayoutGrid, List as ListIcon, Trash2, ExternalLink, ChevronRight, FolderPlus, X, Save, Box, FileText as FileTextIcon, Paperclip, Image as ImageIcon, Download, File as FileIcon, Edit2 } from 'lucide-react';
 import { Tabs, Button } from './ui';
 import { FilePreviewModal } from './FilePreviewModal';
 import { isImageFile } from '../utils/fileUtils';
+import { WeeklyPlansView } from './documents/WeeklyPlansView';
+import { ProtocolsView } from './documents/ProtocolsView';
 
 interface DocumentsViewProps {
   docs: Doc[];
@@ -12,14 +14,17 @@ interface DocumentsViewProps {
   tableId: string;
   showAll?: boolean; // Aggregator mode
   tables?: TableCollection[];
-  tasks?: Task[]; // Добавляем tasks для вложений
+  tasks?: Task[];
+  users?: User[];
+  currentUser?: User;
   onOpenDoc: (doc: Doc) => void;
   onAddDoc: (folderId?: string) => void;
   onCreateFolder: (name: string, parentFolderId?: string) => void;
   onDeleteFolder: (id: string) => void;
   onDeleteDoc?: (id: string) => void;
-  onEditDoc?: (doc: Doc) => void; // Функция для редактирования документа
-  onDeleteAttachment?: (taskId: string, attachmentId: string) => void; // Функция для удаления вложения
+  onEditDoc?: (doc: Doc) => void;
+  onOpenTask?: (task: Task) => void;
+  onDeleteAttachment?: (taskId: string, attachmentId: string) => void;
 }
 
 const DocumentsView: React.FC<DocumentsViewProps> = ({ 
@@ -29,17 +34,20 @@ const DocumentsView: React.FC<DocumentsViewProps> = ({
     showAll = false,
     tables = [],
     tasks = [],
+    users = [],
+    currentUser,
     onOpenDoc, 
     onAddDoc, 
     onCreateFolder,
     onDeleteFolder,
     onDeleteDoc,
     onEditDoc,
+    onOpenTask,
     onDeleteAttachment
 }) => {
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
-  const [folderPath, setFolderPath] = useState<string[]>([]); // Массив ID папок для навигации
-  const [activeTab, setActiveTab] = useState<'docs' | 'attachments'>('docs'); // Вкладка: документы или вложения
+  const [folderPath, setFolderPath] = useState<string[]>([]);
+  const [activeTab, setActiveTab] = useState<'docs' | 'attachments' | 'weekly-plans' | 'protocols'>('docs');
   const [previewFile, setPreviewFile] = useState<{ url: string; name: string; type: string } | null>(null);
   
   // Modal State
@@ -259,10 +267,12 @@ const DocumentsView: React.FC<DocumentsViewProps> = ({
             <Tabs
                 tabs={[
                     { id: 'docs', label: 'Документы' },
-                    { id: 'attachments', label: 'Вложения' }
+                    { id: 'attachments', label: 'Вложения' },
+                    { id: 'weekly-plans', label: 'Недельные планы' },
+                    { id: 'protocols', label: 'Протоколы' }
                 ]}
                 activeTab={activeTab}
-                onChange={(tabId) => setActiveTab(tabId as 'docs' | 'attachments')}
+                onChange={(tabId) => setActiveTab(tabId as 'docs' | 'attachments' | 'weekly-plans' | 'protocols')}
             />
             {activeTab === 'docs' && (
               <div className="flex items-center gap-2 bg-gray-100 dark:bg-[#252525] rounded-full p-1 text-xs">
@@ -279,7 +289,11 @@ const DocumentsView: React.FC<DocumentsViewProps> = ({
       </div>
       <div className="flex-1 min-h-0 overflow-hidden">
         <div className="max-w-7xl mx-auto w-full px-6 pb-20 h-full overflow-y-auto custom-scrollbar">
-          {activeTab === 'docs' ? (
+          {activeTab === 'weekly-plans' && currentUser ? (
+            <WeeklyPlansView currentUser={currentUser} tasks={tasks} onOpenTask={onOpenTask} />
+          ) : activeTab === 'protocols' ? (
+            <ProtocolsView users={users} tasks={tasks} onOpenTask={onOpenTask} />
+          ) : activeTab === 'docs' ? (
             <>
               {renderBreadcrumbs()}
               {viewMode === 'grid' ? (

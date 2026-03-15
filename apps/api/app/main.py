@@ -13,9 +13,11 @@ from app.config import get_settings
 from app.database import engine, Base, AsyncSessionLocal
 from app.logging_handlers import SystemLogHandler
 from app.routers import (
+    admin,
     auth,
     system,
     tasks,
+    weekly_plans,
     projects,
     tables,
     activity,
@@ -80,6 +82,7 @@ app.add_middleware(
 )
 
 # Routers (prefix already in router)
+app.include_router(admin.router, prefix=settings.API_PREFIX)
 app.include_router(auth.router, prefix=settings.API_PREFIX)
 app.include_router(system.router, prefix=settings.API_PREFIX)
 app.include_router(tasks.router, prefix=settings.API_PREFIX)
@@ -105,6 +108,7 @@ app.include_router(bpm.router, prefix=settings.API_PREFIX, tags=["bpm"])
 app.include_router(inventory.router, prefix=settings.API_PREFIX, tags=["inventory"])
 app.include_router(funnels.router, prefix=settings.API_PREFIX, tags=["funnels"])
 app.include_router(sites.router, prefix=settings.API_PREFIX, tags=["sites"])
+app.include_router(weekly_plans.router, prefix=settings.API_PREFIX, tags=["weekly-plans"])
 
 
 @app.exception_handler(Exception)
