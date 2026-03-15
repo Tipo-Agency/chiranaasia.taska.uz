@@ -58,7 +58,15 @@ if docker compose version &>/dev/null; then
 elif command -v docker-compose &>/dev/null; then
   DOCKER_CMD="docker-compose"
 else
-  echo "❌ Docker Compose не найден. Установите: docker compose или docker-compose"
+  echo "❌ Docker Compose не найден на сервере."
+  echo ""
+  echo "Установка на Ubuntu/Debian (выполните на сервере по SSH):"
+  echo "  curl -fsSL https://get.docker.com | sh"
+  echo "  sudo usermod -aG docker \$USER   # затем выйти и зайти по SSH снова"
+  echo "  sudo apt-get install -y docker-compose-plugin   # плагин 'docker compose'"
+  echo ""
+  echo "Или установите standalone: sudo apt-get install -y docker-compose"
+  echo "После установки перезапустите деплой (повторный пуш или Re-run job в Actions)."
   exit 1
 fi
 echo "   Using: $DOCKER_CMD"

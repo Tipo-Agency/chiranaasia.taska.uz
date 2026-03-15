@@ -8,7 +8,22 @@
   - `SERVER_HOST`, `SERVER_USER`, `SERVER_SSH_KEY`, `SERVER_PATH`
   - `TELEGRAM_BOT_TOKEN`
   - `BACKEND_URL` — URL вашего API (например `https://tipa.taska.uz/api` или `http://127.0.0.1:8000` для бота на том же сервере)
-- На сервере установлены: Docker (и Docker Compose), Node.js, nginx.
+- **На сервере обязательно:** Docker + Docker Compose, Node.js, nginx.
+
+### Установка Docker на сервере (Ubuntu/Debian)
+
+Если в логах деплоя: «Docker Compose не найден» — зайдите по SSH и выполните:
+
+```bash
+# Docker Engine + Compose plugin
+curl -fsSL https://get.docker.com | sh
+sudo usermod -aG docker $USER
+# Выйти из SSH и зайти снова, чтобы группа docker применилась
+sudo apt-get update && sudo apt-get install -y docker-compose-plugin
+```
+
+Проверка: `docker compose version` или `docker-compose --version` должны выполняться без ошибок.
+
 - Один раз положите на сервер ключ Firebase (для миграции): например скопируйте `firebase-service-account.json` в `$SERVER_PATH/firebase-key.json` и в Secrets добавьте `FIREBASE_CREDENTIALS=/var/www/tipa.taska.uz/firebase-key.json` (и при первом деплое — `RUN_MIGRATE_FIRESTORE=1`).
 
 ## 2. Деплой
