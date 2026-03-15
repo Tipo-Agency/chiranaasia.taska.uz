@@ -29,25 +29,36 @@ fi
 git config --global --add safe.directory "$SERVER_PATH" || true
 echo "✅ Ownership fixed"
 
-# 2. Обновляем код (если еще не обновлен)
+# 2. Принудительно обновляем код и затираем старые артефакты
 echo ""
-echo "📥 Step 2: Updating code..."
-if ! git diff --quiet HEAD origin/main 2>/dev/null; then
-  git fetch origin || { echo "⚠️ git fetch failed, but continuing..."; }
-  git reset --hard origin/main || { echo "⚠️ git reset failed, but continuing..."; }
-  sudo chown -R "$USER:$USER" "$SERVER_PATH" || true
-  echo "✅ Code updated"
-else
-  echo "✅ Code already up to date"
-fi
+echo "📥 Step 2: Force-updating code (stale code will be overwritten)..."
+git fetch origin || { echo "❌ git fetch failed"; exit 1; }
+git reset --hard origin/main || { echo "❌ git reset failed"; exit 1; }
+git clean -fd || true
+# Затираем корневые папки старой структуры (monorepo: всё в apps/)
+for old in backend components constants frontend hooks services utils telegram-bot seed; do
+  if [ -d "$old" ]; then
+    echo "   Removing legacy dir: $old"
+    rm -rf "$old"
+  fi
+done
+sudo chown -R "$USER:$USER" "$SERVER_PATH" || true
+echo "✅ Code updated (hard reset + cleanup)"
 
 # 2b. Поднимаем Postgres + Python backend (Docker)
 echo ""
 echo "🐳 Step 2b: Starting Postgres + backend (Docker)..."
+cd "$SERVER_PATH" || exit 1
 if [ -f "docker-compose.yml" ]; then
-  docker compose up -d db backend 2>/dev/null || docker-compose up -d db backend 2>/dev/null || {
-    echo "⚠️ Docker Compose failed (install Docker?) — backend и БД должны быть запущены вручную"
+  docker compose up -d --build db backend 2>/dev/null || docker-compose up -d --build db backend 2>/dev/null || {
+    echo "❌ Docker Compose failed — проверьте docker compose ps и логи"
+    exit 1
   }
+  echo "   Waiting for backend to be ready..."
+  for i in 1 2 3 4 5 6 7 8 9 10; do
+    curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:8000/health 2>/dev/null | grep -q 200 && break
+    sleep 2
+  done
   if docker compose ps 2>/dev/null | grep -q backend; then
     echo "✅ Backend container running"
   elif docker-compose ps 2>/dev/null | grep -q backend; then
@@ -56,24 +67,25 @@ if [ -f "docker-compose.yml" ]; then
     echo "⚠️ Backend container not detected — проверьте docker compose ps"
   fi
 else
-  echo "⚠️ docker-compose.yml not found — пропуск"
+  echo "❌ docker-compose.yml not found"
+  exit 1
 fi
+cd "$SERVER_PATH" || exit 1
 
-# 3. Деплой фронтенда
+# 3. Деплой фронтенда (чистая сборка и затирание старого фронта в /var/www/frontend)
 echo ""
 echo "🚀 Step 3: Deploying frontend..."
+cd "$SERVER_PATH" || exit 1
+rm -rf node_modules apps/web/node_modules 2>/dev/null || true
 npm ci || { echo "❌ npm ci failed"; exit 1; }
 npm run build:web || { echo "❌ npm run build:web failed"; exit 1; }
-# Копируем сборку в каталог nginx (нужны права на запись в /var/www/frontend)
-if [ -d "apps/web/dist" ]; then
-  sudo mkdir -p /var/www/frontend
-  sudo rsync -a --delete apps/web/dist/ /var/www/frontend/ 2>/dev/null || sudo cp -r apps/web/dist/* /var/www/frontend/ 2>/dev/null || {
-    echo "⚠️ Не удалось скопировать в /var/www/frontend — проверьте права или настройте root в nginx на $SERVER_PATH/apps/web/dist"
-  }
-  echo "✅ Frontend deployed to /var/www/frontend"
-else
-  echo "⚠️ apps/web/dist not found after build"
+if [ ! -d "apps/web/dist" ]; then
+  echo "❌ apps/web/dist not found after build"
+  exit 1
 fi
+sudo mkdir -p /var/www/frontend
+sudo rsync -a --delete apps/web/dist/ /var/www/frontend/ || { sudo cp -r apps/web/dist/. /var/www/frontend/ || { echo "❌ Copy to /var/www/frontend failed"; exit 1; }; }
+echo "✅ Frontend deployed to /var/www/frontend (old content wiped)"
 
 # 4. Деплой Telegram бота
 echo ""
@@ -158,11 +170,12 @@ else
   echo "⚠️ apps/bot directory not found, skipping..."
 fi
 
-# 4b. (Опционально) Однократная миграция Firestore → Postgres
-# Задать в GitHub Secrets: RUN_MIGRATE_FIRESTORE=1, FIREBASE_CREDENTIALS=/path/on/server/to/key.json
+# 4b. (Однократно) Миграция Firestore → Postgres. После первого успешного прогона можно убрать этот блок и секреты RUN_MIGRATE_FIRESTORE, FIREBASE_CREDENTIALS.
+# В GitHub Secrets: RUN_MIGRATE_FIRESTORE=1, FIREBASE_CREDENTIALS=/path/on/server/to/key.json
 if [ -n "$RUN_MIGRATE_FIRESTORE" ] && [ -n "$FIREBASE_CREDENTIALS" ] && [ -f "$FIREBASE_CREDENTIALS" ]; then
   echo ""
-  echo "📦 Step 4b: Running Firestore → Postgres migration..."
+  echo "📦 Step 4b: Running Firestore → Postgres migration (one-time)..."
+  cd "$SERVER_PATH" || exit 1
   export BACKEND_URL="${BACKEND_URL:-http://127.0.0.1:8000}"
   export FIREBASE_CREDENTIALS
   pip install -q -r scripts/requirements-migrate.txt 2>/dev/null || true

@@ -43,7 +43,99 @@ python3 scripts/migrate_firestore_to_postgres.py
 - **Бот:** написать боту в Telegram, убедиться, что он отвечает и видит данные (после миграции — из Postgres).
 - **Логи:** в приложении «Настройки → Система / Логи» или `GET /api/system/logs?limit=50` — смотреть ошибки.
 
-## 5. Если что-то сломалось
+## 5. Пошаговая проверка: «ничего не обновилось на фронте»
+
+Если после пуша в main сайт выглядит по-старому (даже в инкогнито), проверяй по порядку.
+
+### Шаг 1: Деплой вообще запустился?
+
+- Зайди в репо **tipa.taska.uz** на GitHub → вкладка **Actions**.
+- Есть ли зелёный запуск workflow по последнему коммиту? Если нет или он красный — деплой не прошёл или упал, смотри логи в Actions.
+
+### Шаг 2: На сервере — обновился ли код?
+
+Зайди по SSH на сервер и выполни:
+
+```bash
+cd $SERVER_PATH   # например /var/www/tipa.taska.uz
+git log -1 --oneline
+git status
+```
+
+- `git log` должен показывать последний коммит с деплоем (например «Deploy: Python backend + Postgres...»).
+- Если коммит старый — на сервере не сделали pull. Вручную: `git fetch origin && git reset --hard origin/main`.
+
+### Шаг 3: Поднялись ли Docker (БД и бэкенд)?
+
+На сервере:
+
+```bash
+cd $SERVER_PATH
+docker compose ps
+# или: docker-compose ps
+```
+
+Должны быть контейнеры **db** и **backend** в статусе **Up**. Если их нет или они Exited:
+
+```bash
+docker compose up -d db backend
+docker compose logs backend --tail 50
+```
+
+Если в логах ошибки (БД недоступна, порт занят) — исправь и перезапусти.
+
+### Шаг 4: Бэкенд отвечает?
+
+На сервере или с твоего компа (если порт проброшен или открыт):
+
+```bash
+curl http://127.0.0.1:8000/health
+# с компа, если есть доступ: curl https://tipa.taska.uz/health
+```
+
+Ожидаемо: `{"status":"ok","version":"1.0.0","db":"ok"}`. Если connection refused / 502 — бэкенд не слушает 8000 или nginx не проксирует (см. шаг 6).
+
+### Шаг 5: Фронт собран и скопирован?
+
+На сервере:
+
+```bash
+ls -la /var/www/frontend/
+ls -la $SERVER_PATH/apps/web/dist/
+```
+
+- В `/var/www/frontend/` должны быть `index.html`, папка `assets/` с JS/CSS (дата/время — свежие после деплоя).
+- Если `/var/www/frontend/` пустой или старый — деплой не скопировал сборку (права? путь?). Проверь логи GitHub Actions на шаге «Deploy frontend» и при необходимости вручную:  
+  `sudo rsync -a --delete $SERVER_PATH/apps/web/dist/ /var/www/frontend/`
+
+### Шаг 6: Nginx отдаёт новый фронт и проксирует API?
+
+На сервере:
+
+```bash
+nginx -t
+sudo systemctl status nginx
+# конфиг: обычно /etc/nginx/sites-enabled/ или /etc/nginx/conf.d/
+```
+
+В конфиге должно быть:
+
+- `root /var/www/frontend;` (или путь, куда реально скопирован фронт).
+- `location /api/ { proxy_pass http://127.0.0.1:8000; ... }`
+- `location /health { proxy_pass http://127.0.0.1:8000; }`
+
+После правок: `sudo systemctl reload nginx`.
+
+### Шаг 7: Кэш браузера и CDN
+
+- Открой сайт в **режиме инкогнито** или с **жёстким обновлением** (Ctrl+Shift+R / Cmd+Shift+R).
+- Если перед сайтом стоит CDN или прокси — сбрось кэш там или подожди TTL.
+
+Итог: если на шаге 1–2 код обновился, на 3–4 бэк и БД работают, на 5–6 фронт лежит в нужном месте и nginx настроен — фронт обязан обновиться. Где шаг впервые ломается — там и править.
+
+---
+
+## 6. Если что-то сломалось
 
 - **502 / API не отвечает:** backend не запущен. На сервере: `docker compose ps`, при необходимости `docker compose up -d db backend` и смотреть `docker compose logs backend`.
 - **Фронт пустой или 404:** проверьте, что `/var/www/frontend` заполнен (деплой копирует туда `apps/web/dist`). Или поменяйте в nginx `root` на `$SERVER_PATH/apps/web/dist`.
