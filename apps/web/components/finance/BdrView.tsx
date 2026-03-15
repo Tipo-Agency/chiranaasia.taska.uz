@@ -4,7 +4,7 @@
  */
 import React, { useState, useMemo, useEffect } from 'react';
 import { Bdr, BdrRow } from '../../types';
-import { Plus, Trash2, Save, TrendingUp, TrendingDown } from 'lucide-react';
+import { Plus, Trash2, Save, TrendingUp, TrendingDown, Check, Pencil } from 'lucide-react';
 
 const MONTHS = ['Янв', 'Фев', 'Мар', 'Апр', 'Май', 'Июн', 'Июл', 'Авг', 'Сен', 'Окт', 'Ноя', 'Дек'];
 
@@ -34,6 +34,9 @@ export const BdrView: React.FC<BdrViewProps> = ({ bdr, onLoadBdr, onSaveBdr }) =
   const [rows, setRows] = useState<BdrRow[]>([]);
   const [saving, setSaving] = useState(false);
   const [dirty, setDirty] = useState(false);
+  /** ID строки в режиме редактирования; null — все в режиме просмотра */
+  const [editingRowId, setEditingRowId] = useState<string | null>(null);
+  const [savingRowId, setSavingRowId] = useState<string | null>(null);
 
   const yearStr = String(year);
 
@@ -52,6 +55,7 @@ export const BdrView: React.FC<BdrViewProps> = ({ bdr, onLoadBdr, onSaveBdr }) =
         amounts: typeof r.amounts === 'object' && r.amounts !== null ? { ...r.amounts } : {},
       })) : []);
       setDirty(false);
+      setEditingRowId(null);
     }
   }, [bdr, yearStr]);
 
@@ -92,6 +96,7 @@ export const BdrView: React.FC<BdrViewProps> = ({ bdr, onLoadBdr, onSaveBdr }) =
     };
     setRows(prev => [...prev, newRow]);
     setDirty(true);
+    setEditingRowId(newRow.id);
   };
 
   const updateRowName = (rowId: string, name: string) => {
@@ -109,8 +114,20 @@ export const BdrView: React.FC<BdrViewProps> = ({ bdr, onLoadBdr, onSaveBdr }) =
     try {
       await onSaveBdr({ year: yearStr, rows });
       setDirty(false);
+      setEditingRowId(null);
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleSaveRow = async (rowId: string) => {
+    setSavingRowId(rowId);
+    try {
+      await onSaveBdr({ year: yearStr, rows });
+      setDirty(false);
+      setEditingRowId(null);
+    } finally {
+      setSavingRowId(null);
     }
   };
 
@@ -175,7 +192,7 @@ export const BdrView: React.FC<BdrViewProps> = ({ bdr, onLoadBdr, onSaveBdr }) =
                   {p.label}
                 </th>
               ))}
-              <th className="w-10" />
+              <th className="w-20 text-center text-gray-500 dark:text-gray-400 font-normal text-xs">Действия</th>
             </tr>
           </thead>
           <tbody>
@@ -190,33 +207,55 @@ export const BdrView: React.FC<BdrViewProps> = ({ bdr, onLoadBdr, onSaveBdr }) =
               ))}
               <td />
             </tr>
-            {incomeRows.map(row => (
-              <tr key={row.id} className="border-b border-gray-100 dark:border-[#2a2a2a] hover:bg-gray-50 dark:hover:bg-[#2a2a2a]">
-                <td className="py-1.5 px-3">
-                  <input
-                    type="text"
-                    value={row.name}
-                    onChange={(e) => updateRowName(row.id, e.target.value)}
-                    className="w-full bg-transparent border-b border-transparent hover:border-gray-300 dark:hover:border-[#444] focus:border-[#3337AD] focus:outline-none py-0.5 text-gray-900 dark:text-gray-100"
-                    placeholder="Название дохода"
-                  />
-                </td>
-                {periods.map(period => (
-                  <td key={period.key} className="py-1.5 px-2 text-right">
-                    <input
-                      type="number"
-                      value={getCellValue(row, period) || ''}
-                      onChange={(e) => updateRowAmount(row.id, period.key, parseFloat(e.target.value) || 0)}
-                      className="w-24 text-right bg-gray-50 dark:bg-[#333] border border-gray-200 dark:border-[#444] rounded px-2 py-1 text-gray-900 dark:text-gray-100 text-sm [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                      placeholder="0"
-                    />
+            {incomeRows.map(row => {
+              const isEditing = editingRowId === row.id;
+              const isSavingRow = savingRowId === row.id;
+              return (
+                <tr key={row.id} className="border-b border-gray-100 dark:border-[#2a2a2a] hover:bg-gray-50 dark:hover:bg-[#2a2a2a]">
+                  <td className="py-1.5 px-3">
+                    {isEditing ? (
+                      <input
+                        type="text"
+                        value={row.name}
+                        onChange={(e) => updateRowName(row.id, e.target.value)}
+                        className="w-full bg-gray-50 dark:bg-[#333] border border-gray-200 dark:border-[#444] rounded px-2 py-0.5 text-gray-900 dark:text-gray-100 text-sm"
+                        placeholder="Название дохода"
+                      />
+                    ) : (
+                      <span className="text-gray-900 dark:text-gray-100">{row.name || '—'}</span>
+                    )}
                   </td>
-                ))}
-                <td className="py-1.5 px-1">
-                  <button type="button" onClick={() => removeRow(row.id)} className="p-1 text-gray-400 hover:text-red-500" title="Удалить"><Trash2 size={14} /></button>
-                </td>
-              </tr>
-            ))}
+                  {periods.map(period => (
+                    <td key={period.key} className="py-1.5 px-2 text-right">
+                      {isEditing ? (
+                        <input
+                          type="number"
+                          value={getCellValue(row, period) || ''}
+                          onChange={(e) => updateRowAmount(row.id, period.key, parseFloat(e.target.value) || 0)}
+                          className="w-24 text-right bg-gray-50 dark:bg-[#333] border border-gray-200 dark:border-[#444] rounded px-2 py-1 text-gray-900 dark:text-gray-100 text-sm [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                          placeholder="0"
+                        />
+                      ) : (
+                        <span className="text-gray-700 dark:text-gray-300">{(getCellValue(row, period) || 0).toLocaleString('ru-RU')}</span>
+                      )}
+                    </td>
+                  ))}
+                  <td className="py-1.5 px-1 whitespace-nowrap">
+                    {isEditing ? (
+                      <>
+                        <button type="button" onClick={() => handleSaveRow(row.id)} disabled={isSavingRow} className="p-1.5 text-[#3337AD] hover:bg-[#3337AD]/10 rounded" title="Сохранить"><Check size={16} /></button>
+                        <button type="button" onClick={() => removeRow(row.id)} className="p-1 text-gray-400 hover:text-red-500" title="Удалить"><Trash2 size={14} /></button>
+                      </>
+                    ) : (
+                      <>
+                        <button type="button" onClick={() => setEditingRowId(row.id)} className="p-1 text-gray-400 hover:text-[#3337AD]" title="Редактировать"><Pencil size={14} /></button>
+                        <button type="button" onClick={() => removeRow(row.id)} className="p-1 text-gray-400 hover:text-red-500" title="Удалить"><Trash2 size={14} /></button>
+                      </>
+                    )}
+                  </td>
+                </tr>
+              );
+            })}
             <tr className="bg-rose-50/50 dark:bg-rose-900/10 border-b border-gray-100 dark:border-[#2a2a2a]">
               <td className="py-2 px-3 font-medium text-rose-700 dark:text-rose-400 flex items-center gap-1">
                 <TrendingDown size={14} /> Расходы
@@ -228,33 +267,55 @@ export const BdrView: React.FC<BdrViewProps> = ({ bdr, onLoadBdr, onSaveBdr }) =
               ))}
               <td />
             </tr>
-            {expenseRows.map(row => (
-              <tr key={row.id} className="border-b border-gray-100 dark:border-[#2a2a2a] hover:bg-gray-50 dark:hover:bg-[#2a2a2a]">
-                <td className="py-1.5 px-3">
-                  <input
-                    type="text"
-                    value={row.name}
-                    onChange={(e) => updateRowName(row.id, e.target.value)}
-                    className="w-full bg-transparent border-b border-transparent hover:border-gray-300 dark:hover:border-[#444] focus:border-[#3337AD] focus:outline-none py-0.5 text-gray-900 dark:text-gray-100"
-                    placeholder="Название расхода"
-                  />
-                </td>
-                {periods.map(period => (
-                  <td key={period.key} className="py-1.5 px-2 text-right">
-                    <input
-                      type="number"
-                      value={getCellValue(row, period) || ''}
-                      onChange={(e) => updateRowAmount(row.id, period.key, parseFloat(e.target.value) || 0)}
-                      className="w-24 text-right bg-gray-50 dark:bg-[#333] border border-gray-200 dark:border-[#444] rounded px-2 py-1 text-gray-900 dark:text-gray-100 text-sm [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                      placeholder="0"
-                    />
+            {expenseRows.map(row => {
+              const isEditing = editingRowId === row.id;
+              const isSavingRow = savingRowId === row.id;
+              return (
+                <tr key={row.id} className="border-b border-gray-100 dark:border-[#2a2a2a] hover:bg-gray-50 dark:hover:bg-[#2a2a2a]">
+                  <td className="py-1.5 px-3">
+                    {isEditing ? (
+                      <input
+                        type="text"
+                        value={row.name}
+                        onChange={(e) => updateRowName(row.id, e.target.value)}
+                        className="w-full bg-gray-50 dark:bg-[#333] border border-gray-200 dark:border-[#444] rounded px-2 py-0.5 text-gray-900 dark:text-gray-100 text-sm"
+                        placeholder="Название расхода"
+                      />
+                    ) : (
+                      <span className="text-gray-900 dark:text-gray-100">{row.name || '—'}</span>
+                    )}
                   </td>
-                ))}
-                <td className="py-1.5 px-1">
-                  <button type="button" onClick={() => removeRow(row.id)} className="p-1 text-gray-400 hover:text-red-500" title="Удалить"><Trash2 size={14} /></button>
-                </td>
-              </tr>
-            ))}
+                  {periods.map(period => (
+                    <td key={period.key} className="py-1.5 px-2 text-right">
+                      {isEditing ? (
+                        <input
+                          type="number"
+                          value={getCellValue(row, period) || ''}
+                          onChange={(e) => updateRowAmount(row.id, period.key, parseFloat(e.target.value) || 0)}
+                          className="w-24 text-right bg-gray-50 dark:bg-[#333] border border-gray-200 dark:border-[#444] rounded px-2 py-1 text-gray-900 dark:text-gray-100 text-sm [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                          placeholder="0"
+                        />
+                      ) : (
+                        <span className="text-gray-700 dark:text-gray-300">{(getCellValue(row, period) || 0).toLocaleString('ru-RU')}</span>
+                      )}
+                    </td>
+                  ))}
+                  <td className="py-1.5 px-1 whitespace-nowrap">
+                    {isEditing ? (
+                      <>
+                        <button type="button" onClick={() => handleSaveRow(row.id)} disabled={isSavingRow} className="p-1.5 text-[#3337AD] hover:bg-[#3337AD]/10 rounded" title="Сохранить"><Check size={16} /></button>
+                        <button type="button" onClick={() => removeRow(row.id)} className="p-1 text-gray-400 hover:text-red-500" title="Удалить"><Trash2 size={14} /></button>
+                      </>
+                    ) : (
+                      <>
+                        <button type="button" onClick={() => setEditingRowId(row.id)} className="p-1 text-gray-400 hover:text-[#3337AD]" title="Редактировать"><Pencil size={14} /></button>
+                        <button type="button" onClick={() => removeRow(row.id)} className="p-1 text-gray-400 hover:text-red-500" title="Удалить"><Trash2 size={14} /></button>
+                      </>
+                    )}
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>

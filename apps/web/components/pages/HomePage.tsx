@@ -25,14 +25,13 @@ import {
   StatsCards,
   BirthdayModal,
 } from '../features/home';
-import { TaskCard } from '../features/tasks/TaskCard';
 import { Card } from '../ui/Card';
 import { Container } from '../ui/Container';
 import { PageLayout } from '../ui/PageLayout';
 import { Tabs } from '../ui/Tabs';
 import { MiniMessenger } from '../features/chat/MiniMessenger';
-import { getTodayLocalDate } from '../../utils/dateUtils';
-import { CheckSquare, Briefcase, ArrowRight } from 'lucide-react';
+import { getTodayLocalDate, formatDate } from '../../utils/dateUtils';
+import { CheckSquare, Briefcase, ArrowRight, Calendar, User } from 'lucide-react';
 
 type InboxTab = 'incoming' | 'outgoing' | 'messages';
 
@@ -227,12 +226,34 @@ export const HomePage: React.FC<HomePageProps> = ({
                             </button>
                           )}
                         </div>
-                        <div className="space-y-2">
-                          {myTasks.slice(0, 5).map((t) => (
-                            <div key={t.id} onClick={() => onOpenTask(t)} className="cursor-pointer">
-                              <TaskCard task={t} users={users} projects={projects} statuses={statuses} priorities={priorities} onClick={() => onOpenTask(t)} />
-                            </div>
-                          ))}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                          {myTasks.slice(0, 10).map((t) => {
+                            const project = projects.find((p) => p.id === t.projectId);
+                            const assignee = users.find((u) => u.id === t.assigneeId);
+                            const status = statuses.find((s) => s.value === t.status);
+                            const priority = priorities.find((p) => p.value === t.priority);
+                            const isOverdue = t.endDate && new Date(t.endDate) < new Date() && t.status !== 'Выполнено';
+                            return (
+                              <Card
+                                key={t.id}
+                                className={`p-2.5 cursor-pointer hover:shadow-md active:scale-[0.99] transition-all border-l-2 ${isOverdue ? 'border-l-red-500' : 'border-l-transparent'}`}
+                                onClick={() => onOpenTask(t)}
+                              >
+                                <div className="font-medium text-gray-900 dark:text-white text-sm truncate">{t.title || 'Без названия'}</div>
+                                <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 mt-1 text-xs text-gray-500 dark:text-gray-400">
+                                  {status && <span className="truncate">{status.name}</span>}
+                                  {project && <span className="truncate max-w-[100px]" title={project.name}>{project.name}</span>}
+                                  {t.endDate && (
+                                    <span className={`flex items-center gap-0.5 ${isOverdue ? 'text-red-600 dark:text-red-400' : ''}`}>
+                                      <Calendar size={10} /> {formatDate(t.endDate)}
+                                    </span>
+                                  )}
+                                  {priority && <span>{priority.name}</span>}
+                                  {assignee && <span className="flex items-center gap-0.5 truncate max-w-[80px]" title={assignee.name}><User size={10} /> {assignee.name.split(' ')[0]}</span>}
+                                </div>
+                              </Card>
+                            );
+                          })}
                         </div>
                       </div>
                     )}
@@ -248,31 +269,21 @@ export const HomePage: React.FC<HomePageProps> = ({
                             </button>
                           )}
                         </div>
-                        <div className="space-y-2">
-                          {myDeals.slice(0, 5).map((d) => {
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                          {myDeals.slice(0, 10).map((d) => {
                             const client = clients.find((c) => c.id === d.clientId);
                             const title = d.title || client?.name || d.contactName || 'Сделка';
                             return (
                               <Card
                                 key={d.id}
-                                className="p-4 cursor-pointer hover:shadow-md active:scale-[0.98] transition-all min-h-[72px]"
+                                className="p-2.5 cursor-pointer hover:shadow-md active:scale-[0.99] transition-all"
                                 onClick={() => onNavigateToDeals?.()}
                               >
-                                <div className="flex items-start justify-between gap-2">
-                                  <div className="flex-1 min-w-0">
-                                    <h3 className="font-semibold text-gray-900 dark:text-white text-sm truncate">
-                                      {title}
-                                    </h3>
-                                    <div className="flex flex-wrap items-center gap-2 mt-1.5 text-xs text-gray-500 dark:text-gray-400">
-                                      <span className="px-2 py-0.5 rounded-full bg-gray-100 dark:bg-[#333] text-gray-700 dark:text-gray-300">
-                                        {d.stage}
-                                      </span>
-                                      {d.amount != null && (
-                                        <span>{d.amount.toLocaleString('ru-RU')} {d.currency || ''}</span>
-                                      )}
-                                    </div>
-                                  </div>
-                                  <Briefcase className="shrink-0 w-4 h-4 text-gray-400 dark:text-gray-500" />
+                                <div className="font-medium text-gray-900 dark:text-white text-sm truncate">{title}</div>
+                                <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 mt-1 text-xs text-gray-500 dark:text-gray-400">
+                                  <span className="px-1.5 py-0.5 rounded bg-gray-100 dark:bg-[#333] text-gray-700 dark:text-gray-300 truncate max-w-[120px]" title={d.stage}>{d.stage}</span>
+                                  {d.amount != null && <span>{d.amount.toLocaleString('ru-RU')} {d.currency || ''}</span>}
+                                  {client?.name && <span className="truncate max-w-[90px]" title={client.name}>{client.name}</span>}
                                 </div>
                               </Card>
                             );
@@ -299,12 +310,32 @@ export const HomePage: React.FC<HomePageProps> = ({
                             </button>
                           )}
                         </div>
-                        <div className="space-y-2">
-                          {outgoingTasks.slice(0, 5).map((t) => (
-                            <div key={t.id} onClick={() => onOpenTask(t)} className="cursor-pointer">
-                              <TaskCard task={t} users={users} projects={projects} statuses={statuses} priorities={priorities} onClick={() => onOpenTask(t)} />
-                            </div>
-                          ))}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                          {outgoingTasks.slice(0, 10).map((t) => {
+                            const project = projects.find((p) => p.id === t.projectId);
+                            const assignee = users.find((u) => u.id === t.assigneeId);
+                            const status = statuses.find((s) => s.value === t.status);
+                            const isOverdue = t.endDate && new Date(t.endDate) < new Date() && t.status !== 'Выполнено';
+                            return (
+                              <Card
+                                key={t.id}
+                                className={`p-2.5 cursor-pointer hover:shadow-md active:scale-[0.99] transition-all border-l-2 ${isOverdue ? 'border-l-red-500' : 'border-l-transparent'}`}
+                                onClick={() => onOpenTask(t)}
+                              >
+                                <div className="font-medium text-gray-900 dark:text-white text-sm truncate">{t.title || 'Без названия'}</div>
+                                <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 mt-1 text-xs text-gray-500 dark:text-gray-400">
+                                  {status && <span className="truncate">{status.name}</span>}
+                                  {project && <span className="truncate max-w-[100px]" title={project.name}>{project.name}</span>}
+                                  {t.endDate && (
+                                    <span className={`flex items-center gap-0.5 ${isOverdue ? 'text-red-600 dark:text-red-400' : ''}`}>
+                                      <Calendar size={10} /> {formatDate(t.endDate)}
+                                    </span>
+                                  )}
+                                  {assignee && <span className="truncate max-w-[80px]" title={assignee.name}>→ {assignee.name.split(' ')[0]}</span>}
+                                </div>
+                              </Card>
+                            );
+                          })}
                         </div>
                       </div>
                     ) : (

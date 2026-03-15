@@ -35,6 +35,25 @@ git merge origin/main --ff-only || { echo "❌ git merge --ff-only failed (не 
 sudo chown -R "$USER:$USER" "$SERVER_PATH" || true
 echo "✅ Code updated (merge only, DB and untracked files unchanged)"
 
+# 2a. Файл .env в корне репо (для docker compose: backend нужен TELEGRAM_BOT_TOKEN для админки «Тестовая отправка»)
+echo ""
+echo "🔐 Step 2a: Ensuring .env for Docker (TELEGRAM_BOT_TOKEN for backend)..."
+cd "$SERVER_PATH" || exit 1
+if [ ! -f ".env" ]; then
+  touch .env
+fi
+if [ -n "$TELEGRAM_BOT_TOKEN" ]; then
+  if grep -q "^TELEGRAM_BOT_TOKEN=" .env 2>/dev/null; then
+    sed -i "s|^TELEGRAM_BOT_TOKEN=.*|TELEGRAM_BOT_TOKEN=$TELEGRAM_BOT_TOKEN|" .env
+  else
+    echo "TELEGRAM_BOT_TOKEN=$TELEGRAM_BOT_TOKEN" >> .env
+  fi
+  echo "   TELEGRAM_BOT_TOKEN written to .env (backend will receive it)"
+else
+  echo "   ⚠️ TELEGRAM_BOT_TOKEN empty, backend will not have token (set GitHub secret)"
+fi
+sudo chown "$USER:$USER" .env 2>/dev/null || true
+
 # 2b. Поднимаем Postgres + Python backend (Docker)
 echo ""
 echo "🐳 Step 2b: Starting Postgres + backend (Docker)..."
@@ -65,6 +84,8 @@ if ! $DOCKER_CMD up -d --build db backend; then
   echo "   На сервере выполните: $DOCKER_CMD logs backend"
   exit 1
 fi
+# Пересоздать backend, чтобы подхватить актуальный .env (TELEGRAM_BOT_TOKEN для админки)
+$DOCKER_CMD up -d --force-recreate backend 2>/dev/null || true
 echo "   Waiting for backend to be ready (port 8003)..."
 for i in 1 2 3 4 5 6 7 8 9 10; do
   curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:8003/health 2>/dev/null | grep -q 200 && break

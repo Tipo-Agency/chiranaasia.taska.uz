@@ -25,6 +25,7 @@ services:
       DATABASE_URL: postgresql+asyncpg://taska:${DB_PASSWORD:-taska}@db:5432/taska
       SECRET_KEY: ${SECRET_KEY:-change-me-in-production}
       CORS_ORIGINS: "http://localhost:3000,http://127.0.0.1:3000"
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
     depends_on:
       db:
         condition: service_healthy
