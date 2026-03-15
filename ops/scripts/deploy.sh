@@ -49,26 +49,33 @@ echo "✅ Code updated (hard reset + cleanup)"
 echo ""
 echo "🐳 Step 2b: Starting Postgres + backend (Docker)..."
 cd "$SERVER_PATH" || exit 1
-if [ -f "docker-compose.yml" ]; then
-  docker compose up -d --build db backend 2>/dev/null || docker-compose up -d --build db backend 2>/dev/null || {
-    echo "❌ Docker Compose failed — проверьте docker compose ps и логи"
-    exit 1
-  }
-  echo "   Waiting for backend to be ready..."
-  for i in 1 2 3 4 5 6 7 8 9 10; do
-    curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:8000/health 2>/dev/null | grep -q 200 && break
-    sleep 2
-  done
-  if docker compose ps 2>/dev/null | grep -q backend; then
-    echo "✅ Backend container running"
-  elif docker-compose ps 2>/dev/null | grep -q backend; then
-    echo "✅ Backend container running"
-  else
-    echo "⚠️ Backend container not detected — проверьте docker compose ps"
-  fi
-else
+if [ ! -f "docker-compose.yml" ]; then
   echo "❌ docker-compose.yml not found"
   exit 1
+fi
+if docker compose version &>/dev/null; then
+  DOCKER_CMD="docker compose"
+elif command -v docker-compose &>/dev/null; then
+  DOCKER_CMD="docker-compose"
+else
+  echo "❌ Docker Compose не найден. Установите: docker compose или docker-compose"
+  exit 1
+fi
+echo "   Using: $DOCKER_CMD"
+if ! $DOCKER_CMD up -d --build db backend; then
+  echo "❌ Docker Compose failed. Вывод выше — смотрите причину (права, порты, образы)."
+  echo "   На сервере выполните: $DOCKER_CMD logs backend"
+  exit 1
+fi
+echo "   Waiting for backend to be ready..."
+for i in 1 2 3 4 5 6 7 8 9 10; do
+  curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:8000/health 2>/dev/null | grep -q 200 && break
+  sleep 2
+done
+if $DOCKER_CMD ps 2>/dev/null | grep -q backend; then
+  echo "✅ Backend container running"
+else
+  echo "⚠️ Backend container не в списке — проверьте: $DOCKER_CMD ps"
 fi
 cd "$SERVER_PATH" || exit 1
 
