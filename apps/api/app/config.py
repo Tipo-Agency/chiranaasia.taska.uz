@@ -24,6 +24,8 @@ class Settings(BaseSettings):
     # Optional: Telegram alerts on CRITICAL errors (chat_id for employee notifications group)
     TELEGRAM_ALERT_CHAT_ID: str = ""
     TELEGRAM_EMPLOYEE_BOT_TOKEN: str = ""
+    # Optional: same bot token for admin "test send" (sends to group from API)
+    TELEGRAM_BOT_TOKEN: str = ""
 
     class Config:
         env_file = ".env"

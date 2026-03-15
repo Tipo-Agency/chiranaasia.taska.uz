@@ -15,6 +15,7 @@ def row_to_dept(row):
         "name": row.name,
         "headId": row.head_id,
         "description": row.description,
+        "isArchived": getattr(row, "is_archived", False) or False,
     }
 
 
@@ -35,12 +36,15 @@ async def update_departments(departments: list[dict], db: AsyncSession = Depends
             existing.name = d.get("name", existing.name)
             existing.head_id = d.get("headId")
             existing.description = d.get("description")
+            if "isArchived" in d:
+                existing.is_archived = bool(d.get("isArchived", False))
         else:
             db.add(Department(
                 id=did,
                 name=d.get("name", ""),
                 head_id=d.get("headId"),
                 description=d.get("description"),
+                is_archived=bool(d.get("isArchived", False)),
             ))
     await db.commit()
     return {"ok": True}

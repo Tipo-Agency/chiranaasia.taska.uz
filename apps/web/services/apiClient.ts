@@ -76,6 +76,11 @@ export const adminEndpoint = {
   getStats: () =>
     get<{ tables: Array<{ table_name: string; row_count: number }>; db_size_mb?: number }>('/admin/stats'),
   runTests: () => post<{ ok: boolean; output: string; exit_code: number }>('/admin/tests/run'),
+  getBotStatus: () =>
+    get<{ telegram_configured: boolean; group_chat_id?: string; group_chat_id_set: boolean }>('/admin/bot/status'),
+  testBotDailySummary: () => post<{ ok: boolean; error?: string }>('/admin/bot/test-daily-summary'),
+  testBotNewDeal: () => post<{ ok: boolean; error?: string }>('/admin/bot/test-new-deal'),
+  testBotCongrats: () => post<{ ok: boolean; error?: string }>('/admin/bot/test-congrats'),
 };
 
 // Auth / Users
@@ -297,6 +302,8 @@ export const financeEndpoint = {
   deleteBankStatement: (id: string) => del<{ ok: boolean }>(`/finance/bank-statements/${id}`),
   getIncomeReports: () => get<IncomeReportApi[]>('/finance/income-reports'),
   updateIncomeReports: (reports: IncomeReportApi[]) => put<{ ok: boolean }>('/finance/income-reports', reports),
+  getBdr: (year?: string) => get<{ year: string; rows: unknown[] }>(`/finance/bdr${year ? `?year=${encodeURIComponent(year)}` : ''}`),
+  updateBdr: (payload: { year: string; rows: unknown[] }) => put<{ ok: boolean }>('/finance/bdr', payload),
 };
 
 // BPM

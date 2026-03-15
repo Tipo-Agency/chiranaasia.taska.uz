@@ -23,6 +23,8 @@ COLLECTION_MAP = {
     'docs': '/docs',
     'statuses': '/statuses',
     'notificationPrefs': '/notification-prefs',
+    'contentPosts': '/content-posts',
+    'tables': '/tables',
 }
 
 

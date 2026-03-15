@@ -16,6 +16,7 @@ class Department(Base):
     name = Column(String(255), nullable=False)
     head_id = Column(String(36), nullable=True)
     description = Column(String(500), nullable=True)
+    is_archived = Column(Boolean, default=False)
 
 
 class FinanceCategory(Base):
@@ -127,4 +128,14 @@ class IncomeReport(Base):
     period = Column(String(20), nullable=False)  # YYYY-MM
     data = Column(JSONB, default=dict)  # например {"2024-01-15": 1000.5, ...} — дата -> сумма прихода
     created_at = Column(String(50), nullable=False)
+    updated_at = Column(String(50), nullable=True)
+
+
+class Bdr(Base):
+    """БДР — бюджет доходов и расходов. Один документ на год; данные по строкам и суммам по месяцам в JSONB."""
+    __tablename__ = "bdr"
+
+    id = Column(String(36), primary_key=True, default=gen_id)  # обычно год, например "2025"
+    year = Column(String(4), nullable=False)  # год планирования
+    rows = Column(JSONB, default=list)  # [ {"id": "uuid", "name": "...", "type": "income"|"expense", "amounts": {"2025-01": 100, ...} }, ... ]
     updated_at = Column(String(50), nullable=True)

@@ -4,10 +4,19 @@
 from typing import List, Dict, Any, Optional
 from datetime import datetime, timedelta
 from firebase_client import firebase
-from tasks import get_today_tasks, get_overdue_tasks, get_yesterday_tasks, get_all_today_tasks, get_all_overdue_tasks
+from tasks import (
+    get_today_tasks,
+    get_overdue_tasks,
+    get_yesterday_tasks,
+    get_all_today_tasks,
+    get_all_overdue_tasks,
+    get_tasks_completed_yesterday,
+    COMPLETED_STATUSES,
+    _normalize_date,
+)
 from deals import get_won_deals_today
 from messages import format_daily_reminder, format_weekly_report, format_successful_deal
-from utils import get_week_range, format_date
+from utils import get_week_range, format_date, get_today_date
 import pytz
 
 def check_new_tasks(user_id: str, last_check_time: datetime) -> List[Dict[str, Any]]:
@@ -222,19 +231,100 @@ def get_weekly_report_message() -> Optional[str]:
         print(f"Error getting weekly report: {e}")
         return None
 
+def _is_task_for_user(task: Dict[str, Any], user_id: str) -> bool:
+    aid = task.get('assigneeId')
+    aids = task.get('assigneeIds') or []
+    if aid and str(aid) == str(user_id):
+        return True
+    if isinstance(aids, list) and user_id in [str(x) for x in aids if x]:
+        return True
+    return False
+
+
 def get_group_daily_summary() -> Optional[str]:
-    """Получить ежедневную сводку для группы"""
+    """Ежедневная сводка для группы: по сотрудникам (выполнено вчера, на сегодня, просрочено) и по проектам контент-плана."""
     try:
-        yesterday_tasks = get_yesterday_tasks()
-        overdue_tasks = get_all_overdue_tasks()
-        today_tasks = get_all_today_tasks()
-        users = firebase.get_all('users')
-        
-        from messages import format_group_daily_summary
-        return format_group_daily_summary(yesterday_tasks, overdue_tasks, today_tasks, users)
+        today_str = get_today_date()
+        tz = pytz.timezone('Asia/Tashkent')
+        today = datetime.now(tz).date()
+        yesterday_str = (today - timedelta(days=1)).isoformat()
+
+        all_tasks = firebase.get_all('tasks') or []
+        users = [u for u in (firebase.get_all('users') or []) if not u.get('isArchived')]
+        tables = firebase.get_all('tables') or []
+        content_posts = firebase.get_all('contentPosts') or []
+
+        completed_yesterday = [
+            t for t in all_tasks
+            if not t.get('isArchived')
+            and (t.get('status') or '').strip() in COMPLETED_STATUSES
+            and _normalize_date(t.get('endDate') or '') == yesterday_str
+        ]
+        planned_today = [
+            t for t in all_tasks
+            if not t.get('isArchived')
+            and (t.get('status') or '').strip() not in COMPLETED_STATUSES
+            and _normalize_date(t.get('endDate') or '') == today_str
+        ]
+        overdue = [
+            t for t in all_tasks
+            if not t.get('isArchived')
+            and (t.get('status') or '').strip() not in COMPLETED_STATUSES
+            and t.get('endDate')
+            and _normalize_date(t.get('endDate') or '') < today_str
+        ]
+
+        per_employee = {}
+        for u in users:
+            uid = u.get('id')
+            if not uid:
+                continue
+            per_employee[uid] = {
+                'user': u,
+                'completed_yesterday': [t for t in completed_yesterday if _is_task_for_user(t, uid)],
+                'planned_today': [t for t in planned_today if _is_task_for_user(t, uid)],
+                'overdue': [t for t in overdue if _is_task_for_user(t, uid)],
+            }
+
+        posts_today = [
+            p for p in content_posts
+            if not p.get('isArchived') and _normalize_date(p.get('date') or '') == today_str
+        ]
+        by_table = {}
+        for p in posts_today:
+            tid = p.get('tableId') or 'other'
+            if tid not in by_table:
+                by_table[tid] = []
+            by_table[tid].append(p)
+        table_names = {t.get('id'): t.get('name', t.get('id', 'Проект')) for t in tables}
+
+        from messages import format_group_daily_summary_v2
+        return format_group_daily_summary_v2(per_employee, by_table, table_names)
     except Exception as e:
         print(f"Error getting group daily summary: {e}")
+        import traceback
+        traceback.print_exc()
         return None
+
+def get_group_chat_id_and_deal_state() -> tuple:
+    """Возвращает (telegram_group_chat_id, last_deal_sent_at, congratulated_deal_ids)."""
+    prefs = firebase.get_by_id('notificationPrefs', 'default') or {}
+    chat_id = prefs.get('telegramGroupChatId')
+    last_at = prefs.get('lastDealSentAt') or '1970-01-01T00:00:00'
+    congratulated = list(prefs.get('congratulatedDealIds') or [])
+    return chat_id, last_at, congratulated
+
+
+def save_deal_notification_state(last_deal_sent_at: str, congratulated_deal_ids: List[str]) -> None:
+    """Сохранить lastDealSentAt и congratulatedDealIds в настройках (для следующего запуска)."""
+    try:
+        prefs = firebase.get_by_id('notificationPrefs', 'default') or {}
+        prefs['lastDealSentAt'] = last_deal_sent_at
+        prefs['congratulatedDealIds'] = congratulated_deal_ids[-50:]  # последние 50
+        firebase.save('notificationPrefs', prefs)
+    except Exception as e:
+        print(f"Error saving deal notification state: {e}")
+
 
 def get_successful_deal_message(deal: Dict[str, Any]) -> Optional[str]:
     """Получить сообщение об успешной сделке"""
@@ -254,3 +344,58 @@ def get_successful_deal_message(deal: Dict[str, Any]) -> Optional[str]:
     except Exception as e:
         print(f"Error getting successful deal message: {e}")
         return None
+
+
+async def run_deal_notifications_job(bot) -> None:
+    """
+    Отправить в группу: (1) все новые заявки со всех воронок с указанием воронки;
+    (2) поздравления по сделкам, перешедшим в успешные.
+    """
+    try:
+        chat_id, last_deal_sent_at, congratulated_ids = get_group_chat_id_and_deal_state()
+        if not chat_id:
+            return
+        deals = [d for d in (firebase.get_all('deals') or []) if not d.get('isArchived')]
+        funnels = {f['id']: f.get('name', f.get('id', 'Воронка')) for f in (firebase.get_all('salesFunnels') or [])}
+        clients = {c['id']: c for c in (firebase.get_all('clients') or [])}
+
+        new_deals = [d for d in deals if (d.get('createdAt') or '') > last_deal_sent_at]
+        new_deals.sort(key=lambda d: d.get('createdAt') or '')
+        for deal in new_deals:
+            funnel_name = funnels.get(deal.get('funnelId'), deal.get('funnelId') or '—')
+            title = deal.get('title') or deal.get('contactName') or 'Без названия'
+            client_name = ''
+            if deal.get('clientId') and deal['clientId'] in clients:
+                client_name = clients[deal['clientId']].get('name') or clients[deal['clientId']].get('companyName') or ''
+            elif deal.get('contactName'):
+                client_name = deal.get('contactName')
+            msg = f"🆕 <b>Новая заявка</b> [<b>{funnel_name}</b>]\n\n{title}"
+            if client_name:
+                msg += f"\nКлиент: {client_name}"
+            try:
+                await bot.send_message(chat_id=chat_id, text=msg, parse_mode='HTML')
+            except Exception as e:
+                print(f"Error sending new deal to group: {e}")
+            last_deal_sent_at = max(last_deal_sent_at, (deal.get('createdAt') or ''))
+
+        won_statuses = ('completed', 'paid', 'active')
+        for deal in deals:
+            if deal.get('id') in congratulated_ids:
+                continue
+            status = (deal.get('status') or '').lower()
+            stage = (deal.get('stage') or '').lower()
+            if status not in won_statuses and stage != 'won':
+                continue
+            congratulated_ids.append(deal.get('id'))
+            text = get_successful_deal_message(deal)
+            if text:
+                try:
+                    await bot.send_message(chat_id=chat_id, text=text, parse_mode='HTML')
+                except Exception as e:
+                    print(f"Error sending congrats to group: {e}")
+
+        save_deal_notification_state(last_deal_sent_at, congratulated_ids)
+    except Exception as e:
+        print(f"Error in run_deal_notifications_job: {e}")
+        import traceback
+        traceback.print_exc()

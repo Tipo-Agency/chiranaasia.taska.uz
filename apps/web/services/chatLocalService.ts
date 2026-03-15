@@ -35,7 +35,7 @@ function writeAll(messages: ChatMessageLocal[]): void {
 export const chatLocalService = {
   getMessagesForUser(userId: string): ChatMessageLocal[] {
     return readAll().filter(
-      m => m.fromId === userId || m.toId === userId
+      m => m.fromId === userId || m.toId === userId || m.toId === '__all__'
     );
   },
 

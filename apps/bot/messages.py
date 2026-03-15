@@ -161,10 +161,8 @@ def format_daily_reminder(today_tasks: List[Dict[str, Any]], overdue_tasks: List
     return message
 
 def format_group_daily_summary(yesterday_tasks: List[Dict[str, Any]], overdue_tasks: List[Dict[str, Any]], today_tasks: List[Dict[str, Any]], users: List[Dict[str, Any]]) -> str:
-    """Форматировать ежедневную сводку для группы"""
+    """Форматировать ежедневную сводку для группы (legacy)."""
     message = "📋 <b>Ежедневная сводка по задачам</b>\n\n"
-    
-    # Задачи на вчера (не выполненные)
     if yesterday_tasks:
         message += f"📅 <b>Задачи на вчера (не выполненные) ({len(yesterday_tasks)}):</b>\n"
         for i, task in enumerate(yesterday_tasks[:15], 1):
@@ -174,16 +172,12 @@ def format_group_daily_summary(yesterday_tasks: List[Dict[str, Any]], overdue_ta
                 assignee = next((u for u in users if u.get('id') == assignee_id), None)
                 if assignee:
                     assignee_name = assignee.get('name', 'Неизвестно')
-            
             message += f"{i}. {task.get('title', 'Без названия')} - <b>{assignee_name}</b>\n"
-        
         if len(yesterday_tasks) > 15:
             message += f"... и еще {len(yesterday_tasks) - 15} задач\n"
         message += "\n"
     else:
         message += "📅 <b>Задачи на вчера:</b> нет\n\n"
-    
-    # Ранее просроченные задачи
     if overdue_tasks:
         message += f"⚠️ <b>Ранее просроченные задачи ({len(overdue_tasks)}):</b>\n"
         for i, task in enumerate(overdue_tasks[:15], 1):
@@ -193,7 +187,6 @@ def format_group_daily_summary(yesterday_tasks: List[Dict[str, Any]], overdue_ta
                 assignee = next((u for u in users if u.get('id') == assignee_id), None)
                 if assignee:
                     assignee_name = assignee.get('name', 'Неизвестно')
-            
             end_date = task.get('endDate', '')
             days_overdue = ""
             if end_date:
@@ -205,18 +198,14 @@ def format_group_daily_summary(yesterday_tasks: List[Dict[str, Any]], overdue_ta
                     task_date = date_obj.date()
                     days = (today - task_date).days
                     days_overdue = f" ({days} {'день' if days == 1 else 'дня' if days < 5 else 'дней'})"
-                except:
+                except Exception:
                     pass
-            
             message += f"{i}. {task.get('title', 'Без названия')} - <b>{assignee_name}</b>{days_overdue}\n"
-        
         if len(overdue_tasks) > 15:
             message += f"... и еще {len(overdue_tasks) - 15} задач\n"
         message += "\n"
     else:
         message += "⚠️ <b>Ранее просроченные задачи:</b> нет\n\n"
-    
-    # Задачи на сегодня
     if today_tasks:
         message += f"✅ <b>Задачи на сегодня ({len(today_tasks)}):</b>\n"
         for i, task in enumerate(today_tasks[:15], 1):
@@ -226,15 +215,66 @@ def format_group_daily_summary(yesterday_tasks: List[Dict[str, Any]], overdue_ta
                 assignee = next((u for u in users if u.get('id') == assignee_id), None)
                 if assignee:
                     assignee_name = assignee.get('name', 'Неизвестно')
-            
             message += f"{i}. {task.get('title', 'Без названия')} - <b>{assignee_name}</b>\n"
-        
         if len(today_tasks) > 15:
             message += f"... и еще {len(today_tasks) - 15} задач\n"
     else:
         message += "✅ <b>Задачи на сегодня:</b> нет\n"
-    
     return message
+
+
+def format_group_daily_summary_v2(
+    per_employee: Dict[str, Dict[str, Any]],
+    content_by_project: Dict[str, List[Dict[str, Any]]],
+    table_names: Dict[str, str],
+) -> str:
+    """Ежедневная сводка: по сотрудникам (выполнено вчера, сегодня, просрочено) и по проектам контент-плана."""
+    import pytz
+    tz = pytz.timezone('Asia/Tashkent')
+    today = datetime.now(tz).date()
+    lines = ["📋 <b>Ежедневная сводка</b> (9:00 Ташкент)\n"]
+
+    for uid, data in per_employee.items():
+        user = data.get('user', {})
+        name = user.get('name', uid)
+        completed = data.get('completed_yesterday', [])
+        planned = data.get('planned_today', [])
+        overdue_list = data.get('overdue', [])
+        if not completed and not planned and not overdue_list:
+            continue
+        lines.append(f"\n👤 <b>{name}</b>")
+        if completed:
+            lines.append(f"  ✅ Выполнено вчера: {len(completed)}")
+            for t in completed[:7]:
+                lines.append(f"    • {t.get('title', 'Без названия')}")
+            if len(completed) > 7:
+                lines.append(f"    ... и ещё {len(completed) - 7}")
+        if planned:
+            lines.append(f"  📅 На сегодня: {len(planned)}")
+            for t in planned[:7]:
+                lines.append(f"    • {t.get('title', 'Без названия')}")
+            if len(planned) > 7:
+                lines.append(f"    ... и ещё {len(planned) - 7}")
+        if overdue_list:
+            lines.append(f"  ⚠️ Просрочено: {len(overdue_list)}")
+            for t in overdue_list[:5]:
+                lines.append(f"    • {t.get('title', 'Без названия')}")
+            if len(overdue_list) > 5:
+                lines.append(f"    ... и ещё {len(overdue_list) - 5}")
+
+    if content_by_project:
+        lines.append("\n📱 <b>Контент-план на сегодня</b>")
+        for table_id, posts in content_by_project.items():
+            project_name = table_names.get(table_id, table_id or 'Без проекта')
+            lines.append(f"\n  📂 {project_name}:")
+            for p in posts[:15]:
+                fmt = (p.get('format') or 'post').lower()
+                kind = 'пост' if fmt == 'post' else 'рилс' if fmt == 'reel' else 'сторис' if fmt == 'story' else fmt
+                lines.append(f"    • [{kind}] {p.get('topic', 'Без темы')}")
+            if len(posts) > 15:
+                lines.append(f"    ... и ещё {len(posts) - 15}")
+
+    return "\n".join(lines) if len(lines) > 1 else "\n".join(lines) + "\nНет данных за сегодня."
 
 def format_weekly_report(stats: Dict[str, Any]) -> str:
     """Форматировать еженедельный отчет"""
@@ -273,25 +313,17 @@ def format_weekly_report(stats: Dict[str, Any]) -> str:
     return message
 
 def format_successful_deal(deal: Dict[str, Any], client: Optional[Dict[str, Any]], user: Optional[Dict[str, Any]]) -> str:
-    """Форматировать сообщение об успешной сделке для группового чата"""
-    message = "🎉 <b>Всем привет, поздравляю! У нас новый клиент!</b>\n\n"
-    
+    """Форматировать сообщение об успешной сделке для группового чата (без суммы)."""
+    message = "🎉 <b>Поздравляем! У нас новый клиент!</b>\n\n"
     if deal.get('title'):
         message += f"<b>Сделка:</b> {deal.get('title')}\n"
-    
     if client:
         message += f"<b>Клиент:</b> {client.get('name', client.get('companyName', 'Неизвестно'))}\n"
     elif deal.get('contactName'):
         message += f"<b>Клиент:</b> {deal.get('contactName')}\n"
-    
-    if deal.get('amount'):
-        message += f"<b>Сумма:</b> {deal.get('amount', 0):,} {deal.get('currency', 'UZS')}\n"
-    
     if user:
         message += f"<b>Ответственный:</b> {user.get('name', 'Неизвестно')}\n"
-    
     message += "\n🚀 Продолжаем в том же духе!"
-    
     return message
 
 def format_meeting_message(meeting: Dict[str, Any], users: List[Dict[str, Any]]) -> str:

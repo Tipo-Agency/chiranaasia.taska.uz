@@ -222,34 +222,62 @@ def get_overdue_tasks(user_id: str) -> List[Dict[str, Any]]:
         logger.error(f"[TASKS] Traceback: {traceback.format_exc()}")
         return []
 
-def get_yesterday_tasks() -> List[Dict[str, Any]]:
-    """Получить задачи на вчера (не выполненные)"""
+COMPLETED_STATUSES = ('Выполнено', 'Done', 'Завершено', 'Completed', 'completed', 'выполнено', 'завершено')
+
+def _normalize_date(d: str) -> str:
+    """YYYY-MM-DD from endDate/date string."""
+    if not d:
+        return ''
+    if 'T' in d:
+        return d.split('T')[0]
+    if ' ' in d:
+        return d.split(' ')[0]
+    return d[:10] if len(d) >= 10 else d
+
+def get_tasks_completed_yesterday() -> List[Dict[str, Any]]:
+    """Задачи, которые были выполнены вчера (status = выполнено, end_date = вчера)."""
     try:
-        from utils import get_today_date
-        from datetime import datetime, timedelta
+        from datetime import timedelta
         import pytz
-        
         tz = pytz.timezone('Asia/Tashkent')
         today = datetime.now(tz).date()
         yesterday = today - timedelta(days=1)
         yesterday_str = yesterday.isoformat()
-        
         all_tasks = firebase.get_all('tasks')
-        yesterday_tasks = []
-        
-        for task in all_tasks:
+        out = []
+        for task in all_tasks or []:
             if task.get('isArchived'):
                 continue
-            
-            # Исключаем выполненные задачи
+            status = (task.get('status') or '').strip()
+            if status not in COMPLETED_STATUSES:
+                continue
+            if _normalize_date(task.get('endDate') or '') != yesterday_str:
+                continue
+            out.append(task)
+        return out
+    except Exception as e:
+        print(f"Error get_tasks_completed_yesterday: {e}")
+        return []
+
+def get_yesterday_tasks() -> List[Dict[str, Any]]:
+    """Получить задачи на вчера (не выполненные) — для обратной совместимости."""
+    try:
+        from datetime import timedelta
+        import pytz
+        tz = pytz.timezone('Asia/Tashkent')
+        today = datetime.now(tz).date()
+        yesterday = today - timedelta(days=1)
+        yesterday_str = yesterday.isoformat()
+        all_tasks = firebase.get_all('tasks')
+        yesterday_tasks = []
+        for task in all_tasks or []:
+            if task.get('isArchived'):
+                continue
             status = task.get('status', '')
             if status in ['Выполнено', 'Done', 'Завершено']:
                 continue
-            
-            end_date = task.get('endDate', '')
-            if end_date == yesterday_str:
+            if _normalize_date(task.get('endDate') or '') == yesterday_str:
                 yesterday_tasks.append(task)
-        
         return yesterday_tasks
     except Exception as e:
         print(f"Error getting yesterday tasks: {e}")

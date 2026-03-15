@@ -1,5 +1,6 @@
 
 import React, { useRef, useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { Project, Role, Task, User, StatusOption, PriorityOption, TableCollection, BusinessProcess } from '../types';
 import { Trash2, Calendar, Layout, AlertCircle, ChevronDown, Check, Network, TrendingUp, FileText, Archive, Layers, Plus, CheckCircle2 as CheckIcon } from 'lucide-react';
 import { formatDate, normalizeDateForInput, isOverdue } from '../utils/dateUtils';
@@ -60,21 +61,98 @@ const resolveColorClass = (colorInput: string, type: 'status' | 'priority' | 'pr
 const CustomSelect = ({ value, options, onChange, type }: { value: string, options: any[], onChange: (val: string) => void, type: 'status' | 'priority' | 'project' }) => {
     const [isOpen, setIsOpen] = useState(false);
     const containerRef = useRef<HTMLDivElement>(null);
+    const dropdownRef = useRef<HTMLDivElement>(null);
+    const [dropdownStyle, setDropdownStyle] = useState<{ top: number; left: number; minWidth: number }>({ top: 0, left: 0, minWidth: 0 });
 
     const selectedOption = options.find(o => (type === 'project' ? o.id : o.name) === value);
     const label = selectedOption ? selectedOption.name : (type === 'project' ? 'Без модуля' : value);
     const colorClass = selectedOption ? resolveColorClass(selectedOption.color, type) : 'text-gray-500 bg-gray-50 dark:bg-[#333]';
 
+    const updatePosition = () => {
+        if (containerRef.current) {
+            const rect = containerRef.current.getBoundingClientRect();
+            setDropdownStyle({ top: rect.bottom + 4, left: rect.left, minWidth: rect.width });
+        }
+    };
+
+    useEffect(() => {
+        if (isOpen) updatePosition();
+    }, [isOpen]);
+
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
-            if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
-                setIsOpen(false);
-            }
+            const target = event.target as Node;
+            if (containerRef.current?.contains(target) || dropdownRef.current?.contains(target)) return;
+            setIsOpen(false);
         };
-        // Используем capture phase для более раннего перехвата
         document.addEventListener('mousedown', handleClickOutside, true);
         return () => document.removeEventListener('mousedown', handleClickOutside, true);
     }, []);
+
+    useEffect(() => {
+        if (!isOpen) return;
+        const handleScrollOrResize = () => {
+            updatePosition();
+        };
+        window.addEventListener('scroll', handleScrollOrResize, true);
+        window.addEventListener('resize', handleScrollOrResize);
+        return () => {
+            window.removeEventListener('scroll', handleScrollOrResize, true);
+            window.removeEventListener('resize', handleScrollOrResize);
+        };
+    }, [isOpen]);
+
+    const dropdownContent = isOpen ? (
+        <div
+            ref={dropdownRef}
+            className="fixed bg-white dark:bg-[#252525] border border-gray-200 dark:border-[#333] rounded-lg shadow-xl z-[9999] max-h-64 overflow-y-auto custom-scrollbar p-1.5"
+            style={{ top: dropdownStyle.top, left: dropdownStyle.left, minWidth: dropdownStyle.minWidth }}
+            onClick={(e) => { e.stopPropagation(); e.preventDefault(); }}
+            onMouseDown={(e) => { e.stopPropagation(); e.preventDefault(); }}
+        >
+            {type === 'project' && (
+                 <div 
+                    onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); }}
+                    onClick={(e) => { 
+                        e.preventDefault();
+                        e.stopPropagation(); 
+                        onChange(''); 
+                        setIsOpen(false); 
+                    }}
+                    className="px-2 py-2 hover:bg-gray-50 dark:hover:bg-[#303030] rounded-lg cursor-pointer text-xs text-gray-500 dark:text-gray-400 mb-1 transition-colors whitespace-nowrap"
+                >
+                    Без модуля
+                </div>
+            )}
+            {options.map(opt => {
+                const val = type === 'project' ? opt.id : opt.name;
+                const optColor = resolveColorClass(opt.color, type);
+                return (
+                    <div 
+                        key={opt.id}
+                        onMouseDown={(e) => { 
+                            e.preventDefault(); 
+                            e.stopPropagation(); 
+                            if (type === 'status') {
+                                onChange(val);
+                                setIsOpen(false);
+                            }
+                        }}
+                        onClick={(e) => { 
+                            e.preventDefault();
+                            e.stopPropagation(); 
+                            onChange(val); 
+                            setIsOpen(false); 
+                        }}
+                        className="flex items-center gap-2 px-2 py-2.5 hover:bg-gray-50 dark:hover:bg-[#303030] rounded-lg cursor-pointer transition-colors whitespace-nowrap"
+                    >
+                        <span className={`text-xs font-medium ${optColor} px-2 py-0.5 rounded inline-block`}>{opt.name}</span>
+                        {val === value && <Check size={14} className="text-blue-500 dark:text-blue-400 flex-shrink-0 ml-auto"/>}
+                    </div>
+                );
+            })}
+        </div>
+    ) : null;
 
     return (
         <div 
@@ -98,66 +176,18 @@ const CustomSelect = ({ value, options, onChange, type }: { value: string, optio
                 <span className="truncate">{label}</span>
                 <ChevronDown size={12} className={`transition-transform flex-shrink-0 ${isOpen ? 'rotate-180' : ''}`} />
             </div>
-            
-            {isOpen && (
-                <div 
-                    className="absolute top-full left-0 mt-1 w-auto min-w-full bg-white dark:bg-[#252525] border border-gray-200 dark:border-[#333] rounded-lg shadow-xl z-50 max-h-64 overflow-y-auto custom-scrollbar p-1.5" 
-                    onClick={(e) => { e.stopPropagation(); e.preventDefault(); }}
-                    onMouseDown={(e) => { e.stopPropagation(); e.preventDefault(); }}
-                >
-                    {type === 'project' && (
-                         <div 
-                            onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); }}
-                            onClick={(e) => { 
-                                e.preventDefault();
-                                e.stopPropagation(); 
-                                onChange(''); 
-                                setIsOpen(false); 
-                            }}
-                            className="px-2 py-2 hover:bg-gray-50 dark:hover:bg-[#303030] rounded-lg cursor-pointer text-xs text-gray-500 dark:text-gray-400 mb-1 transition-colors whitespace-nowrap"
-                        >
-                            Без модуля
-                        </div>
-                    )}
-                    {options.map(opt => {
-                        const val = type === 'project' ? opt.id : opt.name;
-                        const optColor = resolveColorClass(opt.color, type);
-                        return (
-                            <div 
-                                key={opt.id}
-                                onMouseDown={(e) => { 
-                                    e.preventDefault(); 
-                                    e.stopPropagation(); 
-                                    // Вызываем onChange сразу на mousedown для более быстрой реакции
-                                    if (type === 'status') {
-                                        onChange(val);
-                                        setIsOpen(false);
-                                    }
-                                }}
-                                onClick={(e) => { 
-                                    e.preventDefault();
-                                    e.stopPropagation(); 
-                                    onChange(val); 
-                                    setIsOpen(false); 
-                                }}
-                                className="flex items-center gap-2 px-2 py-2.5 hover:bg-gray-50 dark:hover:bg-[#303030] rounded-lg cursor-pointer transition-colors whitespace-nowrap"
-                            >
-                                <span className={`text-xs font-medium ${optColor} px-2 py-0.5 rounded inline-block`}>{opt.name}</span>
-                                {val === value && <Check size={14} className="text-blue-500 dark:text-blue-400 flex-shrink-0 ml-auto"/>}
-                            </div>
-                        );
-                    })}
-                </div>
-            )}
+            {typeof document !== 'undefined' && dropdownContent && createPortal(dropdownContent, document.body)}
         </div>
     );
 };
 
-// Компонент для выбора ответственных в таблице
+// Компонент для выбора ответственных в таблице (dropdown через portal — поверх таблицы)
 const AssigneeCell: React.FC<{ task: Task, users: User[], onUpdate: (assigneeIds: string[]) => void }> = ({ task, users, onUpdate }) => {
     const [isOpen, setIsOpen] = useState(false);
     const containerRef = useRef<HTMLDivElement>(null);
-    
+    const dropdownRef = useRef<HTMLDivElement>(null);
+    const [dropdownStyle, setDropdownStyle] = useState<{ top: number; left: number }>({ top: 0, left: 0 });
+
     const assignees = task.assigneeIds && task.assigneeIds.length > 0 
         ? task.assigneeIds.map(uid => users.find(u => u.id === uid)).filter(Boolean) as User[]
         : task.assigneeId 
@@ -177,20 +207,68 @@ const AssigneeCell: React.FC<{ task: Task, users: User[], onUpdate: (assigneeIds
             onUpdate([...currentIds, userId]);
         }
     };
-    
+
+    const updatePosition = () => {
+        if (containerRef.current) {
+            const rect = containerRef.current.getBoundingClientRect();
+            setDropdownStyle({ top: rect.bottom + 4, left: rect.left });
+        }
+    };
+
+    useEffect(() => {
+        if (isOpen) updatePosition();
+    }, [isOpen]);
+
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
-            if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
-                setIsOpen(false);
-            }
+            const target = event.target as Node;
+            if (containerRef.current?.contains(target) || dropdownRef.current?.contains(target)) return;
+            setIsOpen(false);
         };
-        if (isOpen) {
-            document.addEventListener('mousedown', handleClickOutside);
-        }
+        if (isOpen) document.addEventListener('mousedown', handleClickOutside, true);
+        return () => document.removeEventListener('mousedown', handleClickOutside, true);
+    }, [isOpen]);
+
+    useEffect(() => {
+        if (!isOpen) return;
+        const handleScrollOrResize = () => updatePosition();
+        window.addEventListener('scroll', handleScrollOrResize, true);
+        window.addEventListener('resize', handleScrollOrResize);
         return () => {
-            document.removeEventListener('mousedown', handleClickOutside);
+            window.removeEventListener('scroll', handleScrollOrResize, true);
+            window.removeEventListener('resize', handleScrollOrResize);
         };
     }, [isOpen]);
+
+    const dropdownContent = isOpen ? (
+        <div
+            ref={dropdownRef}
+            className="fixed w-64 bg-white dark:bg-[#252525] border border-gray-200 dark:border-gray-700 rounded-lg shadow-xl z-[9999] p-2 max-h-64 overflow-y-auto custom-scrollbar"
+            style={{ top: dropdownStyle.top, left: dropdownStyle.left }}
+        >
+            {users.map(u => {
+                const currentIds = task.assigneeIds && task.assigneeIds.length > 0 
+                    ? task.assigneeIds
+                    : task.assigneeId 
+                        ? [task.assigneeId]
+                        : [];
+                const isSelected = currentIds.includes(u.id);
+                return (
+                    <div 
+                        key={u.id} 
+                        onClick={() => toggleAssignee(u.id)} 
+                        className="flex items-center gap-3 p-2.5 hover:bg-gray-100 dark:hover:bg-[#333] rounded-lg cursor-pointer transition-colors"
+                    >
+                        <div className={`w-5 h-5 border-2 rounded flex items-center justify-center transition-colors ${isSelected ? 'bg-blue-600 border-blue-600' : 'border-gray-300 dark:border-gray-500 bg-white dark:bg-[#252525]'}`}>
+                            {isSelected && <CheckIcon size={12} className="text-white" />}
+                        </div>
+                        <UserAvatar user={u} size="md" />
+                        <span className="text-sm font-medium text-gray-800 dark:text-gray-200 flex-1 truncate">{u.name}</span>
+                    </div>
+                );
+            })}
+        </div>
+    ) : null;
     
     return (
         <div className="relative" ref={containerRef} onClick={(e) => e.stopPropagation()}>
@@ -222,34 +300,7 @@ const AssigneeCell: React.FC<{ task: Task, users: User[], onUpdate: (assigneeIds
                 )}
                 <Plus size={12} className="text-gray-400 ml-auto shrink-0" />
             </div>
-            
-            {isOpen && (
-                <div className="absolute top-full left-0 mt-1 w-64 bg-white dark:bg-[#252525] border border-gray-200 dark:border-gray-700 rounded-lg shadow-xl z-50 p-2 max-h-64 overflow-y-auto custom-scrollbar">
-                    {users.map(u => {
-                        const currentIds = task.assigneeIds && task.assigneeIds.length > 0 
-                            ? task.assigneeIds
-                            : task.assigneeId 
-                                ? [task.assigneeId]
-                                : [];
-                        const isSelected = currentIds.includes(u.id);
-                        return (
-                            <div 
-                                key={u.id} 
-                                onClick={() => {
-                                    toggleAssignee(u.id);
-                                }} 
-                                className="flex items-center gap-3 p-2.5 hover:bg-gray-100 dark:hover:bg-[#333] rounded-lg cursor-pointer transition-colors"
-                            >
-                                <div className={`w-5 h-5 border-2 rounded flex items-center justify-center transition-colors ${isSelected ? 'bg-blue-600 border-blue-600' : 'border-gray-300 dark:border-gray-500 bg-white dark:bg-[#252525]'}`}>
-                                    {isSelected && <CheckIcon size={12} className="text-white" />}
-                                </div>
-                                <UserAvatar user={u} size="md" />
-                                <span className="text-sm font-medium text-gray-800 dark:text-gray-200 flex-1 truncate">{u.name}</span>
-                            </div>
-                        );
-                    })}
-                </div>
-            )}
+            {typeof document !== 'undefined' && dropdownContent && createPortal(dropdownContent, document.body)}
         </div>
     );
 };

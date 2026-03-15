@@ -4,16 +4,23 @@
 try:
     from apscheduler.schedulers.asyncio import AsyncIOScheduler
     from apscheduler.triggers.cron import CronTrigger
+    from apscheduler.triggers.interval import IntervalTrigger
 except ImportError:
-    # Fallback для синхронного планировщика
     from apscheduler.schedulers.blocking import BlockingScheduler as AsyncIOScheduler
     from apscheduler.triggers.cron import CronTrigger
+    IntervalTrigger = None
 from apscheduler.triggers.cron import CronTrigger
 from datetime import datetime
 import pytz
 import config
 from firebase_client import firebase
-from notifications import get_daily_reminder_message, get_weekly_report_message, get_successful_deal_message, get_group_daily_summary
+from notifications import (
+    get_daily_reminder_message,
+    get_weekly_report_message,
+    get_successful_deal_message,
+    get_group_daily_summary,
+    run_deal_notifications_job,
+)
 from deals import get_won_deals_today
 
 class TaskScheduler:
@@ -34,10 +41,10 @@ class TaskScheduler:
             name='Ежедневное напоминание о задачах'
         )
         
-        # Ежедневная сводка в группу в 9:05
+        # Ежедневная сводка в группу в 9:00 (Ташкент)
         self.scheduler.add_job(
             self.send_group_daily_summary,
-            CronTrigger(hour=9, minute=5, timezone=config.DEFAULT_TIMEZONE),
+            CronTrigger(hour=9, minute=0, timezone=config.DEFAULT_TIMEZONE),
             id='group_daily_summary',
             name='Ежедневная сводка в группу'
         )
@@ -49,6 +56,15 @@ class TaskScheduler:
             id='weekly_report',
             name='Еженедельный отчет'
         )
+
+        # Новые заявки и поздравления по сделкам в группу — каждые 5 минут
+        if IntervalTrigger is not None:
+            self.scheduler.add_job(
+                self.send_deal_notifications,
+                IntervalTrigger(minutes=5),
+                id='deal_notifications',
+                name='Заявки и поздравления по сделкам в группу'
+            )
     
     async def send_daily_reminders(self):
         """Отправить ежедневные напоминания всем пользователям"""
@@ -133,6 +149,13 @@ class TaskScheduler:
                     print(f"Error sending weekly report to {telegram_chat_id}: {e}")
         except Exception as e:
             print(f"Error in send_weekly_report: {e}")
+
+    async def send_deal_notifications(self):
+        """Новые заявки со всех воронок и поздравления по успешным сделкам в группу."""
+        try:
+            await run_deal_notifications_job(self.bot)
+        except Exception as e:
+            print(f"Error in send_deal_notifications: {e}")
     
     def start(self):
         """Запустить планировщик"""

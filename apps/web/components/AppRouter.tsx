@@ -30,6 +30,9 @@ import { DocumentsModule } from './modules/DocumentsModule';
 import { SitesView } from './sites/SitesView';
 import InventoryView from './InventoryView';
 import { AdminView } from './admin/AdminView';
+import { MiniMessenger } from './features/chat/MiniMessenger';
+import { PageLayout } from './ui/PageLayout';
+import { Container } from './ui/Container';
 
 interface AppRouterProps {
   currentView: string;
@@ -63,6 +66,7 @@ interface AppRouterProps {
   purchaseRequests: PurchaseRequest[];
   financialPlanDocuments?: FinancialPlanDocument[];
   financialPlannings?: FinancialPlanning[];
+  bdr?: { year: string; rows: unknown[] } | null;
   warehouses: Warehouse[];
   inventoryItems: InventoryItem[];
   inventoryBalances: StockBalance[];
@@ -183,6 +187,18 @@ export const AppRouter: React.FC<AppRouterProps> = (props) => {
       );
   }
 
+  if (view === 'chat') {
+      return (
+          <PageLayout>
+              <Container safeArea className="py-4 h-full flex flex-col min-h-0">
+                  <div className="flex-1 min-h-[60vh]">
+                      <MiniMessenger users={props.users} currentUser={props.currentUser} />
+                  </div>
+              </Container>
+          </PageLayout>
+      );
+  }
+
   if (view === 'inbox') {
       return (
           <InboxPage
@@ -293,7 +309,7 @@ export const AppRouter: React.FC<AppRouterProps> = (props) => {
   }
 
   if (view === 'finance') {
-      return <FinanceModule categories={props.financeCategories} funds={props.funds} plan={props.financePlan} requests={props.purchaseRequests} departments={props.departments} users={props.users} currentUser={props.currentUser} financialPlanDocuments={props.financialPlanDocuments} financialPlannings={props.financialPlannings} actions={actions} />;
+      return <FinanceModule categories={props.financeCategories} funds={props.funds} plan={props.financePlan} requests={props.purchaseRequests} departments={props.departments} users={props.users} currentUser={props.currentUser} financialPlanDocuments={props.financialPlanDocuments} financialPlannings={props.financialPlannings} bdr={props.bdr} actions={actions} />;
   }
 
   if (view === 'employees' || view === 'business-processes') {

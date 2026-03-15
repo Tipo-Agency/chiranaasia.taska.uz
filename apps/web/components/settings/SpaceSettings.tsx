@@ -223,14 +223,14 @@ export const SpaceSettings: React.FC<SpaceSettingsProps> = ({
                   </div>
               </form>
               <div className="grid grid-cols-2 gap-4">
-                  {projects.map(p => (
+                  {projects.filter(p => !p.isArchived).map(p => (
                       <div key={p.id} className="p-4 border border-gray-200 dark:border-[#333] rounded-xl flex justify-between items-center gap-3 bg-white dark:bg-[#252525]">
                           <div className="flex items-center gap-3 min-w-0 flex-1">
                             {/* Use resolveColorClass or direct color here if projects have mixed data formats, but for now use DynamicIcon and assume new format */}
                             <DynamicIcon name={p.icon || 'Briefcase'} className={p.color} size={20} />
                             <span className="text-sm font-bold text-gray-800 dark:text-white truncate">{p.name}</span>
                           </div>
-                          <div className="flex gap-1 shrink-0"><button onClick={() => handleEditProject(p)} className="p-1.5 text-gray-400 hover:text-blue-500"><Pencil size={14}/></button><button onClick={() => onUpdateProjects(projects.filter(pr => pr.id !== p.id))} className="p-1.5 text-gray-400 hover:text-red-500"><Trash2 size={14}/></button></div>
+                          <div className="flex gap-1 shrink-0"><button onClick={() => handleEditProject(p)} className="p-1.5 text-gray-400 hover:text-blue-500"><Pencil size={14}/></button><button onClick={() => onUpdateProjects(projects.map(pr => pr.id === p.id ? { ...pr, isArchived: true } : pr))} className="p-1.5 text-gray-400 hover:text-red-500" title="В архив"><Trash2 size={14}/></button></div>
                       </div>
                   ))}
               </div>

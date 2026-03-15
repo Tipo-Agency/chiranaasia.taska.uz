@@ -44,6 +44,8 @@
 
 **После деплоя:** убедиться, что backend и БД подняты (`docker compose ps`), проверить сайт и логи (Настройки → Логи или `GET /api/system/logs`). Админа и пользователей создают вручную на сервере или через приложение (если есть регистрация).
 
+**Тестовая отправка из админки (вкладка «Telegram бот»):** чтобы кнопки «Тест: ежедневная сводка / новая заявка / поздравление» работали, в окружении **backend** (Docker или .env на сервере) задайте переменную `TELEGRAM_BOT_TOKEN` (тот же токен, что у бота).
+
 Подробный чеклист и устранение неполадок: [docs/DEPLOY_AND_MIGRATION.md](docs/DEPLOY_AND_MIGRATION.md).
 
 Миграция Firestore → Postgres уже выполнена. Скрипты в `scripts/` и описание в [docs/MIGRATION_FROM_FIRESTORE_TO_POSTGRES.md](docs/MIGRATION_FROM_FIRESTORE_TO_POSTGRES.md) сохранены для справки.

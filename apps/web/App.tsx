@@ -12,11 +12,14 @@ import ProfileModal from './components/ProfileModal';
 import SettingsModal from './components/SettingsModal';
 import CreateTableModal from './components/CreateTableModal';
 import PublicContentPlanView from './components/PublicContentPlanView';
+import { MiniMessenger } from './components/features/chat/MiniMessenger';
+import { MessageCircle } from 'lucide-react';
 import { useAppLogic } from './frontend/hooks/useAppLogic';
 
 const App = () => {
   const { state, actions } = useAppLogic();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [chatPanelOpen, setChatPanelOpen] = useState(false);
   const [publicContentPlanId, setPublicContentPlanId] = useState<string | null>(null);
   
   // Проверка публичной ссылки на контент-план
@@ -109,6 +112,35 @@ const App = () => {
                 </div>
             )}
 
+            {/* Кнопка чата слева внизу — только десктоп и планшет */}
+            <button
+              type="button"
+              onClick={() => setChatPanelOpen(true)}
+              className="hidden md:flex fixed bottom-6 left-64 z-40 w-14 h-14 rounded-full bg-[#3337AD] text-white shadow-lg hover:bg-[#292b8a] items-center justify-center"
+              title="Чат"
+            >
+              <MessageCircle size={24} />
+            </button>
+
+            {/* Панель чата (выезжает справа) — только когда открыта */}
+            {chatPanelOpen && (
+              <>
+                <div
+                  className="hidden md:block fixed inset-0 bg-black/30 z-40"
+                  onClick={() => setChatPanelOpen(false)}
+                  aria-hidden
+                />
+                <div className="hidden md:flex fixed top-0 right-0 bottom-0 w-full max-w-md bg-white dark:bg-[#252525] border-l border-gray-200 dark:border-[#333] z-50 flex-col shadow-xl">
+                  <MiniMessenger
+                    users={state.users}
+                    currentUser={state.currentUser}
+                    onClose={() => setChatPanelOpen(false)}
+                    className="rounded-none border-0 h-full"
+                  />
+                </div>
+              </>
+            )}
+
             {/* Main Content Router */}
             <div className="flex-1 min-h-0 overflow-hidden h-full">
             <AppRouter 
@@ -145,6 +177,7 @@ const App = () => {
                 purchaseRequests={state.purchaseRequests}
                 financialPlanDocuments={state.financialPlanDocuments}
                 financialPlannings={state.financialPlannings}
+                bdr={state.bdr}
                 warehouses={state.warehouses}
                 inventoryItems={state.inventoryItems}
                 inventoryBalances={state.inventoryBalances}

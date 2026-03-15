@@ -100,11 +100,19 @@ user_sessions = {}  # {telegram_user_id: {user_id: str, last_check: datetime}}
 user_states = {}  # {telegram_user_id: {state: str, data: dict}}
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """Обработчик команды /start"""
+    """Обработчик команды /start. Авторизация только в личных сообщениях."""
     try:
+        chat_type = update.effective_chat.type if update.effective_chat else "unknown"
+        if chat_type not in ("private",):
+            await update.message.reply_text(
+                "👋 Для авторизации и работы с системой напишите боту в личные сообщения (Private message).\n\n"
+                "Откройте бота по имени и нажмите «Начать» или отправьте /start."
+            )
+            return ConversationHandler.END
+
         telegram_user_id = update.effective_user.id
         username = update.effective_user.username or update.effective_user.first_name or "Unknown"
-        logger.info(f"[START] Command received from user {telegram_user_id} (@{username})")
+        logger.info(f"[START] Command received from user {telegram_user_id} (@{username}) [private]")
         
         # Проверяем, авторизован ли пользователь
         if telegram_user_id in user_sessions:
@@ -135,8 +143,11 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
         return ConversationHandler.END
 
 async def login(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """Обработчик ввода логина"""
+    """Обработчик ввода логина (только в личке)."""
     try:
+        if update.effective_chat and update.effective_chat.type != "private":
+            await update.message.reply_text("Авторизация только в личных сообщениях. Напишите боту в личку.")
+            return ConversationHandler.END
         login_text = update.message.text.strip()
         logger.info(f"[LOGIN] User {update.effective_user.id} entered login: {login_text[:3]}...")
         context.user_data['login'] = login_text
@@ -152,8 +163,11 @@ async def login(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
         return ConversationHandler.END
 
 async def password(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """Обработчик ввода пароля"""
+    """Обработчик ввода пароля (только в личке)."""
     try:
+        if update.effective_chat and update.effective_chat.type != "private":
+            await update.message.reply_text("Авторизация только в личных сообщениях. Напишите боту в личку.")
+            return ConversationHandler.END
         password_text = update.message.text
         login_text = context.user_data.get('login')
         logger.info(f"[PASSWORD] User {update.effective_user.id} attempting login: {login_text}")

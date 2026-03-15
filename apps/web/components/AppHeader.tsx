@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { 
-  Search, Moon, Sun, Settings, Bell, ChevronDown, LogOut, User as UserIcon, Home, Menu, X,
+  Search, Moon, Sun, Settings, Bell, ChevronDown, LogOut, User as UserIcon, Home, Menu, X, MessageCircle,
   BarChart3, Wallet, Network, PieChart, Briefcase, UserCheck, CheckSquare, Users, FileText, Instagram, Layers, Globe, Package
 } from 'lucide-react';
 import { User, Role, TableCollection } from '../types';
@@ -52,6 +52,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
       case 'home': return { title: 'Рабочий стол', icon: <Home size={20} /> };
       case 'tasks': return { title: 'Задачи', icon: <CheckSquare size={20} /> };
       case 'inbox': return { title: 'Входящие', icon: <Bell size={20} /> };
+      case 'chat': return { title: 'Чат', icon: <MessageCircle size={20} /> };
       case 'search': return { title: 'Поиск', icon: <Search size={20} /> };
       case 'settings': return { title: 'Настройки', icon: <Settings size={20} /> };
       case 'analytics': return { title: 'Аналитика', icon: <PieChart size={20} /> };

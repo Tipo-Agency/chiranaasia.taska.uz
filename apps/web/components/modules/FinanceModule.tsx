@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { FinanceCategory, Fund, FinancePlan, PurchaseRequest, Department, User, FinancialPlanDocument, FinancialPlanning } from '../../types';
+import { FinanceCategory, Fund, FinancePlan, PurchaseRequest, Department, User, FinancialPlanDocument, FinancialPlanning, Bdr } from '../../types';
 import FinanceView from '../FinanceView';
 
 interface FinanceModuleProps {
@@ -13,10 +13,11 @@ interface FinanceModuleProps {
   currentUser: User;
   financialPlanDocuments?: FinancialPlanDocument[];
   financialPlannings?: FinancialPlanning[];
+  bdr?: Bdr | null;
   actions: any;
 }
 
-export const FinanceModule: React.FC<FinanceModuleProps> = ({ categories, funds = [], plan, requests, departments, users, currentUser, financialPlanDocuments = [], financialPlannings = [], actions }) => {
+export const FinanceModule: React.FC<FinanceModuleProps> = ({ categories, funds = [], plan, requests, departments, users, currentUser, financialPlanDocuments = [], financialPlannings = [], bdr = null, actions }) => {
     return (
         <FinanceView 
             categories={categories}
@@ -28,6 +29,9 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ categories, funds 
             currentUser={currentUser}
             financialPlanDocuments={financialPlanDocuments}
             financialPlannings={financialPlannings}
+            bdr={bdr}
+            onLoadBdr={actions.loadBdr}
+            onSaveBdr={actions.saveBdr}
             onSaveRequest={actions.savePurchaseRequest} 
             onDeleteRequest={actions.deletePurchaseRequest}
             onSaveFinancialPlanDocument={actions.saveFinancialPlanDocument}

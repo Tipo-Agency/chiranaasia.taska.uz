@@ -10,16 +10,18 @@ import {
   Play,
   RefreshCw,
   Loader2,
+  Send,
 } from 'lucide-react';
 import { adminEndpoint, systemEndpoint } from '../../services/apiClient';
 
-type TabId = 'db' | 'errors' | 'load' | 'tests';
+type TabId = 'db' | 'errors' | 'load' | 'tests' | 'bot';
 
 const TABS: { id: TabId; label: string; icon: React.ReactNode }[] = [
   { id: 'db', label: 'База данных', icon: <Database size={18} /> },
   { id: 'errors', label: 'Ошибки', icon: <AlertCircle size={18} /> },
   { id: 'load', label: 'Нагрузка', icon: <Activity size={18} /> },
   { id: 'tests', label: 'Тесты', icon: <Play size={18} /> },
+  { id: 'bot', label: 'Telegram бот', icon: <Send size={18} /> },
 ];
 
 export const AdminView: React.FC = () => {
@@ -65,6 +67,7 @@ export const AdminView: React.FC = () => {
           {activeTab === 'errors' && <ErrorsTab onAuthError={setAuthError} />}
           {activeTab === 'load' && <LoadTab onAuthError={setAuthError} />}
           {activeTab === 'tests' && <TestsTab onAuthError={setAuthError} />}
+          {activeTab === 'bot' && <BotTab onAuthError={setAuthError} />}
         </main>
       </div>
     </div>
@@ -439,6 +442,132 @@ function TestsTab({ onAuthError }: { onAuthError: (msg: string) => void }) {
           </pre>
         </div>
       )}
+    </div>
+  );
+}
+
+function BotTab({ onAuthError }: { onAuthError: (msg: string) => void }) {
+  const [status, setStatus] = useState<{
+    telegram_configured: boolean;
+    group_chat_id?: string;
+    group_chat_id_set: boolean;
+  } | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [sending, setSending] = useState<'daily' | 'deal' | 'congrats' | null>(null);
+  const [lastResult, setLastResult] = useState<{ ok: boolean; error?: string } | null>(null);
+
+  const loadStatus = async () => {
+    setLoading(true);
+    setLastResult(null);
+    try {
+      const data = await adminEndpoint.getBotStatus();
+      setStatus(data);
+    } catch (e) {
+      if (String(e).includes('401') || String(e).includes('403')) onAuthError(String(e));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadStatus();
+  }, []);
+
+  const sendTest = async (type: 'daily' | 'deal' | 'congrats') => {
+    setSending(type);
+    setLastResult(null);
+    try {
+      const res =
+        type === 'daily'
+          ? await adminEndpoint.testBotDailySummary()
+          : type === 'deal'
+            ? await adminEndpoint.testBotNewDeal()
+            : await adminEndpoint.testBotCongrats();
+      setLastResult({ ok: res.ok, error: res.error });
+    } catch (e) {
+      setLastResult({ ok: false, error: String(e) });
+    } finally {
+      setSending(null);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center gap-2 text-gray-500 dark:text-gray-400">
+        <Loader2 size={20} className="animate-spin" />
+        Загрузка…
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      <h2 className="font-semibold text-lg">Управление Telegram ботом</h2>
+      <p className="text-sm text-gray-500 dark:text-gray-400">
+        Ежедневная сводка (9:00 Ташкент), новые заявки и поздравления по сделкам отправляются в группу. Ниже — статус и тестовая отправка.
+      </p>
+
+      <div className="p-4 rounded-xl border border-gray-200 dark:border-[#333] bg-gray-50 dark:bg-[#252525] space-y-2">
+        <h3 className="font-medium text-gray-700 dark:text-gray-300">Статус</h3>
+        <p className="text-sm">
+          Токен бота (API): {status?.telegram_configured ? (
+            <span className="text-green-600 dark:text-green-400">настроен</span>
+          ) : (
+            <span className="text-amber-600 dark:text-amber-400">не задан (TELEGRAM_BOT_TOKEN на сервере)</span>
+          )}
+        </p>
+        <p className="text-sm">
+          Группа для сводки: {status?.group_chat_id_set ? (
+            <span className="text-green-600 dark:text-green-400">ID задан</span>
+          ) : (
+            <span className="text-amber-600 dark:text-amber-400">не задана (указать в настройках уведомлений в приложении или в боте)</span>
+          )}
+          {status?.group_chat_id && (
+            <span className="ml-2 text-xs text-gray-500 font-mono">{status.group_chat_id}</span>
+          )}
+        </p>
+      </div>
+
+      <div>
+        <h3 className="font-medium text-gray-700 dark:text-gray-300 mb-2">Тестовая отправка в группу</h3>
+        <p className="text-sm text-gray-500 dark:text-gray-400 mb-3">
+          Отправить тестовые сообщения в групповой чат (как при реальной рассылке).
+        </p>
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={() => sendTest('daily')}
+            disabled={sending !== null || !status?.telegram_configured || !status?.group_chat_id_set}
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-[#3337AD] text-white text-sm font-medium disabled:opacity-50"
+          >
+            {sending === 'daily' ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
+            Тест: ежедневная сводка
+          </button>
+          <button
+            type="button"
+            onClick={() => sendTest('deal')}
+            disabled={sending !== null || !status?.telegram_configured || !status?.group_chat_id_set}
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-[#3337AD] text-white text-sm font-medium disabled:opacity-50"
+          >
+            {sending === 'deal' ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
+            Тест: новая заявка
+          </button>
+          <button
+            type="button"
+            onClick={() => sendTest('congrats')}
+            disabled={sending !== null || !status?.telegram_configured || !status?.group_chat_id_set}
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-[#3337AD] text-white text-sm font-medium disabled:opacity-50"
+          >
+            {sending === 'congrats' ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
+            Тест: поздравление
+          </button>
+        </div>
+        {lastResult && (
+          <div className={`mt-3 p-3 rounded-lg text-sm ${lastResult.ok ? 'bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300' : 'bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300'}`}>
+            {lastResult.ok ? 'Сообщение отправлено в группу.' : `Ошибка: ${lastResult.error}`}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

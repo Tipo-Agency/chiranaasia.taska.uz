@@ -1,7 +1,8 @@
 
 import React, { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { ContentPost, Task, TableCollection } from '../types';
-import { Calendar, Plus, X, FileText as FileTextIcon, Send, Youtube, Video, Image, FileText, Clock, List, LayoutGrid, KanbanSquare, Linkedin, Check, CheckSquare, ChevronLeft, ChevronRight, Trash2, Edit2, Instagram, CheckSquare2, Save, RefreshCw } from 'lucide-react';
+import { Calendar, Plus, X, FileText as FileTextIcon, Send, Youtube, Video, Image, FileText, Clock, List, LayoutGrid, KanbanSquare, Linkedin, Check, CheckSquare, ChevronLeft, ChevronRight, Trash2, Edit2, Instagram, CheckSquare2, Save, RefreshCw, MoreVertical } from 'lucide-react';
 import { DynamicIcon } from './AppIcons';
 import { TaskSelect } from './TaskSelect';
 import { api } from '../backend/api';
@@ -62,7 +63,13 @@ const ContentPlanView: React.FC<ContentPlanViewProps> = ({
   const [viewMode, setViewMode] = useState<'calendar' | 'table' | 'kanban' | 'gantt' | 'tasks'>('calendar');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingPost, setEditingPost] = useState<ContentPost | null>(null);
-  
+  /** Фильтр по формату в календаре: пост / рилс / сторис и т.д. */
+  const [formatFilter, setFormatFilter] = useState<ContentPost['format'] | 'all'>('all');
+  /** Открытое контекстное меню поста в календаре (id поста или null) */
+  const [openMenuPostId, setOpenMenuPostId] = useState<string | null>(null);
+  const postMenuAnchorRef = useRef<{ post: ContentPost; x: number; y: number } | null>(null);
+  const postMenuDropdownRef = useRef<HTMLDivElement>(null);
+
   // Calendar Navigation State
   const [currentDate, setCurrentDate] = useState(new Date());
 
@@ -132,6 +139,12 @@ const ContentPlanView: React.FC<ContentPlanViewProps> = ({
     .filter(p => p.tableId === tableId && !p.isArchived)
     .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
+  /** Для календаря: дополнительный фильтр по формату (пост / рилс / сторис и т.д.) */
+  const filteredPostsByFormat =
+    formatFilter === 'all'
+      ? filteredPosts
+      : filteredPosts.filter(p => p.format === formatFilter);
+
   const handleOpenCreate = () => {
       setEditingPost(null);
       const newDate = new Date().toISOString().split('T')[0];
@@ -152,6 +165,28 @@ const ContentPlanView: React.FC<ContentPlanViewProps> = ({
         copy: ''
       };
       setIsModalOpen(true);
+  };
+
+  /** Создать пост/рилс по клику на пустую ячейку календаря с предзаполненной датой */
+  const handleCreateForDate = (dateString: string) => {
+    setEditingPost(null);
+    setTopic('');
+    setDescription('');
+    setDate(dateString);
+    setPlatform(['instagram']);
+    setFormat('post');
+    setStatus('idea');
+    setCopy('');
+    initialValuesRef.current = {
+      topic: '',
+      description: '',
+      date: dateString,
+      platform: ['instagram'],
+      format: 'post',
+      status: 'idea',
+      copy: ''
+    };
+    setIsModalOpen(true);
   };
 
   const handleOpenEdit = (post: ContentPost) => {
@@ -355,9 +390,42 @@ const ContentPlanView: React.FC<ContentPlanViewProps> = ({
       return (<div className="flex -space-x-1">{arr.map(p => (<div key={p} className="bg-white dark:bg-[#303030] rounded-full p-0.5 border border-gray-100 dark:border-gray-600">{getPlatformIcon(p)}</div>))}</div>); 
   };
   
-  const getFormatLabel = (f: string) => { switch (f) { case 'reel': return 'Reels'; case 'post': return 'Пост'; case 'story': return 'Stories'; default: return f; } };
+  const getFormatLabel = (f: string) => {
+    switch (f) {
+      case 'reel': return 'Reels';
+      case 'post': return 'Пост';
+      case 'story': return 'Stories';
+      case 'article': return 'Статья';
+      case 'video': return 'Видео';
+      default: return f;
+    }
+  };
+  const getFormatIcon = (f: string) => {
+    switch (f) {
+      case 'reel': return <Video size={12} className="text-pink-500 shrink-0" />;
+      case 'story': return <Image size={12} className="text-amber-500 shrink-0" />;
+      case 'article': return <FileText size={12} className="text-blue-500 shrink-0" />;
+      case 'video': return <Video size={12} className="text-red-500 shrink-0" />;
+      default: return <FileTextIcon size={12} className="text-gray-500 shrink-0" />;
+    }
+  };
   const getStatusColor = (s: string) => { switch (s) { case 'idea': return 'border-gray-200 bg-gray-50 dark:bg-[#2a2a2a] dark:border-[#444]'; case 'published': return 'border-green-200 bg-green-50 dark:bg-green-900/20 dark:border-green-800'; default: return 'border-blue-200 bg-blue-50 dark:bg-blue-900/20 dark:border-blue-800'; } };
   const getStatusLabel = (s: string) => { switch (s) { case 'idea': return 'Идея'; case 'copywriting': return 'Копирайтинг'; case 'design': return 'Дизайн'; case 'approval': return 'Согласование'; case 'scheduled': return 'План'; case 'published': return 'Готово'; default: return s; } };
+
+  const statuses: ContentPost['status'][] = ['idea', 'copywriting', 'design', 'approval', 'scheduled', 'published'];
+
+  useEffect(() => {
+    if (!openMenuPostId) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      const target = e.target as Node;
+      if (postMenuDropdownRef.current?.contains(target)) return;
+      const trigger = document.querySelector('[data-post-menu-trigger]');
+      if (trigger?.contains(target)) return;
+      setOpenMenuPostId(null);
+    };
+    document.addEventListener('mousedown', handleClickOutside, true);
+    return () => document.removeEventListener('mousedown', handleClickOutside, true);
+  }, [openMenuPostId]);
 
   const handleBackdropClick = (e: React.MouseEvent) => {
       if (e.target === e.currentTarget) {
@@ -517,6 +585,25 @@ const ContentPlanView: React.FC<ContentPlanViewProps> = ({
                  <button onClick={() => setCurrentDate(new Date())} className="text-xs font-medium text-blue-600 hover:underline">Сегодня</button>
             </div>
 
+            {/* Фильтр по формату: пост / рилс / сторис и т.д. */}
+            <div className="flex flex-wrap items-center gap-2 px-3 py-2 border-b border-gray-200 dark:border-[#333] bg-gray-50 dark:bg-[#252525] shrink-0">
+              <span className="text-xs font-medium text-gray-500 dark:text-gray-400">Формат:</span>
+              {(['all', 'post', 'reel', 'story', 'article', 'video'] as const).map((f) => (
+                <button
+                  key={f}
+                  type="button"
+                  onClick={() => setFormatFilter(f)}
+                  className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors ${
+                    formatFilter === f
+                      ? 'bg-[#3337AD] text-white'
+                      : 'bg-white dark:bg-[#2a2a2a] text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-[#333] border border-gray-200 dark:border-[#333]'
+                  }`}
+                >
+                  {f === 'all' ? 'Все' : getFormatLabel(f)}
+                </button>
+              ))}
+            </div>
+
             <div className="grid grid-cols-7 bg-gray-50 dark:bg-[#252525] border-b border-gray-200 dark:border-[#333] text-center text-xs font-bold text-gray-500 dark:text-gray-400 py-2 shrink-0">
                 {['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'].map(d => <div key={d}>{d}</div>)}
             </div>
@@ -530,16 +617,26 @@ const ContentPlanView: React.FC<ContentPlanViewProps> = ({
                         dateString = `${currentYear}-${m}-${d}`;
                     }
 
-                    const dayPosts = day ? filteredPosts.filter(p => {
-                        // Нормализуем дату поста - берем только часть до 'T' (YYYY-MM-DD)
+                    const dayPosts = day ? filteredPostsByFormat.filter(p => {
                         const postDate = p.date.split('T')[0];
                         return postDate === dateString;
                     }) : [];
 
+                    const handleCellClick = (e: React.MouseEvent) => {
+                      if (!day) return;
+                      const target = e.target as HTMLElement;
+                      if (target.closest('[data-post-card]')) return;
+                      handleCreateForDate(dateString);
+                    };
+
                     return (
                         <div
                             key={idx}
-                            className={`min-h-[100px] border-r border-b border-gray-100 dark:border-[#333] p-1 transition-colors ${!day ? 'bg-gray-50/30 dark:bg-[#151515]' : 'hover:bg-gray-50 dark:hover:bg-[#252525]'}`}
+                            role="button"
+                            tabIndex={0}
+                            onClick={handleCellClick}
+                            onKeyDown={(e) => { if (day && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); handleCreateForDate(dateString); } }}
+                            className={`min-h-[100px] border-r border-b border-gray-100 dark:border-[#333] p-1 transition-colors cursor-pointer ${!day ? 'bg-gray-50/30 dark:bg-[#151515] cursor-default' : 'hover:bg-gray-50 dark:hover:bg-[#252525]'}`}
                             {...(day
                                 ? {
                                       onDragOver,
@@ -552,18 +649,33 @@ const ContentPlanView: React.FC<ContentPlanViewProps> = ({
                                   <div className="text-right text-xs text-gray-400 mb-1 mr-1">{day}</div>
                                   <div className="space-y-1">
                                       {dayPosts.map(post => (
-                                          <div 
-                                            key={post.id} 
-                                            onClick={() => handleOpenEdit(post)} 
+                                          <div
+                                            data-post-card
+                                            key={post.id}
+                                            onClick={(e) => { e.stopPropagation(); handleOpenEdit(post); }}
                                             draggable
                                             onDragStart={(e) => onDragStart(e, post.id)}
-                                            className={`p-1.5 rounded border text-[10px] cursor-pointer shadow-sm hover:shadow-md transition-all ${getStatusColor(post.status)}`}
+                                            className={`p-1.5 rounded border text-[10px] cursor-pointer shadow-sm hover:shadow-md transition-all group/card ${getStatusColor(post.status)}`}
                                           >
-                                              <div className="flex items-center justify-between mb-1">
-                                                  <div className="flex items-center gap-1">
+                                              <div className="flex items-center justify-between gap-1 mb-1">
+                                                  <div className="flex items-center gap-1 min-w-0">
+                                                      {getFormatIcon(post.format)}
                                                       {renderPlatformIcons(post.platform)}
-                                                      <span className="font-bold opacity-80 text-gray-700 dark:text-gray-300">{getFormatLabel(post.format)}</span>
+                                                      <span className="font-bold opacity-80 text-gray-700 dark:text-gray-300 truncate">{getFormatLabel(post.format)}</span>
                                                   </div>
+                                                  <button
+                                                    data-post-menu-trigger
+                                                    type="button"
+                                                    onClick={(e) => {
+                                                      e.stopPropagation();
+                                                      const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+                                                      postMenuAnchorRef.current = { post, x: rect.left, y: rect.bottom };
+                                                      setOpenMenuPostId(post.id);
+                                                    }}
+                                                    className="opacity-0 group-hover/card:opacity-100 p-0.5 rounded hover:bg-black/10 dark:hover:bg-white/10 transition-opacity"
+                                                  >
+                                                    <MoreVertical size={14} className="text-gray-500 dark:text-gray-400" />
+                                                  </button>
                                               </div>
                                               <div className="line-clamp-2 leading-tight font-medium text-gray-800 dark:text-gray-200">{post.topic}</div>
                                           </div>
@@ -575,6 +687,43 @@ const ContentPlanView: React.FC<ContentPlanViewProps> = ({
                     );
                 })}
             </div>
+
+            {/* Портал: меню смены статуса / удаления поста в календаре */}
+            {typeof document !== 'undefined' && openMenuPostId && postMenuAnchorRef.current && postMenuAnchorRef.current.post.id === openMenuPostId && createPortal(
+              <div
+                ref={postMenuDropdownRef}
+                className="fixed bg-white dark:bg-[#252525] border border-gray-200 dark:border-[#333] rounded-lg shadow-xl z-[9999] py-1 min-w-[160px]"
+                style={{ top: postMenuAnchorRef.current.y + 4, left: postMenuAnchorRef.current.x }}
+              >
+                <div className="px-2 py-1.5 text-xs font-medium text-gray-500 dark:text-gray-400 border-b border-gray-100 dark:border-[#333]">Статус</div>
+                {statuses.map((s) => (
+                  <button
+                    key={s}
+                    type="button"
+                    onClick={() => {
+                      onSavePost({ ...postMenuAnchorRef.current!.post, status: s });
+                      setOpenMenuPostId(null);
+                    }}
+                    className="w-full text-left px-3 py-2 text-xs hover:bg-gray-50 dark:hover:bg-[#333]"
+                  >
+                    {getStatusLabel(s)}
+                  </button>
+                ))}
+                <div className="border-t border-gray-100 dark:border-[#333] mt-1 pt-1">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (postMenuAnchorRef.current?.post.id) onDeletePost(postMenuAnchorRef.current.post.id);
+                      setOpenMenuPostId(null);
+                    }}
+                    className="w-full text-left px-3 py-2 text-xs text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 flex items-center gap-2"
+                  >
+                    <Trash2 size={12} /> Удалить
+                  </button>
+                </div>
+              </div>,
+              document.body
+            )}
         </div>
     );
   };

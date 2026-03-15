@@ -177,6 +177,7 @@ export const useAppLogic = () => {
       financeSlice.setters.setPurchaseRequests(requests);
       financeSlice.setters.setFinancialPlanDocuments(planDocs);
       financeSlice.setters.setFinancialPlannings(plannings);
+      await financeSlice.actions.loadBdr();
       loadedModulesRef.current.add('finance');
       setLoadedModules(new Set(loadedModulesRef.current));
   };
@@ -300,6 +301,15 @@ export const useAppLogic = () => {
               break;
           case 'finance':
               await loadFinanceData();
+              break;
+          case 'settings':
+              // Для архива нужны подразделения, категории, воронки и т.д.
+              await Promise.all([
+                  loadFinanceData(),
+                  loadCRMData(),
+                  loadContentData(),
+                  loadBPMData(),
+              ]);
               break;
           case 'employees':
           case 'business-processes':
@@ -646,7 +656,7 @@ export const useAppLogic = () => {
       tasks: taskSlice.state.tasks, projects: taskSlice.state.projects, statuses: taskSlice.state.statuses, priorities: taskSlice.state.priorities, isTaskModalOpen: taskSlice.state.isTaskModalOpen, editingTask: taskSlice.state.editingTask,
       clients: crmSlice.state.clients, contracts: crmSlice.state.contracts, oneTimeDeals: crmSlice.state.oneTimeDeals, accountsReceivable: crmSlice.state.accountsReceivable, employeeInfos: crmSlice.state.employeeInfos, deals: crmSlice.state.deals,
       docs: contentSlice.state.docs, folders: contentSlice.state.folders, meetings: contentSlice.state.meetings, contentPosts: contentSlice.state.contentPosts, isDocModalOpen: contentSlice.state.isDocModalOpen, activeDocId: contentSlice.state.activeDocId, targetFolderId: contentSlice.state.targetFolderId, editingDoc: contentSlice.state.editingDoc,
-      departments: financeSlice.state.departments, financeCategories: financeSlice.state.financeCategories, funds: financeSlice.state.funds, financePlan: financeSlice.state.financePlan, purchaseRequests: financeSlice.state.purchaseRequests, financialPlanDocuments: financeSlice.state.financialPlanDocuments, financialPlannings: financeSlice.state.financialPlannings,
+      departments: financeSlice.state.departments, financeCategories: financeSlice.state.financeCategories, funds: financeSlice.state.funds, financePlan: financeSlice.state.financePlan, purchaseRequests: financeSlice.state.purchaseRequests, financialPlanDocuments: financeSlice.state.financialPlanDocuments, financialPlannings: financeSlice.state.financialPlannings, bdr: financeSlice.state.bdr,
       orgPositions: bpmSlice.state.orgPositions, businessProcesses: bpmSlice.state.businessProcesses,
       warehouses: inventorySlice.state.warehouses, inventoryItems: inventorySlice.state.items, inventoryMovements: inventorySlice.state.movements, inventoryBalances: inventorySlice.state.balances, inventoryRevisions: inventorySlice.state.revisions,
       salesFunnels: salesFunnels,
@@ -777,7 +787,9 @@ export const useAppLogic = () => {
           }
         }
       },
-      deletePurchaseRequest: financeSlice.actions.deletePurchaseRequest, saveFinancialPlanDocument: financeSlice.actions.saveFinancialPlanDocument, deleteFinancialPlanDocument: financeSlice.actions.deleteFinancialPlanDocument, saveFinancialPlanning: financeSlice.actions.saveFinancialPlanning, deleteFinancialPlanning: financeSlice.actions.deleteFinancialPlanning,
+      deletePurchaseRequest: financeSlice.actions.deletePurchaseRequest, saveFinancialPlanDocument: financeSlice.actions.saveFinancialPlanDocument, deleteFinancialPlanDocument: financeSlice.actions.deleteFinancialPlanDocument, saveFinancialPlanning: financeSlice.actions.saveFinancialPlanning,       deleteFinancialPlanning: financeSlice.actions.deleteFinancialPlanning,
+      loadBdr: financeSlice.actions.loadBdr,
+      saveBdr: financeSlice.actions.saveBdr,
       saveWarehouse: inventorySlice.actions.saveWarehouse, deleteWarehouse: inventorySlice.actions.deleteWarehouse, saveInventoryItem: inventorySlice.actions.saveItem, deleteInventoryItem: inventorySlice.actions.deleteItem, createInventoryMovement: inventorySlice.actions.createMovement, createInventoryRevision: inventorySlice.actions.createRevision, updateInventoryRevision: inventorySlice.actions.updateRevision, postInventoryRevision: inventorySlice.actions.postRevision,
       savePosition: bpmSlice.actions.savePosition, deletePosition: bpmSlice.actions.deletePosition, saveProcess: bpmSlice.actions.saveProcess, deleteProcess: bpmSlice.actions.deleteProcess, completeProcessStepWithBranch,
       saveSalesFunnel: async (funnel: SalesFunnel) => {

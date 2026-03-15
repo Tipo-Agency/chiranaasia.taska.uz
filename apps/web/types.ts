@@ -574,6 +574,21 @@ export interface FinancialPlanning {
     isArchived?: boolean;
 }
 
+/** Строка БДР (бюджет доходов и расходов): название статьи и суммы по периодам (месяцам) */
+export interface BdrRow {
+  id: string;
+  name: string;
+  type: 'income' | 'expense';
+  /** Ключ — период YYYY-MM, значение — сумма в UZS */
+  amounts: Record<string, number>;
+}
+
+/** БДР за год */
+export interface Bdr {
+  year: string;
+  rows: BdrRow[];
+}
+
 // --- INVENTORY TYPES ---
 
 export interface Warehouse {

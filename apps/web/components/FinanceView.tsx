@@ -1,10 +1,11 @@
 
 import React, { useState, useRef, useMemo, useEffect, useCallback } from 'react';
 import { TaskSelect } from './TaskSelect';
-import { FinanceCategory, Fund, FinancePlan, PurchaseRequest, Department, User, Role, FinancialPlanDocument, FinancialPlanning } from '../types';
+import { FinanceCategory, Fund, FinancePlan, PurchaseRequest, Department, User, Role, FinancialPlanDocument, FinancialPlanning, Bdr } from '../types';
 import { Wallet, Plus, X, Edit2, Trash2, PieChart, TrendingUp, DollarSign, Check, AlertCircle, Calendar, Settings, ArrowLeft, ArrowRight, Save, FileText, Clock, CheckCircle2, ChevronDown } from 'lucide-react';
 import { Tabs, Button, Card } from './ui';
 import { BankStatementsView } from './finance/BankStatementsView';
+import { BdrView } from './finance/BdrView';
 import { FilterConfig } from './FiltersPanel';
 import { Filter } from 'lucide-react';
 
@@ -18,6 +19,9 @@ interface FinanceViewProps {
   currentUser: User;
   financialPlanDocuments?: FinancialPlanDocument[];
   financialPlannings?: FinancialPlanning[];
+  bdr?: Bdr | null;
+  onLoadBdr?: (year?: string) => Promise<void>;
+  onSaveBdr?: (payload: { year: string; rows: Bdr['rows'] }) => Promise<void>;
   onSaveRequest: (req: PurchaseRequest) => void;
   onDeleteRequest: (id: string) => void;
   onSaveFinancialPlanDocument?: (doc: FinancialPlanDocument) => void;
@@ -28,11 +32,12 @@ interface FinanceViewProps {
 
 const FinanceView: React.FC<FinanceViewProps> = ({ 
     categories, funds = [], plan, requests, departments, users, currentUser,
-    financialPlanDocuments = [], financialPlannings = [],
+    financialPlanDocuments = [], financialPlannings = [], bdr = null,
+    onLoadBdr, onSaveBdr,
     onSaveRequest, onDeleteRequest,
     onSaveFinancialPlanDocument, onDeleteFinancialPlanDocument, onSaveFinancialPlanning, onDeleteFinancialPlanning
 }) => {
-  const [activeTab, setActiveTab] = useState<'planning' | 'requests' | 'plan' | 'statements'>('planning');
+  const [activeTab, setActiveTab] = useState<'planning' | 'requests' | 'plan' | 'statements' | 'bdr'>('planning');
   
   // Состояния для детальных страниц
   const [selectedPlanning, setSelectedPlanning] = useState<FinancialPlanning | null>(null);
@@ -1508,6 +1513,7 @@ const FinanceView: React.FC<FinanceViewProps> = ({
                 <Tabs
                     tabs={[
                         { id: 'planning', label: 'Планирование' },
+                        { id: 'bdr', label: 'БДР' },
                         { id: 'requests', label: 'Заявки' },
                         { id: 'statements', label: 'Выписки и сверка' },
                         ...(currentUser.role === Role.ADMIN ? [{ id: 'plan', label: 'Финансовый план' }] : [])
@@ -1522,6 +1528,8 @@ const FinanceView: React.FC<FinanceViewProps> = ({
                             setActiveTab('plan');
                         } else if (tabId === 'statements') {
                             setActiveTab('statements');
+                        } else if (tabId === 'bdr') {
+                            setActiveTab('bdr');
                         } else {
                             setSelectedPlanning(null);
                             setSelectedPlanDoc(null);
@@ -1593,6 +1601,9 @@ const FinanceView: React.FC<FinanceViewProps> = ({
          <div className="max-w-7xl mx-auto w-full px-6 pb-20 h-full overflow-y-auto custom-scrollbar">
            {activeTab === 'planning' && (
              selectedPlanning ? renderPlanningDetail() : renderPlanningList()
+           )}
+           {activeTab === 'bdr' && onLoadBdr && onSaveBdr && (
+             <BdrView bdr={bdr ?? null} onLoadBdr={onLoadBdr} onSaveBdr={onSaveBdr} />
            )}
            {activeTab === 'requests' && renderRequestsTab()}
            {activeTab === 'statements' && <BankStatementsView />}

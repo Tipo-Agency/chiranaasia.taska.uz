@@ -8,7 +8,7 @@ from app.models.client import Client, Deal, EmployeeInfo, AccountsReceivable
 from app.models.content import Doc, Folder, Meeting, ContentPost
 from app.models.finance import Department, FinanceCategory, Fund, FinancePlan, PurchaseRequest
 from app.models.finance import FinancialPlanDocument, FinancialPlanning
-from app.models.finance import BankStatement, BankStatementLine, IncomeReport
+from app.models.finance import BankStatement, BankStatementLine, IncomeReport, Bdr
 from app.models.bpm import OrgPosition, BusinessProcess
 from app.models.inventory import Warehouse, InventoryItem, StockMovement, InventoryRevision
 from app.models.funnel import SalesFunnel
@@ -46,6 +46,7 @@ __all__ = [
     "BankStatement",
     "BankStatementLine",
     "IncomeReport",
+    "Bdr",
     "OrgPosition",
     "BusinessProcess",
     "Warehouse",

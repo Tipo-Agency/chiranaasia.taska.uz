@@ -8,6 +8,7 @@ from app.models.finance import (
     FinanceCategory, Fund, FinancePlan, PurchaseRequest,
     FinancialPlanDocument, FinancialPlanning,
     BankStatement, BankStatementLine, IncomeReport,
+    Bdr,
 )
 
 router = APIRouter(prefix="/finance", tags=["finance"])
@@ -437,5 +438,45 @@ async def update_income_reports(payload: list[dict], db: AsyncSession = Depends(
                 created_at=r.get("createdAt", ""),
                 updated_at=r.get("updatedAt"),
             ))
+    await db.commit()
+    return {"ok": True}
+
+
+# --- БДР (бюджет доходов и расходов) ---
+
+@router.get("/bdr")
+async def get_bdr(year: str | None = None, db: AsyncSession = Depends(get_db)):
+    """Получить БДР за год. Если year не указан — текущий год."""
+    import datetime
+    y = year or str(datetime.date.today().year)
+    result = await db.execute(select(Bdr).where(Bdr.year == y))
+    row = result.scalar_one_or_none()
+    if not row:
+        return {"year": y, "rows": []}
+    return {
+        "year": row.year,
+        "rows": row.rows if isinstance(row.rows, list) else [],
+    }
+
+
+@router.put("/bdr")
+async def update_bdr(payload: dict, db: AsyncSession = Depends(get_db)):
+    """Сохранить БДР за год. payload: { "year": "2025", "rows": [ {"id": "...", "name": "...", "type": "income"|"expense", "amounts": {"2025-01": 100, ...} }, ... ] }"""
+    y = str(payload.get("year", ""))
+    if not y:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=400, detail="year required")
+    rows = payload.get("rows")
+    if not isinstance(rows, list):
+        rows = []
+    result = await db.execute(select(Bdr).where(Bdr.year == y))
+    existing = result.scalar_one_or_none()
+    import datetime
+    now = datetime.datetime.utcnow().isoformat()[:19] + "Z"
+    if existing:
+        existing.rows = rows
+        existing.updated_at = now
+    else:
+        db.add(Bdr(id=y, year=y, rows=rows, updated_at=now))
     await db.commit()
     return {"ok": True}

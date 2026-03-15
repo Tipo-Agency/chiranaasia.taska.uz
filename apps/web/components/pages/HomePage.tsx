@@ -1,8 +1,8 @@
 /**
  * HomePage — «Рабочий стол»:
- * приветствие, кнопка «Создать» и блок «Входящие / Исходящие / Сообщения» + обзор задач/сделок/встреч.
+ * приветствие, Входящие/Исходящие/Сообщения (табы как в других модулях), контент в табах, метрики, недельный план.
  */
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   Task,
   User,
@@ -22,15 +22,16 @@ import {
 } from '../../types';
 import {
   HomeHeader,
-  MyTasksSection,
-  UpcomingMeetings,
-  NewDealsSection,
   StatsCards,
   BirthdayModal,
 } from '../features/home';
+import { TaskCard } from '../features/tasks/TaskCard';
 import { Container } from '../ui/Container';
 import { PageLayout } from '../ui/PageLayout';
+import { Tabs } from '../ui/Tabs';
+import { MiniMessenger } from '../features/chat/MiniMessenger';
 import { getTodayLocalDate } from '../../utils/dateUtils';
+import { CheckSquare, Briefcase, ArrowRight } from 'lucide-react';
 
 type InboxTab = 'incoming' | 'outgoing' | 'messages';
 
@@ -131,14 +132,36 @@ export const HomePage: React.FC<HomePageProps> = ({
     }
   }, [currentUser?.id, employeeInfos]);
 
-  const myTasks = (tasks || []).filter(
-    (t) =>
-      t &&
-      t.entityType !== 'idea' &&
-      t.entityType !== 'feature' &&
-      !t.isArchived &&
-      !['Выполнено', 'Done', 'Завершено'].includes(t.status) &&
-      (t.assigneeId === currentUser?.id || t.assigneeIds?.includes(currentUser?.id))
+  const myTasks = useMemo(
+    () =>
+      (tasks || []).filter(
+        (t) =>
+          t &&
+          t.entityType !== 'idea' &&
+          t.entityType !== 'feature' &&
+          !t.isArchived &&
+          !['Выполнено', 'Done', 'Завершено'].includes(t.status) &&
+          (t.assigneeId === currentUser?.id || t.assigneeIds?.includes(currentUser?.id))
+      ),
+    [tasks, currentUser?.id]
+  );
+
+  const myDeals = useMemo(
+    () => (deals || []).filter((d) => d && !d.isArchived && d.assigneeId === currentUser?.id),
+    [deals, currentUser?.id]
+  );
+
+  const outgoingTasks = useMemo(
+    () =>
+      (tasks || []).filter(
+        (t) =>
+          t &&
+          t.createdByUserId === currentUser?.id &&
+          !t.isArchived &&
+          t.assigneeId &&
+          t.assigneeId !== currentUser?.id
+      ),
+    [tasks, currentUser?.id]
   );
 
   if (!currentUser) {
@@ -165,58 +188,107 @@ export const HomePage: React.FC<HomePageProps> = ({
               onQuickCreateProcess={onQuickCreateProcess}
             />
 
-            {/* Карточка «Входящие / Исходящие / Сообщения» */}
+            {/* Входящие / Исходящие / Сообщения — табы как в других модулях */}
             <div className="bg-white dark:bg-[#252525] border border-gray-200 dark:border-[#333] rounded-2xl shadow-sm overflow-hidden">
-              <div className="flex items-center gap-2 px-4 pt-4 border-b border-gray-100 dark:border-[#333]">
-                <button
-                  type="button"
-                  onClick={() => setInboxTab('incoming')}
-                  className={`px-4 py-2 rounded-full text-sm font-medium ${
-                    inboxTab === 'incoming'
-                      ? 'bg-gray-900 text-white dark:bg-white dark:text-gray-900'
-                      : 'text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white'
-                  }`}
-                >
-                  Входящие
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setInboxTab('outgoing')}
-                  className={`px-4 py-2 rounded-full text-sm font-medium ${
-                    inboxTab === 'outgoing'
-                      ? 'bg-gray-900 text-white dark:bg-white dark:text-gray-900'
-                      : 'text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white'
-                  }`}
-                >
-                  Исходящие
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setInboxTab('messages')}
-                  className={`px-4 py-2 rounded-full text-sm font-medium ${
-                    inboxTab === 'messages'
-                      ? 'bg-gray-900 text-white dark:bg.white dark:text-gray-900'
-                      : 'text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white'
-                  }`}
-                >
-                  Сообщения
-                </button>
+              <div className="px-4 pt-4 pb-2">
+                <Tabs
+                  tabs={[
+                    { id: 'incoming', label: `Входящие${myTasks.length + myDeals.length > 0 ? ` (${myTasks.length + myDeals.length})` : ''}` },
+                    { id: 'outgoing', label: `Исходящие${outgoingTasks.length > 0 ? ` (${outgoingTasks.length})` : ''}` },
+                    { id: 'messages', label: 'Сообщения' },
+                  ]}
+                  activeTab={inboxTab}
+                  onChange={(id) => setInboxTab(id as InboxTab)}
+                />
               </div>
-              <div className="px-4 py-6">
-                <h2 className="text-lg font-semibold text-gray-900 dark:text.white mb-2">
-                  {inboxTab === 'incoming'
-                    ? 'Входящие'
-                    : inboxTab === 'outgoing'
-                    ? 'Исходящие'
-                    : 'Сообщения'}
-                </h2>
-                <p className="text-sm text-gray-500 dark:text-gray-400">
-                  {inboxTab === 'incoming'
-                    ? 'Нет входящих сущностей'
-                    : inboxTab === 'outgoing'
-                    ? 'Нет исходящих сущностей'
-                    : 'Нет сообщений'}
-                </p>
+              <div className="px-4 pb-4 min-h-[200px]">
+                {inboxTab === 'incoming' && (
+                  <div className="space-y-4">
+                    {myTasks.length > 0 && (
+                      <div>
+                        <div className="flex items-center justify-between mb-2">
+                          <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 flex items-center gap-1.5">
+                            <CheckSquare size={16} /> Задачи мне
+                          </h3>
+                          {onNavigateToTasks && (
+                            <button type="button" onClick={onNavigateToTasks} className="text-xs text-[#3337AD] hover:underline flex items-center gap-0.5">
+                              Все <ArrowRight size={12} />
+                            </button>
+                          )}
+                        </div>
+                        <div className="space-y-2">
+                          {myTasks.slice(0, 5).map((t) => (
+                            <div key={t.id} onClick={() => onOpenTask(t)} className="cursor-pointer">
+                              <TaskCard task={t} users={users} projects={projects} statuses={statuses} priorities={priorities} onClick={() => onOpenTask(t)} />
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    {myDeals.length > 0 && (
+                      <div>
+                        <div className="flex items-center justify-between mb-2">
+                          <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 flex items-center gap-1.5">
+                            <Briefcase size={16} /> Сделки мне
+                          </h3>
+                          {onNavigateToDeals && (
+                            <button type="button" onClick={onNavigateToDeals} className="text-xs text-[#3337AD] hover:underline flex items-center gap-0.5">
+                              Все <ArrowRight size={12} />
+                            </button>
+                          )}
+                        </div>
+                        <ul className="space-y-1.5">
+                          {myDeals.slice(0, 5).map((d) => {
+                            const client = clients.find((c) => c.id === d.clientId);
+                            return (
+                              <li
+                                key={d.id}
+                                className="px-3 py-2 rounded-lg bg-gray-50 dark:bg-[#2a2a2a] text-sm text-gray-800 dark:text-gray-200"
+                              >
+                                {d.title || client?.name || d.contactName || 'Сделка'} · {d.stage}
+                              </li>
+                            );
+                          })}
+                        </ul>
+                      </div>
+                    )}
+                    {myTasks.length === 0 && myDeals.length === 0 && (
+                      <p className="text-sm text-gray-500 dark:text-gray-400">Нет входящих задач и сделок.</p>
+                    )}
+                  </div>
+                )}
+                {inboxTab === 'outgoing' && (
+                  <div className="space-y-4">
+                    {outgoingTasks.length > 0 ? (
+                      <div>
+                        <div className="flex items-center justify-between mb-2">
+                          <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 flex items-center gap-1.5">
+                            <CheckSquare size={16} /> Задачи, которые я поставил
+                          </h3>
+                          {onNavigateToTasks && (
+                            <button type="button" onClick={onNavigateToTasks} className="text-xs text-[#3337AD] hover:underline flex items-center gap-0.5">
+                              Все <ArrowRight size={12} />
+                            </button>
+                          )}
+                        </div>
+                        <div className="space-y-2">
+                          {outgoingTasks.slice(0, 5).map((t) => (
+                            <div key={t.id} onClick={() => onOpenTask(t)} className="cursor-pointer">
+                              <TaskCard task={t} users={users} projects={projects} statuses={statuses} priorities={priorities} onClick={() => onOpenTask(t)} />
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ) : (
+                      <p className="text-sm text-gray-500 dark:text-gray-400">Нет исходящих задач.</p>
+                    )}
+                  </div>
+                )}
+                {inboxTab === 'messages' && (
+                  <div className="h-[320px] -mx-4">
+                    <MiniMessenger users={users} currentUser={currentUser} />
+                  </div>
+                )}
               </div>
             </div>
 
@@ -245,7 +317,7 @@ export const HomePage: React.FC<HomePageProps> = ({
               </div>
             )}
 
-            {/* Обзор: метрики, задачи, сделки, встречи */}
+            {/* Метрики */}
             <StatsCards
               deals={deals}
               financePlan={financePlan}
@@ -253,26 +325,6 @@ export const HomePage: React.FC<HomePageProps> = ({
               currentUser={currentUser}
               accountsReceivable={accountsReceivable}
             />
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-              <MyTasksSection
-                tasks={myTasks}
-                users={users}
-                projects={projects}
-                statuses={statuses}
-                priorities={priorities}
-                onOpenTask={onOpenTask}
-                onViewAll={onNavigateToTasks}
-              />
-              <div className="space-y-4">
-                <NewDealsSection
-                  deals={deals}
-                  clients={clients}
-                  users={users}
-                  onViewAll={onNavigateToDeals || (() => {})}
-                />
-                <UpcomingMeetings meetings={meetings} users={users} onViewAll={onNavigateToMeetings} />
-              </div>
-            </div>
           </div>
         </Container>
       </PageLayout>
