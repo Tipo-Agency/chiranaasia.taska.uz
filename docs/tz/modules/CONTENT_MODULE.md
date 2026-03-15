@@ -129,8 +129,8 @@
 - `GET /api/contentPosts` - Получить все посты
 - `POST /api/contentPosts` - Создать пост
 
-### 6.3. Коллекции Firestore
+### 6.3. Таблицы в базе данных
 - `docs` - Документы
 - `folders` - Папки
 - `meetings` - Встречи
-- `contentPosts` - Посты контент-плана
+- `content_posts` - Посты контент-плана

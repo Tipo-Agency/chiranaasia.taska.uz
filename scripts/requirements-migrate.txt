@@ -1,0 +1,5 @@
+# Зависимости только для скрипта миграции Firestore → Postgres.
+# Использование: pip install -r scripts/requirements-migrate.txt
+firebase-admin>=6.2.0
+requests>=2.28.0
+python-dotenv>=1.0.0

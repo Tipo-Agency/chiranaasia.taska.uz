@@ -1,4 +1,7 @@
-# Архитектура системы tipa.taska.uz
+# Архитектура системы tipa.taska.uz (актуальная)
+
+> Этот документ описывает **актуальную** архитектуру (PostgreSQL + FastAPI).  
+> Оригинальная облачная архитектура на Firestore описана в `docs/CLOUD_ARCHITECTURE*.md` и считается legacy.
 
 ## 1. Общая архитектура
 
@@ -6,68 +9,61 @@
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                    Frontend (React + TypeScript)            │
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐       │
-│  │   Components │  │    Hooks    │  │   Services   │       │
-│  └──────────────┘  └──────────────┘  └──────────────┘       │
+│                 apps/web (Frontend, React + TS)             │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐      │
+│  │ Components   │  │    Hooks     │  │   Services   │      │
+│  └──────────────┘  └──────────────┘  └──────────────┘      │
 └─────────────────────────────────────────────────────────────┘
                             │
-                            │ API Calls
+                            │ HTTP / JSON (REST)
                             ▼
 ┌─────────────────────────────────────────────────────────────┐
-│              Backend API (TypeScript)                       │
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐     │
-│  │  Endpoints   │  │  Firestore   │  │  Storage     │     │
-│  └──────────────┘  └──────────────┘  └──────────────┘     │
+│                apps/api (Backend, FastAPI)                  │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐      │
+│  │   Routers    │  │  Services    │  │   Schemas    │      │
+│  └──────────────┘  └──────────────┘  └──────────────┘      │
 └─────────────────────────────────────────────────────────────┘
                             │
-                            │ HTTP/REST
+                            │ async SQLAlchemy
                             ▼
 ┌─────────────────────────────────────────────────────────────┐
-│              Firebase (Google Cloud)                        │
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐     │
-│  │  Firestore   │  │   Storage    │  │   Auth       │     │
-│  └──────────────┘  └──────────────┘  └──────────────┘     │
+│                    PostgreSQL (primary DB)                  │
 └─────────────────────────────────────────────────────────────┘
                             │
-                            │ Webhooks/API
+                            │ HTTP / Webhooks
                             ▼
 ┌─────────────────────────────────────────────────────────────┐
-│         Telegram Bot (Python)                                │
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐     │
-│  │   Bot API    │  │  Scheduler   │  │ Notifications│     │
-│  └──────────────┘  └──────────────┘  └──────────────┘     │
+│                 apps/bot (Telegram Bot, Python)             │
 └─────────────────────────────────────────────────────────────┘
 ```
 
 ### 1.2. Технологический стек
 
 #### Frontend
-- **Framework**: React 18+
+- **Framework**: React 18+ (Vite)
 - **Language**: TypeScript
 - **Build Tool**: Vite
-- **State Management**: Custom hooks (useState, useEffect)
+- **State Management**: Custom hooks
 - **Styling**: Tailwind CSS
-- **Icons**: Lucide React
 
 #### Backend
-- **Language**: TypeScript
-- **Storage**: Firebase Firestore (REST API)
-- **File Storage**: Firebase Storage
-- **Authentication**: Custom (Firebase-based)
+- **Framework**: FastAPI
+- **Language**: Python 3.12
+- **DB**: PostgreSQL
+- **Migrations**: Alembic
+- **ORM**: SQLAlchemy (async)
 
 #### Telegram Bot
 - **Language**: Python 3.10+
 - **Library**: python-telegram-bot v20+
 - **Scheduler**: APScheduler
-- **Database**: Firebase Firestore (Admin SDK)
+- **Data Source**: HTTP API `apps/api` (а не прямой доступ к БД)
 
 #### Infrastructure
 - **Hosting**: VPS (Linux)
 - **Web Server**: Nginx
 - **Process Manager**: systemd
 - **CI/CD**: GitHub Actions
-- **Database**: Firebase Firestore (Cloud)
 
 ## 2. Модульная архитектура
 
@@ -96,13 +92,11 @@
 ### 3.1. Создание задачи
 
 ```
-User Input → TaskModal → useTaskLogic → api.tasks → Firestore
-                                    ↓
-                            notificationService
-                                    ↓
-                    ┌───────────────┴───────────────┐
-                    ▼                               ▼
-            Activity Logs                  Telegram Bot
+User Input → TaskModal → useTaskLogic → api.tasks (HTTP) → FastAPI → PostgreSQL
+                                                   ↓
+                                           notificationService
+                                                   ↓
+                                Activity Logs      +      Telegram Bot
 ```
 
 ### 3.2. Уведомления

@@ -128,7 +128,7 @@
 - `GET /api/bpm/processes` - Получить все процессы
 - `POST /api/bpm/processes` - Создать процесс
 
-### 6.3. Коллекции Firestore
-- `employeeInfos` - Информация о сотрудниках
-- `orgPositions` - Должности
-- `businessProcesses` - Бизнес-процессы
+### 6.3. Таблицы в базе данных
+- `employee_infos` - Информация о сотрудниках
+- `org_positions` - Должности
+- `business_processes` - Бизнес-процессы

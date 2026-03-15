@@ -1,1 +1,19 @@
-{"name":"типа-задачи","private":true,"version":"0.0.0","type":"module","scripts":{"dev":"vite","build":"vite build","preview":"vite preview","push":"git add . && (git diff --staged --quiet || git commit -m \"auto update\") && git push"},"dependencies":{"@types/bcryptjs":"^2.4.6","bcryptjs":"^3.0.3","lucide-react":"^0.554.0","react":"^19.2.1","react-dom":"^19.2.1"},"devDependencies":{"@types/node":"^22.14.0","@vitejs/plugin-react":"^5.0.0","typescript":"~5.8.2","vite":"^6.2.0"}}
+{
+  "name": "tipa-taska",
+  "private": true,
+  "workspaces": [
+    "apps/web"
+  ],
+  "scripts": {
+    "dev:web": "npm --workspace apps/web run dev",
+    "build:web": "npm --workspace apps/web run build",
+    "preview:web": "npm --workspace apps/web run preview",
+    "types:api": "openapi-typescript http://localhost:8000/openapi.json -o apps/web/types/api.d.ts",
+    "docker:up": "docker-compose up -d",
+    "docker:tools": "docker-compose --profile tools up -d",
+    "deploy": "git push origin main"
+  },
+  "devDependencies": {
+    "openapi-typescript": "^7.13.0"
+  }
+}

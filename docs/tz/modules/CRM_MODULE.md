@@ -211,8 +211,8 @@
 - `GET /api/funnels` - Получить все воронки
 - `POST /api/funnels` - Создать воронку
 
-### 9.3. Коллекции Firestore
+### 9.3. Таблицы в базе данных
 - `clients` - Клиенты
 - `deals` - Сделки
-- `salesFunnels` - Воронки продаж
-- `accountsReceivable` - Дебиторская задолженность
+- `sales_funnels` - Воронки продаж
+- `accounts_receivable` - Дебиторская задолженность

@@ -1,5 +1,0 @@
-{
-  "name": "taska.uz",
-  "description": "A Notion-like task management system with Table, Kanban, and Gantt views, featuring role-based access control and Telegram integration.",
-  "requestFramePermissions": []
-}

@@ -27,7 +27,25 @@ dist-ssr
 .env
 .env.local
 .env.*.local
-telegram-bot/.env
+apps/bot/.env
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyd
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Python virtual environments
+venv/
+.venv/
+apps/api/venv/
+apps/api/.venv/
+apps/bot/venv/
+apps/bot/.venv/
 
 # Auto Claude data directory
 .auto-claude/

@@ -110,8 +110,8 @@
 - `GET /api/inventory/movements` - Получить все движения
 - `POST /api/inventory/movements` - Создать движение
 
-### 7.3. Коллекции Firestore
+### 7.3. Таблицы в базе данных
 - `warehouses` - Склады
-- `inventoryItems` - Товары
-- `stockMovements` - Движения товаров
-- `stockBalances` - Остатки (вычисляемые)
+- `inventory_items` - Товары
+- `stock_movements` - Движения товаров
+- Остатки рассчитываются по движениям и могут кэшироваться отдельной таблицей при необходимости

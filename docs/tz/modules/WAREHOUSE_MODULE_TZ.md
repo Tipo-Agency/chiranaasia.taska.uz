@@ -173,25 +173,25 @@
 
 ## 8. API и хранилище
 
-### 8.1. Коллекции (localStorage / localStoreService)
+### 8.1. Таблицы в базе данных
 - **warehouses** — склады
-- **inventoryItems** — номенклатура
-- **stockMovements** — движения
-- **inventoryRevisions** — ревизии
+- **inventory_items** — номенклатура
+- **stock_movements** — движения
+- **inventory_revisions** — ревизии
 
-Остатки не хранятся, вычисляются на фронте по движениям.
+Остатки не хранятся отдельной таблицей, вычисляются по движениям (или могут кэшироваться сервером).
 
-### 8.2. Эндпоинты (api.inventory)
+### 8.2. HTTP API (backend inventory)
 | Метод | Описание |
 |-------|----------|
-| getWarehouses() | Список складов |
-| updateWarehouses(warehouses) | Сохранить склады |
-| getItems() | Список номенклатуры |
-| updateItems(items) | Сохранить номенклатуру |
-| getMovements() | Список движений |
-| updateMovements(movements) | Сохранить движения |
-| getRevisions() | Список ревизий |
-| updateRevisions(revisions) | Сохранить ревизии |
+| `GET /api/inventory/warehouses` | Список складов |
+| `PUT /api/inventory/warehouses` | Обновить/сохранить склады |
+| `GET /api/inventory/items` | Список номенклатуры |
+| `PUT /api/inventory/items` | Обновить/сохранить номенклатуру |
+| `GET /api/inventory/movements` | Список движений |
+| `PUT /api/inventory/movements` | Обновить/сохранить движения |
+| `GET /api/inventory/revisions` | Список ревизий |
+| `PUT /api/inventory/revisions` | Обновить/сохранить ревизии |
 
 ---
 

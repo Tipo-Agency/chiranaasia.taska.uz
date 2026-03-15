@@ -1,6 +1,0 @@
-python-telegram-bot==20.7
-firebase-admin==6.2.0
-bcrypt==4.0.1
-APScheduler==3.10.4
-python-dotenv==1.0.0
-pytz==2024.1

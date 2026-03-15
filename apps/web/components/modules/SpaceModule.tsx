@@ -1,0 +1,456 @@
+
+import React, { useMemo, useState } from 'react';
+import { TableCollection, Task, User, Project, StatusOption, PriorityOption, Doc, Folder, Meeting, ContentPost, ViewMode, BusinessProcess, Client, Deal } from '../../types';
+import TableView from '../TableView';
+import KanbanBoard from '../KanbanBoard';
+import GanttView from '../GanttView';
+import FunctionalityView from '../FunctionalityView';
+import BacklogView from '../BacklogView';
+import MeetingsView from '../MeetingsView';
+import ContentPlanView from '../ContentPlanView';
+import DocumentsView from '../DocumentsView';
+import { AlertCircle, LayoutList, Kanban, BarChart3, ListFilter, EyeOff, Plus, CheckSquare } from 'lucide-react';
+
+interface SpaceModuleProps {
+  activeTable: TableCollection;
+  viewMode: ViewMode;
+  tasks: Task[];
+  users: User[];
+  currentUser: User;
+  projects: Project[];
+  statuses: StatusOption[];
+  priorities: PriorityOption[];
+  tables: TableCollection[];
+  docs: Doc[];
+  folders: Folder[];
+  meetings: Meeting[];
+  contentPosts: ContentPost[];
+  businessProcesses?: BusinessProcess[];
+  clients?: Client[];
+  deals?: Deal[];
+  actions: any;
+}
+
+export const SpaceModule: React.FC<SpaceModuleProps> = ({
+  activeTable, viewMode, tasks, users, currentUser, projects, statuses, priorities, tables, docs, folders, meetings, contentPosts, businessProcesses = [], clients = [], deals = [], actions
+}) => {
+  const isAggregator = activeTable?.isSystem && activeTable?.type === 'tasks';
+
+  // --- Filters for task views (таблица / канбан / гант) ---
+  const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [assigneeFilter, setAssigneeFilter] = useState<string>('all');
+  const [projectFilter, setProjectFilter] = useState<string>('all');
+  const [hideCompleted, setHideCompleted] = useState<boolean>(true);
+
+  const filteredTasks: Task[] = useMemo(() => {
+      return tasks.filter((t) => {
+          if (t.isArchived) return false;
+          if (hideCompleted && t.status === 'Выполнено') return false;
+          if (statusFilter !== 'all' && t.status !== statusFilter) return false;
+          if (assigneeFilter !== 'all' && t.assigneeId !== assigneeFilter && !(t.assigneeIds && t.assigneeIds.includes(assigneeFilter))) {
+              return false;
+          }
+          if (projectFilter !== 'all' && t.projectId !== projectFilter) return false;
+          return true;
+      });
+  }, [tasks, hideCompleted, statusFilter, assigneeFilter, projectFilter]);
+
+  // Получаем идеи для беклога (entityType: 'idea' и tableId совпадает с activeTable.id)
+  const backlogTasks = useMemo(() => {
+    if (activeTable?.type === 'backlog' && activeTable?.id) {
+      return tasks.filter(t => 
+        t.entityType === 'idea' && 
+        t.tableId === activeTable.id &&
+        !t.isArchived
+      );
+    }
+    return [];
+  }, [tasks, activeTable]);
+
+  // Получаем все backlog таблицы для фильтрации
+  const backlogTableIds = useMemo(() => {
+    return tables.filter(t => t.type === 'backlog').map(t => t.id);
+  }, [tables]);
+
+  // Получаем ВСЕ функции из всех functionality таблиц (entityType: 'feature')
+  const allFunctionalityTasks = useMemo(() => {
+    const functionalityTableIds = tables.filter(t => t.type === 'functionality').map(t => t.id);
+    return tasks.filter(t => 
+      t.entityType === 'feature' && 
+      functionalityTableIds.includes(t.tableId) &&
+      !t.isArchived
+    );
+  }, [tasks, tables]);
+
+  // Защита от undefined activeTable (после всех хуков)
+  if (!activeTable) {
+    return (
+      <div className="flex flex-col items-center justify-center h-full text-gray-400">
+        <AlertCircle size={48} className="mb-4 opacity-20" />
+        <p>Страница не выбрана</p>
+      </div>
+    );
+  }
+
+  switch (activeTable.type) {
+    case 'tasks':
+        return (
+            <div className="h-full flex flex-col min-h-0">
+                <div className="max-w-7xl mx-auto w-full pt-4 md:pt-8 px-3 md:px-6 flex-shrink-0">
+                    <div className="mb-4 md:mb-6">
+                        <div className="flex justify-between items-start md:items-center mb-3 md:mb-4 gap-2">
+                            <div className="flex items-center gap-2 md:gap-3 min-w-0 flex-1">
+                                <div className="bg-blue-100 dark:bg-blue-900/30 p-1.5 md:p-2 rounded-lg text-blue-600 dark:text-blue-400 shrink-0">
+                                    <CheckSquare size={20} className="md:w-6 md:h-6" />
+                                </div>
+                                <div className="min-w-0">
+                                    <h1 className="text-xl md:text-3xl font-bold text-gray-800 dark:text-white truncate">Задачи</h1>
+                                    <p className="text-[10px] md:text-xs text-gray-500 dark:text-gray-400 mt-0.5 md:mt-1 hidden sm:block">
+                                        Управление задачами и проектами
+                                    </p>
+                                </div>
+                            </div>
+                            <button
+                                onClick={() => actions.openTaskModal(null)}
+                                className="px-3 md:px-4 py-1.5 md:py-2 rounded-lg bg-blue-600 text-white text-xs md:text-sm font-medium hover:bg-blue-700 flex items-center gap-1.5 md:gap-2 shadow-sm shrink-0"
+                            >
+                                <Plus size={16} className="md:w-[18px] md:h-[18px]" /> <span className="hidden sm:inline">Создать</span>
+                            </button>
+                        </div>
+                        
+                        {/* View Mode Tabs and Filters */}
+                        <div className="flex flex-wrap items-center justify-between gap-2 md:gap-3">
+                            <div className="inline-flex items-center rounded-full bg-gray-100 dark:bg-[#252525] p-1 text-xs">
+                                <button
+                                    onClick={() => actions.setViewMode(ViewMode.TABLE)}
+                                    className={`flex items-center gap-1 px-3 py-1.5 rounded-full ${
+                                        viewMode === ViewMode.TABLE
+                                            ? 'bg-white dark:bg-[#191919] text-gray-900 dark:text-white shadow-sm'
+                                            : 'text-gray-600 dark:text-gray-300'
+                                    }`}
+                                >
+                                    <LayoutList size={14} />
+                                    Таблица
+                                </button>
+                                <button
+                                    onClick={() => actions.setViewMode(ViewMode.KANBAN)}
+                                    className={`flex items-center gap-1 px-3 py-1.5 rounded-full ${
+                                        viewMode === ViewMode.KANBAN
+                                            ? 'bg-white dark:bg-[#191919] text-gray-900 dark:text-white shadow-sm'
+                                            : 'text-gray-600 dark:text-gray-300'
+                                    }`}
+                                >
+                                    <Kanban size={14} />
+                                    Канбан
+                                </button>
+                                <button
+                                    onClick={() => actions.setViewMode(ViewMode.GANTT)}
+                                    className={`flex items-center gap-1 px-3 py-1.5 rounded-full ${
+                                        viewMode === ViewMode.GANTT
+                                            ? 'bg-white dark:bg-[#191919] text-gray-900 dark:text-white shadow-sm'
+                                            : 'text-gray-600 dark:text-gray-300'
+                                    }`}
+                                >
+                                    <BarChart3 size={14} />
+                                    Гант
+                                </button>
+                            </div>
+
+                            <div className="flex flex-wrap items-center gap-1.5 md:gap-2 text-[10px] md:text-xs">
+                                <div className="flex items-center gap-1">
+                                    <ListFilter size={12} className="text-gray-400 md:w-[14px] md:h-[14px]" />
+                                    <select
+                                        value={statusFilter}
+                                        onChange={(e) => setStatusFilter(e.target.value)}
+                                        className="border border-gray-200 dark:border-[#333] rounded-lg px-1.5 md:px-2 py-1 bg-white dark:bg-[#252525] text-gray-800 dark:text-gray-100 text-[10px] md:text-xs"
+                                    >
+                                        <option value="all">Все статусы</option>
+                                        {statuses.map((s) => (
+                                            <option key={s.id} value={s.name}>
+                                                {s.name}
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
+                                <div className="flex items-center gap-1">
+                                    <ListFilter size={12} className="text-gray-400 md:w-[14px] md:h-[14px]" />
+                                    <select
+                                        value={assigneeFilter}
+                                        onChange={(e) => setAssigneeFilter(e.target.value)}
+                                        className="border border-gray-200 dark:border-[#333] rounded-lg px-1.5 md:px-2 py-1 bg-white dark:bg-[#252525] text-gray-800 dark:text-gray-100 text-[10px] md:text-xs"
+                                    >
+                                        <option value="all">Все сотрудники</option>
+                                        {users.map((u) => (
+                                            <option key={u.id} value={u.id}>
+                                                {u.name}
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
+                                <div className="flex items-center gap-1">
+                                    <ListFilter size={12} className="text-gray-400 md:w-[14px] md:h-[14px]" />
+                                    <select
+                                        value={projectFilter}
+                                        onChange={(e) => setProjectFilter(e.target.value)}
+                                        className="border border-gray-200 dark:border-[#333] rounded-lg px-1.5 md:px-2 py-1 bg-white dark:bg-[#252525] text-gray-800 dark:text-gray-100 text-[10px] md:text-xs"
+                                    >
+                                        <option value="all">Все модули</option>
+                                        {projects.map((p) => (
+                                            <option key={p.id} value={p.id}>
+                                                {p.name}
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={() => setHideCompleted((v) => !v)}
+                                    className={`inline-flex items-center gap-1 px-2 md:px-3 py-1 md:py-1.5 rounded-full border text-[10px] md:text-xs ${
+                                        hideCompleted
+                                            ? 'bg-gray-900 text-white border-gray-700'
+                                            : 'bg-white dark:bg-[#252525] text-gray-700 dark:text-gray-200 border-gray-300 dark:border-[#444]'
+                                    }`}
+                                >
+                                    <EyeOff size={12} className="md:w-[14px] md:h-[14px]" />
+                                    <span className="hidden sm:inline">{hideCompleted ? 'Скрыть выполненные' : 'Показывать выполненные'}</span>
+                                    <span className="sm:hidden">{hideCompleted ? 'Скрыть' : 'Показать'}</span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div className="flex-1 overflow-y-auto overflow-x-hidden custom-scrollbar min-h-0">
+                    <div className="max-w-7xl mx-auto w-full px-3 md:px-6 pb-24 md:pb-32">
+                    {viewMode === ViewMode.TABLE && (
+                        <TableView 
+                            tasks={filteredTasks} 
+                            users={users} 
+                            projects={projects} 
+                            statuses={statuses} 
+                            priorities={priorities} 
+                            tables={tables} 
+                            isAggregator={isAggregator} 
+                            currentUser={currentUser} 
+                            businessProcesses={businessProcesses}
+                            onUpdateTask={(id, updates) => actions.saveTask({ id, ...updates })} 
+                            onDeleteTask={actions.deleteTask} 
+                            onOpenTask={actions.openTaskModal} 
+                        />
+                    )}
+                    {viewMode === ViewMode.KANBAN && (
+                        <KanbanBoard 
+                            tasks={filteredTasks} 
+                            users={users} 
+                            projects={projects} 
+                            statuses={statuses} 
+                            tables={tables} 
+                            isAggregator={isAggregator} 
+                            currentUser={currentUser} 
+                            businessProcesses={businessProcesses}
+                            onUpdateStatus={(id, s) => actions.saveTask({id, status: s})} 
+                            onOpenTask={actions.openTaskModal} 
+                        />
+                    )}
+                    {viewMode === ViewMode.GANTT && (
+                        <GanttView tasks={filteredTasks} projects={projects} onOpenTask={actions.openTaskModal} />
+                    )}
+                    </div>
+                </div>
+            </div>
+        );
+
+    case 'backlog':
+        // Функция для переноса идеи из беклога в работу
+        const handleTakeToWork = (idea: Task) => {
+            // Удаляем идею
+            actions.deleteTask(idea.id);
+            
+            // Создаем новую задачу на основе идеи
+            const defaultStatus = statuses.find(s => !['Выполнено', 'Done', 'Завершено'].includes(s.name))?.name || statuses[0]?.name || 'Новая';
+            
+            const newTask: Partial<Task> = {
+                entityType: 'task',
+                tableId: '', // Для обычных задач tableId не используется
+                title: idea.title,
+                description: idea.description,
+                projectId: idea.projectId,
+                status: defaultStatus,
+                priority: idea.priority || 'Средний',
+                assigneeId: idea.assigneeId,
+                assigneeIds: idea.assigneeIds,
+                startDate: idea.startDate || new Date().toISOString().split('T')[0],
+                endDate: idea.endDate || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+                source: 'Беклог',
+                attachments: idea.attachments,
+                createdAt: new Date().toISOString()
+            };
+            
+            actions.saveTask(newTask);
+        };
+
+        return (
+            <div className="h-full flex flex-col min-h-0">
+                <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden px-6 pb-24 md:pb-32">
+                <BacklogView 
+                    backlogTasks={backlogTasks}
+                    users={users}
+                    statuses={statuses}
+                    tables={tables}
+                    onUpdateTask={(id, updates) => actions.saveTask({ id, ...updates })} 
+                    onDeleteTask={actions.deleteTask} 
+                    onOpenTask={actions.openTaskModal} 
+                    onCreateTask={() => {
+                        // При создании идеи в беклоге, устанавливаем entityType: 'idea' и tableId на текущий backlog
+                        const newIdea: Partial<Task> = {
+                            entityType: 'idea',
+                            tableId: activeTable.id,
+                            title: '',
+                            status: 'Новая',
+                            priority: 'Средний',
+                            assigneeId: null,
+                            startDate: new Date().toISOString().split('T')[0],
+                            endDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+                            createdByUserId: currentUser.id,
+                            createdAt: new Date().toISOString()
+                        };
+                        actions.openTaskModal(newIdea);
+                    }}
+                    onTakeToWork={handleTakeToWork}
+                />
+                </div>
+            </div>
+        );
+    
+    case 'functionality':
+        // Функция для переноса функции из функционала в работу
+        const handleTakeFeatureToWork = (feature: Task) => {
+            // Функция НЕ удаляется, остается с entityType: 'feature'
+            // Создаем новую задачу на основе функции
+            const newTask: Partial<Task> = {
+                entityType: 'task',
+                tableId: '', // Для обычных задач tableId не используется
+                title: feature.title,
+                description: feature.description,
+                projectId: feature.projectId,
+                category: feature.category,
+                status: feature.status,
+                priority: feature.priority,
+                assigneeId: feature.assigneeId,
+                assigneeIds: feature.assigneeIds,
+                startDate: feature.startDate || new Date().toISOString().split('T')[0],
+                endDate: feature.endDate || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+                source: 'Функционал',
+                linkedFeatureId: feature.id, // Связываем задачу с функцией
+                attachments: feature.attachments,
+                createdAt: new Date().toISOString()
+            };
+            
+            actions.saveTask(newTask);
+        };
+
+        return (
+            <div className="h-full flex flex-col min-h-0">
+                <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden px-6 pb-24 md:pb-32">
+                <FunctionalityView 
+                    features={allFunctionalityTasks} 
+                    users={users} 
+                    statuses={statuses}
+                    projects={projects}
+                    onUpdateFeature={(id, u) => actions.saveTask({id, ...u})} 
+                    onDeleteFeature={actions.deleteTask} 
+                    onOpenFeature={actions.openTaskModal} 
+                    onCreateFeature={(projectId, category) => {
+                        // При создании функции в функционале, находим подходящую functionality таблицу
+                        // Если указан projectId, ищем таблицу для этого проекта, иначе используем activeTable
+                        let targetTableId = activeTable.id;
+                        
+                        // Если указан projectId, ищем functionality таблицу для этого проекта
+                        if (projectId) {
+                            // Можно использовать первую попавшуюся functionality таблицу или создать новую
+                            const functionalityTable = tables.find(t => t.type === 'functionality');
+                            if (functionalityTable) {
+                                targetTableId = functionalityTable.id;
+                            }
+                        }
+                        
+                        const newTask: Partial<Task> = {
+                            entityType: 'feature',
+                            tableId: targetTableId,
+                            title: '',
+                            status: 'Не начато',
+                            assigneeId: null,
+                            startDate: new Date().toISOString().split('T')[0],
+                            endDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+                            projectId: projectId || null,
+                            category: category || undefined,
+                            createdByUserId: currentUser.id,
+                            createdAt: new Date().toISOString()
+                        };
+                        actions.openTaskModal(newTask);
+                    }}
+                    onTakeToWork={handleTakeFeatureToWork}
+                />
+                </div>
+            </div>
+        );
+
+    case 'meetings':
+        return (
+            <div className="h-full flex flex-col min-h-0">
+                <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden px-6 pb-24 md:pb-32">
+                <MeetingsView 
+                    meetings={meetings} users={users} clients={clients} deals={deals} tableId={activeTable.id} showAll={activeTable.isSystem} tables={tables} 
+                    onSaveMeeting={actions.saveMeeting} onDeleteMeeting={actions.deleteMeeting}                     onUpdateSummary={actions.updateMeetingSummary} 
+                />
+                </div>
+            </div>
+        );
+
+    case 'content-plan':
+        return (
+            <div className="h-full flex flex-col min-h-0">
+                <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden px-6 pb-24 md:pb-32">
+                <ContentPlanView 
+                    posts={contentPosts} tableId={activeTable.id} tasks={tasks} 
+                    activeTable={activeTable}
+                    onSavePost={actions.savePost} onDeletePost={actions.deletePost} 
+                    onOpenTask={actions.openTaskModal} onCreateTask={actions.openTaskModal} 
+                />
+                </div>
+            </div>
+        );
+
+    case 'docs':
+        return (
+            <div className="h-full flex flex-col min-h-0">
+                <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden px-6 pb-24 md:pb-32">
+                <DocumentsView 
+                    docs={docs} folders={folders} tableId={activeTable.id} showAll={activeTable.isSystem} tables={tables} 
+                    tasks={tasks}
+                    onOpenDoc={actions.handleDocClick} 
+                    onAddDoc={(folderId) => actions.openDocModal(folderId)} 
+                    onCreateFolder={(name, parentFolderId) => actions.createFolder(name, activeTable.id, parentFolderId)} 
+                    onDeleteFolder={actions.deleteFolder} 
+                    onDeleteDoc={actions.deleteDoc}
+                    onDeleteAttachment={(taskId, attachmentId) => {
+                        const task = tasks.find(t => t.id === taskId);
+                        if (task) {
+                            const updatedAttachments = (task.attachments || []).filter(a => a.id !== attachmentId);
+                            actions.saveTask({ id: taskId, attachments: updatedAttachments });
+                        }
+                    }}
+                />
+                </div>
+            </div>
+        );
+
+    default:
+        return (
+            <div className="flex flex-col items-center justify-center h-full text-gray-400">
+                <AlertCircle size={48} className="mb-4 opacity-20" />
+                <p>Тип страницы не поддерживается или в разработке</p>
+            </div>
+        );
+  }
+};

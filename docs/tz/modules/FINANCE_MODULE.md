@@ -144,9 +144,9 @@
 - `GET /api/finance/plan` - Получить финансовый план
 - `PUT /api/finance/plan` - Обновить финансовый план
 
-### 8.3. Коллекции Firestore
+### 8.3. Таблицы в базе данных
 - `departments` - Отделы
-- `financeCategories` - Категории расходов
-- `financePlan` - Финансовый план
-- `purchaseRequests` - Заявки на покупку
-- `financialPlanDocuments` - Документы финансового плана
+- `finance_categories` - Категории расходов
+- `finance_plan` - Финансовый план
+- `purchase_requests` - Заявки на покупку
+- `financial_plan_documents` - Документы финансового плана

@@ -22,7 +22,10 @@ jobs:
             git fetch origin
             git reset --hard origin/main
             # Теперь вызываем скрипт деплоя
-            chmod +x scripts/deploy.sh
+            chmod +x ops/scripts/deploy.sh
             SERVER_PATH="${{ secrets.SERVER_PATH }}" \
             TELEGRAM_BOT_TOKEN="${{ secrets.TELEGRAM_BOT_TOKEN }}" \
-            ./scripts/deploy.sh
+            BACKEND_URL="${{ secrets.BACKEND_URL }}" \
+            RUN_MIGRATE_FIRESTORE="${{ secrets.RUN_MIGRATE_FIRESTORE }}" \
+            FIREBASE_CREDENTIALS="${{ secrets.FIREBASE_CREDENTIALS }}" \
+            ./ops/scripts/deploy.sh

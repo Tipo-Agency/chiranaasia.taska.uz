@@ -1,0 +1,112 @@
+"""Sales funnels router."""
+from fastapi import APIRouter, Depends
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.database import get_db
+from app.models.funnel import SalesFunnel
+
+router = APIRouter(prefix="/funnels", tags=["funnels"])
+
+
+def row_to_funnel(row):
+    return {
+        "id": row.id,
+        "name": row.name,
+        "stages": row.stages or [],
+        "sources": row.sources or {},
+        "createdAt": row.created_at,
+        "updatedAt": row.updated_at,
+        "isArchived": str(row.is_archived).lower() == "true" if row.is_archived else False,
+    }
+
+
+@router.get("")
+async def get_funnels(db: AsyncSession = Depends(get_db)):
+    result = await db.execute(select(SalesFunnel))
+    return [row_to_funnel(f) for f in result.scalars().all()]
+
+
+@router.put("")
+async def update_funnels(funnels: list[dict], db: AsyncSession = Depends(get_db)):
+    for f in funnels:
+        fid = f.get("id")
+        if not fid:
+            continue
+        existing = await db.get(SalesFunnel, fid)
+        if existing:
+            existing.name = f.get("name", existing.name)
+            existing.stages = f.get("stages", existing.stages or [])
+            existing.sources = f.get("sources", existing.sources or {})
+            existing.created_at = f.get("createdAt")
+            existing.updated_at = f.get("updatedAt")
+            existing.is_archived = "true" if f.get("isArchived") else "false"
+        else:
+            db.add(SalesFunnel(
+                id=fid,
+                name=f.get("name", ""),
+                stages=f.get("stages", []),
+                sources=f.get("sources", {}),
+                created_at=f.get("createdAt"),
+                updated_at=f.get("updatedAt"),
+                is_archived="true" if f.get("isArchived") else "false",
+            ))
+    await db.commit()
+    return {"ok": True}
+
+
+@router.post("")
+async def create_funnel(funnel: dict, db: AsyncSession = Depends(get_db)):
+    import uuid
+    from datetime import datetime
+    fid = funnel.get("id") or f"funnel-{int(datetime.utcnow().timestamp() * 1000)}"
+    now = datetime.utcnow().isoformat()
+    db.add(SalesFunnel(
+        id=fid,
+        name=funnel.get("name", "Новая воронка"),
+        stages=funnel.get("stages", []),
+        sources=funnel.get("sources", {}),
+        created_at=now,
+        updated_at=now,
+        is_archived="false",
+    ))
+    await db.commit()
+    result = await db.get(SalesFunnel, fid)
+    return row_to_funnel(result)
+
+
+@router.get("/{funnel_id}")
+async def get_funnel(funnel_id: str, db: AsyncSession = Depends(get_db)):
+    f = await db.get(SalesFunnel, funnel_id)
+    if not f:
+        return None
+    return row_to_funnel(f)
+
+
+@router.patch("/{funnel_id}")
+async def update_funnel(funnel_id: str, updates: dict, db: AsyncSession = Depends(get_db)):
+    f = await db.get(SalesFunnel, funnel_id)
+    if not f:
+        return None
+    if "name" in updates:
+        f.name = updates["name"]
+    if "stages" in updates:
+        f.stages = updates["stages"]
+    if "sources" in updates:
+        f.sources = updates["sources"]
+    if "isArchived" in updates:
+        f.is_archived = "true" if updates["isArchived"] else "false"
+    from datetime import datetime
+    f.updated_at = datetime.utcnow().isoformat()
+    await db.commit()
+    await db.refresh(f)
+    return row_to_funnel(f)
+
+
+@router.delete("/{funnel_id}")
+async def delete_funnel(funnel_id: str, db: AsyncSession = Depends(get_db)):
+    f = await db.get(SalesFunnel, funnel_id)
+    if f:
+        f.is_archived = "true"
+        await db.commit()
+    return {"ok": True}
