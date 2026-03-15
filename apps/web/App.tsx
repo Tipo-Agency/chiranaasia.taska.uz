@@ -112,11 +112,11 @@ const App = () => {
                 </div>
             )}
 
-            {/* Кнопка чата слева внизу — только десктоп и планшет */}
+            {/* Кнопка чата справа внизу — только десктоп и планшет */}
             <button
               type="button"
               onClick={() => setChatPanelOpen(true)}
-              className="hidden md:flex fixed bottom-6 left-64 z-40 w-14 h-14 rounded-full bg-[#3337AD] text-white shadow-lg hover:bg-[#292b8a] items-center justify-center"
+              className="hidden md:flex fixed bottom-6 right-6 z-40 w-14 h-14 rounded-full bg-[#3337AD] text-white shadow-lg hover:bg-[#292b8a] items-center justify-center"
               title="Чат"
             >
               <MessageCircle size={24} />

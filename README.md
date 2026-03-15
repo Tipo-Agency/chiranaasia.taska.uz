@@ -38,7 +38,7 @@
 | `SERVER_USER` | да | SSH-пользователь |
 | `SERVER_SSH_KEY` | да | Приватный SSH-ключ |
 | `SERVER_PATH` | да | Путь к репо на сервере (например `/var/www/tipa.taska.uz`) |
-| `TELEGRAM_BOT_TOKEN` | да | Токен Telegram-бота |
+| `TELEGRAM_BOT_TOKEN` | да | Токен Telegram-бота (при деплое подставляется в `apps/bot/.env`; если бот не получает токен — проверьте, что секрет задан в Settings → Secrets and variables → Actions и называется именно `TELEGRAM_BOT_TOKEN`) |
 | `BACKEND_URL` | рекомендуется | URL API для бота (например `http://127.0.0.1:8003` или полный URL) |
 | `NGINX_SITE_NAME` | нет | Имя сайта nginx (по умолчанию `tipa.taska.uz`). Конфиг копируется в `/etc/nginx/sites-available/$NGINX_SITE_NAME`, затем `nginx -t` и `reload`. |
 

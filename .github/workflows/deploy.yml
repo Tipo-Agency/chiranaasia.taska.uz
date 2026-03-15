@@ -17,10 +17,10 @@ jobs:
           username: ${{ secrets.SERVER_USER }}
           key: ${{ secrets.SERVER_SSH_KEY }}
           script: |
-            cd ${{ secrets.SERVER_PATH }}
+            export SERVER_PATH="${{ secrets.SERVER_PATH }}"
+            export TELEGRAM_BOT_TOKEN="${{ secrets.TELEGRAM_BOT_TOKEN }}"
+            export BACKEND_URL="${{ secrets.BACKEND_URL }}"
+            export NGINX_SITE_NAME="${{ secrets.NGINX_SITE_NAME }}"
+            cd "$SERVER_PATH"
             chmod +x ops/scripts/deploy.sh
-            SERVER_PATH="${{ secrets.SERVER_PATH }}" \
-            TELEGRAM_BOT_TOKEN="${{ secrets.TELEGRAM_BOT_TOKEN }}" \
-            BACKEND_URL="${{ secrets.BACKEND_URL }}" \
-            NGINX_SITE_NAME="${{ secrets.NGINX_SITE_NAME }}" \
             ./ops/scripts/deploy.sh

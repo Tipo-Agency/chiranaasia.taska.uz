@@ -26,6 +26,7 @@ import {
   BirthdayModal,
 } from '../features/home';
 import { TaskCard } from '../features/tasks/TaskCard';
+import { Card } from '../ui/Card';
 import { Container } from '../ui/Container';
 import { PageLayout } from '../ui/PageLayout';
 import { Tabs } from '../ui/Tabs';
@@ -132,37 +133,47 @@ export const HomePage: React.FC<HomePageProps> = ({
     }
   }, [currentUser?.id, employeeInfos]);
 
-  const myTasks = useMemo(
-    () =>
-      (tasks || []).filter(
-        (t) =>
-          t &&
-          t.entityType !== 'idea' &&
-          t.entityType !== 'feature' &&
-          !t.isArchived &&
-          !['Выполнено', 'Done', 'Завершено'].includes(t.status) &&
-          (t.assigneeId === currentUser?.id || t.assigneeIds?.includes(currentUser?.id))
-      ),
-    [tasks, currentUser?.id]
-  );
+  const myTasks = useMemo(() => {
+    const list = (tasks || []).filter(
+      (t) =>
+        t &&
+        t.entityType !== 'idea' &&
+        t.entityType !== 'feature' &&
+        !t.isArchived &&
+        !['Выполнено', 'Done', 'Завершено'].includes(t.status) &&
+        (t.assigneeId === currentUser?.id || t.assigneeIds?.includes(currentUser?.id))
+    );
+    return [...list].sort((a, b) => {
+      const da = (a.updatedAt || a.createdAt || '').replace('Z', '');
+      const db = (b.updatedAt || b.createdAt || '').replace('Z', '');
+      return db.localeCompare(da);
+    });
+  }, [tasks, currentUser?.id]);
 
-  const myDeals = useMemo(
-    () => (deals || []).filter((d) => d && !d.isArchived && d.assigneeId === currentUser?.id),
-    [deals, currentUser?.id]
-  );
+  const myDeals = useMemo(() => {
+    const list = (deals || []).filter((d) => d && !d.isArchived && d.assigneeId === currentUser?.id);
+    return [...list].sort((a, b) => {
+      const da = (a.updatedAt || a.createdAt || '').replace('Z', '');
+      const db = (b.updatedAt || b.createdAt || '').replace('Z', '');
+      return db.localeCompare(da);
+    });
+  }, [deals, currentUser?.id]);
 
-  const outgoingTasks = useMemo(
-    () =>
-      (tasks || []).filter(
-        (t) =>
-          t &&
-          t.createdByUserId === currentUser?.id &&
-          !t.isArchived &&
-          t.assigneeId &&
-          t.assigneeId !== currentUser?.id
-      ),
-    [tasks, currentUser?.id]
-  );
+  const outgoingTasks = useMemo(() => {
+    const list = (tasks || []).filter(
+      (t) =>
+        t &&
+        t.createdByUserId === currentUser?.id &&
+        !t.isArchived &&
+        t.assigneeId &&
+        t.assigneeId !== currentUser?.id
+    );
+    return [...list].sort((a, b) => {
+      const da = (a.updatedAt || a.createdAt || '').replace('Z', '');
+      const db = (b.updatedAt || b.createdAt || '').replace('Z', '');
+      return db.localeCompare(da);
+    });
+  }, [tasks, currentUser?.id]);
 
   if (!currentUser) {
     return (
@@ -237,19 +248,36 @@ export const HomePage: React.FC<HomePageProps> = ({
                             </button>
                           )}
                         </div>
-                        <ul className="space-y-1.5">
+                        <div className="space-y-2">
                           {myDeals.slice(0, 5).map((d) => {
                             const client = clients.find((c) => c.id === d.clientId);
+                            const title = d.title || client?.name || d.contactName || 'Сделка';
                             return (
-                              <li
+                              <Card
                                 key={d.id}
-                                className="px-3 py-2 rounded-lg bg-gray-50 dark:bg-[#2a2a2a] text-sm text-gray-800 dark:text-gray-200"
+                                className="p-4 cursor-pointer hover:shadow-md active:scale-[0.98] transition-all min-h-[72px]"
+                                onClick={() => onNavigateToDeals?.()}
                               >
-                                {d.title || client?.name || d.contactName || 'Сделка'} · {d.stage}
-                              </li>
+                                <div className="flex items-start justify-between gap-2">
+                                  <div className="flex-1 min-w-0">
+                                    <h3 className="font-semibold text-gray-900 dark:text-white text-sm truncate">
+                                      {title}
+                                    </h3>
+                                    <div className="flex flex-wrap items-center gap-2 mt-1.5 text-xs text-gray-500 dark:text-gray-400">
+                                      <span className="px-2 py-0.5 rounded-full bg-gray-100 dark:bg-[#333] text-gray-700 dark:text-gray-300">
+                                        {d.stage}
+                                      </span>
+                                      {d.amount != null && (
+                                        <span>{d.amount.toLocaleString('ru-RU')} {d.currency || ''}</span>
+                                      )}
+                                    </div>
+                                  </div>
+                                  <Briefcase className="shrink-0 w-4 h-4 text-gray-400 dark:text-gray-500" />
+                                </div>
+                              </Card>
                             );
                           })}
-                        </ul>
+                        </div>
                       </div>
                     )}
                     {myTasks.length === 0 && myDeals.length === 0 && (

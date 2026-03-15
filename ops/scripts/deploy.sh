@@ -96,6 +96,9 @@ echo "✅ Frontend deployed to /var/www/frontend (old content wiped)"
 echo ""
 echo "🤖 Step 4: Deploying Telegram bot..."
 if [ -d "apps/bot" ]; then
+  if [ -z "$TELEGRAM_BOT_TOKEN" ]; then
+    echo "⚠️ TELEGRAM_BOT_TOKEN не передан (пустой или не задан в GitHub Actions Secrets). Задайте секрет TELEGRAM_BOT_TOKEN в репозитории: Settings → Secrets and variables → Actions."
+  fi
   cd apps/bot || { echo "❌ Failed to cd to apps/bot"; exit 1; }
   
   # Исправляем права

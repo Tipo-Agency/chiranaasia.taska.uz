@@ -37,9 +37,11 @@ export const BdrView: React.FC<BdrViewProps> = ({ bdr, onLoadBdr, onSaveBdr }) =
 
   const yearStr = String(year);
 
+  // Загружаем БДР только при смене года (не при каждом ре-рендере родителя, иначе onLoadBdr сбрасывает локальные добавленные строки)
   useEffect(() => {
     onLoadBdr(yearStr);
-  }, [yearStr, onLoadBdr]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [yearStr]);
 
   useEffect(() => {
     if (bdr && bdr.year === yearStr) {
