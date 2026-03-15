@@ -20,7 +20,7 @@ services:
   backend:
     build: ./apps/api
     ports:
-      - "8000:8000"
+      - "8001:8000"   # хост 8001 — если 8000 уже занят на сервере
     environment:
       DATABASE_URL: postgresql+asyncpg://taska:${DB_PASSWORD:-taska}@db:5432/taska
       SECRET_KEY: ${SECRET_KEY:-change-me-in-production}
