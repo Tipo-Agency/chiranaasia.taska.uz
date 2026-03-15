@@ -3,7 +3,6 @@ import React, { useState, useEffect } from 'react';
 import Sidebar from './components/Sidebar';
 import { AppRouter } from './components/AppRouter';
 import { LoginView } from './components/LoginView';
-import { LoginPage } from './components/pages/LoginPage';
 import { AppHeader } from './components/AppHeader';
 import TaskModal from './components/TaskModal';
 import IdeaModal from './components/IdeaModal';
@@ -19,7 +18,6 @@ const App = () => {
   const { state, actions } = useAppLogic();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [publicContentPlanId, setPublicContentPlanId] = useState<string | null>(null);
-  const [showLoginForm, setShowLoginForm] = useState(false);
   
   // Проверка публичной ссылки на контент-план
   useEffect(() => {
@@ -38,16 +36,7 @@ const App = () => {
   if (state.isLoading) return <div className="h-screen flex items-center justify-center bg-gray-50 dark:bg-[#121212] dark:text-white">Загрузка...</div>;
 
   if (!state.currentUser) {
-      if (showLoginForm) {
-        return <LoginView users={state.users} onLogin={user => { actions.login(user); }} />;
-      }
-      return (
-        <LoginPage
-          users={state.users}
-          onLogin={actions.login}
-          onShowLoginForm={() => setShowLoginForm(true)}
-        />
-      );
+    return <LoginView users={state.users} onLogin={user => { actions.login(user); }} />;
   }
 
   const unreadNotifications = state.activityLogs.filter(a => !a.read);

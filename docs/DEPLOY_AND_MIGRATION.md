@@ -9,7 +9,7 @@
   - `TELEGRAM_BOT_TOKEN`
   - `BACKEND_URL` — URL вашего API (например `https://tipa.taska.uz/api` или `http://127.0.0.1:8000` для бота на том же сервере)
 - **На сервере обязательно:** Docker + Docker Compose, Node.js, nginx.
-- **Порты проекта:** бэкенд на хосте — **8003** (конфликта с занятыми 5432/8000 нет). Фронт отдаёт nginx с 80/443; при необходимости дебаг/превью на портах из списка (3002, 3003 и т.д.) настраивается отдельно.
+- **Порты проекта:** бэкенд на хосте — **8003**. Фронт — статика (Vite+React, не Next.js): nginx раздаёт из `/var/www/frontend` на портах 80 и при необходимости 3002 (см. `ops/nginx/nginx.conf`).
 
 ### Установка Docker на сервере (Ubuntu/Debian)
 
@@ -40,17 +40,27 @@ sudo apt-get update && sudo apt-get install -y docker-compose-plugin
 
 ## 3. Миграция данных (если не автоматически)
 
-Если миграция не запускалась при деплое, зайдите на сервер и выполните один раз:
+Миграцию можно **запустить вручную на сервере** один раз:
 
 ```bash
 cd $SERVER_PATH   # например /var/www/tipa.taska.uz
 pip install -r scripts/requirements-migrate.txt
-export BACKEND_URL=http://127.0.0.1:8000
+export BACKEND_URL=http://127.0.0.1:8003
 export FIREBASE_CREDENTIALS=/var/www/tipa.taska.uz/firebase-key.json
 python3 scripts/migrate_firestore_to_postgres.py
 ```
 
 Проверка без записи в API: добавьте `--dry-run`.
+
+**Если после миграции пользователей всё равно нет** (или миграцию не запускали) — создайте первого админа вручную:
+
+```bash
+cd $SERVER_PATH
+export DATABASE_URL="postgresql+asyncpg://taska:taska@127.0.0.1:5433/taska"
+ADMIN_LOGIN=admin ADMIN_PASSWORD=ваш_пароль python3 scripts/create_admin.py
+```
+
+После этого войдите на сайт с логином и паролем, которые задали.
 
 ## 4. Проверка после деплоя
 
@@ -160,3 +170,23 @@ sudo systemctl status nginx
 - **Баги в интерфейсе:** логи фронта (F12 → Console), логи бэкенда и таблица `system_logs` — по ним править код и при необходимости делать хотфикс и повторный пуш в `main`.
 
 После исправлений — коммит, пуш в `main`, автодеплой отработает снова.
+
+---
+
+## 7. Nginx на сервере (статика + /api/ на бэкенд)
+
+Сейчас фронт — **статический билд** (Vite+React из `apps/web`), не Next.js. Деплой копирует `apps/web/dist/` в **`/var/www/frontend`**. Чтобы сайт отдавал новый фронт и ходил на бэкенд:
+
+1. На сервере используйте конфиг из репо: `ops/nginx/nginx.conf`.
+2. Скопируйте его в конфиг сайта, например:
+   ```bash
+   sudo cp $SERVER_PATH/ops/nginx/nginx.conf /etc/nginx/sites-available/tipa.taska.uz
+   sudo ln -sf /etc/nginx/sites-available/tipa.taska.uz /etc/nginx/sites-enabled/
+   sudo nginx -t && sudo systemctl reload nginx
+   ```
+3. В конфиге задано:
+   - **root /var/www/frontend** — откуда nginx отдаёт статику (сюда деплой копирует билд).
+   - **location /api/** и **/health** → **proxy_pass http://127.0.0.1:8003** (бэкенд в Docker).
+4. Если раньше nginx смотрел в `/var/www/tipa.taska.uz/dist/`, замените на этот конфиг (root = `/var/www/frontend`) и перезапустите деплой, чтобы билд снова попал в `/var/www/frontend`. Либо поменяйте в конфиге root на `$SERVER_PATH/apps/web/dist` и в деплое копируйте билд туда.
+5. **SSL (HTTPS):** в конфиге есть блок `listen 443 ssl` с `server_name tipa.taska.uz` и путями Certbot (`/etc/letsencrypt/live/tipa.taska.uz/...`). Чтобы HTTPS не перехватывал другой server block (например admin-amiscus.tipa.uz), сертификат для tipa.taska.uz должен быть выдан. Один раз на сервере: `sudo certbot --nginx -d tipa.taska.uz`. После этого деплой подхватит конфиг с 443 — запросы к tipa.taska.uz по HTTPS пойдут в наш блок, а не в чужой.
+6. Опционально: в конфиге есть `server` на порту **3002** — тот же сайт доступен по порту 3002.

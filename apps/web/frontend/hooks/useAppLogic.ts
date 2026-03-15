@@ -55,16 +55,10 @@ export const useAppLogic = () => {
   const loadAuthData = async () => {
       try {
           const users = await api.users.getAll();
-          if (users.length === 0) {
-              console.warn('[Auth] No users in local store');
-          }
-          
-          if (users.length !== authSlice.state.users.length || 
+          if (users.length !== authSlice.state.users.length ||
               users.some(u => !authSlice.state.users.find(au => au.id === u.id))) {
-            console.log('[Auth] Updating users via updateUsers');
             authSlice.actions.updateUsers(users);
           } else {
-            console.log('[Auth] Setting users directly');
             authSlice.setters.setUsers(users);
           }
       } catch (error: any) {

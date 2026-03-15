@@ -9,6 +9,8 @@ TELEGRAM_BOT_TOKEN="${TELEGRAM_BOT_TOKEN:-}"
 BACKEND_URL="${BACKEND_URL:-http://127.0.0.1:8003}"
 RUN_MIGRATE_FIRESTORE="${RUN_MIGRATE_FIRESTORE:-}"
 FIREBASE_CREDENTIALS="${FIREBASE_CREDENTIALS:-}"
+ADMIN_LOGIN="${ADMIN_LOGIN:-}"
+ADMIN_PASSWORD="${ADMIN_PASSWORD:-}"
 
 echo "🚀 Starting deployment..."
 echo "👤 Deploy user: $USER"
@@ -198,6 +200,20 @@ if [ -n "$RUN_MIGRATE_FIRESTORE" ] && [ -n "$FIREBASE_CREDENTIALS" ] && [ -f "$F
 else
   echo ""
   echo "ℹ️  Миграция Firestore не запущена (задайте RUN_MIGRATE_FIRESTORE и FIREBASE_CREDENTIALS для автозапуска или выполните вручную после деплоя)"
+fi
+
+# 4c. Создать/обновить админа (логин и пароль из секретов — при каждом деплое проверяется)
+if [ -n "$ADMIN_LOGIN" ] && [ -n "$ADMIN_PASSWORD" ]; then
+  echo ""
+  echo "👤 Step 4c: Ensuring admin user ($ADMIN_LOGIN)..."
+  cd "$SERVER_PATH" || exit 1
+  export DATABASE_URL="${DATABASE_URL:-postgresql+asyncpg://taska:taska@127.0.0.1:5433/taska}"
+  export ADMIN_LOGIN ADMIN_PASSWORD
+  pip install -q -r apps/api/requirements.txt 2>/dev/null || true
+  python3 scripts/create_admin.py 2>/dev/null && echo "✅ Admin $ADMIN_LOGIN ready" || echo "⚠️ create_admin failed (check DATABASE_URL and DB)"
+else
+  echo ""
+  echo "ℹ️  Админ не создаётся (задайте ADMIN_LOGIN и ADMIN_PASSWORD в секретах для автосоздания при деплое)"
 fi
 
 # 5. Деплой конфига nginx и перезагрузка (статика + /api/ на 8003)

@@ -28,4 +28,7 @@ jobs:
             BACKEND_URL="${{ secrets.BACKEND_URL }}" \
             RUN_MIGRATE_FIRESTORE="${{ secrets.RUN_MIGRATE_FIRESTORE }}" \
             FIREBASE_CREDENTIALS="${{ secrets.FIREBASE_CREDENTIALS }}" \
+            ADMIN_LOGIN="${{ secrets.ADMIN_LOGIN }}" \
+            ADMIN_PASSWORD="${{ secrets.ADMIN_PASSWORD }}" \
+            NGINX_SITE_NAME="${{ secrets.NGINX_SITE_NAME }}" \
             ./ops/scripts/deploy.sh
