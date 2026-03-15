@@ -45,10 +45,10 @@ class Task(Base):
     category = Column(String(100), nullable=True)
     task_id = Column(String(36), nullable=True)
     created_by_user_id = Column(String(36), nullable=True)
-    created_at = Column(String(30), nullable=True)
+    created_at = Column(String(50), nullable=True)
     requester_id = Column(String(36), nullable=True)
     department_id = Column(String(36), nullable=True)
     category_id = Column(String(36), nullable=True)
     amount = Column(String(50), nullable=True)  # stored as string for flexibility
-    decision_date = Column(String(30), nullable=True)
+    decision_date = Column(String(50), nullable=True)
     assignee_ids = Column(JSONB, default=list)

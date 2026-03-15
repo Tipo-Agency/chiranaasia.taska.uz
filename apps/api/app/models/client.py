@@ -42,7 +42,7 @@ class Deal(Base):
     telegram_chat_id = Column(String(50), nullable=True)
     telegram_username = Column(String(100), nullable=True)
     assignee_id = Column(String(36), nullable=False)
-    created_at = Column(String(30), nullable=False)
+    created_at = Column(String(50), nullable=False)
     notes = Column(Text, nullable=True)
     project_id = Column(String(36), nullable=True)
     comments = Column(JSONB, default=list)
@@ -52,14 +52,14 @@ class Deal(Base):
     number = Column(String(100), nullable=True)
     status = Column(String(30), nullable=True)  # pending, paid, overdue, active, completed
     description = Column(Text, nullable=True)
-    date = Column(String(20), nullable=True)
-    due_date = Column(String(20), nullable=True)
+    date = Column(String(50), nullable=True)
+    due_date = Column(String(50), nullable=True)
     paid_amount = Column(String(50), nullable=True)
-    paid_date = Column(String(20), nullable=True)
-    start_date = Column(String(20), nullable=True)
-    end_date = Column(String(20), nullable=True)
+    paid_date = Column(String(50), nullable=True)
+    start_date = Column(String(50), nullable=True)
+    end_date = Column(String(50), nullable=True)
     payment_day = Column(String(10), nullable=True)
-    updated_at = Column(String(30), nullable=True)
+    updated_at = Column(String(50), nullable=True)
 
 
 class EmployeeInfo(Base):
@@ -69,8 +69,8 @@ class EmployeeInfo(Base):
     user_id = Column(String(36), nullable=False)
     department_id = Column(String(36), nullable=True)
     position = Column(String(255), nullable=False)
-    hire_date = Column(String(20), nullable=False)
-    birth_date = Column(String(20), nullable=True)
+    hire_date = Column(String(50), nullable=False)
+    birth_date = Column(String(50), nullable=True)
     is_archived = Column(Boolean, default=False)
 
 
@@ -82,11 +82,11 @@ class AccountsReceivable(Base):
     deal_id = Column(String(36), nullable=False)
     amount = Column(String(50), nullable=False)
     currency = Column(String(10), nullable=False)
-    due_date = Column(String(20), nullable=False)
+    due_date = Column(String(50), nullable=False)
     status = Column(String(30), nullable=False)  # current, overdue, paid
     description = Column(Text, nullable=True)
     paid_amount = Column(String(50), nullable=True)
-    paid_date = Column(String(20), nullable=True)
-    created_at = Column(String(30), nullable=False)
-    updated_at = Column(String(30), nullable=True)
+    paid_date = Column(String(50), nullable=True)
+    created_at = Column(String(50), nullable=False)
+    updated_at = Column(String(50), nullable=True)
     is_archived = Column(Boolean, default=False)

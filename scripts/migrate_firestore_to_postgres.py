@@ -82,7 +82,7 @@ def serialize_value(v):
     if v is None:
         return None
     type_name = type(v).__name__
-    if type_name == "Timestamp":
+    if type_name in ("Timestamp", "DatetimeWithNanoseconds"):
         return v.isoformat() if hasattr(v, "isoformat") else str(v)
     if type_name == "datetime":
         return v.isoformat() if hasattr(v, "isoformat") else str(v)

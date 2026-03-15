@@ -1,6 +1,6 @@
 """Auth router - login, users."""
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy import select
+from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from pydantic import BaseModel
 
@@ -25,7 +25,12 @@ class LoginResponse(BaseModel):
 
 @router.post("/login", response_model=LoginResponse)
 async def login(req: LoginRequest, db: AsyncSession = Depends(get_db)):
-    result = await db.execute(select(User).where(User.login == req.login, User.is_archived == False))
+    result = await db.execute(
+        select(User).where(
+            ((func.lower(User.login) == func.lower(req.login)) | (User.name == req.login)),
+            User.is_archived == False
+        )
+    )
     user = result.scalar_one_or_none()
     if not user:
         raise HTTPException(status_code=401, detail="Invalid login or password")

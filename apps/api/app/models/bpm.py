@@ -30,5 +30,5 @@ class BusinessProcess(Base):
     steps = Column(JSONB, default=list)
     instances = Column(JSONB, default=list)
     is_archived = Column(String(10), default="false")  # JSON compat
-    created_at = Column(String(30), nullable=True)
-    updated_at = Column(String(30), nullable=True)
+    created_at = Column(String(50), nullable=True)
+    updated_at = Column(String(50), nullable=True)

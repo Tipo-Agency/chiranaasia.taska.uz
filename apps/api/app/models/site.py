@@ -17,8 +17,8 @@ class PartnerLogo(Base):
     logo_url = Column(String(500), nullable=False)
     website_url = Column(String(500), nullable=True)
     order_val = Column(String(10), default="0")
-    created_at = Column(String(30), nullable=True)
-    updated_at = Column(String(30), nullable=True)
+    created_at = Column(String(50), nullable=True)
+    updated_at = Column(String(50), nullable=True)
     is_archived = Column(String(10), default="false")
 
 
@@ -32,9 +32,9 @@ class News(Base):
     excerpt = Column(String(500), nullable=True)
     tags = Column(JSONB, default=list)
     published = Column(String(10), default="false")
-    published_at = Column(String(30), nullable=True)
-    created_at = Column(String(30), nullable=True)
-    updated_at = Column(String(30), nullable=True)
+    published_at = Column(String(50), nullable=True)
+    created_at = Column(String(50), nullable=True)
+    updated_at = Column(String(50), nullable=True)
     is_archived = Column(String(10), default="false")
 
 
@@ -52,8 +52,8 @@ class Case(Base):
     tags = Column(JSONB, default=list)
     order_val = Column(String(10), default="0")
     published = Column(String(10), default="false")
-    created_at = Column(String(30), nullable=True)
-    updated_at = Column(String(30), nullable=True)
+    created_at = Column(String(50), nullable=True)
+    updated_at = Column(String(50), nullable=True)
     is_archived = Column(String(10), default="false")
 
 
@@ -63,6 +63,6 @@ class Tag(Base):
     id = Column(String(36), primary_key=True, default=gen_id)
     name = Column(String(255), nullable=False)
     color = Column(String(50), nullable=True)
-    created_at = Column(String(30), nullable=True)
-    updated_at = Column(String(30), nullable=True)
+    created_at = Column(String(50), nullable=True)
+    updated_at = Column(String(50), nullable=True)
     is_archived = Column(String(10), default="false")

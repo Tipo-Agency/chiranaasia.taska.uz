@@ -57,3 +57,4 @@ apps/bot/.venv/
 .worktrees/
 .security-key
 logs/security/
+firebase-credentials.json

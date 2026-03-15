@@ -16,6 +16,6 @@ class SalesFunnel(Base):
     name = Column(String(255), nullable=False)
     stages = Column(JSONB, default=list)
     sources = Column(JSONB, default=dict)
-    created_at = Column(String(30), nullable=True)
-    updated_at = Column(String(30), nullable=True)
+    created_at = Column(String(50), nullable=True)
+    updated_at = Column(String(50), nullable=True)
     is_archived = Column(String(10), default="false")

@@ -56,8 +56,8 @@ class PurchaseRequest(Base):
     amount = Column(String(50), nullable=False)
     description = Column(String(500), nullable=False)
     status = Column(String(30), nullable=False)
-    date = Column(String(20), nullable=False)
-    decision_date = Column(String(20), nullable=True)
+    date = Column(String(50), nullable=False)
+    decision_date = Column(String(50), nullable=True)
     is_archived = Column(Boolean, default=False)
 
 
@@ -70,10 +70,10 @@ class FinancialPlanDocument(Base):
     income = Column(String(50), nullable=False)
     expenses = Column(JSONB, default=dict)
     status = Column(String(30), nullable=False)
-    created_at = Column(String(30), nullable=False)
-    updated_at = Column(String(30), nullable=True)
+    created_at = Column(String(50), nullable=False)
+    updated_at = Column(String(50), nullable=True)
     approved_by = Column(String(36), nullable=True)
-    approved_at = Column(String(30), nullable=True)
+    approved_at = Column(String(50), nullable=True)
     is_archived = Column(Boolean, default=False)
 
 
@@ -89,9 +89,9 @@ class FinancialPlanning(Base):
     request_fund_ids = Column(JSONB, default=dict)
     request_ids = Column(JSONB, default=list)
     status = Column(String(30), nullable=False)
-    created_at = Column(String(30), nullable=False)
-    updated_at = Column(String(30), nullable=True)
+    created_at = Column(String(50), nullable=False)
+    updated_at = Column(String(50), nullable=True)
     approved_by = Column(String(36), nullable=True)
-    approved_at = Column(String(30), nullable=True)
+    approved_at = Column(String(50), nullable=True)
     notes = Column(String(500), nullable=True)
     is_archived = Column(Boolean, default=False)

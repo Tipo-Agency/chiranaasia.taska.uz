@@ -46,7 +46,7 @@ class ActivityLog(Base):
     user_avatar = Column(String(500), nullable=True)
     action = Column(String(255), nullable=False)
     details = Column(Text, nullable=True)
-    timestamp = Column(String(30), nullable=False)
+    timestamp = Column(String(50), nullable=False)
     read = Column(Boolean, default=False)
 
 
@@ -59,5 +59,5 @@ class InboxMessage(Base):
     recipient_id = Column(String(36), nullable=True)  # null = всем / общий канал
     text = Column(Text, nullable=False)
     attachments = Column(JSONB, default=list)  # [{"entityType": "task", "entityId": "...", "label": "..."}]
-    created_at = Column(String(30), nullable=False)
+    created_at = Column(String(50), nullable=False)
     read = Column(Boolean, default=False)

@@ -110,6 +110,8 @@ app.include_router(sites.router, prefix=settings.API_PREFIX, tags=["sites"])
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
     """Log unhandled exceptions to system_logs and optionally Telegram."""
+    import traceback
+    traceback.print_exc()
     logging.getLogger("uvicorn.error").critical(
         "Unhandled exception: %s", exc, exc_info=True, extra={"path": request.url.path}
     )
