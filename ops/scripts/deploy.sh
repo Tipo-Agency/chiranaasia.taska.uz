@@ -209,8 +209,19 @@ if [ -n "$ADMIN_LOGIN" ] && [ -n "$ADMIN_PASSWORD" ]; then
   cd "$SERVER_PATH" || exit 1
   export DATABASE_URL="${DATABASE_URL:-postgresql+asyncpg://taska:taska@127.0.0.1:5433/taska}"
   export ADMIN_LOGIN ADMIN_PASSWORD
-  pip install -q -r apps/api/requirements.txt 2>/dev/null || true
-  python3 scripts/create_admin.py 2>/dev/null && echo "✅ Admin $ADMIN_LOGIN ready" || echo "⚠️ create_admin failed (check DATABASE_URL and DB)"
+  python3 -m pip install -q -r apps/api/requirements.txt 2>/dev/null || true
+  if python3 scripts/create_admin.py; then
+    echo "✅ Admin $ADMIN_LOGIN created/updated"
+    # Проверка входа: если бэкенд отвечает — тестируем логин
+    code=$(curl -s -o /dev/null -w "%{http_code}" -X POST http://127.0.0.1:8003/api/auth/login -H "Content-Type: application/json" -d "{\"login\":\"$ADMIN_LOGIN\",\"password\":\"$ADMIN_PASSWORD\"}" 2>/dev/null || echo "000")
+    if [ "$code" = "200" ]; then
+      echo "   ✅ Login check OK (HTTP 200)"
+    else
+      echo "   ⚠️ Login check returned HTTP $code — проверьте логин/пароль на сайте"
+    fi
+  else
+    echo "⚠️ create_admin failed — в логе выше должна быть ошибка. Проверьте DATABASE_URL и что БД доступна."
+  fi
 else
   echo ""
   echo "ℹ️  Админ не создаётся (задайте ADMIN_LOGIN и ADMIN_PASSWORD в секретах для автосоздания при деплое)"

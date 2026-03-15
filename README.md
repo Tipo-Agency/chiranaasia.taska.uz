@@ -48,6 +48,8 @@
 2. Если миграция не запускалась автоматически — один раз выполнить миграцию (см. ниже).  
 3. Проверить сайт, логин, задачи, CRM; при появлении багов — чинить по логам (Настройки → Логи, или `GET /api/system/logs`).
 
+**Если при входе 401 «Invalid login or password»:** проверьте, что в GitHub Secrets заданы `ADMIN_LOGIN` и `ADMIN_PASSWORD` и что в логе деплоя (Step 4c) нет ошибки от `create_admin.py`. Если админ не создаётся при деплое — создайте вручную на сервере: `cd $SERVER_PATH && export DATABASE_URL="postgresql+asyncpg://taska:taska@127.0.0.1:5433/taska" ADMIN_LOGIN=donskikhas ADMIN_PASSWORD=ваш_пароль python3 scripts/create_admin.py`.
+
 Подробный чеклист и устранение неполадок: [docs/DEPLOY_AND_MIGRATION.md](docs/DEPLOY_AND_MIGRATION.md).
 
 ## Миграция Firestore → Postgres (однократно после деплоя)
