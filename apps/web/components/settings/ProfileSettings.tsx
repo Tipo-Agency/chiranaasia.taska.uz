@@ -1,7 +1,6 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { User, Role } from '../../types';
-import { hashPassword } from '../../utils/passwordHash';
 import { Camera, Save, AtSign, Mail, Phone, Send, KeyRound, Trash2, Plus, Lock, Upload, User as UserIcon } from 'lucide-react';
 import { uploadAvatar } from '../../services/localStorageService';
 import { DEFAULT_AVATARS, getDefaultAvatarForId, getRandomDefaultAvatar } from '../../constants/avatars';
@@ -59,18 +58,12 @@ export const ProfileSettings: React.FC<ProfileSettingsProps> = ({ currentUser, u
       };
 
       if (newPassword) {
-          if (newPassword !== confirmPassword) {
-              alert('Пароли не совпадают!');
-              return;
-          }
-          // Хешируем новый пароль перед сохранением
-          try {
-              updates.password = await hashPassword(newPassword);
-          } catch (error) {
-              alert('Ошибка при сохранении пароля. Попробуйте еще раз.');
-              console.error('Ошибка хеширования пароля:', error);
-              return;
-          }
+        if (newPassword !== confirmPassword) {
+          alert('Пароли не совпадают!');
+          return;
+        }
+        // Передаём пароль в открытом виде — бэкенд сам захеширует
+        updates.password = newPassword;
       }
 
       onUpdateProfile(updates);
@@ -126,23 +119,14 @@ export const ProfileSettings: React.FC<ProfileSettingsProps> = ({ currentUser, u
       
       // Ensure password is set
       const passwordToSet = newUserPassword.trim() || '123';
-      
-      // Хешируем пароль перед сохранением
-      let hashedPassword: string;
-      try {
-        hashedPassword = await hashPassword(passwordToSet);
-      } catch (error) {
-        alert('Ошибка при создании пользователя. Попробуйте еще раз.');
-        console.error('Ошибка хеширования пароля:', error);
-        return;
-      }
 
       const newUser: User = {
           id: `u-${Date.now()}`,
           name: newUserName,
           login: newUserLogin,
           email: newUserEmail,
-          password: hashedPassword,
+          // Передаём пароль в открытом виде — бэкенд сам захеширует
+          password: passwordToSet,
           role: Role.EMPLOYEE,
           avatar: getRandomDefaultAvatar(),
           mustChangePassword: true
@@ -170,17 +154,7 @@ export const ProfileSettings: React.FC<ProfileSettingsProps> = ({ currentUser, u
   
   const handleResetPassword = async (id: string) => {
       if(confirm('Сбросить пароль на "123"?')) {
-          // Хешируем новый пароль
-          let hashedPassword: string;
-          try {
-            hashedPassword = await hashPassword('123');
-          } catch (error) {
-            alert('Ошибка при сбросе пароля. Попробуйте еще раз.');
-            console.error('Ошибка хеширования пароля:', error);
-            return;
-          }
-          
-          onUpdateUsers(users.map(u => u.id === id ? { ...u, password: hashedPassword, mustChangePassword: true } : u));
+          onUpdateUsers(users.map(u => u.id === id ? { ...u, password: '123', mustChangePassword: true } : u));
           alert('Пароль сброшен.');
       }
   };

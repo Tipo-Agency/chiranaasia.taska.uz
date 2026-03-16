@@ -164,23 +164,16 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
   const handleAddUser = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newUserName.trim() || !newUserLogin.trim()) return alert('Имя и Логин обязательны');
-    
-    // Хешируем пароль перед сохранением
-    let hashedPassword: string;
-    try {
-      hashedPassword = await hashPassword(newUserPassword || '123456');
-    } catch (error) {
-      alert('Ошибка при создании пользователя. Попробуйте еще раз.');
-      console.error('Ошибка хеширования пароля:', error);
-      return;
-    }
+
+    const passwordToSet = (newUserPassword || '123456').trim();
     
     const newUser: User = {
         id: `u-${Date.now()}`,
         name: newUserName,
         email: newUserEmail,
         login: newUserLogin,
-        password: hashedPassword,
+        // Передаём пароль в открытом виде — бэкенд сам захеширует
+        password: passwordToSet,
         role: newUserRole,
         avatar: getRandomDefaultAvatar(),
         mustChangePassword: true
@@ -213,18 +206,8 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
     }
   };
   const handleResetPassword = async (id: string) => {
-      if(confirm('Сбросить пароль?')) {
-          // Хешируем новый пароль
-          let hashedPassword: string;
-          try {
-            hashedPassword = await hashPassword('123456');
-          } catch (error) {
-            alert('Ошибка при сбросе пароля. Попробуйте еще раз.');
-            console.error('Ошибка хеширования пароля:', error);
-            return;
-          }
-          
-          onUpdateUsers(users.map(u => u.id === id ? { ...u, password: hashedPassword, mustChangePassword: true } : u));
+      if(confirm('Сбросить пароль на "123456"?')) {
+          onUpdateUsers(users.map(u => u.id === id ? { ...u, password: '123456', mustChangePassword: true } : u));
           alert('Пароль сброшен на 123456');
       }
   };
