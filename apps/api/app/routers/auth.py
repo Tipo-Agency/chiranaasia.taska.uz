@@ -54,6 +54,7 @@ async def get_users(db: AsyncSession = Depends(get_db)):
 @router.put("/users")
 async def update_users(users: list[dict], db: AsyncSession = Depends(get_db)):
     from app.auth import get_password_hash
+    from sqlalchemy import select
 
     for u in users:
         if u.get("isArchived"):
@@ -63,6 +64,12 @@ async def update_users(users: list[dict], db: AsyncSession = Depends(get_db)):
             continue
         uid = u.get("id")
         existing = await db.get(User, uid) if uid else None
+
+        # Если id нет, но есть логин — пробуем найти пользователя по логину (в т.ч. архивного)
+        if not existing and not uid and u.get("login"):
+            result = await db.execute(select(User).where(User.login == u["login"]))
+            existing = result.scalar_one_or_none()
+
         if existing:
             existing.name = u.get("name", existing.name)
             existing.role = u.get("role", existing.role)
@@ -80,6 +87,7 @@ async def update_users(users: list[dict], db: AsyncSession = Depends(get_db)):
                 else:
                     existing.password_hash = get_password_hash(raw_password)
             existing.must_change_password = bool(u.get("mustChangePassword", False))
+            existing.is_archived = False
         else:
             new_user = User(
                 id=uid or __import__("uuid").uuid4().__str__(),
