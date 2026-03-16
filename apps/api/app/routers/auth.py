@@ -46,7 +46,8 @@ async def login(req: LoginRequest, db: AsyncSession = Depends(get_db)):
 
 @router.get("/users")
 async def get_users(db: AsyncSession = Depends(get_db)):
-    result = await db.execute(select(User).where(User.is_archived == False))
+    # Возвращаем всех пользователей, включая архивных; фронт сам фильтрует по isArchived.
+    result = await db.execute(select(User))
     users = result.scalars().all()
     return [row_to_user(u) for u in users]
 
