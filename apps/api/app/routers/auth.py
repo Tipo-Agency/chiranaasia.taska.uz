@@ -72,9 +72,14 @@ async def update_users(users: list[dict], db: AsyncSession = Depends(get_db)):
             existing.phone = u.get("phone")
             existing.telegram = u.get("telegram")
             existing.telegram_user_id = u.get("telegramUserId")
-            if u.get("password"):
-                existing.password_hash = get_password_hash(u["password"])
-            existing.must_change_password = u.get("mustChangePassword", False)
+            raw_password = u.get("password")
+            # Если фронт прислал уже захешированный пароль (начинается с $2)
+            if raw_password:
+                if isinstance(raw_password, str) and raw_password.startswith("$2"):
+                    existing.password_hash = raw_password
+                else:
+                    existing.password_hash = get_password_hash(raw_password)
+            existing.must_change_password = bool(u.get("mustChangePassword", False))
         else:
             new_user = User(
                 id=uid or __import__("uuid").uuid4().__str__(),
@@ -86,8 +91,13 @@ async def update_users(users: list[dict], db: AsyncSession = Depends(get_db)):
                 telegram=u.get("telegram"),
                 telegram_user_id=u.get("telegramUserId"),
             )
-            if u.get("password"):
-                new_user.password_hash = get_password_hash(u["password"])
+            raw_password = u.get("password")
+            if raw_password:
+                if isinstance(raw_password, str) and raw_password.startswith("$2"):
+                    new_user.password_hash = raw_password
+                else:
+                    new_user.password_hash = get_password_hash(raw_password)
+            new_user.must_change_password = bool(u.get("mustChangePassword", False))
             db.add(new_user)
     await db.commit()
     return {"ok": True}
