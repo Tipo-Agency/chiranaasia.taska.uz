@@ -13,6 +13,10 @@ const PublicContentPlanView: React.FC<PublicContentPlanViewProps> = ({ tableId }
   const [loading, setLoading] = useState(true);
   const [viewMode, setViewMode] = useState<'calendar' | 'table' | 'gantt'>('calendar');
   const [formatFilter, setFormatFilter] = useState<'all' | 'post' | 'reels' | 'story' | 'article' | 'video'>('all');
+  const [currentMonth, setCurrentMonth] = useState<Date>(() => {
+    const now = new Date();
+    return new Date(now.getFullYear(), now.getMonth(), 1);
+  });
 
   useEffect(() => {
     const loadData = async () => {
@@ -86,7 +90,49 @@ const PublicContentPlanView: React.FC<PublicContentPlanViewProps> = ({ tableId }
     );
   }
 
-  const filteredPosts = posts.filter(post => formatFilter === 'all' ? true : post.format === formatFilter);
+  const filteredPosts = posts.filter(post =>
+    formatFilter === 'all' ? true : post.format === formatFilter
+  );
+  const postsSortedDesc = [...filteredPosts].sort(
+    (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
+  );
+  const postsSortedAsc = [...filteredPosts].sort(
+    (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
+  );
+
+  // Календарная сетка по месяцам
+  const monthStart = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), 1);
+  const monthEnd = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 0);
+  const startWeekDay = (monthStart.getDay() + 6) % 7; // делаем понедельник первым
+  const daysInMonth = monthEnd.getDate();
+
+  const days: Date[] = [];
+  // дни предыдущего месяца
+  for (let i = 0; i < startWeekDay; i++) {
+    const d = new Date(monthStart);
+    d.setDate(d.getDate() - (startWeekDay - i));
+    days.push(d);
+  }
+  // текущий месяц
+  for (let d = 1; d <= daysInMonth; d++) {
+    days.push(new Date(currentMonth.getFullYear(), currentMonth.getMonth(), d));
+  }
+  // добиваем до кратности 7
+  while (days.length % 7 !== 0) {
+    const d = new Date(days[days.length - 1]);
+    d.setDate(d.getDate() + 1);
+    days.push(d);
+  }
+
+  const postsByDay = (date: Date) => {
+    const key = date.toISOString().slice(0, 10);
+    return filteredPosts.filter(p => p.date && p.date.slice(0, 10) === key);
+  };
+
+  const monthLabel = currentMonth.toLocaleDateString('ru-RU', {
+    month: 'long',
+    year: 'numeric',
+  });
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-[#121212]">
@@ -160,31 +206,91 @@ const PublicContentPlanView: React.FC<PublicContentPlanViewProps> = ({ tableId }
         {/* Content (scrollable) */}
         <div className="max-h-[70vh] overflow-y-auto custom-scrollbar space-y-4">
           {viewMode === 'calendar' && (
-            <div className="bg-white dark:bg-[#252525] rounded-lg shadow-sm p-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {filteredPosts.map(post => (
-                <div key={post.id} className="border border-gray-200 dark:border-[#333] rounded-lg p-4 hover:shadow-md transition-shadow">
-                  <div className="flex items-start justify-between mb-2">
-                    <h3 className="font-semibold text-gray-900 dark:text-white">{post.topic}</h3>
-                    <span className={`px-2 py-1 rounded text-xs font-medium ${getStatusColor(post.status)}`}>
-                      {getStatusLabel(post.status)}
-                    </span>
+            <div className="bg-white dark:bg-[#252525] rounded-lg shadow-sm p-4 space-y-3">
+              {/* Навигация по месяцам */}
+              <div className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-200">
+                <button
+                  type="button"
+                  className="px-2 py-1 rounded border border-gray-200 dark:border-[#333]"
+                  onClick={() =>
+                    setCurrentMonth(prev => new Date(prev.getFullYear(), prev.getMonth() - 1, 1))
+                  }
+                >
+                  ‹
+                </button>
+                <span className="font-medium capitalize">{monthLabel}</span>
+                <button
+                  type="button"
+                  className="px-2 py-1 rounded border border-gray-200 dark:border-[#333]"
+                  onClick={() =>
+                    setCurrentMonth(prev => new Date(prev.getFullYear(), prev.getMonth() + 1, 1))
+                  }
+                >
+                  ›
+                </button>
+                <button
+                  type="button"
+                  className="ml-2 px-2 py-1 rounded border border-gray-200 dark:border-[#333] text-xs"
+                  onClick={() => {
+                    const now = new Date();
+                    setCurrentMonth(new Date(now.getFullYear(), now.getMonth(), 1));
+                  }}
+                >
+                  Сегодня
+                </button>
+              </div>
+
+              {/* Шапка дней недели */}
+              <div className="grid grid-cols-7 gap-px mt-2 bg-gray-200 dark:bg-[#333] text-[11px] text-gray-500 dark:text-gray-400">
+                {['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'].map(d => (
+                  <div
+                    key={d}
+                    className="bg-gray-50 dark:bg-[#202020] px-2 py-1 text-center font-medium"
+                  >
+                    {d}
                   </div>
-                  <div className="text-sm text-gray-500 dark:text-gray-400 mb-2">
-                    {new Date(post.date).toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric' }).replace(/\//g, '.')}
-                  </div>
-                  <div className="flex items-center gap-2 flex-wrap">
-                    {Array.isArray(post.platform) ? post.platform.map(p => (
-                      <div key={p} className="flex items-center gap-1">
-                        {getPlatformIcon(p)}
-                      </div>
-                    )) : getPlatformIcon(post.platform)}
-                  </div>
-                  {post.copy && (
-                    <p className="mt-2 text-sm text-gray-600 dark:text-gray-300 line-clamp-2">{post.copy}</p>
-                  )}
-                </div>
                 ))}
+              </div>
+
+              {/* Сетка дней */}
+              <div className="grid grid-cols-7 gap-px bg-gray-200 dark:bg-[#333]">
+                {days.map(d => {
+                  const key = d.toISOString().slice(0, 10);
+                  const inMonth = d.getMonth() === currentMonth.getMonth();
+                  const dayPosts = postsByDay(d);
+                  return (
+                    <div
+                      key={key}
+                      className={`min-h-[80px] bg-white dark:bg-[#252525] p-1.5 border border-transparent ${
+                        inMonth ? '' : 'opacity-40'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-[11px] font-medium text-gray-700 dark:text-gray-200">
+                          {d.getDate()}
+                        </span>
+                        {dayPosts.length > 0 && (
+                          <span className="text-[10px] text-gray-400">{dayPosts.length}</span>
+                        )}
+                      </div>
+                      <div className="space-y-1">
+                        {dayPosts.slice(0, 3).map(p => (
+                          <div
+                            key={p.id}
+                            className="rounded bg-gray-100 dark:bg-[#303030] px-1.5 py-0.5 text-[10px] text-gray-800 dark:text-gray-100 line-clamp-2"
+                          >
+                            {p.topic}
+                          </div>
+                        ))}
+                        {dayPosts.length > 3 && (
+                          <div className="text-[10px] text-gray-400 mt-0.5">
+                            +{dayPosts.length - 3} ещё
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             </div>
           )}
@@ -201,7 +307,7 @@ const PublicContentPlanView: React.FC<PublicContentPlanViewProps> = ({ tableId }
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200 dark:divide-[#333]">
-                  {filteredPosts.map(post => (
+                  {postsSortedDesc.map(post => (
                   <tr key={post.id} className="hover:bg-gray-50 dark:hover:bg-[#303030]">
                     <td className="px-4 py-3 font-medium text-gray-900 dark:text-white">{post.topic}</td>
                     <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-400">
@@ -228,7 +334,7 @@ const PublicContentPlanView: React.FC<PublicContentPlanViewProps> = ({ tableId }
             <div className="bg-white dark:bg-[#252525] rounded-lg shadow-sm p-6 overflow-x-auto">
               <div className="min-w-[800px]">
                 <div className="space-y-4">
-                  {filteredPosts.map(post => {
+                  {postsSortedAsc.map(post => {
                   const postDate = new Date(post.date);
                   const today = new Date();
                   const daysDiff = Math.floor((postDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
