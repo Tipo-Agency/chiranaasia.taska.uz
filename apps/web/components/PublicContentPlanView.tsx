@@ -71,6 +71,17 @@ const PublicContentPlanView: React.FC<PublicContentPlanViewProps> = ({ tableId }
     }
   };
 
+  const getFormatLabel = (f: string) => {
+    switch (f) {
+      case 'reel': return 'Reels';
+      case 'post': return 'Пост';
+      case 'story': return 'Stories';
+      case 'article': return 'Статья';
+      case 'video': return 'Видео';
+      default: return f;
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 dark:bg-[#121212] flex items-center justify-center">
@@ -93,10 +104,17 @@ const PublicContentPlanView: React.FC<PublicContentPlanViewProps> = ({ tableId }
   const filteredPosts = posts.filter(post =>
     formatFilter === 'all' ? true : post.format === formatFilter
   );
-  const postsSortedDesc = [...filteredPosts].sort(
+  // Фильтруем посты по текущему месяцу для всех режимов (как в основной системе)
+  const monthPosts = filteredPosts.filter(p => {
+    if (!p.date) return false;
+    const d = new Date(p.date);
+    return d.getFullYear() === currentMonth.getFullYear() && d.getMonth() === currentMonth.getMonth();
+  });
+
+  const postsSortedDesc = [...monthPosts].sort(
     (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
   );
-  const postsSortedAsc = [...filteredPosts].sort(
+  const postsSortedAsc = [...monthPosts].sort(
     (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
   );
 
@@ -126,7 +144,7 @@ const PublicContentPlanView: React.FC<PublicContentPlanViewProps> = ({ tableId }
 
   const postsByDay = (date: Date) => {
     const key = date.toISOString().slice(0, 10);
-    return filteredPosts.filter(p => p.date && p.date.slice(0, 10) === key);
+    return monthPosts.filter(p => p.date && p.date.slice(0, 10) === key);
   };
 
   const monthLabel = currentMonth.toLocaleDateString('ru-RU', {
@@ -274,19 +292,17 @@ const PublicContentPlanView: React.FC<PublicContentPlanViewProps> = ({ tableId }
                         )}
                       </div>
                       <div className="space-y-1">
-                        {dayPosts.slice(0, 3).map(p => (
+                        {dayPosts.map(p => (
                           <div
                             key={p.id}
-                            className="rounded bg-gray-100 dark:bg-[#303030] px-1.5 py-0.5 text-[10px] text-gray-800 dark:text-gray-100 line-clamp-2"
+                            className="rounded bg-gray-100 dark:bg-[#303030] px-1.5 py-0.5 text-[10px] text-gray-800 dark:text-gray-100"
                           >
+                            <span className="mr-1 text-[9px] uppercase opacity-70">
+                              {getFormatLabel(p.format)}
+                            </span>
                             {p.topic}
                           </div>
                         ))}
-                        {dayPosts.length > 3 && (
-                          <div className="text-[10px] text-gray-400 mt-0.5">
-                            +{dayPosts.length - 3} ещё
-                          </div>
-                        )}
                       </div>
                     </div>
                   );
