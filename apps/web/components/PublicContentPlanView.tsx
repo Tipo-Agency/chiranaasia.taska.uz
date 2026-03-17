@@ -15,20 +15,14 @@ const PublicContentPlanView: React.FC<PublicContentPlanViewProps> = ({ tableId }
   const [currentDate, setCurrentDate] = useState(new Date());
 
   useEffect(() => {
-    // Загружаем данные из backend API
     const loadData = async () => {
       try {
         setLoading(true);
-        const [allPosts, allTables] = await Promise.all([
-          api.contentPosts.getAll(),
-          api.tables.getAll(),
-        ]);
-        
-        const filteredPosts = allPosts.filter(p => p.tableId === tableId && !p.isArchived);
-        const foundTable = allTables.find(t => t.id === tableId);
-        
-        setPosts(filteredPosts);
-        setTable(foundTable || null);
+        const res = await api.publicContentPlan.getByTableId(tableId);
+        const t = (res.table || null) as TableCollection | null;
+        const p = (res.posts || []) as ContentPost[];
+        setTable(t);
+        setPosts(p);
       } catch (err) {
         console.error('Ошибка загрузки данных:', err);
       } finally {

@@ -361,3 +361,9 @@ export const tagsEndpoint = {
 export const publicSitesEndpoint = {
   getSiteData: () => get<{ partnerLogos: unknown[]; news: unknown[]; cases: unknown[]; tags: unknown[] }>('/sites/public/site-data'),
 };
+
+// Public content plan (no auth required)
+export const publicContentPlanEndpoint = {
+  getByTableId: (tableId: string) =>
+    get<{ table: unknown | null; posts: unknown[] }>(`/tables/public/content-plan/${encodeURIComponent(tableId)}`),
+};

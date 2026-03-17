@@ -35,6 +35,7 @@ import {
   casesEndpoint,
   tagsEndpoint,
   publicSitesEndpoint,
+  publicContentPlanEndpoint,
 } from "../services/apiClient";
 
 export const api = {
@@ -76,4 +77,5 @@ export const api = {
   cases: casesEndpoint,
   tags: tagsEndpoint,
   publicSites: publicSitesEndpoint,
+  publicContentPlan: publicContentPlanEndpoint,
 };

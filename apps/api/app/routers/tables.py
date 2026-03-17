@@ -4,10 +4,40 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
+from app.models.content import ContentPost
 from app.models.settings import TableCollection
 from app.utils import row_to_table
 
 router = APIRouter(prefix="/tables", tags=["tables"])
+
+def _row_to_post(row: ContentPost) -> dict:
+    return {
+        "id": row.id,
+        "tableId": row.table_id,
+        "topic": row.topic,
+        "description": row.description,
+        "date": row.date,
+        "platform": row.platform or [],
+        "format": row.format,
+        "status": row.status,
+        "copy": row.copy,
+        "mediaUrl": row.media_url,
+        "isArchived": row.is_archived or False,
+    }
+
+
+@router.get("/public/content-plan/{table_id}")
+async def get_public_content_plan(table_id: str, db: AsyncSession = Depends(get_db)):
+    """
+    Публичный контент-план по table_id (без авторизации).
+    Возвращает только одну таблицу и её посты.
+    """
+    t = await db.get(TableCollection, table_id)
+    if not t or (t.is_archived or False):
+        return {"table": None, "posts": []}
+    posts_result = await db.execute(select(ContentPost).where(ContentPost.table_id == table_id))
+    posts = [p for p in posts_result.scalars().all() if not (p.is_archived or False)]
+    return {"table": row_to_table(t), "posts": [_row_to_post(p) for p in posts]}
 
 
 @router.get("")
