@@ -12,7 +12,7 @@ const PublicContentPlanView: React.FC<PublicContentPlanViewProps> = ({ tableId }
   const [table, setTable] = useState<TableCollection | null>(null);
   const [loading, setLoading] = useState(true);
   const [viewMode, setViewMode] = useState<'calendar' | 'table' | 'gantt'>('calendar');
-  const [currentDate, setCurrentDate] = useState(new Date());
+  const [formatFilter, setFormatFilter] = useState<'all' | 'post' | 'reels' | 'story' | 'article' | 'video'>('all');
 
   useEffect(() => {
     const loadData = async () => {
@@ -86,17 +86,19 @@ const PublicContentPlanView: React.FC<PublicContentPlanViewProps> = ({ tableId }
     );
   }
 
+  const filteredPosts = posts.filter(post => formatFilter === 'all' ? true : post.format === formatFilter);
+
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-[#121212]">
-      <div className="max-w-7xl mx-auto px-4 py-8">
+      <div className="max-w-7xl mx-auto px-4 py-8 space-y-4">
         {/* Header */}
-        <div className="mb-8">
+        <div className="mb-2">
           <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">{table.name}</h1>
           <p className="text-gray-500 dark:text-gray-400">Публичный контент-план</p>
         </div>
 
         {/* View Mode Tabs */}
-        <div className="flex items-center gap-2 bg-white dark:bg-[#252525] rounded-lg p-1 mb-6 shadow-sm">
+        <div className="flex items-center gap-2 bg-white dark:bg-[#252525] rounded-lg p-1 shadow-sm">
           <button 
             onClick={() => setViewMode('calendar')} 
             className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
@@ -129,11 +131,38 @@ const PublicContentPlanView: React.FC<PublicContentPlanViewProps> = ({ tableId }
           </button>
         </div>
 
-        {/* Content */}
-        {viewMode === 'calendar' && (
-          <div className="bg-white dark:bg-[#252525] rounded-lg shadow-sm p-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {posts.map(post => (
+        {/* Format filter */}
+        <div className="flex flex-wrap items-center gap-2 text-xs">
+          <span className="text-gray-600 dark:text-gray-300 font-medium">Формат:</span>
+          {[
+            { id: 'all', label: 'Все' },
+            { id: 'post', label: 'Пост' },
+            { id: 'reels', label: 'Reels' },
+            { id: 'story', label: 'Stories' },
+            { id: 'article', label: 'Статья' },
+            { id: 'video', label: 'Видео' },
+          ].map(f => (
+            <button
+              key={f.id}
+              type="button"
+              onClick={() => setFormatFilter(f.id as any)}
+              className={`px-3 py-1.5 rounded-full border text-xs font-medium ${
+                formatFilter === f.id
+                  ? 'bg-blue-600 text-white border-blue-600'
+                  : 'bg-white dark:bg-[#252525] text-gray-700 dark:text-gray-200 border-gray-200 dark:border-[#333]'
+              }`}
+            >
+              {f.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Content (scrollable) */}
+        <div className="max-h-[70vh] overflow-y-auto custom-scrollbar space-y-4">
+          {viewMode === 'calendar' && (
+            <div className="bg-white dark:bg-[#252525] rounded-lg shadow-sm p-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {filteredPosts.map(post => (
                 <div key={post.id} className="border border-gray-200 dark:border-[#333] rounded-lg p-4 hover:shadow-md transition-shadow">
                   <div className="flex items-start justify-between mb-2">
                     <h3 className="font-semibold text-gray-900 dark:text-white">{post.topic}</h3>
@@ -155,24 +184,24 @@ const PublicContentPlanView: React.FC<PublicContentPlanViewProps> = ({ tableId }
                     <p className="mt-2 text-sm text-gray-600 dark:text-gray-300 line-clamp-2">{post.copy}</p>
                   )}
                 </div>
-              ))}
+                ))}
+              </div>
             </div>
-          </div>
-        )}
+          )}
 
-        {viewMode === 'table' && (
-          <div className="bg-white dark:bg-[#252525] rounded-lg shadow-sm overflow-hidden">
-            <table className="w-full">
-              <thead className="bg-gray-50 dark:bg-[#202020]">
-                <tr>
-                  <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700 dark:text-gray-300">Тема</th>
-                  <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700 dark:text-gray-300">Дата</th>
-                  <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700 dark:text-gray-300">Площадки</th>
-                  <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700 dark:text-gray-300">Статус</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-200 dark:divide-[#333]">
-                {posts.map(post => (
+          {viewMode === 'table' && (
+            <div className="bg-white dark:bg-[#252525] rounded-lg shadow-sm overflow-hidden">
+              <table className="w-full">
+                <thead className="bg-gray-50 dark:bg-[#202020]">
+                  <tr>
+                    <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700 dark:text-gray-300">Тема</th>
+                    <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700 dark:text-gray-300">Дата</th>
+                    <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700 dark:text-gray-300">Площадки</th>
+                    <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700 dark:text-gray-300">Статус</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-200 dark:divide-[#333]">
+                  {filteredPosts.map(post => (
                   <tr key={post.id} className="hover:bg-gray-50 dark:hover:bg-[#303030]">
                     <td className="px-4 py-3 font-medium text-gray-900 dark:text-white">{post.topic}</td>
                     <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-400">
@@ -189,17 +218,17 @@ const PublicContentPlanView: React.FC<PublicContentPlanViewProps> = ({ tableId }
                       </span>
                     </td>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
 
-        {viewMode === 'gantt' && (
-          <div className="bg-white dark:bg-[#252525] rounded-lg shadow-sm p-6 overflow-x-auto">
-            <div className="min-w-[800px]">
-              <div className="space-y-4">
-                {posts.map(post => {
+          {viewMode === 'gantt' && (
+            <div className="bg-white dark:bg-[#252525] rounded-lg shadow-sm p-6 overflow-x-auto">
+              <div className="min-w-[800px]">
+                <div className="space-y-4">
+                  {filteredPosts.map(post => {
                   const postDate = new Date(post.date);
                   const today = new Date();
                   const daysDiff = Math.floor((postDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
@@ -222,17 +251,18 @@ const PublicContentPlanView: React.FC<PublicContentPlanViewProps> = ({ tableId }
                       </div>
                     </div>
                   );
-                })}
+                  })}
+                </div>
               </div>
             </div>
-          </div>
-        )}
+          )}
 
-        {posts.length === 0 && (
-          <div className="bg-white dark:bg-[#252525] rounded-lg shadow-sm p-12 text-center">
-            <p className="text-gray-500 dark:text-gray-400">Контент-план пуст</p>
-          </div>
-        )}
+          {filteredPosts.length === 0 && (
+            <div className="bg-white dark:bg-[#252525] rounded-lg shadow-sm p-12 text-center">
+              <p className="text-gray-500 dark:text-gray-400">Контент-план пуст</p>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
