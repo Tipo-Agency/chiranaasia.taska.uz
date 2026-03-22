@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Deal, Client, User, Comment, Task, Project, SalesFunnel, Meeting } from '../types';
-import { Plus, KanbanSquare, List as ListIcon, X, Send, MessageSquare, Instagram, Globe, UserPlus, Bot, Edit2, TrendingUp, CheckSquare, CheckCircle2, XCircle, Trash2, Calendar, Clock, Users } from 'lucide-react';
+import { Plus, KanbanSquare, List as ListIcon, X, Send, MessageSquare, Instagram, Globe, UserPlus, Bot, Edit2, TrendingUp, CheckSquare, CheckCircle2, XCircle, Trash2, Calendar, Clock, Users, Tag, GitBranch, Filter, User as UserIcon } from 'lucide-react';
 // Telegram / Instagram интеграции отключены в локальной демо-версии
 // import { sendClientMessage } from '../services/telegramService';
 // import { instagramService } from '../services/instagramService';
@@ -41,7 +41,7 @@ const SalesFunnelView: React.FC<SalesFunnelViewProps> = ({ deals, clients, users
   const [viewMode, setViewMode] = useState<'kanban' | 'list' | 'rejected'>('kanban');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingDeal, setEditingDeal] = useState<Deal | null>(null);
-  const [modalTab, setModalTab] = useState<'details' | 'chat' | 'tasks' | 'meetings'>('details');
+  const [modalTab, setModalTab] = useState<'chat' | 'tasks' | 'meetings'>('chat');
 
   const [title, setTitle] = useState('');
   const [clientName, setClientName] = useState(''); // Просто название клиента, без создания
@@ -127,6 +127,7 @@ const SalesFunnelView: React.FC<SalesFunnelViewProps> = ({ deals, clients, users
     setAssigneeId(users[0]?.id || ''); 
     setNotes('');
     setComments([]); 
+    setModalTab('chat');
     setIsModalOpen(true); 
   };
   
@@ -145,6 +146,7 @@ const SalesFunnelView: React.FC<SalesFunnelViewProps> = ({ deals, clients, users
     setSource(d.source || 'manual'); 
     setNotes(d.notes || '');
     setComments(d.comments || []); 
+    setModalTab('chat');
     setIsModalOpen(true); 
   };
 
@@ -241,7 +243,7 @@ const SalesFunnelView: React.FC<SalesFunnelViewProps> = ({ deals, clients, users
           text: chatMessage, 
           authorId: currentUser?.id || 'demo-user', 
           createdAt: new Date().toISOString(), 
-          type: 'comment' 
+          type: 'internal' 
       };
       const nextComments = [...(comments || []), c];
       setComments(nextComments);
@@ -385,8 +387,7 @@ const SalesFunnelView: React.FC<SalesFunnelViewProps> = ({ deals, clients, users
 
   const handleBackdropClick = (e: React.MouseEvent) => {
       if (e.target === e.currentTarget) {
-          if(window.confirm("Сохранить изменения?")) handleSubmit();
-          else setIsModalOpen(false);
+          setIsModalOpen(false);
       }
   };
 
@@ -647,117 +648,23 @@ const SalesFunnelView: React.FC<SalesFunnelViewProps> = ({ deals, clients, users
         </div>
       </div>
       {isModalOpen && (
-          <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-[80] p-2 md:p-4" onClick={handleBackdropClick}>
-              <div className="bg-white dark:bg-[#252525] w-full max-w-4xl max-h-[min(720px,92vh)] h-full md:h-auto rounded-xl flex flex-col overflow-hidden border border-gray-200 dark:border-[#333]" onClick={e => e.stopPropagation()}>
-                  <div className="p-3 md:p-4 border-b border-gray-100 dark:border-[#333] flex justify-between items-center bg-white dark:bg-[#252525] shrink-0">
-                      <div className="flex items-center gap-2 flex-1 min-w-0">
-                          <h3 className="font-bold text-gray-800 dark:text-white text-sm md:text-base">Сделка</h3>
-                          <div className="flex items-center gap-1 bg-gray-100 dark:bg-[#333] rounded-full p-1 text-xs shrink-0">
-                              <button onClick={() => setModalTab('details')} className={`px-2 py-1 rounded-full ${modalTab === 'details' ? 'bg-white dark:bg-[#191919]' : ''}`}>Детали</button>
-                              <button onClick={() => setModalTab('chat')} className={`px-2 py-1 rounded-full ${modalTab === 'chat' ? 'bg-white dark:bg-[#191919]' : ''}`}>Чат</button>
-                              <button onClick={() => setModalTab('tasks')} className={`px-2 py-1 rounded-full ${modalTab === 'tasks' ? 'bg-white dark:bg-[#191919]' : ''}`}>Задачи</button>
-                              <button onClick={() => setModalTab('meetings')} className={`px-2 py-1 rounded-full ${modalTab === 'meetings' ? 'bg-white dark:bg-[#191919]' : ''}`}>Встречи</button>
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-end md:items-center justify-center z-[80] p-0 md:p-4" onClick={handleBackdropClick}>
+              <div className="bg-white dark:bg-[#1e1e1e] w-full h-full md:h-auto md:max-h-[min(680px,92vh)] md:max-w-5xl md:rounded-xl shadow-2xl flex flex-col md:flex-row overflow-hidden border-0 md:border border-gray-200 dark:border-gray-800 rounded-t-2xl md:rounded-xl" onClick={e => e.stopPropagation()}>
+                  {/* Левая колонка — поля (как в модалке задачи) */}
+                  <div className="flex-1 flex flex-col min-w-0 border-b md:border-b-0 md:border-r border-gray-200 dark:border-gray-800 max-h-[52vh] md:max-h-none overflow-hidden">
+                      <div className="p-3 border-b border-gray-100 dark:border-gray-800 flex justify-between items-start gap-2 shrink-0">
+                          <div className="flex-1 min-w-0">
+                              <label className="block text-[10px] uppercase font-bold text-gray-400 mb-1 ml-0.5">Сделка</label>
+                              <input
+                                  value={title}
+                                  onChange={e => setTitle(e.target.value)}
+                                  className="w-full text-sm font-semibold bg-white dark:bg-[#252525] border border-gray-300 dark:border-gray-700 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500/20 text-gray-900 dark:text-gray-100 placeholder-gray-400"
+                                  placeholder="Название сделки"
+                              />
                           </div>
-                      </div>
-                      <button onClick={() => setIsModalOpen(false)} className="shrink-0"><X size={18} className="text-gray-400"/></button>
-                  </div>
-                  <div className="flex-1 flex flex-col md:flex-row overflow-hidden">
-                      {/* Левая панель - всегда видима */}
-                      <div className="w-full md:w-1/2 p-4 md:p-6 overflow-y-auto border-b md:border-b-0 md:border-r border-gray-100 dark:border-[#333]">
-                          <form onSubmit={handleSubmit} className="space-y-4">
-                              <input required value={title} onChange={e => setTitle(e.target.value)} className="w-full border border-gray-300 dark:border-gray-600 rounded px-3 py-2 bg-white dark:bg-[#333] text-gray-900 dark:text-gray-100 text-sm md:text-base" placeholder="Название сделки"/>
-                              
-                              <div>
-                                  <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1.5">Воронка</label>
-                                  <TaskSelect
-                                      value={funnelId}
-                                      onChange={handleDealFunnelChange}
-                                      options={salesFunnels.map(f => ({ value: f.id, label: f.name }))}
-                                      placeholder="Выберите воронку"
-                                  />
-                              </div>
-                              <div>
-                                  <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1.5">Стадия</label>
-                                  <TaskSelect
-                                      value={stage}
-                                      onChange={setStage}
-                                      options={[
-                                          ...(funnelId 
-                                              ? (() => {
-                                                  const currentFunnel = salesFunnels.find(f => f.id === funnelId);
-                                                  return currentFunnel && currentFunnel.stages.length > 0
-                                                      ? currentFunnel.stages.map(s => ({ value: s.id, label: s.label }))
-                                                      : STAGES.map(s => ({ value: s.id, label: s.label }));
-                                              })()
-                                              : STAGES.map(s => ({ value: s.id, label: s.label }))),
-                                          { value: 'won', label: 'Выиграна' },
-                                          { value: 'lost', label: 'Проиграна' }
-                                      ]}
-                                  />
-                              </div>
-                              
-                              <div>
-                                  <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1.5">Источник</label>
-                                  <TaskSelect
-                                      value={source}
-                                      onChange={setSource}
-                                      options={[
-                                          { value: 'manual', label: 'Вручную' },
-                                          { value: 'site', label: 'Заявка с сайта' },
-                                          { value: 'instagram', label: 'Instagram' },
-                                          { value: 'telegram', label: 'Telegram' },
-                                          { value: 'vk', label: 'ВКонтакте' },
-                                          { value: 'recommendation', label: 'Рекомендация' }
-                                      ]}
-                                  />
-                              </div>
-
-                              <div>
-                                  <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1.5">Вид услуг</label>
-                                  <TaskSelect
-                                      value={dealProjectId}
-                                      onChange={setDealProjectId}
-                                      placeholder=""
-                                      options={[
-                                        { value: '', label: 'Не выбрано' },
-                                        ...(projects || []).map(p => ({ value: p.id, label: p.name })),
-                                      ]}
-                                  />
-                              </div>
-                              
-                              <div>
-                                  <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1.5">Исполнитель</label>
-                                  <TaskSelect
-                                      value={assigneeId}
-                                      onChange={setAssigneeId}
-                                      options={users.map(u => ({ value: u.id, label: u.name }))}
-                                      placeholder="Выберите исполнителя"
-                                  />
-                              </div>
-                              
-                              {/* Кнопки действий */}
-                              <div className="flex flex-col sm:flex-row gap-2 pt-2">
-                                  <button 
-                                      type="button"
-                                      onClick={handleMarkAsWon}
-                                      className="flex-1 bg-green-600 hover:bg-green-700 text-white font-semibold py-2.5 px-4 rounded-lg transition-colors flex items-center justify-center gap-2"
-                                  >
-                                      <CheckCircle2 size={18} />
-                                      <span>Успешно</span>
-                                  </button>
-                                  <button 
-                                      type="button"
-                                      onClick={handleMarkAsLost}
-                                      className="flex-1 bg-red-600 hover:bg-red-700 text-white font-semibold py-2.5 px-4 rounded-lg transition-colors flex items-center justify-center gap-2"
-                                  >
-                                      <XCircle size={18} />
-                                      <span>Отказ</span>
-                                  </button>
-                              </div>
-                              
-                              {/* Кнопка удаления в архив */}
+                          <div className="flex items-center gap-1 shrink-0 mt-5">
                               {editingDeal && (
-                                  <button 
+                                  <button
                                       type="button"
                                       onClick={() => {
                                           if (window.confirm('Удалить сделку в архив?')) {
@@ -765,69 +672,213 @@ const SalesFunnelView: React.FC<SalesFunnelViewProps> = ({ deals, clients, users
                                               setIsModalOpen(false);
                                           }
                                       }}
-                                      className="w-full bg-gray-600 hover:bg-gray-700 text-white font-semibold py-2.5 px-4 rounded-lg transition-colors flex items-center justify-center gap-2 mt-2"
+                                      className="p-2 text-gray-400 hover:text-red-500 hover:bg-gray-100 dark:hover:bg-gray-800 rounded transition-colors"
+                                      title="В архив"
                                   >
                                       <Trash2 size={18} />
-                                      <span>Удалить в архив</span>
                                   </button>
                               )}
-                              
-                              <Button type="submit" size="md" fullWidth className="mt-2">Сохранить</Button>
-                          </form>
+                              <button type="button" onClick={() => setIsModalOpen(false)} className="p-2 text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 rounded transition-colors">
+                                  <X size={20} />
+                              </button>
+                          </div>
                       </div>
-                      {/* Правая панель - вкладки */}
-                      <div className="w-full md:w-1/2 flex flex-col bg-gray-50 dark:bg-[#202020]">
-                          {modalTab === 'details' ? (
-                              <div className="flex-1 p-4 md:p-6 overflow-y-auto space-y-4">
-                                  <div className="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-3 uppercase">Основная информация</div>
-                                  
-                                  {/* Название клиента */}
-                                  <div>
-                                      <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1.5">Название клиента</label>
-                                      <input 
-                                          value={clientName} 
-                                          onChange={e => setClientName(e.target.value)} 
-                                          className="w-full border border-gray-300 dark:border-gray-600 rounded px-3 py-2 bg-white dark:bg-[#333] text-gray-900 dark:text-gray-100 text-sm md:text-base" 
-                                          placeholder="Введите название клиента"
-                                      />
+
+                      <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto custom-scrollbar p-3 md:p-4 space-y-2 min-h-0">
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-x-3 gap-y-2">
+                              <div className="flex items-center gap-2 md:gap-3 md:col-span-2">
+                                  <div className="w-24 shrink-0 text-[10px] font-semibold text-gray-500 dark:text-gray-400 uppercase flex items-center gap-1.5">
+                                      <KanbanSquare size={14} className="text-gray-400 shrink-0" />
+                                      Воронка
                                   </div>
-                                  
-                                  {/* Контактное лицо */}
-                                  <div>
-                                      <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1.5">Контактное лицо</label>
-                                      <input 
-                                          value={contactName} 
-                                          onChange={e => setContactName(e.target.value)} 
-                                          className="w-full border border-gray-300 dark:border-gray-600 rounded px-3 py-2 bg-white dark:bg-[#333] text-gray-900 dark:text-gray-100 text-sm md:text-base" 
-                                          placeholder="Введите контактное лицо"
-                                      />
-                                  </div>
-                                  
-                                  {/* Сумма (без валюты) */}
-                                  <div>
-                                      <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1.5">Сумма</label>
-                                      <input 
-                                          type="number" 
-                                          value={amount} 
-                                          onChange={e => setAmount(e.target.value)} 
-                                          className="w-full border border-gray-300 dark:border-gray-600 rounded px-3 py-2 bg-white dark:bg-[#333] text-gray-900 dark:text-gray-100 text-sm md:text-base" 
-                                          placeholder="Введите сумму"
-                                      />
-                                  </div>
-                                  
-                                  {/* Примечания */}
-                                  <div>
-                                      <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1.5">Примечание</label>
-                                      <textarea 
-                                          value={notes} 
-                                          onChange={e => setNotes(e.target.value)} 
-                                          rows={4}
-                                          className="w-full border border-gray-300 dark:border-gray-600 rounded px-3 py-2 bg-white dark:bg-[#333] text-gray-900 dark:text-gray-100 text-sm md:text-base resize-none"
-                                          placeholder="Дополнительная информация о сделке..."
+                                  <div className="flex-1 min-w-0">
+                                      <TaskSelect
+                                          size="compact"
+                                          value={funnelId}
+                                          onChange={handleDealFunnelChange}
+                                          options={salesFunnels.map(f => ({ value: f.id, label: f.name }))}
+                                          placeholder="Выберите воронку"
                                       />
                                   </div>
                               </div>
-                          ) : modalTab === 'chat' ? (
+                              <div className="flex items-center gap-2 md:gap-3">
+                                  <div className="w-24 shrink-0 text-[10px] font-semibold text-gray-500 dark:text-gray-400 uppercase flex items-center gap-1.5">
+                                      <GitBranch size={14} className="text-gray-400 shrink-0" />
+                                      Стадия
+                                  </div>
+                                  <div className="flex-1 min-w-0">
+                                      <TaskSelect
+                                          size="compact"
+                                          value={stage}
+                                          onChange={setStage}
+                                          options={[
+                                              ...(funnelId
+                                                  ? (() => {
+                                                        const currentFunnel = salesFunnels.find(f => f.id === funnelId);
+                                                        return currentFunnel && currentFunnel.stages.length > 0
+                                                            ? currentFunnel.stages.map(s => ({ value: s.id, label: s.label }))
+                                                            : STAGES.map(s => ({ value: s.id, label: s.label }));
+                                                    })()
+                                                  : STAGES.map(s => ({ value: s.id, label: s.label }))),
+                                              { value: 'won', label: 'Выиграна' },
+                                              { value: 'lost', label: 'Проиграна' },
+                                          ]}
+                                      />
+                                  </div>
+                              </div>
+                              <div className="flex items-center gap-2 md:gap-3">
+                                  <div className="w-24 shrink-0 text-[10px] font-semibold text-gray-500 dark:text-gray-400 uppercase flex items-center gap-1.5">
+                                      <Filter size={14} className="text-gray-400 shrink-0" />
+                                      Источник
+                                  </div>
+                                  <div className="flex-1 min-w-0">
+                                      <TaskSelect
+                                          size="compact"
+                                          value={source}
+                                          onChange={setSource}
+                                          options={[
+                                              { value: 'manual', label: 'Вручную' },
+                                              { value: 'site', label: 'Заявка с сайта' },
+                                              { value: 'instagram', label: 'Instagram' },
+                                              { value: 'telegram', label: 'Telegram' },
+                                              { value: 'vk', label: 'ВКонтакте' },
+                                              { value: 'recommendation', label: 'Рекомендация' },
+                                          ]}
+                                      />
+                                  </div>
+                              </div>
+                              <div className="flex items-center gap-2 md:gap-3 md:col-span-2">
+                                  <div className="w-24 shrink-0 text-[10px] font-semibold text-gray-500 dark:text-gray-400 uppercase flex items-center gap-1.5">
+                                      <Tag size={14} className="text-gray-400 shrink-0" />
+                                      Модуль
+                                  </div>
+                                  <div className="flex-1 min-w-0">
+                                      <TaskSelect
+                                          size="compact"
+                                          value={dealProjectId}
+                                          onChange={setDealProjectId}
+                                          placeholder=""
+                                          options={[
+                                              { value: '', label: 'Не выбрано' },
+                                              ...(projects || []).map(p => ({ value: p.id, label: p.name })),
+                                          ]}
+                                      />
+                                  </div>
+                              </div>
+                              <div className="flex items-center gap-2 md:gap-3 md:col-span-2">
+                                  <div className="w-24 shrink-0 text-[10px] font-semibold text-gray-500 dark:text-gray-400 uppercase flex items-center gap-1.5">
+                                      <UserIcon size={14} className="text-gray-400 shrink-0" />
+                                      Ответств.
+                                  </div>
+                                  <div className="flex-1 min-w-0">
+                                      <TaskSelect
+                                          size="compact"
+                                          value={assigneeId}
+                                          onChange={setAssigneeId}
+                                          options={users.map(u => ({ value: u.id, label: u.name }))}
+                                          placeholder="Выберите исполнителя"
+                                      />
+                                  </div>
+                              </div>
+                          </div>
+
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-2 pt-1 border-t border-gray-100 dark:border-gray-800">
+                              <div>
+                                  <label className="block text-[10px] font-bold text-gray-500 dark:text-gray-400 mb-1 uppercase">Клиент</label>
+                                  <input
+                                      value={clientName}
+                                      onChange={e => setClientName(e.target.value)}
+                                      className="w-full border border-gray-300 dark:border-gray-600 rounded-md px-2.5 py-1.5 min-h-[32px] text-sm bg-white dark:bg-[#333] text-gray-900 dark:text-gray-100"
+                                      placeholder="Название или компания"
+                                  />
+                              </div>
+                              <div>
+                                  <label className="block text-[10px] font-bold text-gray-500 dark:text-gray-400 mb-1 uppercase">Контакт</label>
+                                  <input
+                                      value={contactName}
+                                      onChange={e => setContactName(e.target.value)}
+                                      className="w-full border border-gray-300 dark:border-gray-600 rounded-md px-2.5 py-1.5 min-h-[32px] text-sm bg-white dark:bg-[#333] text-gray-900 dark:text-gray-100"
+                                      placeholder="ФИО, телефон"
+                                  />
+                              </div>
+                              <div className="md:col-span-2">
+                                  <label className="block text-[10px] font-bold text-gray-500 dark:text-gray-400 mb-1 uppercase">Сумма (UZS)</label>
+                                  <input
+                                      type="number"
+                                      value={amount}
+                                      onChange={e => setAmount(e.target.value)}
+                                      className="w-full border border-gray-300 dark:border-gray-600 rounded-md px-2.5 py-1.5 min-h-[32px] text-sm bg-white dark:bg-[#333] text-gray-900 dark:text-gray-100 [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none [-moz-appearance:textfield]"
+                                      placeholder="0"
+                                  />
+                              </div>
+                          </div>
+
+                          <div>
+                              <label className="block text-[10px] font-bold text-gray-500 dark:text-gray-400 mb-1 uppercase">Примечание</label>
+                              <textarea
+                                  value={notes}
+                                  onChange={e => setNotes(e.target.value)}
+                                  rows={3}
+                                  className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-2.5 py-2 text-sm bg-white dark:bg-[#333] text-gray-900 dark:text-gray-100 resize-y min-h-[72px]"
+                                  placeholder="Дополнительно о сделке..."
+                              />
+                          </div>
+
+                          <div className="flex flex-col sm:flex-row gap-2 pt-1">
+                              <button
+                                  type="button"
+                                  onClick={handleMarkAsWon}
+                                  className="flex-1 bg-green-600 hover:bg-green-700 text-white font-medium py-2 px-3 rounded-lg transition-colors flex items-center justify-center gap-2 text-sm"
+                              >
+                                  <CheckCircle2 size={16} />
+                                  <span>Успешно</span>
+                              </button>
+                              <button
+                                  type="button"
+                                  onClick={handleMarkAsLost}
+                                  className="flex-1 bg-red-600 hover:bg-red-700 text-white font-medium py-2 px-3 rounded-lg transition-colors flex items-center justify-center gap-2 text-sm"
+                              >
+                                  <XCircle size={16} />
+                                  <span>Отказ</span>
+                              </button>
+                          </div>
+
+                          <Button type="submit" size="md" fullWidth className="mt-1">
+                              Сохранить
+                          </Button>
+                      </form>
+                  </div>
+
+                  {/* Правая колонка — чат / задачи / встречи */}
+                  <div className="w-full md:w-[min(420px,44%)] flex flex-col bg-gray-50 dark:bg-[#202020] border-t md:border-t-0 md:border-l border-gray-200 dark:border-gray-800 min-h-[280px] md:min-h-0">
+                      <div className="flex items-center gap-1 p-1.5 border-b border-gray-200 dark:border-[#333] bg-white/90 dark:bg-[#252525]/90 shrink-0">
+                          <button
+                              type="button"
+                              onClick={() => setModalTab('chat')}
+                              className={`flex-1 px-2 py-1.5 rounded-lg text-xs font-medium transition-colors ${modalTab === 'chat' ? 'bg-[#3337AD] text-white' : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-[#333]'}`}
+                          >
+                              <MessageSquare size={14} className="inline mr-1 -mt-0.5 opacity-90" />
+                              Чат
+                          </button>
+                          <button
+                              type="button"
+                              onClick={() => setModalTab('tasks')}
+                              className={`flex-1 px-2 py-1.5 rounded-lg text-xs font-medium transition-colors ${modalTab === 'tasks' ? 'bg-[#3337AD] text-white' : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-[#333]'}`}
+                          >
+                              <CheckSquare size={14} className="inline mr-1 -mt-0.5 opacity-90" />
+                              Задачи
+                          </button>
+                          <button
+                              type="button"
+                              onClick={() => setModalTab('meetings')}
+                              className={`flex-1 px-2 py-1.5 rounded-lg text-xs font-medium transition-colors ${modalTab === 'meetings' ? 'bg-[#3337AD] text-white' : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-[#333]'}`}
+                          >
+                              <Calendar size={14} className="inline mr-1 -mt-0.5 opacity-90" />
+                              Встречи
+                          </button>
+                      </div>
+                      <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
+                          {modalTab === 'chat' ? (
                               <>
                                   <div className="flex-1 p-4 overflow-y-auto space-y-2">
                                       {comments.map(c => (
@@ -835,83 +886,10 @@ const SalesFunnelView: React.FC<SalesFunnelViewProps> = ({ deals, clients, users
                                       ))}
                                   </div>
                                   <div className="p-4 border-t border-gray-200 dark:border-[#333] flex gap-2">
-                                      <input value={chatMessage} onChange={e => setChatMessage(e.target.value)} className="flex-1 border rounded px-3 py-2 text-sm bg-white dark:bg-[#333] text-gray-900 dark:text-gray-100" placeholder="Telegram message..."/>
+                                      <input value={chatMessage} onChange={e => setChatMessage(e.target.value)} className="flex-1 border border-gray-300 dark:border-gray-600 rounded-lg px-2.5 py-1.5 min-h-[36px] text-sm bg-white dark:bg-[#333] text-gray-900 dark:text-gray-100" placeholder="Сообщение по сделке..."/>
                                       <button onClick={handleSendChat} className="bg-blue-600 text-white p-2 rounded"><Send size={16}/></button>
                                   </div>
                               </>
-                          ) : modalTab === 'tasks' ? (
-                              <div className="flex-1 p-4 md:p-6 overflow-y-auto flex flex-col">
-                                  <div className="flex items-center justify-between mb-4">
-                                      <h4 className="font-bold text-gray-800 dark:text-white flex items-center gap-2">
-                                          <CheckSquare size={18} /> Задачи по сделке
-                                      </h4>
-                                      {dealTasks.length > 0 && (
-                                          <span className="text-xs text-gray-500 dark:text-gray-400">{dealTasks.length}</span>
-                                      )}
-                                  </div>
-                                  
-                                  {/* Список связанных задач */}
-                                  {dealTasks.length > 0 && (
-                                      <div className="space-y-2 mb-4">
-                                          {dealTasks.map(task => (
-                                              <div 
-                                                  key={task.id}
-                                                  onClick={() => onOpenTask && onOpenTask(task)}
-                                                  className="p-3 bg-white dark:bg-[#333] border border-gray-200 dark:border-[#444] rounded-lg hover:border-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors cursor-pointer"
-                                              >
-                                                  <div className="font-medium text-sm text-gray-800 dark:text-gray-200 mb-1">{task.title}</div>
-                                                  <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
-                                                      <span className="px-2 py-0.5 rounded bg-gray-100 dark:bg-[#444]">{task.status}</span>
-                                                      {task.priority && (
-                                                          <span className="px-2 py-0.5 rounded bg-gray-100 dark:bg-[#444]">{task.priority}</span>
-                                                      )}
-                                                  </div>
-                                              </div>
-                                          ))}
-                                      </div>
-                                  )}
-                                  
-                                  {/* Кнопка создания задачи с выпадающим списком */}
-                                  <div className="relative">
-                                      <button
-                                          onClick={() => setShowTaskDropdown(!showTaskDropdown)}
-                                          className="w-full p-3 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg hover:border-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors flex items-center justify-center gap-2 text-gray-600 dark:text-gray-400 hover:text-blue-600"
-                                      >
-                                          <Plus size={18} /> Создать задачу
-                                      </button>
-                                      {showTaskDropdown && (
-                                          <>
-                                              <div className="fixed inset-0 z-30" onClick={() => setShowTaskDropdown(false)}></div>
-                                              <div className="absolute top-full left-0 right-0 mt-2 bg-white dark:bg-[#333] border border-gray-200 dark:border-[#444] rounded-lg shadow-lg z-40 overflow-hidden">
-                                                  <button
-                                                      onClick={() => { handleCreateTask('Подготовить КП'); setShowTaskDropdown(false); }}
-                                                      className="w-full text-left px-4 py-2.5 hover:bg-gray-50 dark:hover:bg-[#404040] transition-colors text-sm text-gray-700 dark:text-gray-300"
-                                                  >
-                                                      Подготовить КП
-                                                  </button>
-                                                  <button
-                                                      onClick={() => { handleCreateTask('Согласовать условия'); setShowTaskDropdown(false); }}
-                                                      className="w-full text-left px-4 py-2.5 hover:bg-gray-50 dark:hover:bg-[#404040] transition-colors text-sm text-gray-700 dark:text-gray-300"
-                                                  >
-                                                      Согласовать условия
-                                                  </button>
-                                                  <button
-                                                      onClick={() => { handleCreateTask('Подготовить договор'); setShowTaskDropdown(false); }}
-                                                      className="w-full text-left px-4 py-2.5 hover:bg-gray-50 dark:hover:bg-[#404040] transition-colors text-sm text-gray-700 dark:text-gray-300"
-                                                  >
-                                                      Подготовить договор
-                                                  </button>
-                                                  <button
-                                                      onClick={() => { handleCreateTask('Связаться с клиентом'); setShowTaskDropdown(false); }}
-                                                      className="w-full text-left px-4 py-2.5 hover:bg-gray-50 dark:hover:bg-[#404040] transition-colors text-sm text-gray-700 dark:text-gray-300"
-                                                  >
-                                                      Связаться с клиентом
-                                                  </button>
-                                              </div>
-                                          </>
-                                      )}
-                                  </div>
-                              </div>
                           ) : modalTab === 'tasks' ? (
                               <div className="flex-1 p-4 md:p-6 overflow-y-auto flex flex-col">
                                   <div className="flex items-center justify-between mb-4">

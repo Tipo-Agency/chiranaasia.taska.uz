@@ -415,10 +415,10 @@ const TaskModal: React.FC<TaskModalProps> = ({
         <div className="relative flex-1" ref={containerRef}>
             <div 
                 onClick={() => setIsOpen(!isOpen)}
-                className={`px-3 py-2.5 rounded-lg text-sm font-medium cursor-pointer transition-all flex items-center justify-between ${colorClass}`}
+                className={`px-2.5 py-1.5 min-h-[32px] rounded-md text-xs font-medium cursor-pointer transition-all flex items-center justify-between ${colorClass}`}
             >
                 <span className="truncate">{value}</span>
-                <ChevronDown size={16} className={`ml-2 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+                <ChevronDown size={14} className={`ml-1.5 shrink-0 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
             </div>
             
             {isOpen && (
@@ -432,10 +432,10 @@ const TaskModal: React.FC<TaskModalProps> = ({
                                     onChange(opt.name);
                                     setIsOpen(false);
                                 }}
-                                className="flex items-center gap-2 px-3 py-2.5 hover:bg-gray-50 dark:hover:bg-[#303030] rounded-lg cursor-pointer transition-colors whitespace-nowrap"
+                                className="flex items-center gap-2 px-2.5 py-1.5 hover:bg-gray-50 dark:hover:bg-[#303030] rounded-md cursor-pointer transition-colors whitespace-nowrap"
                             >
-                                <span className={`text-sm font-medium ${optColor} px-2 py-0.5 rounded inline-block`}>{opt.name}</span>
-                                {opt.name === value && <Check size={16} className="text-blue-500 dark:text-blue-400 flex-shrink-0 ml-auto"/>}
+                                <span className={`text-xs font-medium ${optColor} px-1.5 py-0.5 rounded inline-block`}>{opt.name}</span>
+                                {opt.name === value && <Check size={14} className="text-blue-500 dark:text-blue-400 flex-shrink-0 ml-auto"/>}
                             </div>
                         );
                     })}
@@ -509,7 +509,7 @@ const TaskModal: React.FC<TaskModalProps> = ({
         <div className="relative flex-1 flex gap-2" ref={containerRef}>
             <div 
                 onClick={() => setIsOpen(!isOpen)}
-                className="flex-1 px-3 py-2.5 rounded-lg text-sm font-medium cursor-pointer transition-all flex items-center gap-2 bg-gray-50 dark:bg-[#252525] border border-gray-200 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-[#303030]"
+                className="flex-1 px-2.5 py-1.5 min-h-[32px] rounded-md text-xs font-medium cursor-pointer transition-all flex items-center gap-1.5 bg-gray-50 dark:bg-[#252525] border border-gray-200 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-[#303030]"
             >
                 {selectedProject ? (
                     <>
@@ -517,25 +517,25 @@ const TaskModal: React.FC<TaskModalProps> = ({
                             <DynamicIcon 
                                 name={selectedProject.icon} 
                                 className={selectedProject.color || 'text-gray-500'} 
-                                size={16} 
+                                size={14} 
                             />
                         )}
-                        <span className={`truncate flex-1 ${resolveProjectColor(selectedProject.color)} px-2 py-0.5 rounded`}>
+                        <span className={`truncate flex-1 ${resolveProjectColor(selectedProject.color)} px-1.5 py-0.5 rounded text-xs`}>
                             {selectedProject.name}
                         </span>
                     </>
                 ) : (
                     <span className="truncate text-gray-500 dark:text-gray-400">Без модуля</span>
                 )}
-                <ChevronDown size={16} className={`ml-auto transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+                <ChevronDown size={14} className={`ml-auto shrink-0 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
             </div>
             <button 
                 type="button" 
                 onClick={handleCreateNew}
-                className="px-3 py-2 text-gray-400 hover:text-blue-500 hover:bg-gray-100 dark:hover:bg-[#303030] rounded-lg transition-colors"
+                className="h-8 w-8 shrink-0 flex items-center justify-center text-gray-400 hover:text-blue-500 hover:bg-gray-100 dark:hover:bg-[#303030] rounded-md transition-colors"
                 title="Создать модуль"
             >
-                <Plus size={18}/>
+                <Plus size={16}/>
             </button>
             
             {isOpen && (
@@ -545,7 +545,7 @@ const TaskModal: React.FC<TaskModalProps> = ({
                             onChange('');
                             setIsOpen(false);
                         }}
-                        className="px-3 py-2.5 hover:bg-gray-50 dark:hover:bg-[#303030] rounded-lg cursor-pointer transition-colors text-sm text-gray-500 dark:text-gray-400 whitespace-nowrap"
+                        className="px-2.5 py-1.5 hover:bg-gray-50 dark:hover:bg-[#303030] rounded-md cursor-pointer transition-colors text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap"
                     >
                         Без модуля
                     </div>
@@ -558,17 +558,17 @@ const TaskModal: React.FC<TaskModalProps> = ({
                                     onChange(project.id);
                                     setIsOpen(false);
                                 }}
-                                className="flex items-center gap-2 px-3 py-2.5 hover:bg-gray-50 dark:hover:bg-[#303030] rounded-lg cursor-pointer transition-colors whitespace-nowrap"
+                                className="flex items-center gap-2 px-2.5 py-1.5 hover:bg-gray-50 dark:hover:bg-[#303030] rounded-md cursor-pointer transition-colors whitespace-nowrap"
                             >
                                 {project.icon && (
                                     <DynamicIcon 
                                         name={project.icon} 
                                         className={project.color || 'text-gray-500'} 
-                                        size={16} 
+                                        size={14} 
                                     />
                                 )}
-                                <span className={`text-sm font-medium ${projectColor} px-2 py-0.5 rounded inline-block flex-1`}>{project.name}</span>
-                                {project.id === value && <Check size={16} className="text-blue-500 dark:text-blue-400 flex-shrink-0"/>}
+                                <span className={`text-xs font-medium ${projectColor} px-1.5 py-0.5 rounded inline-block flex-1`}>{project.name}</span>
+                                {project.id === value && <Check size={14} className="text-blue-500 dark:text-blue-400 flex-shrink-0"/>}
                             </div>
                         );
                     })}
@@ -613,8 +613,8 @@ const TaskModal: React.FC<TaskModalProps> = ({
             </div>
 
             {/* Properties Grid */}
-            <div className="p-3 md:p-4 space-y-3 overflow-y-auto custom-scrollbar flex-1 min-h-0">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-x-3 md:gap-x-6 gap-y-2.5 md:gap-y-3">
+            <div className="p-3 md:p-4 space-y-2 overflow-y-auto custom-scrollbar flex-1 min-h-0">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-x-3 md:gap-x-6 gap-y-2.5 md:gap-y-2">
                     {/* Status - скрыт для идей */}
                     {taskType !== 'idea' && (
                         <div className="flex items-center gap-2 md:gap-3">
@@ -649,25 +649,25 @@ const TaskModal: React.FC<TaskModalProps> = ({
                         <div className="flex-1 relative" ref={assigneeDropdownRef}>
                             <div 
                                 onClick={() => setIsAssigneeDropdownOpen(!isAssigneeDropdownOpen)}
-                                className="flex items-center gap-2 cursor-pointer bg-gray-50 dark:bg-[#252525] border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2 min-h-[40px] hover:bg-gray-100 dark:hover:bg-[#303030] transition-colors"
+                                className="flex items-center gap-1.5 cursor-pointer bg-gray-50 dark:bg-[#252525] border border-gray-200 dark:border-gray-700 rounded-md px-2.5 py-1 min-h-[32px] hover:bg-gray-100 dark:hover:bg-[#303030] transition-colors"
                             >
                                 {assigneeIds.length > 0 ? (
-                                    <div className="flex items-center gap-2 flex-1 min-w-0">
-                                        <div className="flex -space-x-2 shrink-0">
+                                    <div className="flex items-center gap-1.5 flex-1 min-w-0">
+                                        <div className="flex -space-x-1.5 shrink-0">
                                             {assigneeIds.map(uid => {
                                                 const u = users.find(us => us.id === uid);
-                                                return u ? <img key={uid} src={u.avatar} className="w-10 h-10 rounded-full border-2 border-white dark:border-[#252525] object-cover object-center" title={u.name} /> : null;
+                                                return u ? <img key={uid} src={u.avatar} className="w-7 h-7 rounded-full border-2 border-white dark:border-[#252525] object-cover object-center" title={u.name} /> : null;
                                             })}
                                         </div>
                                         {assigneeIds.length === 1 && (() => {
                                             const singleUser = users.find(u => u.id === assigneeIds[0]);
                                             return singleUser ? (
-                                                <span className="text-sm font-medium text-gray-700 dark:text-gray-300 truncate">{singleUser.name}</span>
+                                                <span className="text-xs font-medium text-gray-700 dark:text-gray-300 truncate">{singleUser.name}</span>
                                             ) : null;
                                         })()}
                                     </div>
-                                ) : <span className="text-sm text-gray-400">Не назначено</span>}
-                                <Plus size={16} className="text-gray-400 ml-auto shrink-0" />
+                                ) : <span className="text-xs text-gray-400">Не назначено</span>}
+                                <Plus size={14} className="text-gray-400 ml-auto shrink-0" />
                             </div>
                             
                             {/* Custom Dropdown */}
@@ -699,9 +699,9 @@ const TaskModal: React.FC<TaskModalProps> = ({
                         return creator ? (
                             <div className="flex items-center gap-2 md:gap-3">
                                 <div className="w-24 shrink-0 text-[10px] font-semibold text-gray-500 dark:text-gray-400 uppercase flex items-center gap-2"><UserIcon size={16} className="shrink-0 text-gray-400" strokeWidth={2} /> Постановщик</div>
-                                <div className="flex-1 flex items-center gap-2 bg-gray-50 dark:bg-[#252525] border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2.5">
-                                    <img src={creator.avatar} className="w-8 h-8 rounded-full border border-gray-200 dark:border-gray-600 object-cover object-center" />
-                                    <span className="text-sm font-medium text-gray-700 dark:text-gray-300">{creator.name}</span>
+                                <div className="flex-1 flex items-center gap-1.5 bg-gray-50 dark:bg-[#252525] border border-gray-200 dark:border-gray-700 rounded-md px-2.5 py-1 min-h-[32px]">
+                                    <img src={creator.avatar} className="w-6 h-6 rounded-full border border-gray-200 dark:border-gray-600 object-cover object-center" />
+                                    <span className="text-xs font-medium text-gray-700 dark:text-gray-300 truncate">{creator.name}</span>
                                 </div>
                             </div>
                         ) : null;
@@ -725,7 +725,7 @@ const TaskModal: React.FC<TaskModalProps> = ({
                             <select
                                 value={category}
                                 onChange={e => setCategory(e.target.value)}
-                                className="flex-1 px-3 pr-8 py-2.5 text-sm bg-gray-50 dark:bg-[#252525] border border-gray-200 dark:border-gray-700 rounded-lg text-gray-800 dark:text-gray-200 focus:ring-2 focus:ring-blue-500/50 appearance-none relative"
+                                className="flex-1 px-2.5 pr-8 py-1.5 min-h-[32px] text-sm leading-tight bg-gray-50 dark:bg-[#252525] border border-gray-200 dark:border-gray-700 rounded-md text-gray-800 dark:text-gray-200 focus:ring-2 focus:ring-blue-500/50 appearance-none relative"
                             >
                                 <option value="">Не выбрана</option>
                                 {STANDARD_CATEGORIES.map(cat => (
@@ -745,12 +745,14 @@ const TaskModal: React.FC<TaskModalProps> = ({
                                     value={startDate}
                                     onChange={setStartDate}
                                     className="flex-1 sm:flex-none"
+                                    size="compact"
                                 />
-                                <span className="text-gray-400 dark:text-gray-500 text-sm shrink-0">➜</span>
+                                <span className="text-gray-400 dark:text-gray-500 text-xs shrink-0">➜</span>
                                 <DateInput
                                     value={endDate}
                                     onChange={setEndDate}
                                     className="flex-1 sm:flex-none"
+                                    size="compact"
                                 />
                             </div>
                         </div>
@@ -768,6 +770,7 @@ const TaskModal: React.FC<TaskModalProps> = ({
                               onChange={setParentTaskId}
                               options={parentTaskOptions}
                               placeholder=""
+                              size="compact"
                             />
                           </div>
                         </div>

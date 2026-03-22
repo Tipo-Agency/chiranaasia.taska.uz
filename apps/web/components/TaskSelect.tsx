@@ -8,6 +8,8 @@ interface TaskSelectProps {
   placeholder?: string;
   className?: string;
   disabled?: boolean;
+  /** Компактная высота — для плотных форм (модалка задачи и т.п.) */
+  size?: 'default' | 'compact';
 }
 
 /**
@@ -20,8 +22,16 @@ export const TaskSelect: React.FC<TaskSelectProps> = ({
   options,
   placeholder = 'Выберите...',
   className = '',
-  disabled = false
+  disabled = false,
+  size = 'default',
 }) => {
+  const sizeClass =
+    size === 'compact'
+      ? 'px-2.5 pr-8 py-1.5 min-h-[32px] text-sm leading-tight rounded-md'
+      : 'px-3 pr-10 py-2.5 text-sm rounded-lg';
+  const chevronRight = size === 'compact' ? 'right-2' : 'right-3';
+  const chevronSize = size === 'compact' ? 14 : 16;
+
   return (
     <div className="relative">
       <select
@@ -30,16 +40,12 @@ export const TaskSelect: React.FC<TaskSelectProps> = ({
         disabled={disabled}
         className={`
           w-full 
-          px-3 
-          pr-10 
-          py-2.5 
-          text-sm 
+          ${sizeClass}
           bg-white 
           dark:bg-[#252525] 
           border 
           border-gray-300 
           dark:border-gray-600 
-          rounded-lg 
           text-gray-900 
           dark:text-gray-100 
           appearance-none 
@@ -65,8 +71,8 @@ export const TaskSelect: React.FC<TaskSelectProps> = ({
         ))}
       </select>
       <ChevronDown 
-        size={16} 
-        className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400 dark:text-gray-500" 
+        size={chevronSize} 
+        className={`absolute ${chevronRight} top-1/2 -translate-y-1/2 pointer-events-none text-gray-400 dark:text-gray-500`} 
       />
     </div>
   );

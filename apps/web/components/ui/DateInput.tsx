@@ -18,6 +18,8 @@ interface DateInputProps {
   required?: boolean;
   min?: string;
   max?: string;
+  /** Ниже по высоте — для плотных форм (модалка задачи) */
+  size?: 'default' | 'compact';
 }
 
 export const DateInput: React.FC<DateInputProps> = ({
@@ -28,7 +30,13 @@ export const DateInput: React.FC<DateInputProps> = ({
   required = false,
   min,
   max,
+  size = 'default',
 }) => {
+  const compact = size === 'compact';
+  const inputPad = compact ? 'px-2.5 py-1.5 pr-9 min-h-[32px] text-sm leading-tight rounded-md' : 'px-3 py-2 pr-10 text-sm rounded-lg';
+  const iconCls = compact ? 'right-2' : 'right-3';
+  const iconSz = compact ? 14 : 16;
+
   return (
     <div className={className}>
       {label && (
@@ -37,7 +45,7 @@ export const DateInput: React.FC<DateInputProps> = ({
           {required && <span className="text-red-500 ml-1">*</span>}
         </label>
       )}
-      <div className="relative isolate overflow-hidden rounded-lg">
+      <div className={`relative isolate overflow-hidden ${compact ? 'rounded-md' : 'rounded-lg'}`}>
         <input
           type="date"
           value={value}
@@ -45,11 +53,11 @@ export const DateInput: React.FC<DateInputProps> = ({
           required={required}
           min={min}
           max={max}
-          className="w-full bg-white dark:bg-[#252525] text-gray-900 dark:text-gray-100 border border-gray-300 dark:border-[#555] rounded-lg px-3 py-2 pr-10 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all date-input-custom"
+          className={`w-full bg-white dark:bg-[#252525] text-gray-900 dark:text-gray-100 border border-gray-300 dark:border-[#555] ${inputPad} focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all date-input-custom ${compact ? 'date-input-custom--compact' : ''}`}
         />
         <Calendar 
-          size={16} 
-          className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500 pointer-events-none z-10" 
+          size={iconSz} 
+          className={`absolute ${iconCls} top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500 pointer-events-none z-10`} 
         />
       </div>
       <style>{`
@@ -64,6 +72,11 @@ export const DateInput: React.FC<DateInputProps> = ({
           height: 22px;
           cursor: pointer;
           padding: 0;
+        }
+        .date-input-custom--compact::-webkit-calendar-picker-indicator {
+          right: 6px;
+          width: 20px;
+          height: 20px;
         }
         .date-input-custom::-webkit-datetime-edit-text {
           color: rgb(107 114 128);

@@ -1,9 +1,8 @@
 
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { BusinessProcess, ProcessStep, ProcessStepBranch, OrgPosition, User, Task, ProcessInstance, TableCollection } from '../types';
-import { Network, Plus, Edit2, Trash2, ChevronRight, User as UserIcon, Building2, Save, X, ArrowDown, Play, CheckCircle2, Clock, FileText, ArrowLeft, Calendar, Users } from 'lucide-react';
+import { Network, Plus, Edit2, Trash2, ChevronRight, User as UserIcon, Building2, Save, X, ArrowDown, Play, CheckCircle2, Clock, FileText, ArrowLeft, Calendar, Users, Layers3, PauseCircle } from 'lucide-react';
 import { TaskSelect } from './TaskSelect';
-import { FiltersPanel, FilterConfig } from './FiltersPanel';
 import { ProcessCard } from './features/processes/ProcessCard';
 
 interface BusinessProcessesViewProps {
@@ -25,10 +24,9 @@ const BusinessProcessesView: React.FC<BusinessProcessesViewProps> = ({
     processes, orgPositions, users, tasks, tables, currentUser, onSaveProcess, onDeleteProcess, onSaveTask, onOpenTask, onCompleteProcessStepWithBranch, autoOpenCreateModal = false
 }) => {
   const [selectedProcessId, setSelectedProcessId] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'processes' | 'instances'>('processes');
-  const [showCompletedInstances, setShowCompletedInstances] = useState<string>('hide'); // 'hide' или 'show'
+  /** Шаблоны = описания процессов; В работе = active + paused; Завершённые = completed */
+  const [activeTab, setActiveTab] = useState<'templates' | 'running' | 'completed'>('templates');
   const [selectedInstanceId, setSelectedInstanceId] = useState<string | null>(null);
-  const [showFilters, setShowFilters] = useState(false);
   
   // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -323,31 +321,22 @@ const BusinessProcessesView: React.FC<BusinessProcessesViewProps> = ({
       }))
     );
 
-  const filteredInstances = allInstances.filter(({ instance }) =>
-    showCompletedInstances === 'show' ? true : instance.status !== 'completed'
+  const runningInstances = useMemo(
+    () => allInstances.filter(({ instance }) => instance.status === 'active' || instance.status === 'paused'),
+    [allInstances]
   );
 
-  // Конфигурация фильтров для экземпляров
-  const instanceFilters: FilterConfig[] = useMemo(() => [
-    {
-      label: 'Завершённые',
-      value: showCompletedInstances,
-      onChange: setShowCompletedInstances,
-      options: [
-        { value: 'hide', label: 'Скрыть' },
-        { value: 'show', label: 'Показать' }
-      ]
-    }
-  ], [showCompletedInstances]);
-
-  const hasActiveInstanceFilters = useMemo(() => 
-    showCompletedInstances !== 'hide',
-    [showCompletedInstances]
+  const completedInstancesList = useMemo(
+    () => allInstances.filter(({ instance }) => instance.status === 'completed'),
+    [allInstances]
   );
-  
-  const clearInstanceFilters = useCallback(() => {
-    setShowCompletedInstances('hide');
-  }, []);
+
+  const tabInstanceList =
+    activeTab === 'templates'
+      ? []
+      : activeTab === 'running'
+        ? runningInstances
+        : completedInstancesList;
 
   // Если выбран экземпляр — показываем его детали (приоритет над страницей процесса)
   if (selectedInstanceId) {
@@ -1129,78 +1118,65 @@ const BusinessProcessesView: React.FC<BusinessProcessesViewProps> = ({
             <div>
               <h1 className="text-lg md:text-2xl font-bold text-gray-800 dark:text-white truncate">Бизнес-процессы</h1>
               <p className="hidden md:block text-xs text-gray-500 dark:text-gray-400 mt-1">
-                Управление бизнес-процессами компании
+                Шаблоны, запуски в работе и завершённые экземпляры — на отдельных вкладках
               </p>
             </div>
             <div className="flex items-center gap-2">
-              {activeTab === 'instances' && (
-                <FiltersPanel
-                  filters={instanceFilters}
-                  showFilters={showFilters}
-                  onToggleFilters={() => setShowFilters(!showFilters)}
-                  hasActiveFilters={hasActiveInstanceFilters}
-                  onClearFilters={clearInstanceFilters}
-                  columns={1}
-                />
-              )}
-              {activeTab === 'processes' && (
+              {activeTab === 'templates' && (
                 <button 
                   onClick={handleOpenCreate} 
                   className="px-4 py-2 rounded-lg bg-indigo-600 text-white text-sm font-medium hover:bg-indigo-700 flex items-center gap-2 shadow-sm"
                 >
                   <Plus size={18} />
-                  <span className="hidden sm:inline">Создать</span>
+                  <span className="hidden sm:inline">Создать шаблон</span>
                 </button>
               )}
             </div>
           </div>
           
-          {/* Tabs */}
+          {/* Вкладки: шаблоны | в работе | завершённые */}
           <div className="mb-4">
-            <div className="flex items-center gap-2 bg-gray-100 dark:bg-[#252525] rounded-full p-1 text-xs mb-4">
+            <div className="flex flex-wrap items-center gap-1.5 bg-gray-100 dark:bg-[#252525] rounded-full p-1 text-xs mb-3">
               <button
-                onClick={() => setActiveTab('processes')}
-                className={`px-3 py-1.5 rounded-full transition-colors ${
-                  activeTab === 'processes'
+                type="button"
+                onClick={() => setActiveTab('templates')}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full transition-colors ${
+                  activeTab === 'templates'
                     ? 'bg-white dark:bg-[#191919] text-gray-900 dark:text-white shadow-sm'
                     : 'text-gray-600 dark:text-gray-300'
                 }`}
               >
-                Процессы
+                <Layers3 size={14} className="opacity-80 shrink-0" />
+                Шаблоны
               </button>
               <button
-                onClick={() => setActiveTab('instances')}
-                className={`px-3 py-1.5 rounded-full transition-colors ${
-                  activeTab === 'instances'
+                type="button"
+                onClick={() => setActiveTab('running')}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full transition-colors ${
+                  activeTab === 'running'
                     ? 'bg-white dark:bg-[#191919] text-gray-900 dark:text-white shadow-sm'
                     : 'text-gray-600 dark:text-gray-300'
                 }`}
               >
-                Запущенные
+                <Play size={14} className="opacity-80 shrink-0" />
+                В работе
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveTab('completed')}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full transition-colors ${
+                  activeTab === 'completed'
+                    ? 'bg-white dark:bg-[#191919] text-gray-900 dark:text-white shadow-sm'
+                    : 'text-gray-600 dark:text-gray-300'
+                }`}
+              >
+                <CheckCircle2 size={14} className="opacity-80 shrink-0" />
+                Завершённые
               </button>
             </div>
-            {showFilters && activeTab === 'instances' && (
-              <div className="p-4 bg-gray-50 dark:bg-[#252525] rounded-lg border border-gray-200 dark:border-[#333]">
-                <div className="grid gap-3" style={{ gridTemplateColumns: `repeat(auto-fit, minmax(150px, 1fr))`, maxWidth: '100%' }}>
-                  {instanceFilters.map((filter, index) => (
-                    <div key={index}>
-                      <label className="block text-xs font-semibold text-gray-600 dark:text-gray-400 mb-1">{filter.label}</label>
-                      <TaskSelect value={filter.value} onChange={filter.onChange} options={filter.options} />
-                    </div>
-                  ))}
-                </div>
-                {hasActiveInstanceFilters && (
-                  <div className="mt-3 flex justify-end">
-                    <button onClick={clearInstanceFilters} className="text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200 flex items-center gap-1">
-                      <X size={14} /> Очистить фильтры
-                    </button>
-                  </div>
-                )}
-              </div>
-            )}
 
-            <div className="flex flex-wrap items-center gap-2 mt-3 text-[11px] sm:text-xs text-gray-600 dark:text-gray-400">
-              {activeTab === 'processes' ? (
+            <div className="flex flex-wrap items-center gap-2 text-[11px] sm:text-xs text-gray-600 dark:text-gray-400">
+              {activeTab === 'templates' && (
                 <>
                   <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-gray-100 dark:bg-[#2a2a2a] border border-gray-200/80 dark:border-[#444]">
                     <Network size={13} className="text-indigo-500 shrink-0" />
@@ -1208,22 +1184,31 @@ const BusinessProcessesView: React.FC<BusinessProcessesViewProps> = ({
                   </span>
                   <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-blue-50 dark:bg-blue-950/40 border border-blue-100 dark:border-blue-900/50 text-blue-800 dark:text-blue-200">
                     <Play size={13} className="shrink-0" />
-                    Сейчас в работе: <strong>{allInstances.filter(({ instance: i }) => i.status === 'active').length}</strong>
-                  </span>
-                </>
-              ) : (
-                <>
-                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-gray-100 dark:bg-[#2a2a2a] border border-gray-200/80 dark:border-[#444]">
-                    В списке: <strong className="text-gray-900 dark:text-white">{filteredInstances.length}</strong>
-                    {showCompletedInstances === 'hide' && allInstances.some(({ instance: i }) => i.status === 'completed') && (
-                      <span className="text-gray-500 dark:text-gray-500">(завершённые скрыты)</span>
-                    )}
+                    Активных запусков: <strong>{runningInstances.length}</strong>
                   </span>
                   <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-100 dark:border-emerald-900/40 text-emerald-800 dark:text-emerald-200">
-                    <CheckCircle2 size={13} />
-                    Завершено всего: {allInstances.filter(({ instance: i }) => i.status === 'completed').length}
+                    <CheckCircle2 size={13} className="shrink-0" />
+                    Завершено: <strong>{completedInstancesList.length}</strong>
                   </span>
                 </>
+              )}
+              {activeTab === 'running' && (
+                <>
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-blue-50 dark:bg-blue-950/40 border border-blue-100 dark:border-blue-900/50 text-blue-800 dark:text-blue-200">
+                    <Play size={13} />
+                    Активны: <strong>{allInstances.filter(({ instance: i }) => i.status === 'active').length}</strong>
+                  </span>
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-amber-50 dark:bg-amber-950/30 border border-amber-100 dark:border-amber-900/40 text-amber-900 dark:text-amber-200">
+                    <PauseCircle size={13} />
+                    На паузе: <strong>{allInstances.filter(({ instance: i }) => i.status === 'paused').length}</strong>
+                  </span>
+                </>
+              )}
+              {activeTab === 'completed' && (
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-100 dark:border-emerald-900/40 text-emerald-800 dark:text-emerald-200">
+                  <CheckCircle2 size={13} />
+                  Всего завершённых экземпляров: <strong>{completedInstancesList.length}</strong>
+                </span>
               )}
             </div>
           </div>
@@ -1232,28 +1217,73 @@ const BusinessProcessesView: React.FC<BusinessProcessesViewProps> = ({
       
       <div className="flex-1 min-h-0 overflow-hidden">
         <div className="max-w-7xl mx-auto w-full px-6 pb-20 h-full overflow-y-auto custom-scrollbar">
-          {activeTab === 'instances' ? (
-            // Вкладка со списком всех запущенных экземпляров
+          {activeTab === 'templates' ? (
+            processes.length === 0 ? (
+            <div className="bg-white dark:bg-[#252525] border border-gray-200 dark:border-[#333] rounded-xl p-12 text-center">
+              <Network size={48} className="mx-auto text-gray-300 dark:text-gray-600 mb-4" />
+              <p className="text-gray-500 dark:text-gray-400 text-sm mb-2">Нет бизнес-процессов</p>
+              <p className="text-xs text-gray-400 dark:text-gray-500 mb-4">Создайте первый шаблон для начала работы</p>
+              <button 
+                onClick={handleOpenCreate}
+                className="px-4 py-2 bg-indigo-600 text-white text-sm font-medium hover:bg-indigo-700 rounded-lg inline-flex items-center gap-2"
+              >
+                <Plus size={16} /> Создать шаблон
+              </button>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {uniqueProcesses.filter(p => !p.isArchived).map(process => {
+                const instances = getProcessInstances(process.id);
+                
+                return (
+                  <ProcessCard
+                    key={process.id}
+                    process={process}
+                    instances={instances}
+                    onClick={() => setSelectedProcessId(process.id)}
+                    onEdit={(e) => {
+                      e.stopPropagation();
+                      handleOpenEdit(process);
+                    }}
+                  />
+                );
+              })}
+            </div>
+          )
+          ) : (
             <div>
               <div className="mb-4">
-                <h2 className="text-lg font-bold text-gray-900 dark:text-white mb-4">
-                  Все запущенные экземпляры
+                <h2 className="text-lg font-bold text-gray-900 dark:text-white mb-1">
+                  {activeTab === 'running' ? 'Процессы в работе' : 'Завершённые процессы'}
                 </h2>
+                <p className="text-xs text-gray-500 dark:text-gray-400">
+                  {activeTab === 'running'
+                    ? 'Активные и приостановленные экземпляры. Завершённые — во вкладке «Завершённые».'
+                    : 'История завершённых запусков.'}
+                </p>
               </div>
 
-              {filteredInstances.length === 0 ? (
+              {tabInstanceList.length === 0 ? (
                 <div className="bg-white dark:bg-[#252525] border border-gray-200 dark:border-[#333] rounded-xl p-12 text-center">
-                  <Play size={48} className="mx-auto text-gray-300 dark:text-gray-600 mb-4" />
+                  {activeTab === 'running' ? (
+                    <Play size={48} className="mx-auto text-gray-300 dark:text-gray-600 mb-4" />
+                  ) : (
+                    <CheckCircle2 size={48} className="mx-auto text-gray-300 dark:text-gray-600 mb-4" />
+                  )}
                   <p className="text-gray-500 dark:text-gray-400 text-sm mb-2">
-                    {showCompletedInstances === 'show' ? 'Нет экземпляров процессов' : 'Нет активных экземпляров'}
+                    {activeTab === 'running'
+                      ? 'Нет процессов в работе'
+                      : 'Пока нет завершённых экземпляров'}
                   </p>
                   <p className="text-xs text-gray-400 dark:text-gray-500">
-                    Запустите процесс, чтобы создать экземпляр
+                    {activeTab === 'running'
+                      ? 'Запустите процесс со страницы шаблона или из карточки процесса.'
+                      : 'После прохождения всех шагов экземпляр появится здесь.'}
                   </p>
                 </div>
               ) : (
                 <div className="space-y-3">
-                  {filteredInstances.map(({ process, instance, tasks }) => {
+                  {tabInstanceList.map(({ process, instance, tasks }) => {
                     const currentStep = process.steps.find(s => s.id === instance.currentStepId);
                     const completedTasks = tasks.filter(t => t.status === 'Выполнено' || t.status === 'Done').length;
                     const totalTasks = tasks.length;
@@ -1285,7 +1315,7 @@ const BusinessProcessesView: React.FC<BusinessProcessesViewProps> = ({
                                 {instance.status === 'paused' && 'Приостановлен'}
                               </span>
                             </div>
-                            {currentStep && (
+                            {currentStep && instance.status !== 'completed' && (
                               <p className="text-sm text-gray-600 dark:text-gray-400">
                                 Текущий шаг: {currentStep.title}
                               </p>
@@ -1349,37 +1379,6 @@ const BusinessProcessesView: React.FC<BusinessProcessesViewProps> = ({
                   })}
                 </div>
               )}
-            </div>
-          ) : processes.length === 0 ? (
-            <div className="bg-white dark:bg-[#252525] border border-gray-200 dark:border-[#333] rounded-xl p-12 text-center">
-              <Network size={48} className="mx-auto text-gray-300 dark:text-gray-600 mb-4" />
-              <p className="text-gray-500 dark:text-gray-400 text-sm mb-2">Нет бизнес-процессов</p>
-              <p className="text-xs text-gray-400 dark:text-gray-500 mb-4">Создайте первый процесс для начала работы</p>
-              <button 
-                onClick={handleOpenCreate}
-                className="px-4 py-2 bg-indigo-600 text-white text-sm font-medium hover:bg-indigo-700 rounded-lg inline-flex items-center gap-2"
-              >
-                <Plus size={16} /> Создать процесс
-              </button>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {uniqueProcesses.filter(p => !p.isArchived).map(process => {
-                const instances = getProcessInstances(process.id);
-                
-                return (
-                  <ProcessCard
-                    key={process.id}
-                    process={process}
-                    instances={instances}
-                    onClick={() => setSelectedProcessId(process.id)}
-                    onEdit={(e) => {
-                      e.stopPropagation();
-                      handleOpenEdit(process);
-                    }}
-                  />
-                );
-              })}
             </div>
           )}
         </div>
