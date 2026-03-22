@@ -1,7 +1,8 @@
 
 import React, { useState } from 'react';
 import { EmployeeInfo, User, OrgPosition, Department } from '../types';
-import { UserCheck, Plus, Search, Trash2, Edit2, Calendar, FileText, X, Save, User as UserIcon, Phone, Send, Cake, Network, Building2 } from 'lucide-react';
+import { UserCheck, Search, Trash2, Edit2, Calendar, FileText, X, Save, User as UserIcon, Phone, Send, Cake, Network, Building2, UserPlus } from 'lucide-react';
+import { ModuleCreateDropdown } from './ui';
 import { TaskSelect } from './TaskSelect';
 import { getDefaultAvatarForId } from '../constants/avatars';
 import { formatDate, normalizeDateForInput } from '../utils/dateUtils';
@@ -297,17 +298,30 @@ const EmployeesView: React.FC<EmployeesViewProps> = ({
                         Управление сотрудниками и организационной структурой
                     </p>
                 </div>
-                {activeTab === 'cards' ? (
-                    <button onClick={handleOpenCreate} className="px-4 py-2 rounded-lg bg-purple-600 text-white text-sm font-medium hover:bg-purple-700 flex items-center gap-2 shadow-sm">
-                        <Plus size={18} />
-                        <span className="hidden sm:inline">Создать</span>
-                    </button>
-                ) : (
-                    <button onClick={handleOpenPosCreate} className="px-4 py-2 rounded-lg bg-purple-600 text-white text-sm font-medium hover:bg-purple-700 flex items-center gap-2 shadow-sm">
-                        <Plus size={18} />
-                        <span className="hidden sm:inline">Создать</span>
-                    </button>
-                )}
+                <ModuleCreateDropdown
+                  buttonClassName="bg-purple-600 hover:bg-purple-700 text-white"
+                  items={
+                    activeTab === 'cards'
+                      ? [
+                          {
+                            id: 'employee',
+                            label: 'Сотрудник',
+                            icon: UserPlus,
+                            onClick: handleOpenCreate,
+                            iconClassName: 'text-purple-600 dark:text-purple-400',
+                          },
+                        ]
+                      : [
+                          {
+                            id: 'position',
+                            label: 'Должность в оргсхеме',
+                            icon: Building2,
+                            onClick: handleOpenPosCreate,
+                            iconClassName: 'text-purple-600 dark:text-purple-400',
+                          },
+                        ]
+                  }
+                />
             </div>
             
             {/* TABS */}

@@ -3,8 +3,8 @@
  */
 import React from 'react';
 import { User } from '../../../types';
-import { CheckCircle2, Briefcase, Network, Plus, ShoppingCart, ChevronDown } from 'lucide-react';
-import { Button } from '../../ui/Button';
+import { CheckCircle2, Briefcase, Network, ShoppingCart } from 'lucide-react';
+import { ModuleCreateDropdown } from '../../ui/ModuleCreateDropdown';
 
 interface HomeHeaderProps {
   user: User;
@@ -34,33 +34,6 @@ export const HomeHeader: React.FC<HomeHeaderProps> = ({
   const dayOfMonth = today.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' });
   const formattedDate = `${dayOfWeek.charAt(0).toUpperCase() + dayOfWeek.slice(1)}, ${dayOfMonth}`;
 
-  const [menuOpen, setMenuOpen] = React.useState(false);
-
-  const handleCreateTask = () => {
-    onQuickCreateTask();
-    setMenuOpen(false);
-  };
-
-  const handleCreateDeal = () => {
-    onQuickCreateDeal();
-    setMenuOpen(false);
-  };
-
-  const handleCreateProcess = () => {
-    onQuickCreateProcess();
-    setMenuOpen(false);
-  };
-
-  const handleCreatePurchaseRequest = () => {
-    if (onQuickCreatePurchaseRequest) {
-      onQuickCreatePurchaseRequest();
-    } else {
-      // По умолчанию открываем создание задачи — потом можно будет заменить
-      onQuickCreateTask();
-    }
-    setMenuOpen(false);
-  };
-
   return (
     <div className="flex flex-wrap justify-between items-center gap-4 mb-6">
       <div>
@@ -69,63 +42,42 @@ export const HomeHeader: React.FC<HomeHeaderProps> = ({
         </h1>
         <p className="text-sm text-gray-500 dark:text-gray-400">{formattedDate}</p>
       </div>
-      <div className="relative">
-        <Button
-          variant="primary"
-          size="sm"
-          onClick={() => setMenuOpen((prev) => !prev)}
-          className="flex items-center gap-2 px-4"
-        >
-          <Plus size={16} />
-          Создать
-          <ChevronDown size={14} />
-        </Button>
-
-        {menuOpen && (
-          <>
-            <div className="absolute right-0 mt-2 w-56 bg-white dark:bg-[#252525] border border-gray-200 dark:border-[#333] rounded-xl shadow-xl py-1 z-20">
-              <button
-                type="button"
-                onClick={handleCreateTask}
-                className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-800 dark:text-gray-100 hover:bg-gray-100 dark:hover:bg-[#333]"
-              >
-                <CheckCircle2 size={16} className="text-[#3337AD]" />
-                <span>Задача</span>
-              </button>
-              <button
-                type="button"
-                onClick={handleCreateDeal}
-                className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-800 dark:text-gray-100 hover:bg-gray-100 dark:hover:bg-[#333]"
-              >
-                <Briefcase size={16} className="text-[#3337AD]" />
-                <span>Сделка</span>
-              </button>
-              <button
-                type="button"
-                onClick={handleCreateProcess}
-                className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-800 dark:text-gray-100 hover:bg-gray-100 dark:hover:bg-[#333]"
-              >
-                <Network size={16} className="text-[#3337AD]" />
-                <span>Процесс</span>
-              </button>
-              <button
-                type="button"
-                onClick={handleCreatePurchaseRequest}
-                className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-800 dark:text-gray-100 hover:bg-gray-100 dark:hover:bg-[#333]"
-              >
-                <ShoppingCart size={16} className="text-[#3337AD]" />
-                <span>Заявка на приобретение</span>
-              </button>
-            </div>
-            <button
-              type="button"
-              className="fixed inset-0 z-10 cursor-default"
-              onClick={() => setMenuOpen(false)}
-              aria-hidden="true"
-            />
-          </>
-        )}
-      </div>
+      <ModuleCreateDropdown
+        buttonClassName="bg-[#3337AD] hover:bg-[#292b8a] text-white"
+        items={[
+          {
+            id: 'task',
+            label: 'Задача',
+            icon: CheckCircle2,
+            onClick: onQuickCreateTask,
+            iconClassName: 'text-[#3337AD] dark:text-[#8b8ee0]',
+          },
+          {
+            id: 'deal',
+            label: 'Сделка',
+            icon: Briefcase,
+            onClick: onQuickCreateDeal,
+            iconClassName: 'text-[#3337AD] dark:text-[#8b8ee0]',
+          },
+          {
+            id: 'process',
+            label: 'Процесс',
+            icon: Network,
+            onClick: onQuickCreateProcess,
+            iconClassName: 'text-[#3337AD] dark:text-[#8b8ee0]',
+          },
+          {
+            id: 'purchase',
+            label: 'Заявка на приобретение',
+            icon: ShoppingCart,
+            onClick: () => {
+              if (onQuickCreatePurchaseRequest) onQuickCreatePurchaseRequest();
+              else onQuickCreateTask();
+            },
+            iconClassName: 'text-[#3337AD] dark:text-[#8b8ee0]',
+          },
+        ]}
+      />
     </div>
   );
 };

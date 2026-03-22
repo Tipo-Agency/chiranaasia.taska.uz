@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { 
   Search, Moon, Sun, Settings, Bell, ChevronDown, LogOut, User as UserIcon, Home, Menu, X, MessageCircle,
-  BarChart3, Wallet, Network, PieChart, Briefcase, UserCheck, CheckSquare, Users, FileText, Instagram, Layers, Globe, Package
+  BarChart3, Wallet, Network, PieChart, Briefcase, UserCheck, CheckSquare, Users, FileText, Instagram, Layers, Globe, Package, Cog
 } from 'lucide-react';
 import { User, Role, TableCollection } from '../types';
 import { DynamicIcon } from './AppIcons';
@@ -47,6 +47,28 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
   const [showUserDropdown, setShowUserDropdown] = useState(false);
   const [showNotificationDropdown, setShowNotificationDropdown] = useState(false);
 
+  /** Вкладка настроек, относящаяся к текущему экрану (для кнопки-шестерёнки в шапке). */
+  const getModuleSettingsTab = (view: string): string | null => {
+    switch (view) {
+      case 'tasks': return 'statuses';
+      case 'sales-funnel': return 'sales-funnels';
+      case 'clients': return 'integrations';
+      case 'finance': return 'finance-categories';
+      case 'business-processes': return 'spaces';
+      case 'employees': return 'departments';
+      case 'spaces': return 'spaces';
+      case 'meetings': return 'automation';
+      case 'sites': return 'integrations';
+      case 'inbox': return 'automation';
+      case 'analytics': return 'system';
+      case 'home': return 'profile';
+      case 'admin': return 'system';
+      case 'inventory': return 'funds';
+      case 'table': return 'spaces';
+      default: return null;
+    }
+  };
+
   const getPageHeader = (view: string) => {
     switch(view) {
       case 'home': return { title: 'Рабочий стол', icon: <Home size={20} /> };
@@ -72,6 +94,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
   };
 
   const headerInfo = getPageHeader(currentView);
+  const moduleSettingsTab = getModuleSettingsTab(currentView);
 
   return (
     <div className="h-14 md:h-14 border-b border-gray-200 dark:border-[#333] flex items-center justify-between px-3 md:px-4 bg-white dark:bg-[#191919] shrink-0 z-20">
@@ -84,19 +107,39 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
         </button>
         
         {currentView === 'table' && activeTable ? (
-          <div className="flex items-center gap-2 group cursor-pointer min-w-0 flex-1" onClick={onEditTable}>
-            <DynamicIcon name={activeTable.icon} className={`${activeTable.color} shrink-0`} />
-            <h2 className="font-semibold text-gray-800 dark:text-white truncate text-sm md:text-base">
-              {activeTable.name}
-            </h2>
-            {currentUser.role === Role.ADMIN && (
-              <Settings size={14} className="text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity hidden md:block shrink-0" />
-            )}
+          <div className="flex items-center gap-1 min-w-0 flex-1">
+            <div className="flex items-center gap-2 group cursor-pointer min-w-0 flex-1" onClick={onEditTable}>
+              <DynamicIcon name={activeTable.icon} className={`${activeTable.color} shrink-0`} />
+              <h2 className="font-semibold text-gray-800 dark:text-white truncate text-sm md:text-base">
+                {activeTable.name}
+              </h2>
+              {currentUser.role === Role.ADMIN && (
+                <Settings size={14} className="text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity hidden md:block shrink-0" />
+              )}
+            </div>
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); onOpenSettings('spaces'); }}
+              className="p-1.5 rounded-lg text-gray-500 hover:text-[#3337AD] dark:hover:text-[#8b8ee0] hover:bg-gray-100 dark:hover:bg-[#252525] shrink-0"
+              title="Настройки модулей и страниц"
+            >
+              <Cog size={16} strokeWidth={2} />
+            </button>
           </div>
         ) : (
-          <div className="flex items-center gap-2 text-gray-800 dark:text-white font-semibold min-w-0">
+          <div className="flex items-center gap-1.5 text-gray-800 dark:text-white font-semibold min-w-0">
             <div className="text-gray-500 dark:text-gray-400 shrink-0">{headerInfo.icon}</div>
             <span className="truncate text-sm md:text-base">{headerInfo.title}</span>
+            {moduleSettingsTab && (
+              <button
+                type="button"
+                onClick={() => onOpenSettings(moduleSettingsTab)}
+                className="p-1.5 rounded-lg text-gray-500 hover:text-[#3337AD] dark:hover:text-[#8b8ee0] hover:bg-gray-100 dark:hover:bg-[#252525] shrink-0"
+                title="Настройки раздела"
+              >
+                <Cog size={16} strokeWidth={2} />
+              </button>
+            )}
           </div>
         )}
       </div>

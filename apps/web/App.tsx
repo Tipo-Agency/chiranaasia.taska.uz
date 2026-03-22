@@ -114,23 +114,27 @@ function MainApp() {
               <MessageCircle size={24} />
             </button>
 
-            {/* Панель чата (выезжает справа) — только когда открыта */}
+            {/* Чат в модальном окне (десктоп) */}
             {chatPanelOpen && (
-              <>
+              <div
+                className="hidden md:flex fixed inset-0 z-50 items-center justify-center p-4 bg-black/40 backdrop-blur-sm animate-in fade-in duration-200"
+                role="dialog"
+                aria-modal="true"
+                aria-label="Чат"
+                onClick={() => setChatPanelOpen(false)}
+              >
                 <div
-                  className="hidden md:block fixed inset-0 bg-black/30 z-40"
-                  onClick={() => setChatPanelOpen(false)}
-                  aria-hidden
-                />
-                <div className="hidden md:flex fixed top-0 right-0 bottom-0 w-full max-w-md bg-white dark:bg-[#252525] border-l border-gray-200 dark:border-[#333] z-50 flex-col shadow-xl">
+                  className="w-full max-w-lg max-h-[min(640px,88vh)] h-[min(560px,85vh)] flex flex-col rounded-2xl shadow-2xl overflow-hidden bg-white dark:bg-[#252525] border border-gray-200 dark:border-[#333]"
+                  onClick={e => e.stopPropagation()}
+                >
                   <MiniMessenger
                     users={state.users}
                     currentUser={state.currentUser}
                     onClose={() => setChatPanelOpen(false)}
-                    className="rounded-none border-0 h-full"
+                    className="rounded-none border-0 h-full min-h-0 flex-1"
                   />
                 </div>
-              </>
+              </div>
             )}
 
             {/* Main Content Router */}

@@ -39,7 +39,6 @@ export const CRMModule: React.FC<CRMModuleProps> = ({ view, deals, clients, cont
         onSaveMeeting={actions.saveMeeting}
         onDeleteMeeting={actions.deleteMeeting}
         onUpdateMeetingSummary={actions.updateMeetingSummary}
-        onOpenSettings={actions.openSettings ? () => actions.openSettings('sales-funnels') : undefined}
         autoOpenCreateModal={autoOpenCreateModal}
       />;
   }

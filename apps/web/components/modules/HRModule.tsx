@@ -38,6 +38,7 @@ export const HRModule: React.FC<HRModuleProps> = ({ view, employees, users, depa
             onDeleteProcess={actions.deleteProcess}
             onSaveTask={actions.saveTask}
             onOpenTask={actions.openTaskModal}
+            onQuickCreateTask={actions.openTaskModal ? () => actions.openTaskModal(null) : undefined}
             onCompleteProcessStepWithBranch={actions.completeProcessStepWithBranch}
             autoOpenCreateModal={autoOpenCreateModal}
         />;

@@ -31,7 +31,8 @@ import { PageLayout } from '../ui/PageLayout';
 import { Tabs } from '../ui/Tabs';
 import { MiniMessenger } from '../features/chat/MiniMessenger';
 import { getTodayLocalDate, formatDate } from '../../utils/dateUtils';
-import { CheckSquare, Briefcase, ArrowRight, Calendar, User } from 'lucide-react';
+import { CheckSquare, Briefcase, ArrowRight, Calendar, User as UserIcon, FileText } from 'lucide-react';
+import { WeeklyPlansModal, ProtocolsModal } from '../documents/PlanningModals';
 
 type InboxTab = 'incoming' | 'outgoing' | 'messages';
 
@@ -106,6 +107,8 @@ export const HomePage: React.FC<HomePageProps> = ({
   const [showBirthdayModal, setShowBirthdayModal] = useState(false);
   const [inboxTab, setInboxTab] = useState<InboxTab>('incoming');
   const [latestWeeklyPlan, setLatestWeeklyPlan] = useState<{ weekStart: string; taskCount: number } | null>(null);
+  const [weeklyPlansModalOpen, setWeeklyPlansModalOpen] = useState(false);
+  const [protocolsModalOpen, setProtocolsModalOpen] = useState(false);
 
   React.useEffect(() => {
     if (!currentUser?.id) return;
@@ -250,7 +253,7 @@ export const HomePage: React.FC<HomePageProps> = ({
                                     </span>
                                   )}
                                   {priority && <span>{priority.name}</span>}
-                                  {assignee && <span className="flex items-center gap-0.5 truncate max-w-[80px]" title={assignee.name}><User size={10} /> {assignee.name.split(' ')[0]}</span>}
+                                  {assignee && <span className="flex items-center gap-0.5 truncate max-w-[80px]" title={assignee.name}><UserIcon size={10} /> {assignee.name.split(' ')[0]}</span>}
                                 </div>
                               </Card>
                             );
@@ -352,11 +355,14 @@ export const HomePage: React.FC<HomePageProps> = ({
               </div>
             </div>
 
-            {/* Последний недельный план */}
-            {onNavigateToDocs && (
-              <div className="bg-white dark:bg-[#252525] border border-gray-200 dark:border-[#333] rounded-2xl shadow-sm p-4">
-                <div className="flex items-center justify-between gap-3">
-                  <div>
+            {/* Недельный план и протоколы — в тех же модалках, что в «Документах» */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="bg-white dark:bg-[#252525] border border-gray-200 dark:border-[#333] rounded-2xl shadow-sm p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                <div className="flex items-start gap-3 min-w-0">
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#3337AD]/10 text-[#3337AD]">
+                    <Calendar size={20} strokeWidth={2} />
+                  </div>
+                  <div className="min-w-0">
                     <h3 className="font-semibold text-gray-900 dark:text-white">Мой недельный план</h3>
                     {latestWeeklyPlan ? (
                       <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
@@ -366,16 +372,36 @@ export const HomePage: React.FC<HomePageProps> = ({
                       <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">План на неделю не создан</p>
                     )}
                   </div>
-                  <button
-                    type="button"
-                    onClick={onNavigateToDocs}
-                    className="px-4 py-2 rounded-lg bg-[#3337AD] text-white text-sm font-medium hover:bg-[#292b8a]"
-                  >
-                    {latestWeeklyPlan ? 'Открыть' : 'Создать'}
-                  </button>
                 </div>
+                <button
+                  type="button"
+                  onClick={() => setWeeklyPlansModalOpen(true)}
+                  className="shrink-0 px-4 py-2.5 rounded-xl bg-[#3337AD] text-white text-sm font-semibold hover:bg-[#292b8a] transition-colors w-full sm:w-auto"
+                >
+                  {latestWeeklyPlan ? 'Открыть план' : 'Создать план'}
+                </button>
               </div>
-            )}
+              <div className="bg-white dark:bg-[#252525] border border-gray-200 dark:border-[#333] rounded-2xl shadow-sm p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                <div className="flex items-start gap-3 min-w-0">
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-violet-100 dark:bg-violet-950/50 text-violet-700 dark:text-violet-300">
+                    <FileText size={20} strokeWidth={2} />
+                  </div>
+                  <div className="min-w-0">
+                    <h3 className="font-semibold text-gray-900 dark:text-white">Протоколы</h3>
+                    <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
+                      Итоги по неделям и задачи из протоколов
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setProtocolsModalOpen(true)}
+                  className="shrink-0 px-4 py-2.5 rounded-xl border border-violet-300/70 dark:border-violet-700 dark:bg-violet-950/30 text-violet-800 dark:text-violet-200 text-sm font-semibold hover:bg-violet-50 dark:hover:bg-violet-950/50 transition-colors w-full sm:w-auto"
+                >
+                  Открыть
+                </button>
+              </div>
+            </div>
 
             {/* Метрики */}
             <StatsCards
@@ -388,6 +414,20 @@ export const HomePage: React.FC<HomePageProps> = ({
           </div>
         </Container>
       </PageLayout>
+      <WeeklyPlansModal
+        isOpen={weeklyPlansModalOpen}
+        onClose={() => setWeeklyPlansModalOpen(false)}
+        currentUser={currentUser}
+        tasks={tasks}
+        onOpenTask={onOpenTask}
+      />
+      <ProtocolsModal
+        isOpen={protocolsModalOpen}
+        onClose={() => setProtocolsModalOpen(false)}
+        users={users}
+        tasks={tasks}
+        onOpenTask={onOpenTask}
+      />
     </>
   );
 };

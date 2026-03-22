@@ -415,7 +415,7 @@ const TaskModal: React.FC<TaskModalProps> = ({
         <div className="relative flex-1" ref={containerRef}>
             <div 
                 onClick={() => setIsOpen(!isOpen)}
-                className={`px-2.5 py-1.5 min-h-[32px] rounded-md text-xs font-medium cursor-pointer transition-all flex items-center justify-between ${colorClass}`}
+                className={`h-8 min-h-8 max-h-8 px-2.5 py-0 rounded-md text-xs font-medium cursor-pointer transition-all flex items-center justify-between ${colorClass}`}
             >
                 <span className="truncate">{value}</span>
                 <ChevronDown size={14} className={`ml-1.5 shrink-0 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
@@ -509,7 +509,7 @@ const TaskModal: React.FC<TaskModalProps> = ({
         <div className="relative flex-1 flex gap-2" ref={containerRef}>
             <div 
                 onClick={() => setIsOpen(!isOpen)}
-                className="flex-1 px-2.5 py-1.5 min-h-[32px] rounded-md text-xs font-medium cursor-pointer transition-all flex items-center gap-1.5 bg-gray-50 dark:bg-[#252525] border border-gray-200 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-[#303030]"
+                className="flex-1 h-8 min-h-8 max-h-8 px-2.5 py-0 rounded-md text-xs font-medium cursor-pointer transition-all flex items-center gap-1.5 bg-gray-50 dark:bg-[#252525] border border-gray-200 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-[#303030]"
             >
                 {selectedProject ? (
                     <>
@@ -580,10 +580,10 @@ const TaskModal: React.FC<TaskModalProps> = ({
 
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-end md:items-center justify-center z-[100] animate-in fade-in duration-200 p-0 md:p-4" onClick={handleBackdropClick} style={{ paddingTop: 'env(safe-area-inset-top)', paddingBottom: 'env(safe-area-inset-bottom)' }}>
-      <div className="bg-white dark:bg-[#1e1e1e] w-full h-full md:max-h-[min(680px,92vh)] md:max-w-5xl md:rounded-xl shadow-2xl flex flex-col md:flex-row overflow-hidden border-0 md:border border-gray-200 dark:border-gray-800 rounded-t-2xl md:rounded-xl" onClick={e => e.stopPropagation()}>
+      <div className="bg-white dark:bg-[#1e1e1e] w-full h-full md:h-[min(680px,92vh)] md:max-h-[min(680px,92vh)] md:max-w-5xl md:rounded-xl shadow-2xl flex flex-col md:flex-row overflow-hidden border-0 md:border border-gray-200 dark:border-gray-800 rounded-t-2xl md:rounded-xl" onClick={e => e.stopPropagation()}>
         
         {/* LEFT COLUMN: DETAILS */}
-        <div className="flex-1 flex flex-col min-w-0 border-b md:border-b-0 md:border-r border-gray-200 dark:border-gray-800 bg-white dark:bg-[#1e1e1e] h-auto md:h-auto min-h-0">
+        <div className="flex-1 flex flex-col min-w-0 border-b md:border-b-0 md:border-r border-gray-200 dark:border-gray-800 bg-white dark:bg-[#1e1e1e] min-h-0 h-full overflow-hidden">
             {/* Header */}
             <div className="p-3 md:p-3 border-b border-gray-100 dark:border-gray-800 flex justify-between items-start shrink-0">
                 <div className="flex-1 mr-2 md:mr-3 min-w-0">
@@ -612,13 +612,14 @@ const TaskModal: React.FC<TaskModalProps> = ({
                 </div>
             </div>
 
-            {/* Properties Grid */}
-            <div className="p-3 md:p-4 space-y-2 overflow-y-auto custom-scrollbar flex-1 min-h-0">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-x-3 md:gap-x-6 gap-y-2.5 md:gap-y-2">
+            {/* Свойства (скролл при переполнении) + описание (растягивается) + вложения + сохранить */}
+            <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
+            <div className="shrink-0 overflow-y-auto max-h-[min(40vh,300px)] md:max-h-[min(44vh,340px)] px-3 md:px-4 pt-2 pb-2 space-y-2 custom-scrollbar border-b border-gray-100 dark:border-gray-800">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-x-4 md:gap-x-8 gap-y-2.5 md:gap-y-2">
                     {/* Status - скрыт для идей */}
                     {taskType !== 'idea' && (
-                        <div className="flex items-center gap-2 md:gap-3">
-                            <div className="w-24 shrink-0 text-[10px] font-semibold text-gray-500 dark:text-gray-400 uppercase flex items-center gap-2"><CheckCircle2 size={16} className="shrink-0 text-gray-400" strokeWidth={2} /> Статус</div>
+                        <div className="flex items-center gap-3 md:gap-4 min-h-8">
+                            <div className="w-28 min-w-[7rem] shrink-0 pr-2 text-[10px] font-semibold text-gray-500 dark:text-gray-400 uppercase flex items-center gap-2"><CheckCircle2 size={14} className="shrink-0 text-gray-400" strokeWidth={2} /> Статус</div>
                             <StatusPrioritySelect
                                 value={status}
                                 options={statuses}
@@ -631,8 +632,8 @@ const TaskModal: React.FC<TaskModalProps> = ({
 
                     {/* Priority - скрыт для идей и функций */}
                     {taskType !== 'idea' && taskType !== 'feature' && (
-                        <div className="flex items-center gap-2 md:gap-3">
-                            <div className="w-24 shrink-0 text-[10px] font-semibold text-gray-500 dark:text-gray-400 uppercase flex items-center gap-2"><Flag size={16} className="shrink-0 text-gray-400" strokeWidth={2} /> Приоритет</div>
+                        <div className="flex items-center gap-3 md:gap-4 min-h-8">
+                            <div className="w-28 min-w-[7rem] shrink-0 pr-2 text-[10px] font-semibold text-gray-500 dark:text-gray-400 uppercase flex items-center gap-2"><Flag size={14} className="shrink-0 text-gray-400" strokeWidth={2} /> Приоритет</div>
                             <StatusPrioritySelect
                                 value={priority}
                                 options={priorities}
@@ -644,19 +645,19 @@ const TaskModal: React.FC<TaskModalProps> = ({
                     )}
 
                     {/* Assignee Multiple */}
-                    <div className="flex items-center gap-2 md:gap-3">
-                        <div className="w-24 shrink-0 text-[10px] font-semibold text-gray-500 dark:text-gray-400 uppercase flex items-center gap-2"><Users size={16} className="shrink-0 text-gray-400" strokeWidth={2} /> Исполнители</div>
+                    <div className="flex items-center gap-3 md:gap-4 min-h-8">
+                        <div className="w-28 min-w-[7rem] shrink-0 pr-2 text-[10px] font-semibold text-gray-500 dark:text-gray-400 uppercase flex items-center gap-2"><Users size={14} className="shrink-0 text-gray-400" strokeWidth={2} /> Исполнители</div>
                         <div className="flex-1 relative" ref={assigneeDropdownRef}>
                             <div 
                                 onClick={() => setIsAssigneeDropdownOpen(!isAssigneeDropdownOpen)}
-                                className="flex items-center gap-1.5 cursor-pointer bg-gray-50 dark:bg-[#252525] border border-gray-200 dark:border-gray-700 rounded-md px-2.5 py-1 min-h-[32px] hover:bg-gray-100 dark:hover:bg-[#303030] transition-colors"
+                                className="flex items-center gap-1.5 cursor-pointer bg-gray-50 dark:bg-[#252525] border border-gray-200 dark:border-gray-700 rounded-md px-2.5 py-0 h-8 min-h-8 max-h-8 hover:bg-gray-100 dark:hover:bg-[#303030] transition-colors"
                             >
                                 {assigneeIds.length > 0 ? (
                                     <div className="flex items-center gap-1.5 flex-1 min-w-0">
                                         <div className="flex -space-x-1.5 shrink-0">
                                             {assigneeIds.map(uid => {
                                                 const u = users.find(us => us.id === uid);
-                                                return u ? <img key={uid} src={u.avatar} className="w-7 h-7 rounded-full border-2 border-white dark:border-[#252525] object-cover object-center" title={u.name} /> : null;
+                                                return u ? <img key={uid} src={u.avatar} className="w-6 h-6 rounded-full border-2 border-white dark:border-[#252525] object-cover object-center" title={u.name} /> : null;
                                             })}
                                         </div>
                                         {assigneeIds.length === 1 && (() => {
@@ -693,23 +694,9 @@ const TaskModal: React.FC<TaskModalProps> = ({
                         </div>
                     </div>
 
-                    {/* Постановщик - только для существующих задач */}
-                    {currentTask?.id && currentTask?.createdByUserId && (() => {
-                        const creator = users.find(u => u.id === currentTask.createdByUserId);
-                        return creator ? (
-                            <div className="flex items-center gap-2 md:gap-3">
-                                <div className="w-24 shrink-0 text-[10px] font-semibold text-gray-500 dark:text-gray-400 uppercase flex items-center gap-2"><UserIcon size={16} className="shrink-0 text-gray-400" strokeWidth={2} /> Постановщик</div>
-                                <div className="flex-1 flex items-center gap-1.5 bg-gray-50 dark:bg-[#252525] border border-gray-200 dark:border-gray-700 rounded-md px-2.5 py-1 min-h-[32px]">
-                                    <img src={creator.avatar} className="w-6 h-6 rounded-full border border-gray-200 dark:border-gray-600 object-cover object-center" />
-                                    <span className="text-xs font-medium text-gray-700 dark:text-gray-300 truncate">{creator.name}</span>
-                                </div>
-                            </div>
-                        ) : null;
-                    })()}
-
-                    {/* Module */}
-                    <div className="flex items-center gap-2 md:gap-3">
-                        <div className="w-24 shrink-0 text-[10px] font-semibold text-gray-500 dark:text-gray-400 uppercase flex items-center gap-2"><Tag size={16} className="shrink-0 text-gray-400" strokeWidth={2} /> Модуль</div>
+                    {/* Module — сразу после исполнителей */}
+                    <div className="flex items-center gap-3 md:gap-4 min-h-8">
+                        <div className="w-28 min-w-[7rem] shrink-0 pr-2 text-[10px] font-semibold text-gray-500 dark:text-gray-400 uppercase flex items-center gap-2"><Tag size={14} className="shrink-0 text-gray-400" strokeWidth={2} /> Модуль</div>
                         <ModuleSelect
                             value={projectId}
                             options={projects}
@@ -718,28 +705,44 @@ const TaskModal: React.FC<TaskModalProps> = ({
                         />
                     </div>
 
+                    {/* Постановщик - только для существующих задач */}
+                    {currentTask?.id && currentTask?.createdByUserId && (() => {
+                        const creator = users.find(u => u.id === currentTask.createdByUserId);
+                        return creator ? (
+                            <div className="flex items-center gap-3 md:gap-4 min-h-8">
+                                <div className="w-28 min-w-[7rem] shrink-0 pr-2 text-[10px] font-semibold text-gray-500 dark:text-gray-400 uppercase flex items-center gap-2"><UserIcon size={14} className="shrink-0 text-gray-400" strokeWidth={2} /> Постановщик</div>
+                                <div className="flex-1 flex items-center gap-1.5 bg-gray-50 dark:bg-[#252525] border border-gray-200 dark:border-gray-700 rounded-md px-2.5 h-8 min-h-8 max-h-8">
+                                    <img src={creator.avatar} className="w-6 h-6 rounded-full border border-gray-200 dark:border-gray-600 object-cover object-center shrink-0" />
+                                    <span className="text-xs font-medium text-gray-700 dark:text-gray-300 truncate leading-none">{creator.name}</span>
+                                </div>
+                            </div>
+                        ) : null;
+                    })()}
+
                     {/* Category - только для функций */}
                     {taskType === 'feature' && (
-                        <div className="flex items-center gap-2 md:gap-3">
-                            <div className="w-24 shrink-0 text-[10px] font-semibold text-gray-500 dark:text-gray-400 uppercase flex items-center gap-2"><Folder size={16} className="shrink-0 text-gray-400" strokeWidth={2} /> Категория</div>
+                        <div className="flex items-center gap-3 md:gap-4 min-h-8">
+                            <div className="w-28 min-w-[7rem] shrink-0 pr-2 text-[10px] font-semibold text-gray-500 dark:text-gray-400 uppercase flex items-center gap-2"><Folder size={14} className="shrink-0 text-gray-400" strokeWidth={2} /> Категория</div>
+                            <div className="flex-1 relative min-w-0">
                             <select
                                 value={category}
                                 onChange={e => setCategory(e.target.value)}
-                                className="flex-1 px-2.5 pr-8 py-1.5 min-h-[32px] text-sm leading-tight bg-gray-50 dark:bg-[#252525] border border-gray-200 dark:border-gray-700 rounded-md text-gray-800 dark:text-gray-200 focus:ring-2 focus:ring-blue-500/50 appearance-none relative"
+                                className="w-full px-2.5 pr-8 h-8 min-h-8 text-sm leading-tight bg-gray-50 dark:bg-[#252525] border border-gray-200 dark:border-gray-700 rounded-md text-gray-800 dark:text-gray-200 focus:ring-2 focus:ring-blue-500/50 appearance-none"
                             >
                                 <option value="">Не выбрана</option>
                                 {STANDARD_CATEGORIES.map(cat => (
                                     <option key={cat.id} value={cat.id}>{cat.name}</option>
                                 ))}
                             </select>
-                            <ChevronDown size={16} className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400" />
+                            <ChevronDown size={14} className="absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400" />
+                            </div>
                         </div>
                     )}
 
                     {/* Dates - скрыты для идей */}
                     {taskType !== 'idea' && (
-                        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-3 col-span-1 md:col-span-2">
-                            <div className="w-full sm:w-24 text-[10px] font-semibold text-gray-500 dark:text-gray-400 uppercase flex items-center gap-2 shrink-0"><CalendarIcon size={16} className="shrink-0 text-gray-400" strokeWidth={2} /> Сроки</div>
+                        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-4 col-span-1 md:col-span-2 min-h-8">
+                            <div className="w-full sm:w-28 sm:min-w-[7rem] sm:pr-2 text-[10px] font-semibold text-gray-500 dark:text-gray-400 uppercase flex items-center gap-2 shrink-0"><CalendarIcon size={14} className="shrink-0 text-gray-400" strokeWidth={2} /> Сроки</div>
                             <div className="flex items-center gap-2 flex-1 w-full sm:w-auto">
                                 <DateInput
                                     value={startDate}
@@ -760,9 +763,9 @@ const TaskModal: React.FC<TaskModalProps> = ({
 
                     {taskType === 'task' && (
                       <>
-                        <div className="flex items-center gap-2 md:gap-3 col-span-1 md:col-span-2">
-                          <div className="w-24 shrink-0 text-[10px] font-semibold text-gray-500 dark:text-gray-400 uppercase flex items-center gap-2">
-                            <ListTree size={16} className="shrink-0 text-gray-400" strokeWidth={2} /> Родитель
+                        <div className="flex items-center gap-3 md:gap-4 min-h-8 col-span-1 md:col-span-2">
+                          <div className="w-28 min-w-[7rem] shrink-0 pr-2 text-[10px] font-semibold text-gray-500 dark:text-gray-400 uppercase flex items-center gap-2">
+                            <ListTree size={14} className="shrink-0 text-gray-400" strokeWidth={2} /> Родитель
                           </div>
                           <div className="flex-1 min-w-0">
                             <TaskSelect
@@ -775,7 +778,7 @@ const TaskModal: React.FC<TaskModalProps> = ({
                           </div>
                         </div>
                         {currentTask?.id && childTasks.length > 0 && (
-                          <div className="col-span-1 md:col-span-2 md:pl-[7.25rem]">
+                          <div className="col-span-1 md:col-span-2 md:pl-32">
                             <div className="text-[10px] font-semibold text-gray-500 dark:text-gray-400 uppercase mb-1">Подзадачи ({childTasks.length})</div>
                             <ul className="space-y-0.5 max-h-24 overflow-y-auto custom-scrollbar text-sm text-gray-700 dark:text-gray-300">
                               {childTasks.map(ch => (
@@ -787,23 +790,23 @@ const TaskModal: React.FC<TaskModalProps> = ({
                       </>
                     )}
                 </div>
+            </div>
 
-                {/* Description */}
-                <div className="mt-4">
-                    <label className="block text-[10px] font-bold text-gray-500 dark:text-gray-400 mb-1.5 uppercase flex items-center gap-2">
+                {/* Description — заполняет свободную высоту модалки */}
+                <div className="flex-1 flex flex-col min-h-0 px-3 md:px-4 pt-3">
+                    <label className="shrink-0 block text-[10px] font-bold text-gray-500 dark:text-gray-400 mb-1.5 uppercase flex items-center gap-2">
                         <AlignLeft size={16} className="text-gray-400" strokeWidth={2} /> Описание
                     </label>
                     <textarea 
                         value={description}
                         onChange={e => setDescription(e.target.value)}
-                        rows={3}
-                        className="w-full min-h-[72px] max-h-40 bg-white dark:bg-[#1e1e1e] border border-gray-200 dark:border-gray-700 rounded-lg p-2.5 text-sm text-gray-800 dark:text-gray-200 focus:ring-2 focus:ring-blue-500/20 outline-none resize-y placeholder-gray-400 dark:placeholder-gray-600"
+                        className="w-full flex-1 min-h-[100px] bg-white dark:bg-[#1e1e1e] border border-gray-200 dark:border-gray-700 rounded-lg p-2.5 text-sm text-gray-800 dark:text-gray-200 focus:ring-2 focus:ring-blue-500/20 outline-none resize-none placeholder-gray-400 dark:placeholder-gray-600"
                         placeholder="Добавьте описание задачи..."
                     />
                 </div>
 
                 {/* Attachments */}
-                <div className="mt-4">
+                <div className="shrink-0 px-3 md:px-4 pt-3 mt-auto">
                     <div className="flex items-center justify-between mb-2">
                         <label className="text-[10px] font-bold text-gray-500 dark:text-gray-400 uppercase flex items-center gap-2">
                             <Paperclip size={16} className="text-gray-400" strokeWidth={2} /> Вложения
@@ -850,7 +853,7 @@ const TaskModal: React.FC<TaskModalProps> = ({
                 </div>
                 
                 {/* Footer Save */}
-                <div className="mt-4 pt-3 border-t border-gray-100 dark:border-gray-800 flex justify-end pb-8 md:pb-3">
+                <div className="shrink-0 px-3 md:px-4 mt-4 pt-3 border-t border-gray-100 dark:border-gray-800 flex justify-end pb-8 md:pb-3">
                     <Button
                         type="button"
                         variant="primary"
@@ -866,7 +869,7 @@ const TaskModal: React.FC<TaskModalProps> = ({
 
         {/* RIGHT COLUMN: COMMENTS (Bottom on Mobile) */}
         {currentTask?.id && !hideChat && (
-            <div className="w-full md:w-80 bg-gray-50 dark:bg-[#121212] border-t md:border-t-0 md:border-l border-gray-200 dark:border-gray-800 flex flex-col shrink-0 h-auto md:h-auto min-h-[300px] md:min-h-0">
+            <div className="w-full md:w-80 bg-gray-50 dark:bg-[#121212] border-t md:border-t-0 md:border-l border-gray-200 dark:border-gray-800 flex flex-col shrink-0 h-auto md:h-full md:min-h-0 min-h-[300px]">
                 <div className="p-4 border-b border-gray-200 dark:border-gray-800 flex items-center gap-2 bg-gray-50 dark:bg-[#121212]">
                     <MessageSquare size={18} className="text-gray-500"/>
                     <h3 className="font-bold text-gray-700 dark:text-gray-200 text-sm">Комментарии</h3>

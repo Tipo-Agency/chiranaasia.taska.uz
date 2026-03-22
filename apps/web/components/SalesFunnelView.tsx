@@ -26,7 +26,6 @@ interface SalesFunnelViewProps {
   onSaveMeeting?: (meeting: Meeting) => void;
   onDeleteMeeting?: (meetingId: string) => void;
   onUpdateMeetingSummary?: (meetingId: string, summary: string) => void;
-  onOpenSettings?: () => void; // Переход в настройки для создания воронки
   autoOpenCreateModal?: boolean; // Автоматически открыть модалку создания
 }
 
@@ -37,7 +36,7 @@ const STAGES = [
     { id: 'negotiation', label: 'Переговоры', color: 'bg-orange-200 dark:bg-orange-900' },
 ];
 
-const SalesFunnelView: React.FC<SalesFunnelViewProps> = ({ deals, clients, users, projects = [], tasks = [], meetings = [], salesFunnels = [], currentUser, onSaveDeal, onDeleteDeal, onCreateTask, onCreateClient, onOpenTask, onSaveMeeting, onDeleteMeeting, onUpdateMeetingSummary, onOpenSettings, autoOpenCreateModal = false }) => {
+const SalesFunnelView: React.FC<SalesFunnelViewProps> = ({ deals, clients, users, projects = [], tasks = [], meetings = [], salesFunnels = [], currentUser, onSaveDeal, onDeleteDeal, onCreateTask, onCreateClient, onOpenTask, onSaveMeeting, onDeleteMeeting, onUpdateMeetingSummary, autoOpenCreateModal = false }) => {
   const [viewMode, setViewMode] = useState<'kanban' | 'list' | 'rejected'>('kanban');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingDeal, setEditingDeal] = useState<Deal | null>(null);
@@ -449,18 +448,12 @@ const SalesFunnelView: React.FC<SalesFunnelViewProps> = ({ deals, clients, users
           <h2 className="text-2xl font-bold text-gray-800 dark:text-white mb-3">
             Создайте свою первую воронку
           </h2>
-          <p className="text-gray-500 dark:text-gray-400 mb-6">
-            Настройте воронку продаж в настройках, чтобы начать работу со сделками
+          <p className="text-gray-500 dark:text-gray-400 mb-2">
+            Создайте воронку в разделе «Настройки системы» → «Воронки продаж».
           </p>
-          {onOpenSettings && (
-            <button
-              onClick={onOpenSettings}
-              className="px-6 py-3 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 flex items-center gap-2 shadow-sm mx-auto"
-            >
-              <Plus size={18} />
-              Создать воронку в настройках
-            </button>
-          )}
+          <p className="text-sm text-gray-400 dark:text-gray-500 mb-6">
+            Быстрый переход: иконка шестерёнки в шапке рядом с названием «Воронка продаж».
+          </p>
         </div>
       </div>
     );
@@ -486,15 +479,6 @@ const SalesFunnelView: React.FC<SalesFunnelViewProps> = ({ deals, clients, users
                   className="bg-white dark:bg-[#333] border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100"
                 />
               </div>
-              {onOpenSettings && (
-                <button
-                  type="button"
-                  onClick={onOpenSettings}
-                  className="text-xs font-medium text-[#3337AD] dark:text-[#8b8ee0] hover:underline whitespace-nowrap px-1"
-                >
-                  Этапы воронки
-                </button>
-              )}
               <Button variant="primary" size="sm" icon={Plus} onClick={handleOpenCreate}>
                 <span className="hidden sm:inline">Создать</span>
                 <span className="sm:hidden">+</span>

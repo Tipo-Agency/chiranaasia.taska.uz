@@ -4,6 +4,7 @@ import { BusinessProcess, ProcessStep, ProcessStepBranch, OrgPosition, User, Tas
 import { Network, Plus, Edit2, Trash2, ChevronRight, User as UserIcon, Building2, Save, X, ArrowDown, Play, CheckCircle2, Clock, FileText, ArrowLeft, Calendar, Users, Layers3, PauseCircle } from 'lucide-react';
 import { TaskSelect } from './TaskSelect';
 import { ProcessCard } from './features/processes/ProcessCard';
+import { ModuleCreateDropdown } from './ui';
 
 interface BusinessProcessesViewProps {
   processes: BusinessProcess[];
@@ -16,12 +17,14 @@ interface BusinessProcessesViewProps {
   onDeleteProcess: (id: string) => void;
   onSaveTask: (task: Partial<Task>) => void;
   onOpenTask: (task: Task) => void;
+  /** Быстрое создание задачи из меню «Создать» (как на главной) */
+  onQuickCreateTask?: () => void;
   onCompleteProcessStepWithBranch?: (instanceId: string, nextStepId: string) => void;
   autoOpenCreateModal?: boolean;
 }
 
 const BusinessProcessesView: React.FC<BusinessProcessesViewProps> = ({ 
-    processes, orgPositions, users, tasks, tables, currentUser, onSaveProcess, onDeleteProcess, onSaveTask, onOpenTask, onCompleteProcessStepWithBranch, autoOpenCreateModal = false
+    processes, orgPositions, users, tasks, tables, currentUser, onSaveProcess, onDeleteProcess, onSaveTask, onOpenTask, onQuickCreateTask, onCompleteProcessStepWithBranch, autoOpenCreateModal = false
 }) => {
   const [selectedProcessId, setSelectedProcessId] = useState<string | null>(null);
   /** Шаблоны = описания процессов; В работе = active + paused; Завершённые = completed */
@@ -1122,15 +1125,29 @@ const BusinessProcessesView: React.FC<BusinessProcessesViewProps> = ({
               </p>
             </div>
             <div className="flex items-center gap-2">
-              {activeTab === 'templates' && (
-                <button 
-                  onClick={handleOpenCreate} 
-                  className="px-4 py-2 rounded-lg bg-indigo-600 text-white text-sm font-medium hover:bg-indigo-700 flex items-center gap-2 shadow-sm"
-                >
-                  <Plus size={18} />
-                  <span className="hidden sm:inline">Создать шаблон</span>
-                </button>
-              )}
+              <ModuleCreateDropdown
+                buttonClassName="bg-indigo-600 hover:bg-indigo-700 text-white"
+                items={[
+                  {
+                    id: 'template',
+                    label: 'Шаблон процесса',
+                    icon: Layers3,
+                    onClick: handleOpenCreate,
+                    iconClassName: 'text-indigo-600 dark:text-indigo-400',
+                  },
+                  ...(onQuickCreateTask
+                    ? [
+                        {
+                          id: 'task',
+                          label: 'Задача',
+                          icon: CheckCircle2,
+                          onClick: onQuickCreateTask,
+                          iconClassName: 'text-indigo-600 dark:text-indigo-400',
+                        },
+                      ]
+                    : []),
+                ]}
+              />
             </div>
           </div>
           
@@ -1222,13 +1239,31 @@ const BusinessProcessesView: React.FC<BusinessProcessesViewProps> = ({
             <div className="bg-white dark:bg-[#252525] border border-gray-200 dark:border-[#333] rounded-xl p-12 text-center">
               <Network size={48} className="mx-auto text-gray-300 dark:text-gray-600 mb-4" />
               <p className="text-gray-500 dark:text-gray-400 text-sm mb-2">Нет бизнес-процессов</p>
-              <p className="text-xs text-gray-400 dark:text-gray-500 mb-4">Создайте первый шаблон для начала работы</p>
-              <button 
-                onClick={handleOpenCreate}
-                className="px-4 py-2 bg-indigo-600 text-white text-sm font-medium hover:bg-indigo-700 rounded-lg inline-flex items-center gap-2"
-              >
-                <Plus size={16} /> Создать шаблон
-              </button>
+              <p className="text-xs text-gray-400 dark:text-gray-500 mb-4">Выберите действие в меню «Создать» выше или создайте шаблон здесь</p>
+              <ModuleCreateDropdown
+                buttonClassName="bg-indigo-600 hover:bg-indigo-700 text-white"
+                align="left"
+                items={[
+                  {
+                    id: 'template',
+                    label: 'Шаблон процесса',
+                    icon: Layers3,
+                    onClick: handleOpenCreate,
+                    iconClassName: 'text-indigo-600 dark:text-indigo-400',
+                  },
+                  ...(onQuickCreateTask
+                    ? [
+                        {
+                          id: 'task',
+                          label: 'Задача',
+                          icon: CheckCircle2,
+                          onClick: onQuickCreateTask,
+                          iconClassName: 'text-indigo-600 dark:text-indigo-400',
+                        },
+                      ]
+                    : []),
+                ]}
+              />
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">

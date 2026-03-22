@@ -1,9 +1,16 @@
 import React, { useMemo, useState } from 'react';
 import { Department, Warehouse, InventoryItem, StockBalance, StockMovement, InventoryRevision } from '../types';
-import { Layers, Plus } from 'lucide-react';
+import {
+  Layers,
+  Plus,
+  Package,
+  ArrowLeftRight,
+  ClipboardCheck,
+  Building2,
+  BarChart3,
+} from 'lucide-react';
 import { Button } from './ui/Button';
-
-const PRIMARY_COLOR = '#267022';
+import { ModuleCreateDropdown } from './ui';
 
 interface InventoryViewProps {
   departments: Department[];
@@ -174,124 +181,151 @@ const InventoryView: React.FC<InventoryViewProps> = ({
     setToWarehouseId('');
   };
 
+  const totalQty = useMemo(
+    () => balancesForView.reduce((s, b) => s + (Number(b.quantity) || 0), 0),
+    [balancesForView]
+  );
+
   return (
-    <div className="h-full flex flex-col min-h-0">
-      <div className="max-w-7xl mx-auto w-full pt-8 px-6 flex-shrink-0">
-        <div className="mb-6">
-          <div className="flex justify-between items-center mb-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2 rounded-lg flex items-center justify-center" style={{ backgroundColor: `${PRIMARY_COLOR}20`, color: PRIMARY_COLOR }}>
-                <Layers size={24} />
+    <div className="h-full flex flex-col min-h-0 bg-slate-50/80 dark:bg-[#121212]">
+      <div className="max-w-7xl mx-auto w-full pt-6 md:pt-8 px-4 sm:px-6 flex-shrink-0">
+        <div className="mb-5">
+          <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+            <div className="flex items-start gap-3 min-w-0">
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-emerald-600 to-green-700 text-white shadow-lg shadow-emerald-600/25">
+                <Layers size={24} strokeWidth={2} />
               </div>
               <div>
-                <h1 className="text-lg md:text-2xl font-bold text-gray-800 dark:text-white truncate">Склад</h1>
-                <p className="hidden md:block text-xs text-gray-500 dark:text-gray-400 mt-1">
-                  Номенклатура, подразделения, перемещения, оприходования и ревизии
+                <h1 className="text-xl md:text-2xl font-bold text-gray-900 dark:text-white tracking-tight">Склад</h1>
+                <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
+                  Остатки, номенклатура, движения и инвентаризация
                 </p>
+                <div className="flex flex-wrap gap-2 mt-3">
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-white dark:bg-[#1e1e1e] border border-gray-200 dark:border-[#333] px-3 py-1 text-xs font-medium text-gray-700 dark:text-gray-200">
+                    <Building2 size={12} className="text-emerald-600" />
+                    Складов: <strong>{filteredWarehouses.length}</strong>
+                  </span>
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-100 dark:border-emerald-900 px-3 py-1 text-xs font-medium text-emerald-900 dark:text-emerald-200">
+                    <BarChart3 size={12} />
+                    Позиций на экране: <strong>{balancesForView.length}</strong>
+                    {activeTab === 'balances' && balancesForView.length > 0 && (
+                      <> · Σ <strong>{totalQty.toLocaleString('ru-RU')}</strong> ед.</>
+                    )}
+                  </span>
+                </div>
               </div>
             </div>
-            {activeTab === 'items' && (
-              <Button variant="primary" size="sm" icon={Plus} onClick={handleCreateItem}>
-                Создать
-              </Button>
-            )}
+            <div className="flex flex-wrap items-center gap-2 shrink-0">
+              <ModuleCreateDropdown
+                buttonClassName="bg-emerald-600 hover:bg-emerald-700 text-white"
+                items={[
+                  {
+                    id: 'nom',
+                    label: 'Новая номенклатура',
+                    icon: Package,
+                    onClick: () => setActiveTab('items'),
+                    iconClassName: 'text-emerald-600 dark:text-emerald-400',
+                  },
+                  {
+                    id: 'mov',
+                    label: 'Складская операция',
+                    icon: ArrowLeftRight,
+                    onClick: () => setActiveTab('movements'),
+                    iconClassName: 'text-emerald-600 dark:text-emerald-400',
+                  },
+                  {
+                    id: 'rev',
+                    label: 'Ревизия',
+                    icon: ClipboardCheck,
+                    onClick: () => setActiveTab('revisions'),
+                    iconClassName: 'text-emerald-600 dark:text-emerald-400',
+                  },
+                ]}
+              />
+            </div>
           </div>
         </div>
       </div>
       <div className="flex-1 overflow-y-auto custom-scrollbar min-h-0">
-        <div className="max-w-7xl mx-auto w-full px-6 pb-20">
+        <div className="max-w-7xl mx-auto w-full px-4 sm:px-6 pb-20">
 
-          {/* TABS */}
-          <div className="flex items-center gap-2 bg-gray-100 dark:bg-[#252525] rounded-full p-1 text-xs mb-4">
-            <button
-              onClick={() => setActiveTab('balances')}
-              className={`px-3 py-1.5 rounded-full flex items-center gap-1 ${
-                activeTab === 'balances'
-                  ? 'bg-white dark:bg-[#191919] text-gray-900 dark:text-white shadow-sm'
-                  : 'text-gray-600 dark:text-gray-300'
-              }`}
-            >
-              Остатки
-            </button>
-            <button
-              onClick={() => setActiveTab('items')}
-              className={`px-3 py-1.5 rounded-full flex items-center gap-1 ${
-                activeTab === 'items'
-                  ? 'bg-white dark:bg-[#191919] text-gray-900 dark:text-white shadow-sm'
-                  : 'text-gray-600 dark:text-gray-300'
-              }`}
-            >
-              Номенклатура
-            </button>
-            <button
-              onClick={() => setActiveTab('movements')}
-              className={`px-3 py-1.5 rounded-full flex items-center gap-1 ${
-                activeTab === 'movements'
-                  ? 'bg-white dark:bg-[#191919] text-gray-900 dark:text-white shadow-sm'
-                  : 'text-gray-600 dark:text-gray-300'
-              }`}
-            >
-              Журнал
-            </button>
-            <button
-              onClick={() => setActiveTab('revisions')}
-              className={`px-3 py-1.5 rounded-full flex items-center gap-1 ${
-                activeTab === 'revisions'
-                  ? 'bg-white dark:bg-[#191919] text-gray-900 dark:text-white shadow-sm'
-                  : 'text-gray-600 dark:text-gray-300'
-              }`}
-            >
-              Ревизии
-            </button>
+          <div className="flex flex-wrap items-center gap-2 mb-4">
+            {(
+              [
+                { id: 'balances' as const, label: 'Остатки', icon: BarChart3 },
+                { id: 'items' as const, label: 'Номенклатура', icon: Package },
+                { id: 'movements' as const, label: 'Журнал', icon: ArrowLeftRight },
+                { id: 'revisions' as const, label: 'Ревизии', icon: ClipboardCheck },
+              ] as const
+            ).map(tab => {
+              const Icon = tab.icon;
+              return (
+                <button
+                  key={tab.id}
+                  type="button"
+                  onClick={() => setActiveTab(tab.id)}
+                  className={`inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition-all ${
+                    activeTab === tab.id
+                      ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/25'
+                      : 'bg-white dark:bg-[#1a1a1a] text-gray-600 dark:text-gray-300 border border-gray-200 dark:border-[#333] hover:border-emerald-300 dark:hover:border-emerald-800'
+                  }`}
+                >
+                  <Icon size={16} strokeWidth={2} />
+                  {tab.label}
+                </button>
+              );
+            })}
           </div>
 
-          {/* Filters */}
-          <div className="flex items-center gap-4 mb-4">
-            <div className="flex flex-col">
-              <span className="text-[11px] uppercase font-semibold text-gray-500 dark:text-gray-400 mb-1">
-                Подразделение
-              </span>
-              <select
-                value={selectedDepartmentId}
-                onChange={e => setSelectedDepartmentId(e.target.value)}
-                className="border border-gray-200 dark:border-[#333] rounded-lg px-3 py-1.5 text-sm bg-white dark:bg-[#252525] text-gray-800 dark:text-gray-100 min-w-[220px]"
-              >
-                <option value="">Все подразделения</option>
-                {departments.map(d => (
-                  <option key={d.id} value={d.id}>
-                    {d.name}
-                  </option>
-                ))}
-              </select>
+          <div className="rounded-2xl border border-gray-200 dark:border-[#333] bg-white dark:bg-[#191919] p-4 sm:p-5 mb-4 shadow-sm">
+            <p className="text-[11px] font-bold uppercase tracking-wide text-gray-400 dark:text-gray-500 mb-2">Контекст</p>
+            <div className="flex flex-col sm:flex-row sm:items-end gap-4">
+              <label className="flex flex-col gap-1.5 flex-1 min-w-[200px]">
+                <span className="text-xs font-medium text-gray-600 dark:text-gray-300">Подразделение</span>
+                <select
+                  value={selectedDepartmentId}
+                  onChange={e => setSelectedDepartmentId(e.target.value)}
+                  className="rounded-xl border border-gray-200 dark:border-[#333] bg-gray-50 dark:bg-[#252525] px-3 py-2.5 text-sm text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-emerald-500/30 outline-none"
+                >
+                  <option value="">Все подразделения</option>
+                  {departments.map(d => (
+                    <option key={d.id} value={d.id}>
+                      {d.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
             </div>
           </div>
 
-          <div className="flex-1 bg-white dark:bg-[#252525] border border-gray-200 dark:border-[#333] rounded-xl shadow-sm overflow-hidden flex flex-col min-h-0">
+          <div className="flex-1 bg-white dark:bg-[#1a1a1a] border border-gray-200 dark:border-[#333] rounded-2xl shadow-sm overflow-hidden flex flex-col min-h-0">
         {activeTab === 'balances' && (
           <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
-            <div className="border-b border-gray-100 dark:border-[#333] px-4 py-3 flex items-center gap-3 shrink-0">
-              <span className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase">Склад</span>
-              <select
-                value={selectedWarehouseId}
-                onChange={e => setSelectedWarehouseId(e.target.value)}
-                className="border border-gray-200 dark:border-[#333] rounded-lg px-3 py-1.5 text-sm bg-white dark:bg-[#252525] text-gray-800 dark:text-gray-100 min-w-[220px]"
-              >
-                <option value="">Выберите склад</option>
-                {filteredWarehouses.map(w => (
-                  <option key={w.id} value={w.id}>
-                    {w.name}
-                  </option>
-                ))}
-              </select>
+            <div className="border-b border-gray-100 dark:border-[#2a2a2a] px-4 sm:px-5 py-4 flex flex-col lg:flex-row lg:items-end gap-4 shrink-0 bg-emerald-50/40 dark:bg-emerald-950/15">
+              <label className="flex flex-col gap-1.5 min-w-[200px]">
+                <span className="text-[11px] font-bold uppercase tracking-wide text-emerald-800/80 dark:text-emerald-300/90">Склад</span>
+                <select
+                  value={selectedWarehouseId}
+                  onChange={e => setSelectedWarehouseId(e.target.value)}
+                  className="rounded-xl border border-emerald-200 dark:border-emerald-900/50 px-3 py-2.5 text-sm bg-white dark:bg-[#252525] text-gray-900 dark:text-gray-100 min-w-[220px] focus:ring-2 focus:ring-emerald-500/30 outline-none"
+                >
+                  <option value="">Выберите склад</option>
+                  {filteredWarehouses.map(w => (
+                    <option key={w.id} value={w.id}>
+                      {w.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
 
-              <div className="ml-auto flex items-center gap-2">
+              <div className="flex flex-col sm:flex-row flex-1 gap-2 lg:justify-end lg:ml-auto">
                 <input
                   value={newWarehouseName}
                   onChange={e => setNewWarehouseName(e.target.value)}
-                  placeholder={currentDepartment ? `Новый склад (${currentDepartment.name})` : 'Новый склад'}
-                  className="border border-gray-200 dark:border-[#333] rounded-lg px-3 py-1.5 text-sm bg-white dark:bg-[#252525] text-gray-800 dark:text-gray-100"
+                  placeholder={currentDepartment ? `Название склада (${currentDepartment.name})` : 'Название нового склада'}
+                  className="rounded-xl border border-gray-200 dark:border-[#333] px-3 py-2.5 text-sm bg-white dark:bg-[#252525] text-gray-800 dark:text-gray-100 flex-1 min-w-[180px] focus:ring-2 focus:ring-emerald-500/25 outline-none"
                 />
-                <Button variant="primary" size="sm" onClick={handleCreateWarehouse}>
+                <Button variant="primary" size="sm" onClick={handleCreateWarehouse} className="bg-emerald-600 hover:bg-emerald-700 shrink-0">
                   Добавить склад
                 </Button>
               </div>
@@ -299,26 +333,28 @@ const InventoryView: React.FC<InventoryViewProps> = ({
 
             <div className="flex-1 overflow-auto custom-scrollbar min-h-0">
               {balancesForView.length === 0 ? (
-                <div className="h-full flex items-center justify-center text-gray-400 dark:text-gray-500 text-sm">
-                  Нет данных по остаткам. Создайте склад и добавьте операции поступления.
+                <div className="h-full min-h-[200px] flex flex-col items-center justify-center text-center px-6 py-12">
+                  <Package className="text-gray-300 dark:text-gray-600 mb-3" size={40} strokeWidth={1.25} />
+                  <p className="text-gray-700 dark:text-gray-300 font-medium">Нет остатков для выбранного склада</p>
+                  <p className="text-sm text-gray-500 dark:text-gray-500 mt-1 max-w-md">Создайте склад выше, заведите номенклатуру и проведите оприходование на вкладке «Журнал».</p>
                 </div>
               ) : (
-                <table className="w-full text-left text-xs border-collapse">
-                  <thead className="bg-gray-50 dark:bg-[#2a2a2a] border-b border-gray-200 dark:border-[#333]">
-                    <tr className="text-gray-500 dark:text-gray-400">
-                      <th className="px-4 py-2 font-medium w-40">Код</th>
-                      <th className="px-4 py-2 font-medium">Номенклатура</th>
-                      <th className="px-4 py-2 font-medium w-20">Ед.</th>
-                      <th className="px-4 py-2 font-medium w-28 text-right">Остаток</th>
+                <table className="w-full text-left text-sm border-collapse">
+                  <thead className="bg-gray-50 dark:bg-[#252525] border-b border-gray-200 dark:border-[#333] sticky top-0 z-[1]">
+                    <tr className="text-gray-500 dark:text-gray-400 text-xs uppercase tracking-wide">
+                      <th className="px-4 py-3 font-semibold w-36">Код</th>
+                      <th className="px-4 py-3 font-semibold">Номенклатура</th>
+                      <th className="px-4 py-3 font-semibold w-24">Ед.</th>
+                      <th className="px-4 py-3 font-semibold w-32 text-right">Остаток</th>
                     </tr>
                   </thead>
-                  <tbody>
+                  <tbody className="divide-y divide-gray-100 dark:divide-[#2a2a2a]">
                     {balancesForView.map(b => (
-                      <tr key={`${b.warehouseId}_${b.itemId}`} className="border-b border-gray-100 dark:border-[#333] last:border-0">
-                        <td className="px-4 py-2 text-gray-500 dark:text-gray-400">{b.itemSku}</td>
-                        <td className="px-4 py-2 text-gray-800 dark:text-gray-100">{b.itemName}</td>
-                        <td className="px-4 py-2 text-gray-500 dark:text-gray-400">{b.itemUnit}</td>
-                        <td className="px-4 py-2 text-right text-gray-800 dark:text-gray-100">{b.quantity}</td>
+                      <tr key={`${b.warehouseId}_${b.itemId}`} className="hover:bg-emerald-50/50 dark:hover:bg-emerald-950/20 transition-colors">
+                        <td className="px-4 py-3 text-gray-500 dark:text-gray-400 font-mono text-xs">{b.itemSku || '—'}</td>
+                        <td className="px-4 py-3 text-gray-900 dark:text-gray-100 font-medium">{b.itemName}</td>
+                        <td className="px-4 py-3 text-gray-500 dark:text-gray-400">{b.itemUnit}</td>
+                        <td className="px-4 py-3 text-right tabular-nums font-semibold text-emerald-800 dark:text-emerald-200">{b.quantity}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -330,8 +366,9 @@ const InventoryView: React.FC<InventoryViewProps> = ({
 
         {activeTab === 'items' && (
           <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
-            <div className="border-b border-gray-100 dark:border-[#333] px-4 py-3 flex items-center gap-3 flex-wrap shrink-0">
-              <span className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase">Новая номенклатура</span>
+            <div className="border-b border-gray-100 dark:border-[#2a2a2a] px-4 sm:px-5 py-4 flex flex-col gap-3 shrink-0 bg-slate-50/80 dark:bg-[#141414]">
+              <span className="text-[11px] font-bold uppercase tracking-wide text-gray-500 dark:text-gray-400">Новая позиция справочника</span>
+              <div className="flex flex-wrap items-end gap-2">
               <input
                 value={newItemSku}
                 onChange={e => setNewItemSku(e.target.value)}
@@ -362,35 +399,38 @@ const InventoryView: React.FC<InventoryViewProps> = ({
                 placeholder="Комментарий"
                 className="border border-gray-200 dark:border-[#333] rounded-lg px-2 py-1.5 text-xs bg-white dark:bg-[#252525] text-gray-800 dark:text-gray-100 flex-1"
               />
-              <Button variant="primary" size="sm" onClick={handleCreateItem}>
+              <Button variant="primary" size="sm" onClick={handleCreateItem} className="bg-emerald-600 hover:bg-emerald-700">
                 Добавить
               </Button>
+              </div>
             </div>
 
             <div className="flex-1 overflow-auto custom-scrollbar min-h-0">
               {items.length === 0 ? (
-                <div className="h-full flex items-center justify-center text-gray-400 dark:text-gray-500 text-sm">
-                  Номенклатура не создана. Добавьте позиции выше.
+                <div className="h-full min-h-[180px] flex flex-col items-center justify-center text-center px-6 py-10">
+                  <Package className="text-gray-300 dark:text-gray-600 mb-3" size={36} strokeWidth={1.25} />
+                  <p className="text-gray-700 dark:text-gray-300 font-medium">Справочник пуст</p>
+                  <p className="text-sm text-gray-500 mt-1">Заполните поля выше и нажмите «Добавить».</p>
                 </div>
               ) : (
-                <table className="w-full text-left text-xs border-collapse">
-                  <thead className="bg-gray-50 dark:bg-[#2a2a2a] border-b border-gray-200 dark:border-[#333]">
-                    <tr className="text-gray-500 dark:text-gray-400">
-                      <th className="px-4 py-2 font-medium w-32">Код</th>
-                      <th className="px-4 py-2 font-medium">Название</th>
-                      <th className="px-4 py-2 font-medium w-24">Ед. изм.</th>
-                      <th className="px-4 py-2 font-medium w-32">Категория</th>
-                      <th className="px-4 py-2 font-medium">Комментарий</th>
+                <table className="w-full text-left text-sm border-collapse">
+                  <thead className="bg-gray-50 dark:bg-[#252525] border-b border-gray-200 dark:border-[#333] sticky top-0">
+                    <tr className="text-gray-500 dark:text-gray-400 text-xs uppercase tracking-wide">
+                      <th className="px-4 py-3 font-semibold w-32">Код</th>
+                      <th className="px-4 py-3 font-semibold">Название</th>
+                      <th className="px-4 py-3 font-semibold w-24">Ед. изм.</th>
+                      <th className="px-4 py-3 font-semibold w-36">Категория</th>
+                      <th className="px-4 py-3 font-semibold">Комментарий</th>
                     </tr>
                   </thead>
-                  <tbody>
+                  <tbody className="divide-y divide-gray-100 dark:divide-[#2a2a2a]">
                     {items.filter(item => !item.isArchived).map(item => (
-                      <tr key={item.id} className="border-b border-gray-100 dark:border-[#333] last:border-0">
-                        <td className="px-4 py-2 text-gray-500 dark:text-gray-400">{item.sku}</td>
-                        <td className="px-4 py-2 text-gray-800 dark:text-gray-100">{item.name}</td>
-                        <td className="px-4 py-2 text-gray-500 dark:text-gray-400">{item.unit}</td>
-                        <td className="px-4 py-2 text-gray-500 dark:text-gray-400">{item.category}</td>
-                        <td className="px-4 py-2 text-gray-500 dark:text-gray-400">{item.notes}</td>
+                      <tr key={item.id} className="hover:bg-slate-50/80 dark:hover:bg-[#222] transition-colors">
+                        <td className="px-4 py-3 text-gray-500 dark:text-gray-400 font-mono text-xs">{item.sku}</td>
+                        <td className="px-4 py-3 text-gray-900 dark:text-gray-100 font-medium">{item.name}</td>
+                        <td className="px-4 py-3 text-gray-600 dark:text-gray-400">{item.unit}</td>
+                        <td className="px-4 py-3 text-gray-600 dark:text-gray-400">{item.category || '—'}</td>
+                        <td className="px-4 py-3 text-gray-500 dark:text-gray-500 text-xs">{item.notes || '—'}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -402,112 +442,145 @@ const InventoryView: React.FC<InventoryViewProps> = ({
 
         {activeTab === 'movements' && (
           <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
-            <div className="border-b border-gray-100 dark:border-[#333] px-4 py-3 flex flex-wrap items-center gap-3 shrink-0">
-              <span className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase">Новая операция</span>
-              <select
-                value={movementType}
-                onChange={e => setMovementType(e.target.value as any)}
-                className="border border-gray-200 dark:border-[#333] rounded-lg px-2 py-1.5 text-xs bg-white dark:bg-[#252525] text-gray-800 dark:text-gray-100"
-              >
-                <option value="receipt">Оприходование</option>
-                <option value="transfer">Перемещение</option>
-                <option value="writeoff">Списание</option>
-                <option value="adjustment">Корректировка</option>
-              </select>
-              {movementType !== 'receipt' && movementType !== 'adjustment' && (
-                <select
-                  value={fromWarehouseId}
-                  onChange={e => setFromWarehouseId(e.target.value)}
-                  className="border border-gray-200 dark:border-[#333] rounded-lg px-2 py-1.5 text-xs bg-white dark:bg-[#252525] text-gray-800 dark:text-gray-100 min-w-[160px]"
-                >
-                  <option value="">Со склада</option>
-                  {warehouses.filter(w => !w.isArchived).map(w => (
-                    <option key={w.id} value={w.id}>
-                      {w.name}
-                    </option>
-                  ))}
-                </select>
-              )}
-              {movementType !== 'writeoff' && (
-                <select
-                  value={toWarehouseId}
-                  onChange={e => setToWarehouseId(e.target.value)}
-                  className="border border-gray-200 dark:border-[#333] rounded-lg px-2 py-1.5 text-xs bg-white dark:bg-[#252525] text-gray-800 dark:text-gray-100 min-w-[160px]"
-                >
-                  <option value="">На склад</option>
-                  {warehouses.filter(w => !w.isArchived).map(w => (
-                    <option key={w.id} value={w.id}>
-                      {w.name}
-                    </option>
-                  ))}
-                </select>
-              )}
-              <select
-                value={movementItemId}
-                onChange={e => setMovementItemId(e.target.value)}
-                className="border border-gray-200 dark:border-[#333] rounded-lg px-2 py-1.5 text-xs bg-white dark:bg-[#252525] text-gray-800 dark:text-gray-100 min-w-[200px]"
-              >
-                <option value="">Номенклатура</option>
-                  {items.filter(i => !i.isArchived).map(i => (
-                    <option key={i.id} value={i.id}>
-                      {i.name}
-                    </option>
-                  ))}
-              </select>
-              <input
-                value={movementQty}
-                onChange={e => setMovementQty(e.target.value)}
-                placeholder={movementType === 'adjustment' ? '± Кол-во' : 'Кол-во'}
-                className="border border-gray-200 dark:border-[#333] rounded-lg px-2 py-1.5 text-xs bg-white dark:bg-[#252525] text-gray-800 dark:text-gray-100 w-24"
-              />
-              <input
-                value={movementReason}
-                onChange={e => setMovementReason(e.target.value)}
-                placeholder="Комментарий"
-                className="border border-gray-200 dark:border-[#333] rounded-lg px-2 py-1.5 text-xs bg-white dark:bg-[#252525] text-gray-800 dark:text-gray-100 flex-1"
-              />
-              <Button variant="primary" size="sm" onClick={handleCreateMovement}>
-                Провести
-              </Button>
+            <div className="border-b border-gray-100 dark:border-[#2a2a2a] px-4 sm:px-5 py-4 shrink-0 bg-slate-50/80 dark:bg-[#141414] space-y-4">
+              <div>
+                <span className="text-[11px] font-bold uppercase tracking-wide text-gray-500 dark:text-gray-400">Новая операция</span>
+                <div className="mt-2 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
+                  <label className="flex flex-col gap-1.5">
+                    <span className="text-xs text-gray-600 dark:text-gray-400">Тип</span>
+                    <select
+                      value={movementType}
+                      onChange={e => setMovementType(e.target.value as 'receipt' | 'transfer' | 'writeoff' | 'adjustment')}
+                      className="rounded-xl border border-gray-200 dark:border-[#333] px-3 py-2 text-sm bg-white dark:bg-[#252525] text-gray-800 dark:text-gray-100 focus:ring-2 focus:ring-emerald-500/25 outline-none"
+                    >
+                      <option value="receipt">Оприходование</option>
+                      <option value="transfer">Перемещение</option>
+                      <option value="writeoff">Списание</option>
+                      <option value="adjustment">Корректировка</option>
+                    </select>
+                  </label>
+                  {movementType !== 'receipt' && movementType !== 'adjustment' && (
+                    <label className="flex flex-col gap-1.5">
+                      <span className="text-xs text-gray-600 dark:text-gray-400">Со склада</span>
+                      <select
+                        value={fromWarehouseId}
+                        onChange={e => setFromWarehouseId(e.target.value)}
+                        className="rounded-xl border border-gray-200 dark:border-[#333] px-3 py-2 text-sm bg-white dark:bg-[#252525] text-gray-800 dark:text-gray-100 focus:ring-2 focus:ring-emerald-500/25 outline-none"
+                      >
+                        <option value="">Выберите</option>
+                        {warehouses.filter(w => !w.isArchived).map(w => (
+                          <option key={w.id} value={w.id}>
+                            {w.name}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  )}
+                  {movementType !== 'writeoff' && (
+                    <label className="flex flex-col gap-1.5">
+                      <span className="text-xs text-gray-600 dark:text-gray-400">На склад</span>
+                      <select
+                        value={toWarehouseId}
+                        onChange={e => setToWarehouseId(e.target.value)}
+                        className="rounded-xl border border-gray-200 dark:border-[#333] px-3 py-2 text-sm bg-white dark:bg-[#252525] text-gray-800 dark:text-gray-100 focus:ring-2 focus:ring-emerald-500/25 outline-none"
+                      >
+                        <option value="">Выберите</option>
+                        {warehouses.filter(w => !w.isArchived).map(w => (
+                          <option key={w.id} value={w.id}>
+                            {w.name}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  )}
+                  <label className="flex flex-col gap-1.5 md:col-span-2 lg:col-span-1">
+                    <span className="text-xs text-gray-600 dark:text-gray-400">Номенклатура</span>
+                    <select
+                      value={movementItemId}
+                      onChange={e => setMovementItemId(e.target.value)}
+                      className="rounded-xl border border-gray-200 dark:border-[#333] px-3 py-2 text-sm bg-white dark:bg-[#252525] text-gray-800 dark:text-gray-100 focus:ring-2 focus:ring-emerald-500/25 outline-none"
+                    >
+                      <option value="">Выберите позицию</option>
+                      {items.filter(i => !i.isArchived).map(i => (
+                        <option key={i.id} value={i.id}>
+                          {i.name}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                </div>
+                <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 items-end">
+                  <label className="flex flex-col gap-1.5">
+                    <span className="text-xs text-gray-600 dark:text-gray-400">Количество</span>
+                    <input
+                      value={movementQty}
+                      onChange={e => setMovementQty(e.target.value)}
+                      placeholder={movementType === 'adjustment' ? '± количество' : 'Количество'}
+                      className="rounded-xl border border-gray-200 dark:border-[#333] px-3 py-2 text-sm bg-white dark:bg-[#252525] text-gray-800 dark:text-gray-100 focus:ring-2 focus:ring-emerald-500/25 outline-none"
+                    />
+                  </label>
+                  <label className="flex flex-col gap-1.5 sm:col-span-2">
+                    <span className="text-xs text-gray-600 dark:text-gray-400">Комментарий</span>
+                    <input
+                      value={movementReason}
+                      onChange={e => setMovementReason(e.target.value)}
+                      placeholder="Необязательно"
+                      className="rounded-xl border border-gray-200 dark:border-[#333] px-3 py-2 text-sm bg-white dark:bg-[#252525] text-gray-800 dark:text-gray-100 focus:ring-2 focus:ring-emerald-500/25 outline-none"
+                    />
+                  </label>
+                  <Button variant="primary" size="sm" onClick={handleCreateMovement} className="bg-emerald-600 hover:bg-emerald-700 w-full sm:w-auto h-[42px]">
+                    Провести операцию
+                  </Button>
+                </div>
+              </div>
             </div>
 
             <div className="flex-1 overflow-auto custom-scrollbar min-h-0">
               {movements.length === 0 ? (
-                <div className="h-full flex items-center justify-center text-gray-400 dark:text-gray-500 text-sm">
-                  Журнал пуст. Создайте первую операцию.
+                <div className="h-full min-h-[200px] flex flex-col items-center justify-center text-center px-6 py-12">
+                  <ArrowLeftRight className="text-gray-300 dark:text-gray-600 mb-3" size={40} strokeWidth={1.25} />
+                  <p className="text-gray-700 dark:text-gray-300 font-medium">Журнал движений пуст</p>
+                  <p className="text-sm text-gray-500 mt-1">Проведите первую операцию с помощью формы выше.</p>
                 </div>
               ) : (
-                <table className="w-full text-left text-xs border-collapse">
-                  <thead className="bg-gray-50 dark:bg-[#2a2a2a] border-b border-gray-200 dark:border-[#333]">
-                    <tr className="text-gray-500 dark:text-gray-400">
-                      <th className="px-4 py-2 font-medium w-24">Дата</th>
-                      <th className="px-4 py-2 font-medium w-24">Тип</th>
-                      <th className="px-4 py-2 font-medium w-40">Со склада</th>
-                      <th className="px-4 py-2 font-medium w-40">На склад</th>
-                      <th className="px-4 py-2 font-medium">Описание</th>
+                <table className="w-full text-left text-sm border-collapse">
+                  <thead className="bg-gray-50 dark:bg-[#252525] border-b border-gray-200 dark:border-[#333] sticky top-0">
+                    <tr className="text-gray-500 dark:text-gray-400 text-xs uppercase tracking-wide">
+                      <th className="px-4 py-3 font-semibold w-28">Дата</th>
+                      <th className="px-4 py-3 font-semibold w-36">Тип</th>
+                      <th className="px-4 py-3 font-semibold">Со склада</th>
+                      <th className="px-4 py-3 font-semibold">На склад</th>
+                      <th className="px-4 py-3 font-semibold">Комментарий</th>
                     </tr>
                   </thead>
-                  <tbody>
+                  <tbody className="divide-y divide-gray-100 dark:divide-[#2a2a2a]">
                     {movements
                       .slice()
                       .reverse()
                       .map(m => {
                         const fromWh = m.fromWarehouseId ? warehouses.find(w => w.id === m.fromWarehouseId)?.name : '';
                         const toWh = m.toWarehouseId ? warehouses.find(w => w.id === m.toWarehouseId)?.name : '';
+                        const typeLabel =
+                          m.type === 'receipt'
+                            ? 'Оприходование'
+                            : m.type === 'transfer'
+                              ? 'Перемещение'
+                              : m.type === 'writeoff'
+                                ? 'Списание'
+                                : 'Корректировка';
                         return (
-                          <tr key={m.id} className="border-b border-gray-100 dark:border-[#333] last:border-0">
-                            <td className="px-4 py-2 text-gray-500 dark:text-gray-400">
-                              {new Date(m.date).toLocaleDateString()}
+                          <tr key={m.id} className="hover:bg-slate-50/80 dark:hover:bg-[#222] transition-colors">
+                            <td className="px-4 py-3 text-gray-600 dark:text-gray-400 whitespace-nowrap">
+                              {new Date(m.date).toLocaleDateString('ru-RU')}
                             </td>
-                            <td className="px-4 py-2 text-gray-800 dark:text-gray-100">
-                              {m.type === 'receipt' && 'Оприходование'}
-                              {m.type === 'transfer' && 'Перемещение'}
-                              {m.type === 'writeoff' && 'Списание'}
-                              {m.type === 'adjustment' && 'Корректировка'}
+                            <td className="px-4 py-3">
+                              <span className="inline-flex rounded-lg bg-emerald-50 dark:bg-emerald-950/40 px-2 py-0.5 text-xs font-semibold text-emerald-800 dark:text-emerald-200">
+                                {typeLabel}
+                              </span>
                             </td>
-                            <td className="px-4 py-2 text-gray-500 dark:text-gray-400">{fromWh}</td>
-                            <td className="px-4 py-2 text-gray-500 dark:text-gray-400">{toWh}</td>
-                            <td className="px-4 py-2 text-gray-500 dark:text-gray-400">{m.reason}</td>
+                            <td className="px-4 py-3 text-gray-600 dark:text-gray-400">{fromWh || '—'}</td>
+                            <td className="px-4 py-3 text-gray-600 dark:text-gray-400">{toWh || '—'}</td>
+                            <td className="px-4 py-3 text-gray-500 dark:text-gray-500 text-xs">{m.reason || '—'}</td>
                           </tr>
                         );
                       })}
@@ -520,16 +593,20 @@ const InventoryView: React.FC<InventoryViewProps> = ({
 
         {activeTab === 'revisions' && (
           <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
-            <div className="border-b border-gray-100 dark:border-[#333] px-4 py-3 flex flex-wrap items-center gap-3 shrink-0">
-              <span className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase">Ревизии</span>
+            <div className="border-b border-gray-100 dark:border-[#2a2a2a] px-4 sm:px-5 py-4 flex flex-wrap items-center justify-between gap-3 shrink-0 bg-emerald-50/30 dark:bg-emerald-950/20">
+              <div>
+                <span className="text-[11px] font-bold uppercase tracking-wide text-emerald-800/90 dark:text-emerald-300">Инвентаризация</span>
+                <p className="text-xs text-gray-600 dark:text-gray-400 mt-0.5">Сначала выберите склад на вкладке «Остатки», затем создайте ревизию</p>
+              </div>
               {onCreateRevision && (
                 <Button
                   variant="primary"
                   size="sm"
                   icon={Plus}
+                  className="bg-emerald-600 hover:bg-emerald-700"
                   onClick={() => {
                     const whId = selectedWarehouseId || filteredWarehouses[0]?.id;
-                    if (!whId) { alert('Выберите склад'); return; }
+                    if (!whId) { alert('Выберите склад на вкладке «Остатки» или создайте склад'); return; }
                     onCreateRevision({ warehouseId: whId, date: new Date().toISOString().slice(0, 10), createdByUserId: currentUserId });
                   }}
                 >
@@ -537,10 +614,12 @@ const InventoryView: React.FC<InventoryViewProps> = ({
                 </Button>
               )}
             </div>
-            <div className="flex-1 overflow-auto custom-scrollbar min-h-0 p-4">
+            <div className="flex-1 overflow-auto custom-scrollbar min-h-0 p-4 sm:p-5">
               {revisions.length === 0 ? (
-                <div className="flex items-center justify-center text-gray-400 dark:text-gray-500 text-sm py-8">
-                  Ревизий нет. Создайте ревизию по кнопке выше (выберите склад в фильтре «Склад» на вкладке Остатки).
+                <div className="flex flex-col items-center justify-center text-center py-12 px-4 rounded-2xl border border-dashed border-gray-200 dark:border-[#333] bg-slate-50/50 dark:bg-[#141414]">
+                  <ClipboardCheck className="text-gray-300 dark:text-gray-600 mb-3" size={40} strokeWidth={1.25} />
+                  <p className="text-gray-700 dark:text-gray-300 font-medium">Ревизий пока нет</p>
+                  <p className="text-sm text-gray-500 dark:text-gray-500 mt-1 max-w-md">Укажите склад на вкладке «Остатки» и нажмите «Новая ревизия».</p>
                 </div>
               ) : (
                 <div className="space-y-4">
@@ -549,8 +628,8 @@ const InventoryView: React.FC<InventoryViewProps> = ({
                     const isDraft = rev.status === 'draft';
                     const isEditing = editingRevisionId === rev.id;
                     return (
-                      <div key={rev.id} className="border border-gray-200 dark:border-[#333] rounded-xl overflow-hidden bg-white dark:bg-[#252525]">
-                        <div className="px-4 py-2 bg-gray-50 dark:bg-[#2a2a2a] flex items-center justify-between flex-wrap gap-2">
+                      <div key={rev.id} className="border border-gray-200 dark:border-[#333] rounded-2xl overflow-hidden bg-white dark:bg-[#1e1e1e] shadow-sm">
+                        <div className="px-4 py-3 bg-gradient-to-r from-slate-50 to-white dark:from-[#252525] dark:to-[#1e1e1e] flex items-center justify-between flex-wrap gap-2 border-b border-gray-100 dark:border-[#333]">
                           <span className="font-medium text-sm text-gray-800 dark:text-gray-100">{rev.number}</span>
                           <span className="text-xs text-gray-500 dark:text-gray-400">{wh?.name || rev.warehouseId} · {new Date(rev.date).toLocaleDateString()}</span>
                           <span className={`text-xs px-2 py-0.5 rounded ${rev.status === 'posted' ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300' : 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300'}`}>

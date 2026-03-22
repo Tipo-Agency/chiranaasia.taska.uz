@@ -1,12 +1,11 @@
 
 import React, { useState, useMemo } from 'react';
 import { Doc, Folder, TableCollection, Task, TaskAttachment, User } from '../types';
-import { FileText, Folder as FolderIcon, Plus, LayoutGrid, List as ListIcon, Trash2, ExternalLink, ChevronRight, FolderPlus, X, Save, Box, FileText as FileTextIcon, Paperclip, Image as ImageIcon, Download, File as FileIcon, Edit2 } from 'lucide-react';
-import { Tabs, Button } from './ui';
+import { FileText, Folder as FolderIcon, Plus, LayoutGrid, List as ListIcon, Trash2, ExternalLink, ChevronRight, FolderPlus, X, Save, Box, FileText as FileTextIcon, Paperclip, Image as ImageIcon, Download, File as FileIcon, Edit2, Calendar, Users } from 'lucide-react';
+import { Tabs, Button, ModuleCreateDropdown } from './ui';
 import { FilePreviewModal } from './FilePreviewModal';
 import { isImageFile } from '../utils/fileUtils';
-import { WeeklyPlansView } from './documents/WeeklyPlansView';
-import { ProtocolsView } from './documents/ProtocolsView';
+import { WeeklyPlansModal, ProtocolsModal } from './documents/PlanningModals';
 
 interface DocumentsViewProps {
   docs: Doc[];
@@ -47,8 +46,10 @@ const DocumentsView: React.FC<DocumentsViewProps> = ({
 }) => {
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [folderPath, setFolderPath] = useState<string[]>([]);
-  const [activeTab, setActiveTab] = useState<'docs' | 'attachments' | 'weekly-plans' | 'protocols'>('docs');
+  const [activeTab, setActiveTab] = useState<'docs' | 'attachments'>('docs');
   const [previewFile, setPreviewFile] = useState<{ url: string; name: string; type: string } | null>(null);
+  const [weeklyPlansModalOpen, setWeeklyPlansModalOpen] = useState(false);
+  const [protocolsModalOpen, setProtocolsModalOpen] = useState(false);
   
   // Modal State
   const [isFolderModalOpen, setIsFolderModalOpen] = useState(false);
@@ -248,52 +249,79 @@ const DocumentsView: React.FC<DocumentsViewProps> = ({
               </p>
             </div>
             {activeTab === 'docs' && (
-              <div className="flex gap-2">
-                {!currentFolderId && (
-                  <button onClick={() => setIsFolderModalOpen(true)} className="hidden sm:flex items-center gap-2 px-3 py-2 bg-white dark:bg-[#252525] border border-gray-200 dark:border-[#333] text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-[#303030] rounded-lg text-sm font-medium transition-colors">
-                    <FolderPlus size={16} /> Папка
-                  </button>
-                )}
-                <button onClick={() => onAddDoc(currentFolderId || undefined)} className="px-4 py-2 rounded-lg bg-yellow-600 text-white text-sm font-medium hover:bg-yellow-700 flex items-center gap-2 shadow-sm">
-                  <Plus size={18} />
-                  <span className="hidden sm:inline">Создать</span>
-                </button>
-              </div>
+              <ModuleCreateDropdown
+                buttonClassName="bg-yellow-600 hover:bg-yellow-700 text-white"
+                items={[
+                  {
+                    id: 'doc',
+                    label: 'Документ',
+                    icon: FileTextIcon,
+                    onClick: () => onAddDoc(currentFolderId || undefined),
+                    iconClassName: 'text-yellow-600 dark:text-yellow-400',
+                  },
+                  ...(!currentFolderId
+                    ? [
+                        {
+                          id: 'folder',
+                          label: 'Папка',
+                          icon: FolderPlus,
+                          onClick: () => setIsFolderModalOpen(true),
+                          iconClassName: 'text-yellow-600 dark:text-yellow-400',
+                        },
+                      ]
+                    : []),
+                ]}
+              />
             )}
           </div>
           
-          {/* Tabs: Документы / Вложения из задач + View Mode Toggle */}
-          <div className="mb-4 flex items-center justify-between gap-4">
-            <Tabs
-                tabs={[
-                    { id: 'docs', label: 'Документы' },
-                    { id: 'attachments', label: 'Вложения' },
-                    { id: 'weekly-plans', label: 'Недельные планы' },
-                    { id: 'protocols', label: 'Протоколы' }
-                ]}
-                activeTab={activeTab}
-                onChange={(tabId) => setActiveTab(tabId as 'docs' | 'attachments' | 'weekly-plans' | 'protocols')}
-            />
-            {activeTab === 'docs' && (
-              <div className="flex items-center gap-2 bg-gray-100 dark:bg-[#252525] rounded-full p-1 text-xs">
-                <button onClick={() => setViewMode('grid')} className={`px-3 py-1.5 rounded-full ${viewMode === 'grid' ? 'bg-white dark:bg-[#191919] text-gray-900 dark:text-white shadow-sm' : 'text-gray-600 dark:text-gray-300'}`}>
-                  Плитка
-                </button>
-                <button onClick={() => setViewMode('list')} className={`px-3 py-1.5 rounded-full ${viewMode === 'list' ? 'bg-white dark:bg-[#191919] text-gray-900 dark:text-white shadow-sm' : 'text-gray-600 dark:text-gray-300'}`}>
-                  Список
-                </button>
-              </div>
-            )}
+          {/* Tabs: Документы / Вложения + планы и протоколы в модалках */}
+          <div className="mb-4 flex flex-col gap-3">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+              <Tabs
+                  tabs={[
+                      { id: 'docs', label: 'Документы' },
+                      { id: 'attachments', label: 'Вложения' },
+                  ]}
+                  activeTab={activeTab}
+                  onChange={(tabId) => setActiveTab(tabId as 'docs' | 'attachments')}
+              />
+              {activeTab === 'docs' && (
+                <div className="flex items-center gap-2 bg-gray-100 dark:bg-[#252525] rounded-full p-1 text-xs self-start sm:self-auto">
+                  <button type="button" onClick={() => setViewMode('grid')} className={`px-3 py-1.5 rounded-full ${viewMode === 'grid' ? 'bg-white dark:bg-[#191919] text-gray-900 dark:text-white shadow-sm' : 'text-gray-600 dark:text-gray-300'}`}>
+                    Плитка
+                  </button>
+                  <button type="button" onClick={() => setViewMode('list')} className={`px-3 py-1.5 rounded-full ${viewMode === 'list' ? 'bg-white dark:bg-[#191919] text-gray-900 dark:text-white shadow-sm' : 'text-gray-600 dark:text-gray-300'}`}>
+                    Список
+                  </button>
+                </div>
+              )}
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => setWeeklyPlansModalOpen(true)}
+                disabled={!currentUser}
+                className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border border-[#3337AD]/30 bg-[#3337AD]/5 dark:bg-[#3337AD]/15 text-[#3337AD] dark:text-[#a8abf0] text-sm font-semibold hover:bg-[#3337AD]/10 dark:hover:bg-[#3337AD]/25 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <Calendar size={18} strokeWidth={2} />
+                Недельные планы
+              </button>
+              <button
+                type="button"
+                onClick={() => setProtocolsModalOpen(true)}
+                className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border border-violet-300/60 dark:border-violet-800/60 bg-violet-50/80 dark:bg-violet-950/30 text-violet-800 dark:text-violet-200 text-sm font-semibold hover:bg-violet-100/80 dark:hover:bg-violet-950/50 transition-colors"
+              >
+                <Users size={18} strokeWidth={2} />
+                Протоколы
+              </button>
+            </div>
           </div>
         </div>
       </div>
       <div className="flex-1 min-h-0 overflow-hidden">
         <div className="max-w-7xl mx-auto w-full px-6 pb-20 h-full overflow-y-auto custom-scrollbar">
-          {activeTab === 'weekly-plans' && currentUser ? (
-            <WeeklyPlansView currentUser={currentUser} tasks={tasks} onOpenTask={onOpenTask} />
-          ) : activeTab === 'protocols' ? (
-            <ProtocolsView users={users} tasks={tasks} onOpenTask={onOpenTask} />
-          ) : activeTab === 'docs' ? (
+          {activeTab === 'docs' ? (
             <>
               {renderBreadcrumbs()}
               {viewMode === 'grid' ? (
@@ -503,6 +531,22 @@ const DocumentsView: React.FC<DocumentsViewProps> = ({
           onClose={() => setPreviewFile(null)}
         />
       )}
+      {currentUser && (
+        <WeeklyPlansModal
+          isOpen={weeklyPlansModalOpen}
+          onClose={() => setWeeklyPlansModalOpen(false)}
+          currentUser={currentUser}
+          tasks={tasks}
+          onOpenTask={onOpenTask}
+        />
+      )}
+      <ProtocolsModal
+        isOpen={protocolsModalOpen}
+        onClose={() => setProtocolsModalOpen(false)}
+        users={users}
+        tasks={tasks}
+        onOpenTask={onOpenTask}
+      />
     </div>
     </>
   );

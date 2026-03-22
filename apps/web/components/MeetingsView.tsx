@@ -1,7 +1,8 @@
 
 import React, { useState, useMemo } from 'react';
 import { Meeting, User, TableCollection, Client, Deal } from '../types';
-import { Calendar, Users, Plus, X, List, LayoutGrid, Clock, Repeat, Check, Trash2, Box, Briefcase, Building2 } from 'lucide-react';
+import { Calendar, Users, X, List, LayoutGrid, Clock, Repeat, Check, Trash2, Box, Briefcase, Building2, CalendarDays } from 'lucide-react';
+import { ModuleCreateDropdown } from './ui';
 import { TaskSelect } from './TaskSelect';
 import { normalizeDateForInput } from '../utils/dateUtils';
 
@@ -181,25 +182,28 @@ const MeetingsView: React.FC<MeetingsViewProps> = ({ meetings = [], users, clien
       for (let i = 1; i <= daysInMonth; i++) days.push(i);
 
       return (
-          <div className="bg-white dark:bg-[#1e1e1e] border border-gray-200 dark:border-[#333] rounded-xl shadow-sm overflow-hidden">
-              <div className="bg-gray-50 dark:bg-[#252525] border-b border-gray-200 dark:border-[#333] p-4 font-semibold text-gray-700 dark:text-gray-200 flex justify-between items-center">
-                  <span className="capitalize">{today.toLocaleString('ru-RU', { month: 'long', year: 'numeric' })}</span>
-                  <div className="flex gap-2 text-xs font-normal text-gray-500 dark:text-gray-400">
-                      <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-blue-500"></span> Встреча</span>
+          <div className="rounded-2xl border border-gray-200 dark:border-[#333] bg-white dark:bg-[#191919] shadow-sm overflow-hidden">
+              <div className="flex flex-wrap items-center justify-between gap-3 border-b border-gray-100 dark:border-[#333] bg-gradient-to-r from-teal-50/90 to-cyan-50/80 dark:from-teal-950/40 dark:to-cyan-950/30 px-5 py-4">
+                  <div className="flex items-center gap-2">
+                    <CalendarDays className="text-teal-600 dark:text-teal-400 shrink-0" size={22} />
+                    <span className="capitalize font-semibold text-gray-900 dark:text-white text-base">
+                      {today.toLocaleString('ru-RU', { month: 'long', year: 'numeric' })}
+                    </span>
                   </div>
+                  <p className="text-xs text-gray-600 dark:text-gray-400">Перетащите встречу на другой день, чтобы перенести</p>
               </div>
               <div className="grid grid-cols-7 border-b border-gray-200 dark:border-[#333] bg-gray-50 dark:bg-[#252525]">
                   {['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'].map(d => (
-                      <div key={d} className="p-2 text-center text-xs font-bold text-gray-400 dark:text-gray-500">{d}</div>
+                      <div key={d} className="p-2.5 text-center text-[11px] font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">{d}</div>
                   ))}
               </div>
-              <div className="grid grid-cols-7 bg-white dark:bg-[#1e1e1e]">
+              <div className="grid grid-cols-7 bg-white dark:bg-[#141414]">
                   {days.map((day, idx) => {
-                      // Safe date generation
                       let dateStr = '';
                       if (day) {
-                          const d = new Date(currentYear, currentMonth, day + 1); // +1 to fix offset issue often seen
-                          dateStr = d.toISOString().split('T')[0];
+                          const mm = String(currentMonth + 1).padStart(2, '0');
+                          const dd = String(day).padStart(2, '0');
+                          dateStr = `${currentYear}-${mm}-${dd}`;
                       }
 
                       const dayMeetings = day ? filteredMeetings.filter(m => {
@@ -212,13 +216,13 @@ const MeetingsView: React.FC<MeetingsViewProps> = ({ meetings = [], users, clien
                       return (
                         <div 
                             key={idx} 
-                            className={`min-h-[100px] border-r border-b border-gray-100 dark:border-[#333] p-2 transition-colors ${!day ? 'bg-gray-50/30 dark:bg-[#1a1a1a]' : 'hover:bg-gray-50/50 dark:hover:bg-[#2a2a2a]'}`}
+                            className={`min-h-[108px] border-r border-b border-gray-100 dark:border-[#2a2a2a] p-1.5 transition-colors ${!day ? 'bg-gray-50/40 dark:bg-[#0f0f0f]' : 'hover:bg-teal-50/30 dark:hover:bg-teal-950/20'}`}
                             onDragOver={day ? onDragOver : undefined}
                             onDrop={day ? (e) => onDrop(e, dateStr) : undefined}
                         >
                             {day && (
                                 <>
-                                    <div className="text-right text-xs text-gray-400 mb-1">{day}</div>
+                                    <div className={`text-right text-xs font-semibold mb-1.5 px-0.5 ${new Date().toDateString() === new Date(currentYear, currentMonth, day).toDateString() ? 'text-teal-600 dark:text-teal-400' : 'text-gray-500 dark:text-gray-500'}`}>{day}</div>
                                     <div className="space-y-1">
                                         {dayMeetings.map(m => (
                                             <div 
@@ -226,10 +230,10 @@ const MeetingsView: React.FC<MeetingsViewProps> = ({ meetings = [], users, clien
                                                 draggable
                                                 onDragStart={(e) => onDragStart(e, m.id)}
                                                 onClick={(e) => { e.stopPropagation(); handleOpenEdit(m); }}
-                                                className="text-[10px] bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 px-1.5 py-1 rounded border border-blue-100 dark:border-blue-800 truncate cursor-pointer shadow-sm hover:bg-blue-100 dark:hover:bg-blue-900/50" 
+                                                className="text-[10px] leading-tight bg-white dark:bg-teal-950/50 text-teal-900 dark:text-teal-100 px-1.5 py-1.5 rounded-lg border border-teal-200/80 dark:border-teal-800 truncate cursor-pointer shadow-sm hover:border-teal-400 dark:hover:border-teal-600" 
                                                 title={m.title}
                                             >
-                                                {m.time} {m.title}
+                                                <span className="font-semibold opacity-80">{m.time}</span> {m.title}
                                             </div>
                                         ))}
                                     </div>
@@ -243,127 +247,181 @@ const MeetingsView: React.FC<MeetingsViewProps> = ({ meetings = [], users, clien
       );
   };
 
+  const upcomingCount = filteredMeetings.filter(m => new Date(m.date) >= new Date(new Date().toDateString())).length;
+
   return (
-    <div className="h-full flex flex-col min-h-0">
-      <div className="max-w-7xl mx-auto w-full pt-8 px-6 flex-shrink-0">
-        <div className="mb-6">
-          <div className="flex justify-between items-center mb-4">
-            <div>
-              <h1 className="text-lg md:text-2xl font-bold text-gray-800 dark:text-white truncate">Встречи</h1>
-              <p className="hidden md:block text-xs text-gray-500 dark:text-gray-400 mt-1">
-                Управление встречами и планерками
-              </p>
+    <div className="h-full flex flex-col min-h-0 bg-gray-50/50 dark:bg-[#141414]">
+      <div className="max-w-7xl mx-auto w-full pt-6 md:pt-8 px-4 sm:px-6 flex-shrink-0">
+        <div className="mb-5">
+          <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mb-5">
+            <div className="flex items-start gap-3 min-w-0">
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-teal-500 to-cyan-600 text-white shadow-lg shadow-teal-500/20">
+                <CalendarDays size={24} strokeWidth={2} />
+              </div>
+              <div className="min-w-0">
+                <h1 className="text-xl md:text-2xl font-bold text-gray-900 dark:text-white tracking-tight">Встречи</h1>
+                <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
+                  Планирование, календарь и итоги переговоров
+                </p>
+                <div className="flex flex-wrap gap-2 mt-3">
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-white dark:bg-[#252525] border border-gray-200 dark:border-[#333] px-3 py-1 text-xs font-medium text-gray-700 dark:text-gray-200">
+                    <Users size={12} className="text-teal-600" />
+                    Всего: <strong>{filteredMeetings.length}</strong>
+                  </span>
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-teal-50 dark:bg-teal-950/50 border border-teal-100 dark:border-teal-900 px-3 py-1 text-xs font-medium text-teal-800 dark:text-teal-200">
+                    Ближайшие: <strong>{upcomingCount}</strong>
+                  </span>
+                </div>
+              </div>
             </div>
-            <button 
-              onClick={handleOpenCreate}
-              className="px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 flex items-center gap-2 shadow-sm"
-            >
-              <Plus size={18} />
-              <span className="hidden sm:inline">Создать</span>
-            </button>
+            <ModuleCreateDropdown
+              buttonClassName="bg-teal-600 hover:bg-teal-700 text-white shrink-0"
+              items={[
+                {
+                  id: 'meeting',
+                  label: 'Новая встреча',
+                  icon: Calendar,
+                  onClick: handleOpenCreate,
+                  iconClassName: 'text-teal-600 dark:text-teal-400',
+                },
+              ]}
+            />
           </div>
           
-          {/* Filters and View Mode */}
-          <div className="flex items-center justify-between gap-4 mb-4">
-            {/* Type Filter */}
-            <div className="flex items-center gap-2 bg-gray-100 dark:bg-[#252525] rounded-full p-1 text-xs">
+          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
+            <div className="flex flex-wrap items-center gap-1.5 rounded-2xl bg-white dark:bg-[#1a1a1a] border border-gray-200 dark:border-[#333] p-1 shadow-sm">
+              <span className="pl-3 pr-1 text-[10px] font-bold uppercase tracking-wider text-gray-400 hidden sm:inline">Тип</span>
               <button 
+                type="button"
                 onClick={() => setMeetingTypeFilter('all')} 
-                className={`px-3 py-1.5 rounded-full ${meetingTypeFilter === 'all' ? 'bg-white dark:bg-[#191919] text-gray-900 dark:text-white shadow-sm' : 'text-gray-600 dark:text-gray-300'}`}
+                className={`px-3 py-2 rounded-xl text-sm font-medium transition-colors ${meetingTypeFilter === 'all' ? 'bg-gray-900 dark:bg-white text-white dark:text-gray-900 shadow-sm' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-[#252525]'}`}
               >
                 Все
               </button>
               <button 
+                type="button"
                 onClick={() => setMeetingTypeFilter('client')} 
-                className={`px-3 py-1.5 rounded-full ${meetingTypeFilter === 'client' ? 'bg-white dark:bg-[#191919] text-gray-900 dark:text-white shadow-sm' : 'text-gray-600 dark:text-gray-300'}`}
+                className={`px-3 py-2 rounded-xl text-sm font-medium transition-colors ${meetingTypeFilter === 'client' ? 'bg-gray-900 dark:bg-white text-white dark:text-gray-900 shadow-sm' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-[#252525]'}`}
               >
                 С клиентами
               </button>
               <button 
+                type="button"
                 onClick={() => setMeetingTypeFilter('work')} 
-                className={`px-3 py-1.5 rounded-full ${meetingTypeFilter === 'work' ? 'bg-white dark:bg-[#191919] text-gray-900 dark:text-white shadow-sm' : 'text-gray-600 dark:text-gray-300'}`}
+                className={`px-3 py-2 rounded-xl text-sm font-medium transition-colors ${meetingTypeFilter === 'work' ? 'bg-gray-900 dark:bg-white text-white dark:text-gray-900 shadow-sm' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-[#252525]'}`}
               >
                 Рабочие
               </button>
             </div>
             
-            {/* View Mode Tabs */}
-            <div className="flex items-center gap-2 bg-gray-100 dark:bg-[#252525] rounded-full p-1 text-xs">
-              <button onClick={() => setViewMode('list')} className={`px-3 py-1.5 rounded-full ${viewMode === 'list' ? 'bg-white dark:bg-[#191919] text-gray-900 dark:text-white shadow-sm' : 'text-gray-600 dark:text-gray-300'}`}>
-                Список
+            <div className="flex items-center gap-1.5 rounded-2xl bg-white dark:bg-[#1a1a1a] border border-gray-200 dark:border-[#333] p-1 shadow-sm self-start">
+              <button
+                type="button"
+                onClick={() => setViewMode('list')}
+                className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-colors ${viewMode === 'list' ? 'bg-teal-600 text-white shadow-sm' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-[#252525]'}`}
+              >
+                <List size={16} /> Список
               </button>
-              <button onClick={() => setViewMode('calendar')} className={`px-3 py-1.5 rounded-full ${viewMode === 'calendar' ? 'bg-white dark:bg-[#191919] text-gray-900 dark:text-white shadow-sm' : 'text-gray-600 dark:text-gray-300'}`}>
-                Календарь
+              <button
+                type="button"
+                onClick={() => setViewMode('calendar')}
+                className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-colors ${viewMode === 'calendar' ? 'bg-teal-600 text-white shadow-sm' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-[#252525]'}`}
+              >
+                <LayoutGrid size={16} /> Календарь
               </button>
             </div>
           </div>
         </div>
       </div>
       <div className="flex-1 min-h-0 overflow-hidden">
-        <div className="max-w-7xl mx-auto w-full px-6 pb-20 h-full overflow-y-auto custom-scrollbar">
+        <div className="max-w-7xl mx-auto w-full px-4 sm:px-6 pb-20 h-full overflow-y-auto custom-scrollbar">
       {viewMode === 'calendar' ? renderCalendar() : (
         <div className="grid gap-4">
             {filteredMeetings.length === 0 ? (
-                <div className="text-center py-12 bg-gray-50 dark:bg-[#1e1e1e] border border-dashed border-gray-200 dark:border-gray-700 rounded-xl">
-                    <p className="text-gray-500 dark:text-gray-400">Пока нет запланированных встреч.</p>
+                <div className="rounded-2xl border-2 border-dashed border-gray-200 dark:border-[#333] bg-white dark:bg-[#1a1a1a] px-8 py-16 text-center">
+                    <CalendarDays className="mx-auto text-gray-300 dark:text-gray-600 mb-4" size={48} strokeWidth={1.25} />
+                    <p className="text-gray-800 dark:text-gray-200 font-semibold text-lg">Нет встреч по фильтру</p>
+                    <p className="text-gray-500 dark:text-gray-400 text-sm mt-2 max-w-md mx-auto">Создайте встречу с клиентом или планёрку с командой — всё будет в списке и в календаре.</p>
+                    <button
+                      type="button"
+                      onClick={handleOpenCreate}
+                      className="mt-6 inline-flex items-center gap-2 rounded-xl bg-teal-600 hover:bg-teal-700 text-white text-sm font-semibold px-5 py-2.5 shadow-sm"
+                    >
+                      <Calendar size={16} /> Запланировать встречу
+                    </button>
                 </div>
             ) : (
-                filteredMeetings.map(meeting => (
-                    <div key={meeting.id} className="bg-white dark:bg-[#252525] border border-gray-200 dark:border-gray-700 rounded-xl p-5 shadow-sm hover:shadow-md transition-shadow relative">
+                filteredMeetings.map(meeting => {
+                  const d = new Date(meeting.date);
+                  const dayNum = d.getDate();
+                  const monthShort = d.toLocaleString('ru-RU', { month: 'short' });
+                  return (
+                    <div
+                      key={meeting.id}
+                      className="group relative overflow-hidden rounded-2xl border border-gray-200 dark:border-[#333] bg-white dark:bg-[#1a1a1a] shadow-sm transition-all hover:shadow-md hover:border-teal-300/60 dark:hover:border-teal-800"
+                    >
                         {showAll && (
-                            <div className="absolute top-4 right-4 text-[10px] bg-gray-100 dark:bg-[#333] text-gray-500 dark:text-gray-400 px-2 py-0.5 rounded-full flex items-center gap-1">
+                            <div className="absolute top-3 right-3 z-10 text-[10px] bg-gray-100/95 dark:bg-[#252525] text-gray-600 dark:text-gray-300 px-2 py-1 rounded-lg flex items-center gap-1 border border-gray-200 dark:border-[#444]">
                                 <Box size={10} /> {getTableName(meeting.tableId)}
                             </div>
                         )}
-                        <div className="flex justify-between items-start mb-4">
-                            <div className="flex-1 cursor-pointer" onClick={() => handleOpenEdit(meeting)}>
-                                <div className="flex items-center gap-2 mb-1">
-                                    {meeting.type === 'client' ? (
-                                        <Briefcase size={16} className="text-blue-500" />
-                                    ) : (
-                                        <Building2 size={16} className="text-purple-500" />
+                        <div className="flex flex-col sm:flex-row sm:items-stretch">
+                          <div className="flex sm:flex-col items-center justify-center gap-0.5 px-5 py-4 sm:py-5 bg-gradient-to-br from-teal-500/12 to-cyan-500/10 dark:from-teal-900/40 dark:to-cyan-950/30 border-b sm:border-b-0 sm:border-r border-gray-100 dark:border-[#333] min-w-[100px] shrink-0">
+                            <span className="text-3xl font-bold tabular-nums text-teal-700 dark:text-teal-300 leading-none">{dayNum}</span>
+                            <span className="text-[11px] font-semibold uppercase tracking-wide text-teal-600/90 dark:text-teal-400/90">{monthShort}</span>
+                          </div>
+                          <div className="flex-1 p-4 sm:p-5 min-w-0">
+                        <div className="flex justify-between items-start gap-3">
+                            <div className="flex-1 cursor-pointer min-w-0" onClick={() => handleOpenEdit(meeting)}>
+                                <div className="flex flex-wrap items-center gap-2 mb-2">
+                                    <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-wide ${
+                                      meeting.type === 'client'
+                                        ? 'bg-sky-100 text-sky-800 dark:bg-sky-900/40 dark:text-sky-200'
+                                        : 'bg-violet-100 text-violet-800 dark:bg-violet-900/40 dark:text-violet-200'
+                                    }`}>
+                                    {meeting.type === 'client' ? <Briefcase size={12} /> : <Building2 size={12} />}
+                                    {meeting.type === 'client' ? 'С клиентом' : 'Рабочая'}
+                                    </span>
+                                    {meeting.recurrence && meeting.recurrence !== 'none' && (
+                                        <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 dark:bg-amber-950/40 text-amber-800 dark:text-amber-200 px-2 py-0.5 text-[11px] font-medium">
+                                            <Repeat size={10} /> {meeting.recurrence === 'daily' ? 'Каждый день' : meeting.recurrence === 'weekly' ? 'Раз в неделю' : 'Раз в месяц'}
+                                        </span>
                                     )}
-                                    <span className="text-xs text-gray-500 dark:text-gray-400 uppercase font-semibold">
-                                        {meeting.type === 'client' ? 'С клиентом' : 'Рабочая встреча'}
+                                </div>
+                                <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-2 group-hover:text-teal-700 dark:group-hover:text-teal-300 transition-colors">
+                                    {meeting.title}
+                                </h3>
+                                {meeting.type === 'client' && meeting.dealId && (
+                                        <span className="inline-block mb-2 text-xs bg-sky-50 dark:bg-sky-900/40 text-sky-700 dark:text-sky-200 px-2 py-1 rounded-lg border border-sky-100 dark:border-sky-800">
+                                            Сделка: {deals.find(d => d.id === meeting.dealId)?.title || '—'}
+                                        </span>
+                                    )}
+                                <div className="flex flex-wrap items-center gap-2 text-sm text-gray-600 dark:text-gray-300">
+                                    <span className="inline-flex items-center gap-1.5 rounded-lg bg-gray-100 dark:bg-[#252525] px-2.5 py-1 text-xs font-medium">
+                                      <Clock size={14} className="text-gray-400" /> {meeting.time}
                                     </span>
                                 </div>
-                                <h3 className="text-lg font-bold text-gray-800 dark:text-white mb-1 flex items-center gap-2 hover:text-blue-600 dark:hover:text-blue-400 transition-colors">
-                                    {meeting.title}
-                                    {meeting.type === 'client' && meeting.dealId && (
-                                        <span className="text-xs bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-300 px-2 py-0.5 rounded border border-blue-100 dark:border-blue-800">
-                                            {deals.find(d => d.id === meeting.dealId)?.title || 'Сделка'}
-                                        </span>
-                                    )}
-                                    {meeting.recurrence && meeting.recurrence !== 'none' && (
-                                        <span className="text-[10px] bg-purple-50 dark:bg-purple-900/30 text-purple-600 dark:text-purple-300 px-1.5 py-0.5 rounded border border-purple-100 dark:border-purple-800 flex items-center gap-1 capitalize">
-                                            <Repeat size={10} className="text-purple-600 dark:text-purple-300"/> {meeting.recurrence === 'daily' ? 'Ежедневно' : meeting.recurrence === 'weekly' ? 'Еженедельно' : 'Ежемесячно'}
-                                        </span>
-                                    )}
-                                </h3>
-                                <div className="flex items-center gap-3 text-sm text-gray-500 dark:text-gray-400">
-                                    <span className="flex items-center gap-1 bg-gray-50 dark:bg-[#303030] border border-gray-200 dark:border-gray-600 px-2 py-0.5 rounded text-xs"><Calendar size={12} className="text-gray-500 dark:text-gray-400"/> {new Date(meeting.date).toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric' }).replace(/\//g, '.')}</span>
-                                    <span className="flex items-center gap-1 bg-gray-50 dark:bg-[#303030] border border-gray-200 dark:border-gray-600 px-2 py-0.5 rounded text-xs"><Clock size={12} className="text-gray-500 dark:text-gray-400"/> {meeting.time}</span>
-                                </div>
                             </div>
-                            <div className="flex items-center gap-2">
-                                <div className="flex -space-x-2 mr-2">
+                            <div className="flex items-center gap-2 shrink-0">
+                                <div className="flex -space-x-2">
                                     {(meeting.participantIds || []).map(uid => {
                                         const u = users.find(user => user.id === uid);
                                         if (!u) return null;
                                         return (
-                                            <img key={uid} src={u.avatar} className="w-8 h-8 rounded-full border-2 border-white dark:border-[#252525] object-cover object-center" title={u.name} />
+                                            <img key={uid} src={u.avatar} className="w-9 h-9 rounded-full border-2 border-white dark:border-[#1a1a1a] object-cover object-center ring-2 ring-gray-100 dark:ring-[#333]" title={u.name} alt="" />
                                         );
                                     })}
                                 </div>
                                 {onDeleteMeeting && (
                                     <button
+                                        type="button"
                                         onClick={(e) => {
                                             e.stopPropagation();
                                             if (confirm('Удалить встречу?')) {
                                                 onDeleteMeeting(meeting.id);
                                             }
                                         }}
-                                        className="p-2 text-gray-400 hover:text-red-500 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+                                        className="p-2 text-gray-400 hover:text-red-500 rounded-xl hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
                                         title="Удалить встречу"
                                     >
                                         <Trash2 size={18} />
@@ -372,17 +430,20 @@ const MeetingsView: React.FC<MeetingsViewProps> = ({ meetings = [], users, clien
                             </div>
                         </div>
 
-                        <div className="mt-4" onClick={(e) => e.stopPropagation()}>
-                            <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 uppercase mb-2">Резюме встречи / Итоги</label>
+                        <div className="mt-4 pt-4 border-t border-gray-100 dark:border-[#2a2a2a]" onClick={(e) => e.stopPropagation()}>
+                            <label className="block text-[11px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-2">Итоги и резюме</label>
                             <textarea 
-                                className="w-full bg-gray-50 dark:bg-[#1e1e1e] text-gray-900 dark:text-gray-100 border border-gray-200 dark:border-gray-700 rounded-lg p-3 text-sm focus:ring-2 focus:ring-blue-200 dark:focus:ring-blue-900 outline-none min-h-[100px] resize-y placeholder-gray-400 dark:placeholder-gray-600"
-                                placeholder="Напишите здесь результаты встречи..."
+                                className="w-full rounded-xl border border-gray-200 dark:border-[#333] bg-gray-50/80 dark:bg-[#141414] text-gray-900 dark:text-gray-100 px-3 py-2.5 text-sm focus:ring-2 focus:ring-teal-500/30 focus:border-teal-500/50 outline-none min-h-[96px] resize-y placeholder-gray-400 dark:placeholder-gray-600"
+                                placeholder="Кратко зафиксируйте договорённости и следующие шаги…"
                                 defaultValue={meeting.summary}
                                 onBlur={(e) => onUpdateSummary(meeting.id, e.target.value)}
                             />
                         </div>
+                          </div>
+                        </div>
                     </div>
-                ))
+                  );
+                })
             )}
         </div>
       )}
@@ -411,7 +472,6 @@ const MeetingsView: React.FC<MeetingsViewProps> = ({ meetings = [], users, clien
                                     onClick={() => {
                                         setMeetingType('work');
                                         setRecurrence('none');
-                                        setSelectedClientId('');
                                     }}
                                     className={`px-4 py-3 rounded-lg border-2 transition-all flex items-center gap-2 ${
                                         meetingType === 'work'
@@ -557,7 +617,7 @@ const MeetingsView: React.FC<MeetingsViewProps> = ({ meetings = [], users, clien
                             </button>
                             <button 
                                 type="submit" 
-                                className="px-4 py-2 text-sm font-medium bg-blue-600 text-white hover:bg-blue-700 rounded-lg shadow-sm flex items-center gap-2"
+                                className="px-4 py-2 text-sm font-medium bg-teal-600 text-white hover:bg-teal-700 rounded-lg shadow-sm flex items-center gap-2"
                             >
                                 {editingMeeting ? 'Сохранить' : 'Создать встречу'}
                             </button>
