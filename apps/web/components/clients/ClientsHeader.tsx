@@ -1,6 +1,7 @@
 import React from 'react';
-import { Search, Plus, Filter, Users } from 'lucide-react';
+import { Search, Filter, Users } from 'lucide-react';
 import { Button } from '../ui/Button';
+import { ModuleCreateIconButton } from '../ui/ModuleCreateIconButton';
 import { TaskSelect } from '../TaskSelect';
 import { SalesFunnel } from '../../types';
 import { ModulePageHeader } from '../ui/ModulePageHeader';
@@ -71,9 +72,7 @@ export const ClientsHeader: React.FC<ClientsHeaderProps> = ({
                 )}
               </Button>
             )}
-            <Button variant="primary" size="sm" icon={Plus} onClick={onCreateClick}>
-              <span className="hidden sm:inline">Создать</span>
-            </Button>
+            <ModuleCreateIconButton accent="violet" label="Создать" onClick={onCreateClick} />
           </>
         }
       />

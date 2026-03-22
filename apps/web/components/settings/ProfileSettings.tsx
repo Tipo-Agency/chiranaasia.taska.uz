@@ -1,7 +1,8 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { User, Role } from '../../types';
-import { Camera, Save, AtSign, Mail, Phone, Send, KeyRound, Trash2, Plus, Lock, Upload, User as UserIcon } from 'lucide-react';
+import { Camera, Save, AtSign, Mail, Phone, Send, KeyRound, Trash2, Lock, Upload, User as UserIcon } from 'lucide-react';
+import { ModuleCreateIconButton } from '../ui/ModuleCreateIconButton';
 import { uploadAvatar } from '../../services/localStorageService';
 import { DEFAULT_AVATARS, getDefaultAvatarForId, getRandomDefaultAvatar } from '../../constants/avatars';
 
@@ -319,9 +320,7 @@ export const ProfileSettings: React.FC<ProfileSettingsProps> = ({ currentUser, u
                         <label className="block text-xs font-bold text-gray-500 mb-1">Пароль</label>
                         <input value={newUserPassword} onChange={e => setNewUserPassword(e.target.value)} placeholder="123" className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-4 py-2 text-sm bg-white dark:bg-[#252525] text-gray-900 dark:text-gray-100" />
                     </div>
-                    <button type="submit" className="px-6 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 text-sm shadow-sm flex items-center justify-center gap-2">
-                        <Plus size={16}/> Создать
-                    </button>
+                    <ModuleCreateIconButton type="submit" accent="indigo" label="Создать пользователя" />
                 </form>
             </div>
             <div className="space-y-3">

@@ -2,8 +2,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import { PartnerLogo, News, Case, Tag } from '../../types';
 import { api } from '../../backend/api';
 import { uploadFile } from '../../services/localStorageService';
-import { Plus, Edit2, Trash2, Image as ImageIcon, Globe, Tag as TagIcon, FileText, Briefcase, X, Check, Bold, Italic, Underline, Heading1, Heading2, List, ListOrdered, Quote, Monitor, Smartphone, Eye } from 'lucide-react';
-import { Card, ModulePageShell, ModulePageHeader, ModuleSegmentedControl, MODULE_PAGE_GUTTER } from '../ui';
+import { Edit2, Trash2, Image as ImageIcon, Globe, Tag as TagIcon, FileText, Briefcase, X, Check, Bold, Italic, Underline, Heading1, Heading2, List, ListOrdered, Quote, Monitor, Smartphone, Eye } from 'lucide-react';
+import { Card, ModulePageShell, ModulePageHeader, ModuleSegmentedControl, MODULE_PAGE_GUTTER, ModuleCreateIconButton } from '../ui';
 
 interface SitesViewProps {
   currentUser: any;
@@ -272,13 +272,7 @@ const LogosTab: React.FC<LogosTabProps> = ({ logos, onAdd, onEdit, onDelete, onS
   return (
     <div>
       <div className="flex justify-end mb-4">
-        <button
-          onClick={onAdd}
-          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2"
-        >
-          <Plus size={16} />
-          Добавить логотип
-        </button>
+        <ModuleCreateIconButton accent="sky" label="Добавить логотип" onClick={onAdd} />
       </div>
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {activeLogos.map(logo => (
@@ -437,13 +431,7 @@ const NewsTab: React.FC<NewsTabProps> = ({ news, tags, onAdd, onEdit, onDelete, 
   return (
     <div>
       <div className="flex justify-end mb-4">
-        <button
-          onClick={onAdd}
-          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2"
-        >
-          <Plus size={16} />
-          Добавить новость
-        </button>
+        <ModuleCreateIconButton accent="sky" label="Добавить новость" onClick={onAdd} />
       </div>
       <div className="space-y-4">
         {activeNews.map(item => (
@@ -519,13 +507,7 @@ const CasesTab: React.FC<CasesTabProps> = ({ cases, tags, onAdd, onEdit, onDelet
   return (
     <div>
       <div className="flex justify-end mb-4">
-        <button
-          onClick={onAdd}
-          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2"
-        >
-          <Plus size={16} />
-          Добавить кейс
-        </button>
+        <ModuleCreateIconButton accent="sky" label="Добавить кейс" onClick={onAdd} />
       </div>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {activeCases.map(caseItem => (
@@ -603,13 +585,7 @@ const TagsTab: React.FC<TagsTabProps> = ({ tags, onAdd, onEdit, onDelete, onSave
   return (
     <div>
       <div className="flex justify-end mb-4">
-        <button
-          onClick={onAdd}
-          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2"
-        >
-          <Plus size={16} />
-          Добавить тег
-        </button>
+        <ModuleCreateIconButton accent="sky" label="Добавить тег" onClick={onAdd} />
       </div>
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {activeTags.map(tag => (

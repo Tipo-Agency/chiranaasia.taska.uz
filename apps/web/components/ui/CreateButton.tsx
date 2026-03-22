@@ -1,6 +1,7 @@
 import React from 'react';
-import { Plus, X } from 'lucide-react';
-import { Button } from './Button';
+import { X } from 'lucide-react';
+import { ModuleCreateIconButton } from './ModuleCreateIconButton';
+import type { ModuleAccentKey } from './moduleAccent';
 
 export interface CreateOption {
   id: string;
@@ -13,23 +14,20 @@ export interface CreateOption {
 interface CreateButtonProps {
   options: CreateOption[];
   className?: string;
+  accent?: ModuleAccentKey;
 }
 
-export const CreateButton: React.FC<CreateButtonProps> = ({ options, className = '' }) => {
+export const CreateButton: React.FC<CreateButtonProps> = ({ options, className = '', accent = 'indigo' }) => {
   const [isModalOpen, setIsModalOpen] = React.useState(false);
 
   return (
     <>
-      <Button
-        variant="primary"
-        size="sm"
-        icon={Plus}
+      <ModuleCreateIconButton
+        accent={accent}
+        label="Создать"
         onClick={() => setIsModalOpen(true)}
         className={className}
-      >
-        <span className="hidden sm:inline">Создать</span>
-        <span className="sm:hidden">+</span>
-      </Button>
+      />
 
       {isModalOpen && (
         <div 

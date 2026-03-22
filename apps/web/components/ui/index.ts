@@ -6,6 +6,8 @@ export { ModuleSegmentedControl } from './ModuleSegmentedControl';
 export type { ModuleSegmentOption } from './ModuleSegmentedControl';
 export { MODULE_PAGE_GUTTER } from './moduleAccent';
 export type { ModuleAccentKey } from './moduleAccent';
+export { ModuleCreateIconButton } from './ModuleCreateIconButton';
+export type { ModuleCreateIconButtonProps } from './ModuleCreateIconButton';
 export { Button } from './Button';
 export { Input } from './Input';
 export { Textarea } from './Textarea';

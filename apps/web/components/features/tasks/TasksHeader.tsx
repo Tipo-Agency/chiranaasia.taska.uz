@@ -3,7 +3,8 @@
  */
 import React from 'react';
 import { Button } from '../../ui/Button';
-import { Filter, Plus } from 'lucide-react';
+import { ModuleCreateIconButton } from '../../ui/ModuleCreateIconButton';
+import { Filter } from 'lucide-react';
 import { ModulePageHeader } from '../../ui/ModulePageHeader';
 import { CheckSquare } from 'lucide-react';
 
@@ -43,9 +44,7 @@ export const TasksHeader: React.FC<TasksHeaderProps> = ({
               </span>
             )}
           </Button>
-          <Button variant="primary" size="sm" icon={Plus} onClick={onCreateTask}>
-            <span className="hidden sm:inline">Создать</span>
-          </Button>
+          <ModuleCreateIconButton accent="indigo" label="Новая задача" onClick={onCreateTask} />
         </>
       }
     />

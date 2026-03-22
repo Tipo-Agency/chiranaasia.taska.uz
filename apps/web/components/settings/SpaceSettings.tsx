@@ -1,7 +1,8 @@
 
 import React, { useState } from 'react';
 import { Project, StatusOption, PriorityOption, TableCollection } from '../../types';
-import { Trash2, Plus, Pencil, CheckSquare, FileText, Users, Instagram, Archive, Layers } from 'lucide-react';
+import { Trash2, Pencil, CheckSquare, FileText, Users, Instagram, Archive, Layers } from 'lucide-react';
+import { ModuleCreateIconButton } from '../ui/ModuleCreateIconButton';
 import { LABEL_COLORS, PRIORITY_COLORS, ICON_OPTIONS, COLOR_OPTIONS } from '../../constants';
 import { DynamicIcon } from '../AppIcons';
 
@@ -104,9 +105,7 @@ export const SpaceSettings: React.FC<SpaceSettingsProps> = ({
           <div className="space-y-6 max-w-3xl">
               <div className="flex justify-between items-center mb-4">
                   <h3 className="font-bold text-lg text-gray-800 dark:text-white">Проекты</h3>
-                  <button onClick={onCreateTable} className="px-4 py-2 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 rounded-lg text-sm font-medium flex items-center gap-2 hover:bg-blue-100">
-                      <Plus size={16}/> Создать проект
-                  </button>
+                  <ModuleCreateIconButton accent="indigo" label="Создать проект" onClick={onCreateTable} />
               </div>
               <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
                   Здесь отображаются только проекты внутри модулей (Контент планы, Беклог, Функционал). 

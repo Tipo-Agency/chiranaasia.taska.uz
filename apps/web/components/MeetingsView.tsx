@@ -16,11 +16,10 @@ import {
   CalendarDays,
   ChevronLeft,
   ChevronRight,
-  Plus,
 } from 'lucide-react';
 import { TaskSelect } from './TaskSelect';
 import { normalizeDateForInput } from '../utils/dateUtils';
-import { ModulePageShell, ModulePageHeader, ModuleSegmentedControl, MODULE_PAGE_GUTTER } from './ui';
+import { ModulePageShell, ModulePageHeader, ModuleSegmentedControl, MODULE_PAGE_GUTTER, ModuleCreateIconButton } from './ui';
 
 interface MeetingsViewProps {
   meetings: Meeting[];
@@ -348,15 +347,7 @@ const MeetingsView: React.FC<MeetingsViewProps> = ({ meetings = [], users, clien
             title="Встречи"
             description="Планирование, календарь и итоги переговоров"
             actions={
-              <button
-                type="button"
-                onClick={handleOpenCreate}
-                title="Новая встреча"
-                aria-label="Новая встреча"
-                className="inline-flex items-center justify-center w-11 h-11 rounded-xl bg-teal-600 hover:bg-teal-700 text-white shadow-md shadow-teal-600/20 transition-colors"
-              >
-                <Plus size={22} strokeWidth={2.5} />
-              </button>
+              <ModuleCreateIconButton accent="teal" label="Новая встреча" onClick={handleOpenCreate} />
             }
           />
 

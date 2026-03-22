@@ -2,8 +2,8 @@
  * CreateEntityButton - объединенная кнопка создания сущностей
  */
 import React, { useState, useRef, useEffect } from 'react';
-import { Button } from '../../ui/Button';
-import { Plus, CheckSquare, Briefcase, Network } from 'lucide-react';
+import { ModuleCreateIconButton } from '../../ui/ModuleCreateIconButton';
+import { CheckSquare, Briefcase, Network } from 'lucide-react';
 import { Card } from '../../ui/Card';
 
 interface CreateEntityButtonProps {
@@ -46,15 +46,11 @@ export const CreateEntityButton: React.FC<CreateEntityButtonProps> = ({
       <h2 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3 uppercase">
         Быстрые действия
       </h2>
-      <Button
-        variant="primary"
-        size="md"
-        icon={Plus}
+      <ModuleCreateIconButton
+        accent="indigo"
+        label="Быстрое создание"
         onClick={() => setIsOpen(!isOpen)}
-        className="w-full sm:w-auto min-w-[200px]"
-      >
-        Создать
-      </Button>
+      />
 
       {isOpen && (
         <Card className="absolute top-full left-0 mt-2 w-64 z-50 shadow-xl p-2">

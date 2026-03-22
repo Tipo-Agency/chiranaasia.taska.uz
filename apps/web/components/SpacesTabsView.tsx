@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { TableCollection, User, Role } from '../types';
 import { DynamicIcon } from './AppIcons';
-import { Instagram, Archive, Layers, Plus, Edit2, Trash2, Grid, List } from 'lucide-react';
-import { ModulePageShell, ModulePageHeader, ModuleSegmentedControl, MODULE_PAGE_GUTTER } from './ui';
+import { Instagram, Archive, Layers, Edit2, Trash2, Grid, List } from 'lucide-react';
+import { ModulePageShell, ModulePageHeader, ModuleSegmentedControl, MODULE_PAGE_GUTTER, ModuleCreateIconButton } from './ui';
 
 interface SpacesTabsViewProps {
   tables: TableCollection[];
@@ -80,13 +80,11 @@ export const SpacesTabsView: React.FC<SpacesTabsViewProps> = ({
                 ]}
               />
               {currentUser.role === Role.ADMIN && (
-                <button
-                  type="button"
+                <ModuleCreateIconButton
+                  accent="indigo"
+                  label="Создать пространство"
                   onClick={() => onCreateTable(activeTab)}
-                  className="px-4 py-2 rounded-xl bg-[#3337AD] text-white text-sm font-semibold hover:bg-[#292b8a] flex items-center gap-2 shadow-md"
-                >
-                  <Plus size={18} /> Создать
-                </button>
+                />
               )}
             </>
           }
@@ -106,12 +104,12 @@ export const SpacesTabsView: React.FC<SpacesTabsViewProps> = ({
                 Создайте первое пространство типа "{getTypeLabel(activeTab)}"
               </p>
               {currentUser.role === Role.ADMIN && (
-                <button
+                <ModuleCreateIconButton
+                  accent="indigo"
+                  label="Создать пространство"
                   onClick={() => onCreateTable(activeTab)}
-                  className="px-4 py-2 bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 rounded-lg inline-flex items-center gap-2"
-                >
-                  <Plus size={16} /> Создать пространство
-                </button>
+                  className="mx-auto"
+                />
               )}
             </div>
           ) : viewMode === 'grid' ? (

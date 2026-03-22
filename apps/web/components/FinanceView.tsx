@@ -3,7 +3,7 @@ import React, { useState, useRef, useMemo, useEffect, useCallback } from 'react'
 import { TaskSelect } from './TaskSelect';
 import { FinanceCategory, Fund, FinancePlan, PurchaseRequest, Department, User, Role, FinancialPlanDocument, FinancialPlanning, Bdr } from '../types';
 import { Wallet, Plus, X, Edit2, Trash2, PieChart, TrendingUp, DollarSign, Check, AlertCircle, Calendar, Settings, ArrowLeft, ArrowRight, Save, FileText, Clock, CheckCircle2, ChevronDown } from 'lucide-react';
-import { Tabs, Button, Card, ModulePageShell, ModulePageHeader, MODULE_PAGE_GUTTER } from './ui';
+import { Tabs, Button, Card, ModulePageShell, ModulePageHeader, MODULE_PAGE_GUTTER, ModuleCreateIconButton } from './ui';
 import { BankStatementsView } from './finance/BankStatementsView';
 import { BdrView } from './finance/BdrView';
 import { FilterConfig } from './FiltersPanel';
@@ -447,7 +447,7 @@ const FinanceView: React.FC<FinanceViewProps> = ({
           <div className="bg-white dark:bg-[#252525] border border-gray-200 dark:border-[#333] rounded-xl p-12 text-center">
             <FileText size={48} className="mx-auto text-gray-300 dark:text-gray-600 mb-4" />
             <p className="text-gray-400 dark:text-gray-500 text-sm mb-2">Нет финансовых планирований</p>
-            <p className="text-xs text-gray-400 dark:text-gray-500">Создайте первое планирование через кнопку "Создать"</p>
+            <p className="text-xs text-gray-400 dark:text-gray-500">Создайте первое планирование через кнопку с плюсом в шапке</p>
           </div>
         ) : (
           filteredPlannings.map(planning => {
@@ -833,7 +833,7 @@ const FinanceView: React.FC<FinanceViewProps> = ({
           <div className="bg-white dark:bg-[#252525] border border-gray-200 dark:border-[#333] rounded-xl p-12 text-center">
             <FileText size={48} className="mx-auto text-gray-300 dark:text-gray-600 mb-4" />
             <p className="text-gray-400 dark:text-gray-500 text-sm mb-2">Нет финансовых планов</p>
-            <p className="text-xs text-gray-400 dark:text-gray-500">Создайте первый план через кнопку "Создать"</p>
+            <p className="text-xs text-gray-400 dark:text-gray-500">Создайте первый план через кнопку с плюсом в шапке</p>
           </div>
         ) : (
           filteredPlanDocs.map(planDoc => {
@@ -1483,16 +1483,11 @@ const FinanceView: React.FC<FinanceViewProps> = ({
                             )}
                         </button>
                     )}
-                    <Button
+                    <ModuleCreateIconButton
+                      accent="emerald"
+                      label="Создать"
                       onClick={() => setIsCreateModalOpen(true)}
-                      icon={Plus}
-                      iconPosition="left"
-                      size="md"
-                      className="shrink-0"
-                    >
-                      <span className="hidden sm:inline">Создать</span>
-                      <span className="sm:hidden">+</span>
-                    </Button>
+                    />
                 </div>
               }
             />

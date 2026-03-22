@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { SalesFunnel, FunnelStage, NotificationPreferences } from '../../types';
 import { Plus, X, Edit2, Trash2, GripVertical, Settings, Instagram, MessageSquare, Star } from 'lucide-react';
+import { ModuleCreateIconButton } from '../ui/ModuleCreateIconButton';
 
 interface SalesFunnelsSettingsProps {
     funnels: SalesFunnel[];
@@ -216,12 +217,7 @@ const SalesFunnelsSettings: React.FC<SalesFunnelsSettingsProps> = ({ funnels, on
                         Управление воронками продаж для разных направлений бизнеса
                     </p>
                 </div>
-                <button 
-                    onClick={handleOpenCreate} 
-                    className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 flex items-center gap-2 shadow-sm"
-                >
-                    <Plus size={18} /> Добавить воронку
-                </button>
+                <ModuleCreateIconButton accent="violet" label="Добавить воронку" onClick={handleOpenCreate} />
             </div>
 
             {/* Настройка основной воронки */}

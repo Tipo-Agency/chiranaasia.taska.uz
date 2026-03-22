@@ -9,9 +9,8 @@ import BacklogView from '../BacklogView';
 import MeetingsView from '../MeetingsView';
 import ContentPlanView from '../ContentPlanView';
 import DocumentsView from '../DocumentsView';
-import { AlertCircle, LayoutList, Kanban, BarChart3, ListFilter, EyeOff, Plus, CheckSquare } from 'lucide-react';
-import { Button } from '../ui/Button';
-import { ModulePageShell, ModulePageHeader, ModuleSegmentedControl, MODULE_PAGE_GUTTER } from '../ui';
+import { AlertCircle, LayoutList, Kanban, BarChart3, ListFilter, EyeOff, CheckSquare } from 'lucide-react';
+import { ModulePageShell, ModulePageHeader, ModuleSegmentedControl, MODULE_PAGE_GUTTER, ModuleCreateIconButton } from '../ui';
 
 interface SpaceModuleProps {
   activeTable: TableCollection;
@@ -106,15 +105,11 @@ export const SpaceModule: React.FC<SpaceModuleProps> = ({
                             title="Задачи"
                             description="Управление задачами и проектами"
                             actions={
-                                <Button
-                                    variant="primary"
-                                    size="sm"
-                                    icon={Plus}
+                                <ModuleCreateIconButton
+                                    accent="indigo"
+                                    label="Новая задача"
                                     onClick={() => actions.openTaskModal(null)}
-                                    className="shrink-0"
-                                >
-                                    <span className="hidden sm:inline">Создать</span>
-                                </Button>
+                                />
                             }
                         />
                         <div className="flex flex-wrap items-center justify-between gap-2 md:gap-3">

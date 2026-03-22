@@ -1,8 +1,8 @@
 
 import React, { useState, useEffect } from 'react';
 import { Project, Role, Task, User, StatusOption, PriorityOption, NotificationPreferences, AutomationRule, TableCollection, Deal, Department, FinanceCategory, Fund, SalesFunnel, Doc, ContentPost, EmployeeInfo, Client, Contract, BusinessProcess, Meeting } from '../types';
-import { User as UserIcon, Briefcase, Archive, List, BarChart2, Bell, Zap, Users, Building2, Wallet, TrendingUp, X, Layout, PiggyBank, PlugZap, ShieldAlert, Settings } from 'lucide-react';
-import { ModulePageHeader } from './ui/ModulePageHeader';
+import { User as UserIcon, Briefcase, Archive, List, BarChart2, Bell, Users, Building2, Wallet, TrendingUp, X, PiggyBank, PlugZap, ShieldAlert, Settings } from 'lucide-react';
+import { ModulePageHeader, ModulePageShell, ModuleSegmentedControl, MODULE_PAGE_GUTTER } from './ui';
 import { ProfileSettings } from './settings/ProfileSettings';
 import { SystemLogsSettings } from './settings/SystemLogsSettings';
 import { SpaceSettings } from './settings/SpaceSettings';
@@ -104,38 +104,34 @@ const ArchiveView: React.FC<{
         ));
     };
     
+    const archiveTabOptions = [
+        { id: 'tasks' as const, label: 'Задачи' },
+        { id: 'users' as const, label: 'Пользователи' },
+        { id: 'employees' as const, label: 'Сотрудники' },
+        { id: 'projects' as const, label: 'Проекты' },
+        { id: 'departments' as const, label: 'Подразделения' },
+        { id: 'financeCategories' as const, label: 'Статьи расходов' },
+        { id: 'salesFunnels' as const, label: 'Воронки' },
+        { id: 'tables' as const, label: 'Таблицы' },
+        { id: 'businessProcesses' as const, label: 'Бизнес-процессы' },
+        { id: 'deals' as const, label: 'Сделки' },
+        { id: 'clients' as const, label: 'Клиенты' },
+        { id: 'contracts' as const, label: 'Договоры' },
+        { id: 'docs' as const, label: 'Документы' },
+        { id: 'posts' as const, label: 'Посты' },
+        { id: 'meetings' as const, label: 'Встречи' },
+    ];
+
     return (
         <div className="space-y-4">
-            <h3 className="font-bold text-lg text-gray-800 dark:text-white">Архив</h3>
-            
-            {/* Вкладки внутри архива - используем скролл для большого количества вкладок */}
-            <div className="flex items-center gap-2 bg-gray-100 dark:bg-[#252525] rounded-full p-1 text-xs overflow-x-auto">
-                {[
-                    { id: 'tasks', label: 'Задачи' },
-                    { id: 'users', label: 'Пользователи' },
-                    { id: 'employees', label: 'Сотрудники' },
-                    { id: 'projects', label: 'Проекты' },
-                    { id: 'departments', label: 'Подразделения' },
-                    { id: 'financeCategories', label: 'Статьи расходов' },
-                    { id: 'salesFunnels', label: 'Воронки' },
-                    { id: 'tables', label: 'Таблицы' },
-                    { id: 'businessProcesses', label: 'Бизнес-процессы' },
-                    { id: 'deals', label: 'Сделки' },
-                    { id: 'clients', label: 'Клиенты' },
-                    { id: 'contracts', label: 'Договоры' },
-                    { id: 'docs', label: 'Документы' },
-                    { id: 'posts', label: 'Посты' },
-                    { id: 'meetings', label: 'Встречи' },
-                ].map(tab => (
-                    <button 
-                        key={tab.id}
-                        onClick={() => setArchiveTab(tab.id as any)} 
-                        className={`px-3 py-1.5 rounded-full whitespace-nowrap ${archiveTab === tab.id ? 'bg-white dark:bg-[#191919] text-gray-900 dark:text-white shadow-sm' : 'text-gray-600 dark:text-gray-300'}`}
-                    >
-                        {tab.label}
-                    </button>
-                ))}
-            </div>
+            <h3 className="font-bold text-lg text-gray-800 dark:text-white tracking-tight">Архив</h3>
+            <ModuleSegmentedControl
+                variant="neutral"
+                value={archiveTab}
+                onChange={(v) => setArchiveTab(v as typeof archiveTab)}
+                options={archiveTabOptions.map((t) => ({ value: t.id, label: t.label }))}
+                className="w-full max-w-full justify-start"
+            />
             
             {/* Контент вкладок */}
             <div className="space-y-2 max-h-[60vh] overflow-y-auto">
@@ -225,6 +221,22 @@ interface SettingsViewProps {
   initialTab?: string;
 }
 
+const SETTINGS_TABS: { id: string; label: string; icon: React.ReactNode }[] = [
+  { id: 'profile', label: 'Профиль', icon: <UserIcon size={14} /> },
+  { id: 'users', label: 'Пользователи', icon: <Users size={14} /> },
+  { id: 'spaces', label: 'Проекты / модули', icon: <Briefcase size={14} /> },
+  { id: 'departments', label: 'Подразделения', icon: <Building2 size={14} /> },
+  { id: 'finance-categories', label: 'Статьи расходов', icon: <Wallet size={14} /> },
+  { id: 'funds', label: 'Фонды', icon: <PiggyBank size={14} /> },
+  { id: 'sales-funnels', label: 'Воронки продаж', icon: <TrendingUp size={14} /> },
+  { id: 'statuses', label: 'Статусы задач', icon: <List size={14} /> },
+  { id: 'priorities', label: 'Приоритеты задач', icon: <BarChart2 size={14} /> },
+  { id: 'automation', label: 'Уведомления и роботы', icon: <Bell size={14} /> },
+  { id: 'integrations', label: 'Интеграции', icon: <PlugZap size={14} /> },
+  { id: 'system', label: 'Система / Логи', icon: <ShieldAlert size={14} /> },
+  { id: 'archive', label: 'Архив', icon: <Archive size={14} /> },
+];
+
 const SettingsView: React.FC<SettingsViewProps> = ({ 
   users, projects, tasks = [], statuses, priorities, tables = [], automationRules = [], 
   onUpdateTable, onCreateTable, onDeleteTable, onUpdateUsers, onUpdateProjects, onUpdateStatuses, onUpdatePriorities,
@@ -243,31 +255,11 @@ const SettingsView: React.FC<SettingsViewProps> = ({
   notificationPrefs, onClose
 }) => {
   const [activeTab, setActiveTab] = useState<string>(initialTab);
-  
-  const TabButton = ({ id, label, icon }: { id: string; label: string; icon: React.ReactNode }) => (
-    <button
-      type="button"
-      onClick={() => setActiveTab(id)}
-      className={`
-        inline-flex items-center gap-1.5 px-3 py-1.5 text-xs sm:text-sm font-medium rounded-full border
-        whitespace-nowrap
-        ${
-          activeTab === id
-            ? 'bg-gray-900 text-white dark:bg-white dark:text-gray-900 border-gray-900 dark:border-white shadow-sm'
-            : 'bg-white dark:bg-[#191919] text-gray-600 dark:text-gray-300 border-gray-200 dark:border-[#333] hover:bg-gray-100 dark:hover:bg-[#252525]'
-        }
-      `}
-    >
-      {icon}
-      <span>{label}</span>
-    </button>
-  );
 
   return (
-    <div className="h-full flex flex-col bg-gray-50/50 dark:bg-[#141414]">
-      {/* Шапка настроек */}
-      <div className="border-b border-gray-200 dark:border-[#333] bg-white dark:bg-[#191919] px-4 sm:px-6 py-4">
-        <div className="max-w-5xl mx-auto flex items-start justify-between gap-4">
+    <ModulePageShell>
+      <div className={`${MODULE_PAGE_GUTTER} max-w-5xl pt-6 pb-4 flex-shrink-0`}>
+        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 pb-4 border-b border-gray-200 dark:border-[#333]">
           <ModulePageHeader
             accent="slate"
             icon={<Settings size={24} strokeWidth={2} />}
@@ -278,7 +270,7 @@ const SettingsView: React.FC<SettingsViewProps> = ({
               <button
                 type="button"
                 onClick={onClose}
-                className="inline-flex items-center gap-1 px-3 py-2 rounded-xl text-sm font-medium text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-[#252525] shrink-0"
+                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-medium text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-[#252525] border border-gray-200 dark:border-[#333] shrink-0"
               >
                 <X size={16} /> Закрыть
               </button>
@@ -287,32 +279,25 @@ const SettingsView: React.FC<SettingsViewProps> = ({
         </div>
       </div>
 
-      {/* Основное содержимое с горизонтальным меню настроек */}
-      <div className="flex-1 px-6 py-6 overflow-y-auto bg-gray-50 dark:bg-[#121212] custom-scrollbar">
-        <div className="max-w-5xl mx-auto space-y-6">
-          {/* Горизонтальная навигация по разделам настроек */}
-          <div className="bg-white dark:bg-[#191919] border border-gray-200 dark:border-[#333] rounded-2xl px-4 py-3 flex flex-col gap-2 shadow-sm">
-            <div className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wide">
+      <div className="flex-1 min-h-0 overflow-y-auto custom-scrollbar">
+        <div className={`${MODULE_PAGE_GUTTER} max-w-5xl py-6 pb-24 space-y-6`}>
+          <div>
+            <p className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wide mb-2">
               Разделы настроек
-            </div>
-            <div className="flex flex-wrap gap-2 overflow-x-auto pb-1">
-              <TabButton id="profile" label="Профиль" icon={<UserIcon size={14} />} />
-              <TabButton id="users" label="Пользователи" icon={<Users size={14} />} />
-              <TabButton id="spaces" label="Проекты / модули" icon={<Briefcase size={14} />} />
-              <TabButton id="departments" label="Подразделения" icon={<Building2 size={14} />} />
-              <TabButton id="finance-categories" label="Статьи расходов" icon={<Wallet size={14} />} />
-              <TabButton id="funds" label="Фонды" icon={<PiggyBank size={14} />} />
-              <TabButton id="sales-funnels" label="Воронки продаж" icon={<TrendingUp size={14} />} />
-              <TabButton id="statuses" label="Статусы задач" icon={<List size={14} />} />
-              <TabButton id="priorities" label="Приоритеты задач" icon={<BarChart2 size={14} />} />
-              <TabButton id="automation" label="Уведомления и роботы" icon={<Bell size={14} />} />
-              <TabButton id="integrations" label="Интеграции" icon={<PlugZap size={14} />} />
-              <TabButton id="system" label="Система / Логи" icon={<ShieldAlert size={14} />} />
-              <TabButton id="archive" label="Архив" icon={<Archive size={14} />} />
-            </div>
+            </p>
+            <ModuleSegmentedControl
+              variant="neutral"
+              value={activeTab}
+              onChange={(v) => setActiveTab(v)}
+              options={SETTINGS_TABS.map((t) => ({
+                value: t.id,
+                label: t.label,
+                icon: t.icon,
+              }))}
+              className="w-full max-w-full justify-start"
+            />
           </div>
 
-          {/* Контент выбранного раздела */}
           <div className="space-y-6">
           {activeTab === 'profile' && currentUser && <ProfileSettings activeTab="profile" currentUser={currentUser} users={users} onUpdateProfile={onUpdateProfile!} onUpdateUsers={onUpdateUsers} />}
           {activeTab === 'users' && <ProfileSettings activeTab="users" currentUser={currentUser!} users={users} onUpdateProfile={onUpdateProfile!} onUpdateUsers={onUpdateUsers} />}
@@ -380,7 +365,7 @@ const SettingsView: React.FC<SettingsViewProps> = ({
           </div>
         </div>
       </div>
-    </div>
+    </ModulePageShell>
   );
 };
 

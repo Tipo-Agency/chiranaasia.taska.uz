@@ -1,10 +1,10 @@
 /**
- * Стандартная кнопка «Создать» с выпадающим списком (как на рабочем столе / HomeHeader).
- * Высота и отступы согласованы с кнопками в модулях «Сотрудники» и «Документы» (px-4 py-2, min-h-[44px]).
- * Цвет кнопки задаётся через className (акцент модуля).
+ * Кнопка только с «+» (как во «Встречах») + выпадающий список вариантов.
  */
 import React, { useState, useEffect, useRef } from 'react';
-import { Plus, ChevronDown, type LucideIcon } from 'lucide-react';
+import { type LucideIcon } from 'lucide-react';
+import { ModuleCreateIconButton } from './ModuleCreateIconButton';
+import type { ModuleAccentKey } from './moduleAccent';
 
 export interface ModuleCreateMenuItem {
   id: string;
@@ -17,17 +17,23 @@ export interface ModuleCreateMenuItem {
 
 interface ModuleCreateDropdownProps {
   items: ModuleCreateMenuItem[];
-  /** Классы фона/текста кнопки, например: bg-indigo-600 hover:bg-indigo-700 text-white */
+  /** Акцент кнопки «+» (как у модуля) */
+  accent?: ModuleAccentKey;
+  /** @deprecated используйте accent */
   buttonClassName?: string;
   align?: 'left' | 'right';
   disabled?: boolean;
+  /** Подсказка на кнопке */
+  label?: string;
 }
 
 export const ModuleCreateDropdown: React.FC<ModuleCreateDropdownProps> = ({
   items,
-  buttonClassName = 'bg-[#3337AD] hover:bg-[#292b8a] text-white',
+  accent = 'indigo',
+  buttonClassName,
   align = 'right',
   disabled = false,
+  label = 'Создать',
 }) => {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -44,20 +50,13 @@ export const ModuleCreateDropdown: React.FC<ModuleCreateDropdownProps> = ({
 
   return (
     <div className="relative" ref={ref}>
-      <button
-        type="button"
+      <ModuleCreateIconButton
+        accent={accent}
+        label={label}
         disabled={disabled}
         onClick={() => setOpen((o) => !o)}
-        className={`
-          px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 shadow-sm min-h-[44px] transition-colors
-          disabled:opacity-50 disabled:cursor-not-allowed
-          ${buttonClassName}
-        `}
-      >
-        <Plus size={18} className="shrink-0" />
-        <span className="hidden sm:inline">Создать</span>
-        <ChevronDown size={14} className="opacity-90 shrink-0" />
-      </button>
+        className={buttonClassName ?? ''}
+      />
 
       {open && (
         <>

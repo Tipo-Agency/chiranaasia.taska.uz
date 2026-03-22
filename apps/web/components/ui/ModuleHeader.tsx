@@ -1,7 +1,8 @@
 import React from 'react';
-import { Plus, Search, Filter } from 'lucide-react';
+import { Search, Filter } from 'lucide-react';
 import { DynamicIcon } from '../AppIcons';
-import { Button } from './Button';
+import { ModuleCreateIconButton } from './ModuleCreateIconButton';
+import type { ModuleAccentKey } from './moduleAccent';
 
 interface ModuleHeaderProps {
   title: string;
@@ -9,6 +10,7 @@ interface ModuleHeaderProps {
   iconColor?: string;
   onCreate?: () => void;
   createLabel?: string;
+  createAccent?: ModuleAccentKey;
   searchValue?: string;
   onSearchChange?: (value: string) => void;
   searchPlaceholder?: string;
@@ -23,6 +25,7 @@ export const ModuleHeader: React.FC<ModuleHeaderProps> = ({
   iconColor,
   onCreate,
   createLabel = 'Создать',
+  createAccent = 'indigo',
   searchValue,
   onSearchChange,
   searchPlaceholder = 'Поиск...',
@@ -78,12 +81,8 @@ export const ModuleHeader: React.FC<ModuleHeaderProps> = ({
           </div>
         )}
 
-        {/* Create — как на странице «Задачи» (Button primary sm + Plus) */}
         {onCreate && (
-          <Button variant="primary" size="sm" icon={Plus} onClick={onCreate}>
-            <span className="hidden sm:inline">{createLabel}</span>
-            <span className="sm:hidden">+</span>
-          </Button>
+          <ModuleCreateIconButton accent={createAccent} label={createLabel} onClick={onCreate} />
         )}
       </div>
     </div>

@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { Task, User, StatusOption, Project } from '../types';
-import { CheckCircle2, Plus, Trash2, Edit2, Search, Play, Layers, Folder, ChevronDown } from 'lucide-react';
-import { ModulePageShell, ModulePageHeader, MODULE_PAGE_GUTTER } from './ui';
+import { CheckCircle2, Trash2, Edit2, Search, Play, Layers, Folder, ChevronDown } from 'lucide-react';
+import { ModulePageShell, ModulePageHeader, MODULE_PAGE_GUTTER, ModuleCreateIconButton } from './ui';
 
 interface FunctionalityViewProps {
   features: Task[]; // Все функции из всех functionality таблиц
@@ -218,12 +218,11 @@ const FunctionalityView: React.FC<FunctionalityViewProps> = ({
                     <ChevronDown size={16} className="absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400" />
                 </div>
 
-                <button 
+                <ModuleCreateIconButton
+                    accent="sky"
+                    label="Добавить функцию"
                     onClick={() => onCreateFeature(selectedProjectId !== 'all' ? selectedProjectId : undefined, selectedCategory !== 'all' ? selectedCategory : undefined)}
-                    className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 flex items-center gap-2 shadow-sm"
-                >
-                    <Plus size={18} /> Добавить функцию
-                </button>
+                />
             </div>
         </div>
 
@@ -234,12 +233,12 @@ const FunctionalityView: React.FC<FunctionalityViewProps> = ({
                     <Layers size={48} className="mx-auto text-gray-300 dark:text-gray-600 mb-4" />
                     <p className="text-gray-400 dark:text-gray-500 text-lg mb-2">Функционал пуст</p>
                     <p className="text-sm text-gray-400 dark:text-gray-500 mb-4">Добавьте первую функцию</p>
-                    <button 
+                    <ModuleCreateIconButton
+                        accent="sky"
+                        label="Добавить функцию"
                         onClick={() => onCreateFeature()}
-                        className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 flex items-center gap-2 shadow-sm mx-auto"
-                    >
-                        <Plus size={18} /> Добавить функцию
-                    </button>
+                        className="mx-auto"
+                    />
                 </div>
             ) : (
                 Object.entries(groupedFeatures).map(([projectId, categories]) => (

@@ -4,7 +4,8 @@
  */
 import React, { useState, useMemo, useEffect } from 'react';
 import { Bdr, BdrRow } from '../../types';
-import { Plus, Trash2, Save, TrendingUp, TrendingDown, Check, Pencil } from 'lucide-react';
+import { Trash2, Save, TrendingUp, TrendingDown, Check, Pencil } from 'lucide-react';
+import { ModuleCreateIconButton } from '../ui/ModuleCreateIconButton';
 
 const MONTHS = ['Янв', 'Фев', 'Мар', 'Апр', 'Май', 'Июн', 'Июл', 'Авг', 'Сен', 'Окт', 'Ноя', 'Дек'];
 
@@ -320,21 +321,9 @@ export const BdrView: React.FC<BdrViewProps> = ({ bdr, onLoadBdr, onSaveBdr }) =
         </table>
       </div>
 
-      <div className="flex gap-2">
-        <button
-          type="button"
-          onClick={() => addRow('income')}
-          className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-400 text-sm font-medium hover:bg-emerald-50 dark:hover:bg-emerald-900/20"
-        >
-          <Plus size={16} /> Добавить доход
-        </button>
-        <button
-          type="button"
-          onClick={() => addRow('expense')}
-          className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-rose-200 dark:border-rose-800 text-rose-700 dark:text-rose-400 text-sm font-medium hover:bg-rose-50 dark:hover:bg-rose-900/20"
-        >
-          <Plus size={16} /> Добавить расход
-        </button>
+      <div className="flex flex-wrap gap-2">
+        <ModuleCreateIconButton accent="emerald" label="Добавить доход" onClick={() => addRow('income')} />
+        <ModuleCreateIconButton accent="rose" label="Добавить расход" onClick={() => addRow('expense')} />
       </div>
     </div>
   );

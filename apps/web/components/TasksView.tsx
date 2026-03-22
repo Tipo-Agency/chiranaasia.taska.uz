@@ -3,10 +3,10 @@ import { Task, User, Project, StatusOption, PriorityOption, TableCollection, Bus
 import TableView from './TableView';
 import KanbanBoard from './KanbanBoard';
 import GanttView from './GanttView';
-import { Plus, X } from 'lucide-react';
+import { X } from 'lucide-react';
 import { Filter } from 'lucide-react';
 import { TaskSelect } from './TaskSelect';
-import { ModulePageShell, ModulePageHeader, ModuleSegmentedControl, MODULE_PAGE_GUTTER } from './ui';
+import { ModulePageShell, ModulePageHeader, ModuleSegmentedControl, MODULE_PAGE_GUTTER, ModuleCreateIconButton } from './ui';
 import { CheckSquare } from 'lucide-react';
 
 // Константы
@@ -213,14 +213,7 @@ export const TasksView: React.FC<TasksViewProps> = ({
                     </span>
                   )}
                 </button>
-                <button
-                  type="button"
-                  onClick={onCreateTask}
-                  className="px-4 py-2 rounded-xl bg-[#3337AD] text-white text-sm font-semibold hover:bg-[#292b8a] flex items-center gap-2 shadow-md shadow-[#3337AD]/25"
-                >
-                  <Plus size={18} />
-                  <span className="hidden sm:inline">Создать</span>
-                </button>
+                <ModuleCreateIconButton accent="indigo" label="Новая задача" onClick={onCreateTask} />
               </>
             }
           />

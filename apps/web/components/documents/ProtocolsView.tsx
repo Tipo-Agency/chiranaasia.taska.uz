@@ -2,7 +2,8 @@
  * Протоколы: выбор сотрудников и единый документ по задачам из их недельных планов.
  */
 import React, { useEffect, useState } from 'react';
-import { FileText, Plus, Trash2, ChevronDown, ChevronRight, Loader2, Users } from 'lucide-react';
+import { FileText, Trash2, ChevronDown, ChevronRight, Loader2, Users } from 'lucide-react';
+import { ModuleCreateIconButton } from '../ui/ModuleCreateIconButton';
 import { weeklyPlansEndpoint, type ProtocolApi } from '../../services/apiClient';
 import type { User } from '../../types';
 import type { Task } from '../../types';
@@ -145,14 +146,7 @@ export const ProtocolsView: React.FC<ProtocolsViewProps> = ({
               <FileText size={22} className="text-[#3337AD]" />
               Протоколы
             </h2>
-            <button
-              type="button"
-              onClick={handleCreateProtocol}
-              className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-[#3337AD] text-white text-sm font-semibold hover:bg-[#292b8a] shadow-sm"
-            >
-              <Plus size={18} />
-              Новый протокол
-            </button>
+            <ModuleCreateIconButton accent="indigo" label="Новый протокол" onClick={handleCreateProtocol} />
           </div>
           <p className="text-sm text-gray-500 dark:text-gray-400 leading-relaxed">
             Отметьте участников — в протокол подтянутся задачи из их недельных планов на выбранную неделю.
@@ -163,14 +157,7 @@ export const ProtocolsView: React.FC<ProtocolsViewProps> = ({
           <p className="text-sm text-gray-600 dark:text-gray-300 leading-snug">
             Сводка по команде: задачи из недельных планов участников на одну неделю.
           </p>
-          <button
-            type="button"
-            onClick={handleCreateProtocol}
-            className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-[#3337AD] text-white text-sm font-semibold hover:bg-[#292b8a] shadow-md shrink-0"
-          >
-            <Plus size={18} />
-            Новый протокол
-          </button>
+          <ModuleCreateIconButton accent="indigo" label="Новый протокол" onClick={handleCreateProtocol} className="shrink-0" />
         </div>
       )}
 

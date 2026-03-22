@@ -2,9 +2,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { ContentPost, Task, TableCollection } from '../types';
-import { Calendar, Plus, X, FileText as FileTextIcon, Send, Youtube, Video, Image, FileText, Clock, List, LayoutGrid, KanbanSquare, Linkedin, Check, CheckSquare, ChevronLeft, ChevronRight, Trash2, Edit2, Instagram, CheckSquare2, Save, RefreshCw, MoreVertical } from 'lucide-react';
+import { Calendar, X, FileText as FileTextIcon, Send, Youtube, Video, Image, FileText, Clock, List, LayoutGrid, KanbanSquare, Linkedin, Check, CheckSquare, ChevronLeft, ChevronRight, Trash2, Edit2, Instagram, CheckSquare2, Save, RefreshCw, MoreVertical } from 'lucide-react';
 import { DynamicIcon } from './AppIcons';
-import { ModulePageShell, ModulePageHeader, ModuleSegmentedControl, MODULE_PAGE_GUTTER } from './ui';
+import { ModulePageShell, ModulePageHeader, ModuleSegmentedControl, MODULE_PAGE_GUTTER, ModuleCreateIconButton } from './ui';
 import { TaskSelect } from './TaskSelect';
 import { api } from '../backend/api';
 import { normalizeDateForInput } from '../utils/dateUtils';
@@ -26,26 +26,6 @@ const ContentPlanView: React.FC<ContentPlanViewProps> = ({
     onSavePost, onDeletePost, 
     onOpenTask, onCreateTask 
 }) => {
-  // Получаем цвет для кнопки из цвета таблицы
-  const getButtonColor = () => {
-    if (!activeTable?.color) return 'bg-blue-600 hover:bg-blue-700';
-    // Извлекаем основной цвет из класса
-    const bgMatch = activeTable.color.match(/bg-(\w+)-(\d+)/);
-    if (bgMatch) {
-      const colorName = bgMatch[1];
-      return `bg-${colorName}-600 hover:bg-${colorName}-700`;
-    }
-    // Fallback
-    if (activeTable.color.includes('blue')) return 'bg-blue-600 hover:bg-blue-700';
-    if (activeTable.color.includes('green') || activeTable.color.includes('emerald')) return 'bg-emerald-600 hover:bg-emerald-700';
-    if (activeTable.color.includes('red') || activeTable.color.includes('rose')) return 'bg-rose-600 hover:bg-rose-700';
-    if (activeTable.color.includes('yellow') || activeTable.color.includes('amber')) return 'bg-amber-600 hover:bg-amber-700';
-    if (activeTable.color.includes('purple') || activeTable.color.includes('violet')) return 'bg-violet-600 hover:bg-violet-700';
-    if (activeTable.color.includes('pink')) return 'bg-pink-600 hover:bg-pink-700';
-    if (activeTable.color.includes('orange')) return 'bg-orange-600 hover:bg-orange-700';
-    return 'bg-blue-600 hover:bg-blue-700';
-  };
-
   const [viewMode, setViewMode] = useState<'calendar' | 'table' | 'kanban' | 'gantt' | 'tasks'>('calendar');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingPost, setEditingPost] = useState<ContentPost | null>(null);
@@ -828,9 +808,7 @@ const ContentPlanView: React.FC<ContentPlanViewProps> = ({
                 <RefreshCw size={16} className={isRefreshing ? 'animate-spin' : ''} /> 
                 {isRefreshing ? 'Обновление...' : 'Обновить'}
               </button>
-              <button onClick={handleOpenCreate} className={`px-4 py-2 rounded-xl ${getButtonColor()} text-white text-sm font-medium flex items-center gap-2 shadow-sm`}>
-                <Plus size={18} /> Создать
-              </button>
+              <ModuleCreateIconButton accent="yellow" label="Новый пост" onClick={handleOpenCreate} />
             </div>
           }
         />

@@ -1,7 +1,8 @@
 
 import React, { useState, useEffect } from 'react';
 import { Project, Role, Task, User, StatusOption, PriorityOption, NotificationPreferences, AutomationRule, TableCollection, Deal } from '../types';
-import { Trash2, Plus, User as UserIcon, Briefcase, Bot, Save, Archive, KeyRound, List, BarChart2, Pencil, CheckSquare, FileText, Users, Zap, Layout, Bell, Play, Mail, Phone, Camera, Send, Link, Server, AtSign, MessageSquare, Instagram, Layers } from 'lucide-react';
+import { Trash2, Plus, User as UserIcon, Briefcase, Bot, Save, Archive, KeyRound, List, BarChart2, Pencil, CheckSquare, FileText, Users, Zap, Layout, Bell, Play, Mail, Phone, Camera, Send, Link, Server, AtSign, MessageSquare, Instagram, Layers, Settings } from 'lucide-react';
+import { ModulePageHeader } from './ui/ModulePageHeader';
 import { storageService } from '../services/storageService';
 import { getDefaultAvatarForId, getRandomDefaultAvatar } from '../constants/avatars';
 import { LABEL_COLORS, PRIORITY_COLORS, ICON_OPTIONS, COLOR_OPTIONS, DEFAULT_NOTIFICATION_PREFS } from '../constants';
@@ -302,12 +303,18 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
   const nodeServerCode = `// server.js for Meta Webhook ...`;
 
   return (
-    <div className="h-full flex flex-col bg-white dark:bg-[#191919]">
-        <div className="flex justify-between items-center p-6 border-b border-gray-100 dark:border-[#333] shrink-0">
-          <h2 className="text-2xl font-bold text-gray-800 dark:text-white">Настройки пространства</h2>
+    <div className="h-full flex flex-col bg-gray-50/50 dark:bg-[#141414]">
+        <div className="border-b border-gray-200 dark:border-[#333] bg-white dark:bg-[#191919] px-4 sm:px-6 py-4 shrink-0">
+          <ModulePageHeader
+            accent="slate"
+            icon={<Settings size={24} strokeWidth={2} />}
+            title="Настройки пространства"
+            description="Профиль, страницы, модули, статусы и интеграции"
+            className="mb-0"
+          />
         </div>
 
-        <div className="flex flex-1 overflow-hidden">
+        <div className="flex flex-1 overflow-hidden min-h-0">
             <div className="w-64 bg-gray-50 dark:bg-[#202020] border-r border-gray-100 dark:border-[#333] p-4 flex flex-col gap-1 shrink-0 overflow-y-auto custom-scrollbar">
                 <div className="text-xs font-bold text-gray-400 dark:text-gray-600 px-3 mt-1 mb-2 uppercase">Личные</div>
                 <TabButton id="profile" label="Мой профиль" icon={<UserIcon size={16}/>} />

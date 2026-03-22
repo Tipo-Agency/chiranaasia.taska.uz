@@ -1,7 +1,8 @@
 
 import React, { useState } from 'react';
 import { FinanceCategory } from '../../types';
-import { Plus, X, Edit2, Trash2 } from 'lucide-react';
+import { X, Edit2, Trash2 } from 'lucide-react';
+import { ModuleCreateIconButton } from '../ui/ModuleCreateIconButton';
 import { TaskSelect } from '../TaskSelect';
 
 interface FinanceCategoriesSettingsProps {
@@ -62,12 +63,7 @@ const FinanceCategoriesSettings: React.FC<FinanceCategoriesSettingsProps> = ({ c
                         Управление статьями расходов для финансового планирования
                     </p>
                 </div>
-                <button 
-                    onClick={handleOpenCreate} 
-                    className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 flex items-center gap-2 shadow-sm"
-                >
-                    <Plus size={18} /> Добавить статью
-                </button>
+                <ModuleCreateIconButton accent="emerald" label="Добавить статью" onClick={handleOpenCreate} />
             </div>
 
             <div className="bg-white dark:bg-[#252525] border border-gray-200 dark:border-[#333] rounded-xl overflow-hidden">

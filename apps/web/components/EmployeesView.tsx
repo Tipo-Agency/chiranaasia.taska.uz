@@ -298,7 +298,7 @@ const EmployeesView: React.FC<EmployeesViewProps> = ({
             description="Управление сотрудниками и организационной структурой"
             actions={
               <ModuleCreateDropdown
-                buttonClassName="bg-violet-600 hover:bg-violet-700 text-white"
+                accent="violet"
                 items={
                   activeTab === 'cards'
                     ? [

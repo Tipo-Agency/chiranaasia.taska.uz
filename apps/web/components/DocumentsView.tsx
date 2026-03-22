@@ -257,7 +257,7 @@ const DocumentsView: React.FC<DocumentsViewProps> = ({
             actions={
               activeTab === 'docs' ? (
                 <ModuleCreateDropdown
-                  buttonClassName="bg-amber-600 hover:bg-amber-700 text-white"
+                  accent="amber"
                   items={[
                     {
                       id: 'doc',

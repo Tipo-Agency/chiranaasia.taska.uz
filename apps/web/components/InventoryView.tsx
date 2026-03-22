@@ -2,14 +2,13 @@ import React, { useMemo, useState } from 'react';
 import { Department, Warehouse, InventoryItem, StockBalance, StockMovement, InventoryRevision } from '../types';
 import {
   Layers,
-  Plus,
   Package,
   ArrowLeftRight,
   ClipboardCheck,
   BarChart3,
 } from 'lucide-react';
 import { Button } from './ui/Button';
-import { ModuleCreateDropdown, ModulePageShell, ModulePageHeader, ModuleSegmentedControl, MODULE_PAGE_GUTTER } from './ui';
+import { ModuleCreateDropdown, ModulePageShell, ModulePageHeader, ModuleSegmentedControl, MODULE_PAGE_GUTTER, ModuleCreateIconButton } from './ui';
 
 interface InventoryViewProps {
   departments: Department[];
@@ -191,7 +190,7 @@ const InventoryView: React.FC<InventoryViewProps> = ({
             description="Остатки, номенклатура, движения и инвентаризация"
             actions={
               <ModuleCreateDropdown
-                buttonClassName="bg-emerald-600 hover:bg-emerald-700 text-white"
+                accent="emerald"
                 items={[
                   {
                     id: 'nom',
@@ -283,9 +282,7 @@ const InventoryView: React.FC<InventoryViewProps> = ({
                   placeholder={currentDepartment ? `Название склада (${currentDepartment.name})` : 'Название нового склада'}
                   className="rounded-xl border border-gray-200 dark:border-[#333] px-3 py-2.5 text-sm bg-white dark:bg-[#252525] text-gray-800 dark:text-gray-100 flex-1 min-w-[180px] focus:ring-2 focus:ring-emerald-500/25 outline-none"
                 />
-                <Button variant="primary" size="sm" onClick={handleCreateWarehouse} className="bg-emerald-600 hover:bg-emerald-700 shrink-0">
-                  Добавить склад
-                </Button>
+                <ModuleCreateIconButton accent="emerald" label="Добавить склад" onClick={handleCreateWarehouse} className="shrink-0" />
               </div>
             </div>
 
@@ -357,9 +354,7 @@ const InventoryView: React.FC<InventoryViewProps> = ({
                 placeholder="Комментарий"
                 className="border border-gray-200 dark:border-[#333] rounded-lg px-2 py-1.5 text-xs bg-white dark:bg-[#252525] text-gray-800 dark:text-gray-100 flex-1"
               />
-              <Button variant="primary" size="sm" onClick={handleCreateItem} className="bg-emerald-600 hover:bg-emerald-700">
-                Добавить
-              </Button>
+              <ModuleCreateIconButton accent="emerald" label="Добавить номенклатуру" onClick={handleCreateItem} />
               </div>
             </div>
 
@@ -486,9 +481,12 @@ const InventoryView: React.FC<InventoryViewProps> = ({
                       className="rounded-xl border border-gray-200 dark:border-[#333] px-3 py-2 text-sm bg-white dark:bg-[#252525] text-gray-800 dark:text-gray-100 focus:ring-2 focus:ring-emerald-500/25 outline-none"
                     />
                   </label>
-                  <Button variant="primary" size="sm" onClick={handleCreateMovement} className="bg-emerald-600 hover:bg-emerald-700 w-full sm:w-auto h-[42px]">
-                    Провести операцию
-                  </Button>
+                  <ModuleCreateIconButton
+                    accent="emerald"
+                    label="Провести операцию"
+                    onClick={handleCreateMovement}
+                    className="w-full sm:w-auto"
+                  />
                 </div>
               </div>
             </div>
@@ -557,19 +555,15 @@ const InventoryView: React.FC<InventoryViewProps> = ({
                 <p className="text-xs text-gray-600 dark:text-gray-400 mt-0.5">Сначала выберите склад на вкладке «Остатки», затем создайте ревизию</p>
               </div>
               {onCreateRevision && (
-                <Button
-                  variant="primary"
-                  size="sm"
-                  icon={Plus}
-                  className="bg-emerald-600 hover:bg-emerald-700"
+                <ModuleCreateIconButton
+                  accent="emerald"
+                  label="Новая ревизия"
                   onClick={() => {
                     const whId = selectedWarehouseId || filteredWarehouses[0]?.id;
                     if (!whId) { alert('Выберите склад на вкладке «Остатки» или создайте склад'); return; }
                     onCreateRevision({ warehouseId: whId, date: new Date().toISOString().slice(0, 10), createdByUserId: currentUserId });
                   }}
-                >
-                  Новая ревизия
-                </Button>
+                />
               )}
             </div>
             <div className="flex-1 overflow-auto custom-scrollbar min-h-0 p-4 sm:p-5">

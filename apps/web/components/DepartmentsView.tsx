@@ -1,9 +1,9 @@
 
 import React, { useState } from 'react';
 import { Department, User } from '../types';
-import { Plus, X, Edit2, Trash2, Building, User as UserIcon, GitFork } from 'lucide-react';
+import { X, Edit2, Trash2, Building, User as UserIcon, GitFork } from 'lucide-react';
 import { TaskSelect } from './TaskSelect';
-import { ModulePageShell, ModulePageHeader, MODULE_PAGE_GUTTER } from './ui';
+import { ModulePageShell, ModulePageHeader, MODULE_PAGE_GUTTER, ModuleCreateIconButton } from './ui';
 
 interface DepartmentsViewProps {
   departments: Department[];
@@ -66,9 +66,7 @@ const DepartmentsView: React.FC<DepartmentsViewProps> = ({ departments, users, o
               description="Управление структурой подразделений компании"
               accent="orange"
               actions={
-                <button onClick={handleOpenCreate} className="px-4 py-2 rounded-xl bg-orange-600 text-white text-sm font-medium hover:bg-orange-700 flex items-center gap-2 shadow-sm">
-                    <Plus size={18} /> Создать
-                </button>
+                <ModuleCreateIconButton accent="orange" label="Создать подразделение" onClick={handleOpenCreate} />
               }
             />
        </div>

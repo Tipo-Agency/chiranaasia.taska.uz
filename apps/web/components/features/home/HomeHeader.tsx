@@ -44,7 +44,7 @@ export const HomeHeader: React.FC<HomeHeaderProps> = ({
         accent="indigo"
         actions={
           <ModuleCreateDropdown
-            buttonClassName="bg-[#3337AD] hover:bg-[#292b8a] text-white rounded-xl"
+            accent="indigo"
             items={[
               {
                 id: 'task',

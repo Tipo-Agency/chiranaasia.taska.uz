@@ -2,7 +2,8 @@
  * Недельные планы сотрудника: список планов, редактирование, подтянуть задачи из задач/контент-плана.
  */
 import React, { useEffect, useState } from 'react';
-import { Calendar, Plus, Trash2, ChevronDown, ChevronRight, Loader2, ListTodo, Search, X } from 'lucide-react';
+import { Calendar, Trash2, ChevronDown, ChevronRight, Loader2, ListTodo, Search, X } from 'lucide-react';
+import { ModuleCreateIconButton } from '../ui/ModuleCreateIconButton';
 import { weeklyPlansEndpoint, type WeeklyPlanApi } from '../../services/apiClient';
 import type { User } from '../../types';
 import type { Task } from '../../types';
@@ -140,14 +141,7 @@ export const WeeklyPlansView: React.FC<WeeklyPlansViewProps> = ({
               <Calendar size={22} className="text-[#3337AD]" />
               Недельные планы
             </h2>
-            <button
-              type="button"
-              onClick={handleCreatePlan}
-              className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-[#3337AD] text-white text-sm font-semibold hover:bg-[#292b8a] shadow-sm"
-            >
-              <Plus size={18} />
-              План на эту неделю
-            </button>
+            <ModuleCreateIconButton accent="indigo" label="План на эту неделю" onClick={handleCreatePlan} />
           </div>
           <p className="text-sm text-gray-500 dark:text-gray-400 leading-relaxed">
             Составляйте план недели: добавляйте задачи из раздела «Задачи» и контент-плана, убирайте лишнее.
@@ -158,14 +152,7 @@ export const WeeklyPlansView: React.FC<WeeklyPlansViewProps> = ({
           <p className="text-sm text-gray-600 dark:text-gray-300 leading-snug">
             Добавьте задачи в план и ведите заметки по неделе. Всё сохраняется автоматически.
           </p>
-          <button
-            type="button"
-            onClick={handleCreatePlan}
-            className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-[#3337AD] text-white text-sm font-semibold hover:bg-[#292b8a] shadow-md shrink-0"
-          >
-            <Plus size={18} />
-            План на эту неделю
-          </button>
+          <ModuleCreateIconButton accent="indigo" label="План на эту неделю" onClick={handleCreatePlan} className="shrink-0" />
         </div>
       )}
 

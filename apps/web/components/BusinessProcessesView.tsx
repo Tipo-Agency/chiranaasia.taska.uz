@@ -1124,7 +1124,7 @@ const BusinessProcessesView: React.FC<BusinessProcessesViewProps> = ({
             description="Шаблоны, запуски в работе и завершённые экземпляры — на отдельных вкладках"
             actions={
               <ModuleCreateDropdown
-                buttonClassName="bg-[#3337AD] hover:bg-[#292b8a] text-white"
+                accent="indigo"
                 items={[
                   {
                     id: 'template',
@@ -1208,7 +1208,7 @@ const BusinessProcessesView: React.FC<BusinessProcessesViewProps> = ({
               <p className="text-gray-500 dark:text-gray-400 text-sm mb-2">Нет бизнес-процессов</p>
               <p className="text-xs text-gray-400 dark:text-gray-500 mb-4">Выберите действие в меню «Создать» выше или создайте шаблон здесь</p>
               <ModuleCreateDropdown
-                buttonClassName="bg-indigo-600 hover:bg-indigo-700 text-white"
+                accent="indigo"
                 align="left"
                 items={[
                   {

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Task, User, StatusOption, TableCollection } from '../types';
-import { Archive, Plus, Trash2, Edit2, Search, Play } from 'lucide-react';
-import { ModulePageShell, ModulePageHeader, MODULE_PAGE_GUTTER } from './ui';
+import { Archive, Trash2, Edit2, Search, Play } from 'lucide-react';
+import { ModulePageShell, ModulePageHeader, MODULE_PAGE_GUTTER, ModuleCreateIconButton } from './ui';
 
 interface BacklogViewProps {
   backlogTasks: Task[]; // Задачи из беклога
@@ -71,13 +71,7 @@ const BacklogView: React.FC<BacklogViewProps> = ({
                     className="w-full pl-9 pr-4 py-2 bg-white dark:bg-[#252525] border border-gray-200 dark:border-[#333] rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none text-gray-800 dark:text-gray-200"
                 />
             </div>
-            <button 
-                onClick={onCreateTask}
-                className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 flex items-center gap-2 shadow-sm"
-            >
-                <Plus size={18} />
-                <span className="hidden sm:inline">Создать</span>
-            </button>
+            <ModuleCreateIconButton accent="orange" label="Новая идея" onClick={onCreateTask} />
         </div>
 
         {/* Ideas List - Card View */}
@@ -160,12 +154,12 @@ const BacklogView: React.FC<BacklogViewProps> = ({
                     <Archive size={48} className="mx-auto text-gray-300 dark:text-gray-600 mb-4" />
                     <p className="text-gray-400 dark:text-gray-500 text-lg mb-2">Бэклог пуст</p>
                     <p className="text-sm text-gray-400 dark:text-gray-500 mb-4">Добавьте первую идею для будущей реализации</p>
-                    <button 
+                    <ModuleCreateIconButton
+                        accent="orange"
+                        label="Добавить идею"
                         onClick={onCreateTask}
-                        className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 flex items-center gap-2 shadow-sm mx-auto"
-                    >
-                        <Plus size={18} /> Добавить идею
-                    </button>
+                        className="mx-auto"
+                    />
                 </div>
             )}
         </div>

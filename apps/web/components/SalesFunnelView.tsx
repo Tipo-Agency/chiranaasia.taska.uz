@@ -7,7 +7,7 @@ import { Plus, KanbanSquare, List as ListIcon, X, Send, MessageSquare, Instagram
 // import { instagramService } from '../services/instagramService';
 import { DynamicIcon } from './AppIcons';
 import { TaskSelect } from './TaskSelect';
-import { Button, ModulePageShell, ModulePageHeader, ModuleSegmentedControl, MODULE_PAGE_GUTTER } from './ui';
+import { Button, ModulePageShell, ModulePageHeader, ModuleSegmentedControl, MODULE_PAGE_GUTTER, ModuleCreateIconButton } from './ui';
 import { api } from '../backend/api';
 
 interface SalesFunnelViewProps {
@@ -478,10 +478,7 @@ const SalesFunnelView: React.FC<SalesFunnelViewProps> = ({ deals, clients, users
                     className="bg-white dark:bg-[#333] border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100"
                   />
                 </div>
-                <Button variant="primary" size="sm" icon={Plus} onClick={handleOpenCreate}>
-                  <span className="hidden sm:inline">Создать</span>
-                  <span className="sm:hidden">+</span>
-                </Button>
+                <ModuleCreateIconButton accent="violet" label="Новая сделка" onClick={handleOpenCreate} />
               </>
             }
           />
@@ -884,10 +881,13 @@ const SalesFunnelView: React.FC<SalesFunnelViewProps> = ({ deals, clients, users
                                   {/* Кнопка создания задачи с выпадающим списком */}
                                   <div className="relative">
                                       <button
+                                          type="button"
+                                          title="Создать задачу"
+                                          aria-label="Создать задачу"
                                           onClick={() => setShowTaskDropdown(!showTaskDropdown)}
-                                          className="w-full p-3 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg hover:border-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors flex items-center justify-center gap-2 text-gray-600 dark:text-gray-400 hover:text-blue-600"
+                                          className="w-full p-3 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg hover:border-violet-500 hover:bg-violet-50 dark:hover:bg-violet-900/20 transition-colors flex items-center justify-center text-violet-600 dark:text-violet-400"
                                       >
-                                          <Plus size={18} /> Создать задачу
+                                          <Plus size={22} strokeWidth={2.5} />
                                       </button>
                                       {showTaskDropdown && (
                                           <>
@@ -987,6 +987,9 @@ const SalesFunnelView: React.FC<SalesFunnelViewProps> = ({ deals, clients, users
                                   {/* Кнопка создания встречи */}
                                   {onSaveMeeting && editingDeal && (
                                       <button
+                                          type="button"
+                                          title="Создать встречу"
+                                          aria-label="Создать встречу"
                                           onClick={() => {
                                               // Создаем новую встречу, привязанную к сделке
                                               const newMeeting: Meeting = {
@@ -1004,9 +1007,9 @@ const SalesFunnelView: React.FC<SalesFunnelViewProps> = ({ deals, clients, users
                                               };
                                               onSaveMeeting(newMeeting);
                                           }}
-                                          className="w-full p-3 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg hover:border-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors flex items-center justify-center gap-2 text-gray-600 dark:text-gray-400 hover:text-blue-600"
+                                          className="w-full p-3 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg hover:border-violet-500 hover:bg-violet-50 dark:hover:bg-violet-900/20 transition-colors flex items-center justify-center text-violet-600 dark:text-violet-400"
                                       >
-                                          <Plus size={18} /> Создать встречу
+                                          <Plus size={22} strokeWidth={2.5} />
                                       </button>
                                   )}
                               </div>
