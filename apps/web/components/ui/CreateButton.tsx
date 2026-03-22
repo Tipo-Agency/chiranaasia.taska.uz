@@ -1,5 +1,6 @@
 import React from 'react';
 import { Plus, X } from 'lucide-react';
+import { Button } from './Button';
 
 export interface CreateOption {
   id: string;
@@ -19,14 +20,16 @@ export const CreateButton: React.FC<CreateButtonProps> = ({ options, className =
 
   return (
     <>
-      <button
+      <Button
+        variant="primary"
+        size="sm"
+        icon={Plus}
         onClick={() => setIsModalOpen(true)}
-        className={`px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 flex items-center gap-2 shadow-sm ${className}`}
+        className={className}
       >
-        <Plus size={18} />
         <span className="hidden sm:inline">Создать</span>
         <span className="sm:hidden">+</span>
-      </button>
+      </Button>
 
       {isModalOpen && (
         <div 

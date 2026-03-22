@@ -111,7 +111,7 @@ export const useSettingsLogic = (showNotification: (msg: string) => void) => {
       api.activity.updateAll(u).catch(() => showNotification('Ошибка обновления ленты'));
   };
 
-  const handleNavigate = (view: 'home' | 'tasks' | 'inbox' | 'search' | 'clients' | 'employees' | 'sales-funnel' | 'finance' | 'business-processes' | 'analytics' | 'spaces' | 'meetings' | 'docs' | 'inventory' | 'sites') => {
+  const handleNavigate = (view: 'home' | 'tasks' | 'inbox' | 'search' | 'clients' | 'employees' | 'sales-funnel' | 'finance' | 'business-processes' | 'analytics' | 'spaces' | 'meetings' | 'docs' | 'inventory' | 'sites' | 'chat' | 'admin') => {
       setCurrentView(view); setActiveTableId('');
   };
 
@@ -121,7 +121,7 @@ export const useSettingsLogic = (showNotification: (msg: string) => void) => {
         settingsActiveTab, isCreateTableModalOpen, createTableType, isEditTableModalOpen, editingTable, notificationPrefs,
         automationRules, activeSpaceTab
     },
-    setters: { setTables, setActivityLogs, setCurrentView, setActiveTableId, setViewMode, setSearchQuery, setNotificationPrefs, setAutomationRules, setActiveSpaceTab },
+    setters: { setTables, setActivityLogs, setCurrentView, setActiveTableId, setViewMode, setSearchQuery, setNotificationPrefs, setAutomationRules, setActiveSpaceTab, setSettingsActiveTab },
     actions: {
         toggleDarkMode, createTable, updateTable, deleteTable, markAllRead, navigate: handleNavigate,
         // Changed: Opens settings page instead of modal

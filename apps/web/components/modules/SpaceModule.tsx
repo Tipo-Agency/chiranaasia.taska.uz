@@ -10,6 +10,7 @@ import MeetingsView from '../MeetingsView';
 import ContentPlanView from '../ContentPlanView';
 import DocumentsView from '../DocumentsView';
 import { AlertCircle, LayoutList, Kanban, BarChart3, ListFilter, EyeOff, Plus, CheckSquare } from 'lucide-react';
+import { Button } from '../ui/Button';
 
 interface SpaceModuleProps {
   activeTable: TableCollection;
@@ -110,12 +111,15 @@ export const SpaceModule: React.FC<SpaceModuleProps> = ({
                                     </p>
                                 </div>
                             </div>
-                            <button
+                            <Button
+                                variant="primary"
+                                size="sm"
+                                icon={Plus}
                                 onClick={() => actions.openTaskModal(null)}
-                                className="px-3 md:px-4 py-1.5 md:py-2 rounded-lg bg-blue-600 text-white text-xs md:text-sm font-medium hover:bg-blue-700 flex items-center gap-1.5 md:gap-2 shadow-sm shrink-0"
+                                className="shrink-0"
                             >
-                                <Plus size={16} className="md:w-[18px] md:h-[18px]" /> <span className="hidden sm:inline">Создать</span>
-                            </button>
+                                <span className="hidden sm:inline">Создать</span>
+                            </Button>
                         </div>
                         
                         {/* View Mode Tabs and Filters */}

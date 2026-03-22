@@ -16,25 +16,17 @@ import { MiniMessenger } from './components/features/chat/MiniMessenger';
 import { MessageCircle } from 'lucide-react';
 import { useAppLogic } from './frontend/hooks/useAppLogic';
 
-const App = () => {
+/** Синхронно из pathname — чтобы не монтировать useAppLogic на публичной странице (избегаем React #310). */
+function getPublicContentPlanIdFromPath(): string | null {
+  if (typeof window === 'undefined') return null;
+  const m = window.location.pathname.match(/^\/content-plan\/(.+)$/);
+  return m ? decodeURIComponent(m[1].trim()) : null;
+}
+
+function MainApp() {
   const { state, actions } = useAppLogic();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [chatPanelOpen, setChatPanelOpen] = useState(false);
-  const [publicContentPlanId, setPublicContentPlanId] = useState<string | null>(null);
-  
-  // Проверка публичной ссылки на контент-план
-  useEffect(() => {
-    const path = window.location.pathname;
-    const match = path.match(/^\/content-plan\/(.+)$/);
-    if (match) {
-      setPublicContentPlanId(match[1]);
-    }
-  }, []);
-
-  // Публичный контент-план (без авторизации)
-  if (publicContentPlanId) {
-    return <PublicContentPlanView tableId={publicContentPlanId} />;
-  }
 
   if (state.isLoading) return <div className="h-screen flex items-center justify-center bg-gray-50 dark:bg-[#121212] dark:text-white">Загрузка...</div>;
 
@@ -310,6 +302,22 @@ const App = () => {
         )}
     </div>
   );
+}
+
+const App = () => {
+  const [publicContentPlanId, setPublicContentPlanId] = useState<string | null>(() => getPublicContentPlanIdFromPath());
+
+  useEffect(() => {
+    const sync = () => setPublicContentPlanId(getPublicContentPlanIdFromPath());
+    window.addEventListener('popstate', sync);
+    return () => window.removeEventListener('popstate', sync);
+  }, []);
+
+  if (publicContentPlanId) {
+    return <PublicContentPlanView tableId={publicContentPlanId} />;
+  }
+
+  return <MainApp />;
 };
 
 export default App;

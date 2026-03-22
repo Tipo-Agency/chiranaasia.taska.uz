@@ -54,4 +54,4 @@ python scripts/migrate_firestore_to_postgres.py --from-json ./export
 python scripts/migrate_firestore_to_postgres.py --dry-run
 ```
 
-Подробнее о шагах миграции и проверке см. [docs/MIGRATION_FROM_FIRESTORE_TO_POSTGRES.md](../docs/MIGRATION_FROM_FIRESTORE_TO_POSTGRES.md).
+Пошаговое описание миграции ранее было в `docs/`; каталог документации очищен. Скрипт и комментарии в коде — основной источник по процессу.

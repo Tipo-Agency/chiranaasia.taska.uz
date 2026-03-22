@@ -27,6 +27,7 @@ import { useFinanceLogic } from './slices/useFinanceLogic';
 import { useBPMLogic } from './slices/useBPMLogic';
 import { useInventoryLogic } from './slices/useInventoryLogic';
 import { STANDARD_FEATURES } from '../../components/FunctionalityView';
+import { buildLocation, parseLocation } from '../../utils/urlSync';
 // Функция заполнения тестовыми данными полностью удалена
 
 export const useAppLogic = () => {
@@ -36,7 +37,23 @@ export const useAppLogic = () => {
   const [loadedModules, setLoadedModules] = useState<Set<string>>(new Set());
   const loadedModulesRef = useRef<Set<string>>(new Set());
 
-  const showNotification = (msg: string) => { setNotification(msg); setTimeout(() => setNotification(null), 3000); };
+  const lastToastRef = useRef<{ msg: string; at: number } | null>(null);
+  const notificationTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  /** Централизованные тосты: без дублей подряд, сброс при смене раздела */
+  const showNotification = (msg: string) => {
+    const now = Date.now();
+    if (lastToastRef.current && lastToastRef.current.msg === msg && now - lastToastRef.current.at < 2000) {
+      return;
+    }
+    lastToastRef.current = { msg, at: now };
+    if (notificationTimeoutRef.current) clearTimeout(notificationTimeoutRef.current);
+    setNotification(msg);
+    notificationTimeoutRef.current = setTimeout(() => {
+      setNotification(null);
+      notificationTimeoutRef.current = null;
+    }, 4000);
+  };
 
   const settingsSlice = useSettingsLogic(showNotification);
   const authSlice = useAuthLogic(showNotification);
@@ -261,6 +278,116 @@ export const useAppLogic = () => {
     initApp();
   }, []);
 
+  const didHydrateUrlRef = useRef(false);
+  const ignoreNextUrlSyncRef = useRef(false);
+
+  useEffect(() => {
+    return () => {
+      if (notificationTimeoutRef.current) clearTimeout(notificationTimeoutRef.current);
+    };
+  }, []);
+
+  // Сброс тоста при смене раздела (первый ренер пропускаем — иначе сбросим до показа)
+  const toastClearAfterNavRef = useRef(false);
+  useEffect(() => {
+    if (!toastClearAfterNavRef.current) {
+      toastClearAfterNavRef.current = true;
+      return;
+    }
+    setNotification(null);
+    if (notificationTimeoutRef.current) {
+      clearTimeout(notificationTimeoutRef.current);
+      notificationTimeoutRef.current = null;
+    }
+  }, [settingsSlice.state.currentView]);
+
+  useEffect(() => {
+    if (!authSlice.state.currentUser) {
+      didHydrateUrlRef.current = false;
+    }
+  }, [authSlice.state.currentUser]);
+
+  // Один раз после входа: восстановить раздел из URL (F5 остаётся на /tasks и т.д.)
+  useEffect(() => {
+    if (isLoading || !authSlice.state.currentUser) return;
+    if (didHydrateUrlRef.current) return;
+    const parsed = parseLocation(window.location.pathname, window.location.search);
+    didHydrateUrlRef.current = true;
+    if (!parsed) {
+      if (window.location.pathname !== '/' && window.location.pathname !== '') {
+        window.history.replaceState(null, '', '/');
+      }
+      return;
+    }
+    ignoreNextUrlSyncRef.current = true;
+    if (parsed.view === 'table' && parsed.activeTableId) {
+      settingsSlice.setters.setActiveTableId(parsed.activeTableId);
+      settingsSlice.setters.setCurrentView('table');
+    } else {
+      settingsSlice.setters.setActiveTableId('');
+      settingsSlice.setters.setCurrentView(parsed.view as typeof settingsSlice.state.currentView);
+    }
+    if (parsed.activeSpaceTab) {
+      settingsSlice.setters.setActiveSpaceTab(parsed.activeSpaceTab);
+    }
+    if (parsed.settingsTab) {
+      settingsSlice.setters.setSettingsActiveTab(parsed.settingsTab);
+    }
+  }, [isLoading, authSlice.state.currentUser]);
+
+  // Адресная строка следует за состоянием (клик по меню и т.д.)
+  useEffect(() => {
+    if (isLoading || !authSlice.state.currentUser) return;
+    if (!didHydrateUrlRef.current) return;
+    if (ignoreNextUrlSyncRef.current) {
+      ignoreNextUrlSyncRef.current = false;
+      return;
+    }
+    const next =
+      window.location.pathname +
+      (window.location.search || '');
+    const built = buildLocation({
+      currentView: settingsSlice.state.currentView,
+      activeTableId: settingsSlice.state.activeTableId,
+      activeSpaceTab: settingsSlice.state.activeSpaceTab,
+      settingsActiveTab: settingsSlice.state.settingsActiveTab,
+    });
+    if (next === built) return;
+    window.history.pushState(null, '', built);
+  }, [
+    isLoading,
+    authSlice.state.currentUser,
+    settingsSlice.state.currentView,
+    settingsSlice.state.activeTableId,
+    settingsSlice.state.activeSpaceTab,
+    settingsSlice.state.settingsActiveTab,
+  ]);
+
+  useEffect(() => {
+    const onPop = () => {
+      const parsed = parseLocation(window.location.pathname, window.location.search);
+      if (!parsed) return;
+      ignoreNextUrlSyncRef.current = true;
+      if (parsed.view === 'table' && parsed.activeTableId) {
+        settingsSlice.setters.setActiveTableId(parsed.activeTableId);
+        settingsSlice.setters.setCurrentView('table');
+      } else {
+        settingsSlice.setters.setActiveTableId('');
+        settingsSlice.setters.setCurrentView(parsed.view as typeof settingsSlice.state.currentView);
+      }
+      if (parsed.activeSpaceTab) {
+        settingsSlice.setters.setActiveSpaceTab(parsed.activeSpaceTab);
+      } else if (parsed.view === 'spaces') {
+        settingsSlice.setters.setActiveSpaceTab(undefined);
+      }
+      if (parsed.settingsTab) {
+        settingsSlice.setters.setSettingsActiveTab(parsed.settingsTab);
+      }
+    };
+    window.addEventListener('popstate', onPop);
+    return () => window.removeEventListener('popstate', onPop);
+  }, []);
+
   // Данные хранятся локально, загружаются по требованию
 
   // Instagram синхронизация для воронок с подключенным Instagram
@@ -332,6 +459,15 @@ export const useAppLogic = () => {
               break;
           case 'inventory':
               await loadInventoryData();
+              break;
+          case 'inbox':
+          case 'chat':
+              await loadTasksData();
+              await loadMessages();
+              break;
+          case 'sites':
+          case 'admin':
+              await loadTasksData();
               break;
       }
     };
@@ -1040,7 +1176,7 @@ export const useAppLogic = () => {
           }
       },
       toggleDarkMode: settingsSlice.actions.toggleDarkMode, createTable: createTableWrapper, updateTable: settingsSlice.actions.updateTable, deleteTable: settingsSlice.actions.deleteTable, markAllRead: settingsSlice.actions.markAllRead, navigate: settingsSlice.actions.navigate, openSettings: settingsSlice.actions.openSettings, closeSettings: settingsSlice.actions.closeSettings, openCreateTable: settingsSlice.actions.openCreateTable, closeCreateTable: settingsSlice.actions.closeCreateTable, openEditTable: settingsSlice.actions.openEditTable, closeEditTable: settingsSlice.actions.closeEditTable, updateNotificationPrefs: settingsSlice.actions.updateNotificationPrefs, saveAutomationRule: settingsSlice.actions.saveAutomationRule, deleteAutomationRule: settingsSlice.actions.deleteAutomationRule, setActiveSpaceTab: settingsSlice.actions.setActiveSpaceTab,
-      setActiveTableId: settingsSlice.setters.setActiveTableId, setCurrentView: settingsSlice.setters.setCurrentView, setViewMode: settingsSlice.setters.setViewMode, setSearchQuery: settingsSlice.setters.setSearchQuery,
+      setActiveTableId: settingsSlice.setters.setActiveTableId, setCurrentView: settingsSlice.setters.setCurrentView, setViewMode: settingsSlice.setters.setViewMode, setSearchQuery: settingsSlice.setters.setSearchQuery, setSettingsActiveTab: settingsSlice.setters.setSettingsActiveTab,
       loadMessages,
       sendMessage: async (payload: { text: string; attachments?: MessageAttachment[]; recipientId?: string | null }) => {
         const uid = authSlice.state.currentUser?.id;

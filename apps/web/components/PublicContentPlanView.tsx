@@ -12,7 +12,7 @@ const PublicContentPlanView: React.FC<PublicContentPlanViewProps> = ({ tableId }
   const [table, setTable] = useState<TableCollection | null>(null);
   const [loading, setLoading] = useState(true);
   const [viewMode, setViewMode] = useState<'calendar' | 'table' | 'gantt'>('calendar');
-  const [formatFilter, setFormatFilter] = useState<'all' | 'post' | 'reels' | 'story' | 'article' | 'video'>('all');
+  const [formatFilter, setFormatFilter] = useState<'all' | 'post' | 'reel' | 'story' | 'article' | 'video'>('all');
   const [currentMonth, setCurrentMonth] = useState<Date>(() => {
     const now = new Date();
     return new Date(now.getFullYear(), now.getMonth(), 1);
@@ -201,7 +201,7 @@ const PublicContentPlanView: React.FC<PublicContentPlanViewProps> = ({ tableId }
           {[
             { id: 'all', label: 'Все' },
             { id: 'post', label: 'Пост' },
-            { id: 'reels', label: 'Reels' },
+            { id: 'reel', label: 'Reels' },
             { id: 'story', label: 'Stories' },
             { id: 'article', label: 'Статья' },
             { id: 'video', label: 'Видео' },

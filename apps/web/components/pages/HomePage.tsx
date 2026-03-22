@@ -198,20 +198,21 @@ export const HomePage: React.FC<HomePageProps> = ({
               onQuickCreateProcess={onQuickCreateProcess}
             />
 
-            {/* Входящие / Исходящие / Сообщения — табы как в других модулях */}
+            {/* Табы над «рабочим пространством» (карточка только контент) */}
+            <div className="mb-2">
+              <Tabs
+                tabs={[
+                  { id: 'incoming', label: `Входящие${myTasks.length + myDeals.length > 0 ? ` (${myTasks.length + myDeals.length})` : ''}` },
+                  { id: 'outgoing', label: `Исходящие${outgoingTasks.length > 0 ? ` (${outgoingTasks.length})` : ''}` },
+                  { id: 'messages', label: 'Сообщения' },
+                ]}
+                activeTab={inboxTab}
+                onChange={(id) => setInboxTab(id as InboxTab)}
+              />
+            </div>
+
             <div className="bg-white dark:bg-[#252525] border border-gray-200 dark:border-[#333] rounded-2xl shadow-sm overflow-hidden">
-              <div className="px-4 pt-4 pb-2">
-                <Tabs
-                  tabs={[
-                    { id: 'incoming', label: `Входящие${myTasks.length + myDeals.length > 0 ? ` (${myTasks.length + myDeals.length})` : ''}` },
-                    { id: 'outgoing', label: `Исходящие${outgoingTasks.length > 0 ? ` (${outgoingTasks.length})` : ''}` },
-                    { id: 'messages', label: 'Сообщения' },
-                  ]}
-                  activeTab={inboxTab}
-                  onChange={(id) => setInboxTab(id as InboxTab)}
-                />
-              </div>
-              <div className="px-4 pb-4 min-h-[200px]">
+              <div className="px-4 py-4 min-h-[200px]">
                 {inboxTab === 'incoming' && (
                   <div className="space-y-4">
                     {myTasks.length > 0 && (

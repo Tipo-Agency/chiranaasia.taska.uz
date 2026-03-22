@@ -72,9 +72,9 @@ export const HomeHeader: React.FC<HomeHeaderProps> = ({
       <div className="relative">
         <Button
           variant="primary"
-          size="md"
+          size="sm"
           onClick={() => setMenuOpen((prev) => !prev)}
-          className="flex items-center gap-2 px-5"
+          className="flex items-center gap-2 px-4"
         >
           <Plus size={16} />
           Создать

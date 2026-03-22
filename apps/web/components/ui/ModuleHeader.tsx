@@ -1,6 +1,7 @@
 import React from 'react';
 import { Plus, Search, Filter } from 'lucide-react';
 import { DynamicIcon } from '../AppIcons';
+import { Button } from './Button';
 
 interface ModuleHeaderProps {
   title: string;
@@ -77,16 +78,12 @@ export const ModuleHeader: React.FC<ModuleHeaderProps> = ({
           </div>
         )}
 
-        {/* Create Button */}
+        {/* Create — как на странице «Задачи» (Button primary sm + Plus) */}
         {onCreate && (
-          <button
-            onClick={onCreate}
-            className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition-colors shrink-0 whitespace-nowrap"
-          >
-            <Plus size={16} />
+          <Button variant="primary" size="sm" icon={Plus} onClick={onCreate}>
             <span className="hidden sm:inline">{createLabel}</span>
             <span className="sm:hidden">+</span>
-          </button>
+          </Button>
         )}
       </div>
     </div>

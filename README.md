@@ -6,19 +6,14 @@
 - `apps/api` — backend (FastAPI + PostgreSQL + Alembic)
 - `apps/bot` — Telegram bot
 - `ops` — деплой/инфра (nginx, скрипты)
-- `docs` — документация (в т.ч. миграция с Firestore)
+- `docs` — документация ([`docs/README.md`](docs/README.md))
 - `scripts` — одноразовые скрипты (миграция Firestore → Postgres и т.п.)
 
 ## С чего читать документацию
 
-1. **README.md** (этот файл) — структура репо, запуск, тесты, лимиты.
+1. **README.md** (этот файл) — структура репо, запуск, тесты, лимиты, деплой.
 2. **REFACTORING.md** — что уже отрефакторено во фронте (утилиты, хуки, константы).
-3. **docs/MIGRATION_FROM_FIRESTORE_TO_POSTGRES.md** — пошаговая миграция данных с Firestore на Postgres.
-4. **docs/ARCHITECTURE.md** — актуальная архитектура (Postgres, API, бот).
-5. **docs/ADMIN_PANEL.md** — админ-панель (БД, логи, нагрузка, тесты).
-6. **docs/DEPLOY_FLOW.md** — как работает автодеплой (пошагово, что трогается, что сохраняется).
-7. **docs/WORKFLOW_AND_ENTITIES.md** — рабочий процесс (кто что меняет), список сущностей и идея ТЗ по каждой.
-8. Остальное в `docs/` и `docs/tz/` — legacy и частные ТЗ по мере надобности.
+3. **[`docs/README.md`](docs/README.md)** — оглавление: архитектура, деплой, модули UI, бэкенд, бот, сущности и БД.
 
 ## Папка .auto-claude
 
@@ -46,9 +41,7 @@
 
 **Тестовая отправка из админки (вкладка «Telegram бот»):** чтобы кнопки «Тест: ежедневная сводка / новая заявка / поздравление» работали, в окружении **backend** (Docker или .env на сервере) задайте переменную `TELEGRAM_BOT_TOKEN` (тот же токен, что у бота).
 
-Подробный чеклист и устранение неполадок: [docs/DEPLOY_AND_MIGRATION.md](docs/DEPLOY_AND_MIGRATION.md).
-
-Миграция Firestore → Postgres уже выполнена. Скрипты в `scripts/` и описание в [docs/MIGRATION_FROM_FIRESTORE_TO_POSTGRES.md](docs/MIGRATION_FROM_FIRESTORE_TO_POSTGRES.md) сохранены для справки.
+Миграция Firestore → Postgres уже выполнена. Скрипты остаются в `scripts/` (см. `scripts/README.md`). Подробно о деплое и окружении: **[`docs/operations/DEPLOY.md`](docs/operations/DEPLOY.md)**, **[`docs/operations/ENV_AND_SECRETS.md`](docs/operations/ENV_AND_SECRETS.md)**.
 
 ## Запуск локально (быстро)
 
@@ -58,8 +51,10 @@
 docker-compose up -d
 ```
 
-- API: `http://localhost:8000`
-- DB: `localhost:5432`
+- API (Docker Compose): `http://localhost:8003` (на хосте; в контейнере 8000)
+- DB: `localhost:5433` → Postgres в контейнере (порт 5432 внутри)
+
+Подробности и несовпадение с прокси Vite (по умолчанию `8000`): см. [`docs/00-ONBOARDING.md`](docs/00-ONBOARDING.md).
 
 ### Frontend
 
@@ -106,7 +101,6 @@ Adminer: `http://localhost:8080`, pgAdmin: `http://localhost:5050`
 - **Health:** `GET /health` возвращает `{"status":"ok","version":"1.0.0","db":"ok"}`. Используется мониторингом и после деплоя.
 - **Логи ошибок:** все `ERROR`/`CRITICAL`/`WARNING` пишутся в таблицу `system_logs`. Просмотр — в приложении: **Настройки → Система / Логи** (или `GET /api/system/logs?limit=50`).
 - **Telegram-алерты:** при уровне `CRITICAL` сообщение уходит в Telegram, если в `.env` backend'а заданы `TELEGRAM_EMPLOYEE_BOT_TOKEN` и `TELEGRAM_ALERT_CHAT_ID`. Токен хранится только на сервере.
-- Подробнее: [docs/HEALTH_LOGS_ALERTS.md](docs/HEALTH_LOGS_ALERTS.md).
 
 ## Тесты (smoke)
 
@@ -116,11 +110,11 @@ Adminer: `http://localhost:8080`, pgAdmin: `http://localhost:5050`
 cd apps/api && pip install -r requirements-dev.txt && pytest tests/ -v
 ```
 
-Переменная `TEST_API_URL` (по умолчанию `http://localhost:8000`) задаёт адрес API. Проверяются: `/health`, `/api/auth/login`, `/api/tasks`, `/api/system/logs`.
+Переменная `TEST_API_URL` (по умолчанию `http://localhost:8000`) задаёт адрес API; при тестах против Docker укажите `http://localhost:8003`. Проверяются: `/health`, `/api/auth/login`, `/api/tasks`, `/api/system/logs`.
 
 ## Лимиты и надёжность
 
-- **Одновременные пользователи:** жёсткого лимита в коде нет; всё упирается в воркеры uvicorn и пул соединений БД. См. [docs/LIMITS_AND_RELIABILITY.md](docs/LIMITS_AND_RELIABILITY.md).
+- **Одновременные пользователи:** жёсткого лимита в коде нет; всё упирается в воркеры uvicorn и пул соединений БД.
 - **Проверки доставки (сообщения/задачи):** статусов «дошло/не дошло» в системе нет; при ошибке сохранения на API пользователь видит уведомление об ошибке.
 - **Ошибки API:** при сбое сохранения (задача, пост, сделка, настройки и т.д.) во фронте показывается сообщение вида «Ошибка сохранения...» или «Не удалось сохранить задачу».
 
