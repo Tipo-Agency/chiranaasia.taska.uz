@@ -58,7 +58,15 @@ const SalesFunnelView: React.FC<SalesFunnelViewProps> = ({ deals, clients, users
   const [showTaskDropdown, setShowTaskDropdown] = useState(false);
   const [selectedFunnelId, setSelectedFunnelId] = useState<string>('');
   const [funnelId, setFunnelId] = useState<string>('');
+  const [dealProjectId, setDealProjectId] = useState<string>(''); // вид услуг (модуль/проект)
   const [defaultFunnelId, setDefaultFunnelId] = useState<string | undefined>(undefined);
+
+  /** Этапы для канбана — из выбранной воронки в шапке страницы */
+  const kanbanStages = useMemo(() => {
+    const f = salesFunnels.find(x => x.id === selectedFunnelId);
+    if (f?.stages?.length) return f.stages;
+    return STAGES.map(s => ({ id: s.id, label: s.label, color: s.color }));
+  }, [salesFunnels, selectedFunnelId]);
 
   // Получаем основную воронку из настроек
   useEffect(() => {
@@ -110,9 +118,12 @@ const SalesFunnelView: React.FC<SalesFunnelViewProps> = ({ deals, clients, users
     setClientName(''); 
     setContactName(''); 
     setAmount(''); 
-    setStage('new'); 
     setSource('manual'); 
-    setFunnelId(selectedFunnelId || salesFunnels[0]?.id || ''); 
+    const fid = selectedFunnelId || salesFunnels[0]?.id || '';
+    setFunnelId(fid);
+    const fu = salesFunnels.find(f => f.id === fid);
+    setStage(fu?.stages?.[0]?.id || 'new');
+    setDealProjectId('');
     setAssigneeId(users[0]?.id || ''); 
     setNotes('');
     setComments([]); 
@@ -129,11 +140,24 @@ const SalesFunnelView: React.FC<SalesFunnelViewProps> = ({ deals, clients, users
     setAmount(d.amount.toString()); 
     setStage(d.stage); 
     setFunnelId(d.funnelId || ''); 
+    setDealProjectId(d.projectId || '');
     setAssigneeId(d.assigneeId); 
     setSource(d.source || 'manual'); 
     setNotes(d.notes || '');
     setComments(d.comments || []); 
     setIsModalOpen(true); 
+  };
+
+  /** Смена воронки в модалке: подставляем первый этап, если текущий этап не из этой воронки */
+  const handleDealFunnelChange = (id: string) => {
+    setFunnelId(id);
+    const fu = salesFunnels.find(f => f.id === id);
+    if (fu?.stages?.length) {
+      const still = fu.stages.some(s => s.id === stage);
+      if (!still && stage !== 'won' && stage !== 'lost') {
+        setStage(fu.stages[0].id);
+      }
+    }
   };
 
   const handleSubmit = async (e?: React.FormEvent) => {
@@ -191,7 +215,7 @@ const SalesFunnelView: React.FC<SalesFunnelViewProps> = ({ deals, clients, users
               source: source || 'manual', 
               assigneeId: assigneeId || undefined, 
               notes: notes.trim() || undefined,
-              projectId: undefined, // Убрали проект
+              projectId: dealProjectId || undefined,
               telegramChatId: editingDeal?.telegramChatId, 
               telegramUsername: editingDeal?.telegramUsername, 
               createdAt: editingDeal ? editingDeal.createdAt : new Date().toISOString(), 
@@ -386,7 +410,7 @@ const SalesFunnelView: React.FC<SalesFunnelViewProps> = ({ deals, clients, users
                         const assignee = users.find(u => u.id === deal.assigneeId);
                         const dealFunnel = deal.funnelId ? salesFunnels.find(f => f.id === deal.funnelId) : null;
                         const dealStage = dealFunnel?.stages.find(s => s.id === deal.stage);
-                        const stageLabel = dealStage?.name || STAGES.find(s => s.id === deal.stage)?.label || deal.stage;
+                        const stageLabel = dealStage?.label || STAGES.find(s => s.id === deal.stage)?.label || deal.stage;
                         const dealProject = projects.find(p => p.id === deal.projectId);
                         return (
                             <tr key={deal.id} onClick={() => handleOpenEdit(deal)} className="hover:bg-gray-50 dark:hover:bg-[#2a2a2a] cursor-pointer group transition-colors">
@@ -452,8 +476,8 @@ const SalesFunnelView: React.FC<SalesFunnelViewProps> = ({ deals, clients, users
                 Управление сделками и продажами
               </p>
             </div>
-            <div className="flex items-center gap-3">
-              <div className="min-w-[180px]">
+            <div className="flex items-center gap-2 sm:gap-3 flex-wrap justify-end">
+              <div className="min-w-[160px] sm:min-w-[180px]">
                 <TaskSelect
                   value={selectedFunnelId}
                   onChange={setSelectedFunnelId}
@@ -461,13 +485,19 @@ const SalesFunnelView: React.FC<SalesFunnelViewProps> = ({ deals, clients, users
                   className="bg-white dark:bg-[#333] border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100"
                 />
               </div>
-              <button
-                onClick={handleOpenCreate}
-                className="px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 flex items-center gap-2 shadow-sm"
-              >
-                <Plus size={18} />
+              {onOpenSettings && (
+                <button
+                  type="button"
+                  onClick={onOpenSettings}
+                  className="text-xs font-medium text-[#3337AD] dark:text-[#8b8ee0] hover:underline whitespace-nowrap px-1"
+                >
+                  Этапы воронки
+                </button>
+              )}
+              <Button variant="primary" size="sm" icon={Plus} onClick={handleOpenCreate}>
                 <span className="hidden sm:inline">Создать</span>
-              </button>
+                <span className="sm:hidden">+</span>
+              </Button>
             </div>
           </div>
           {/* View Mode Tabs */}
@@ -513,7 +543,7 @@ const SalesFunnelView: React.FC<SalesFunnelViewProps> = ({ deals, clients, users
           {viewMode === 'kanban' ? (
               <div className="h-full flex flex-col gap-4">
                   <div className="flex h-full overflow-x-auto gap-3 md:gap-4 pb-4">
-                      {STAGES.map(s => (
+                      {kanbanStages.map(s => (
                           <div key={s.id} className="w-64 md:w-80 flex-shrink-0 flex flex-col bg-gray-50/50 dark:bg-[#1e1e1e] rounded-lg border border-gray-200 dark:border-[#333]" onDragOver={(e) => e.preventDefault()} onDrop={(e) => onDrop(e, s.id)}>
                               <div className="p-2 md:p-3 font-bold text-xs md:text-sm text-gray-700 dark:text-gray-200 flex justify-between">{s.label} <span className="bg-gray-200 dark:bg-[#333] px-2 rounded text-xs">{activeDeals.filter(d => d.stage === s.id).length}</span></div>
                               <div className="p-2 flex-1 overflow-y-auto space-y-2 custom-scrollbar min-h-0">
@@ -618,7 +648,7 @@ const SalesFunnelView: React.FC<SalesFunnelViewProps> = ({ deals, clients, users
       </div>
       {isModalOpen && (
           <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-[80] p-2 md:p-4" onClick={handleBackdropClick}>
-              <div className="bg-white dark:bg-[#252525] w-full max-w-4xl h-full md:h-[80vh] rounded-xl flex flex-col overflow-hidden border border-gray-200 dark:border-[#333]" onClick={e => e.stopPropagation()}>
+              <div className="bg-white dark:bg-[#252525] w-full max-w-4xl max-h-[min(720px,92vh)] h-full md:h-auto rounded-xl flex flex-col overflow-hidden border border-gray-200 dark:border-[#333]" onClick={e => e.stopPropagation()}>
                   <div className="p-3 md:p-4 border-b border-gray-100 dark:border-[#333] flex justify-between items-center bg-white dark:bg-[#252525] shrink-0">
                       <div className="flex items-center gap-2 flex-1 min-w-0">
                           <h3 className="font-bold text-gray-800 dark:text-white text-sm md:text-base">Сделка</h3>
@@ -641,7 +671,7 @@ const SalesFunnelView: React.FC<SalesFunnelViewProps> = ({ deals, clients, users
                                   <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1.5">Воронка</label>
                                   <TaskSelect
                                       value={funnelId}
-                                      onChange={setFunnelId}
+                                      onChange={handleDealFunnelChange}
                                       options={salesFunnels.map(f => ({ value: f.id, label: f.name }))}
                                       placeholder="Выберите воронку"
                                   />
@@ -656,7 +686,7 @@ const SalesFunnelView: React.FC<SalesFunnelViewProps> = ({ deals, clients, users
                                               ? (() => {
                                                   const currentFunnel = salesFunnels.find(f => f.id === funnelId);
                                                   return currentFunnel && currentFunnel.stages.length > 0
-                                                      ? currentFunnel.stages.map(s => ({ value: s.id, label: s.name }))
+                                                      ? currentFunnel.stages.map(s => ({ value: s.id, label: s.label }))
                                                       : STAGES.map(s => ({ value: s.id, label: s.label }));
                                               })()
                                               : STAGES.map(s => ({ value: s.id, label: s.label }))),
@@ -678,6 +708,19 @@ const SalesFunnelView: React.FC<SalesFunnelViewProps> = ({ deals, clients, users
                                           { value: 'telegram', label: 'Telegram' },
                                           { value: 'vk', label: 'ВКонтакте' },
                                           { value: 'recommendation', label: 'Рекомендация' }
+                                      ]}
+                                  />
+                              </div>
+
+                              <div>
+                                  <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1.5">Вид услуг</label>
+                                  <TaskSelect
+                                      value={dealProjectId}
+                                      onChange={setDealProjectId}
+                                      placeholder=""
+                                      options={[
+                                        { value: '', label: 'Не выбрано' },
+                                        ...(projects || []).map(p => ({ value: p.id, label: p.name })),
                                       ]}
                                   />
                               </div>

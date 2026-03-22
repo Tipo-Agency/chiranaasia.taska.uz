@@ -135,6 +135,17 @@ const BusinessProcessesView: React.FC<BusinessProcessesViewProps> = ({
 
   const handleSubmit = (e?: React.FormEvent) => {
       if (e) e.preventDefault();
+
+      if (!String(title || '').trim()) {
+          alert('Укажите название процесса.');
+          return;
+      }
+
+      const emptyStep = steps.find(s => !String(s.title || '').trim());
+      if (steps.length > 0 && emptyStep) {
+          alert('Укажите название у каждого шага процесса.');
+          return;
+      }
       
       const now = new Date().toISOString();
       let version = 1;
@@ -297,8 +308,7 @@ const BusinessProcessesView: React.FC<BusinessProcessesViewProps> = ({
 
   const handleBackdropClick = (e: React.MouseEvent) => {
       if (e.target === e.currentTarget) {
-          if(window.confirm("Сохранить изменения?")) handleSubmit();
-          else setIsModalOpen(false);
+          setIsModalOpen(false);
       }
   };
 
@@ -743,9 +753,21 @@ const BusinessProcessesView: React.FC<BusinessProcessesViewProps> = ({
               {isModalOpen && (
                   <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-[90] animate-in fade-in duration-200" onClick={handleBackdropClick}>
                       <div className="bg-white dark:bg-[#252525] rounded-xl shadow-2xl w-full max-w-2xl overflow-hidden border border-gray-200 dark:border-[#333] flex flex-col max-h-[90vh]" onClick={e => e.stopPropagation()}>
-                          <div className="p-4 border-b border-gray-100 dark:border-[#333] flex justify-between items-center bg-white dark:bg-[#252525] shrink-0">
-                              <h3 className="font-bold text-gray-800 dark:text-white">{editingProcess ? 'Редактировать процесс' : 'Новый процесс'}</h3>
-                              <button onClick={() => setIsModalOpen(false)} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 p-1 rounded-full hover:bg-gray-100 dark:hover:bg-[#333]"><X size={18} /></button>
+                          <div className="p-4 border-b border-gray-100 dark:border-[#333] flex justify-between items-center gap-2 bg-white dark:bg-[#252525] shrink-0">
+                              <h3 className="font-bold text-gray-800 dark:text-white truncate">{editingProcess ? 'Редактировать процесс' : 'Новый процесс'}</h3>
+                              <div className="flex items-center gap-1 shrink-0">
+                                {editingProcess && (
+                                  <button
+                                    type="button"
+                                    onClick={(e) => { e.stopPropagation(); handleDelete(); }}
+                                    className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-sm font-medium text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40"
+                                  >
+                                    <Trash2 size={16} />
+                                    <span className="hidden sm:inline">Удалить</span>
+                                  </button>
+                                )}
+                                <button type="button" onClick={() => setIsModalOpen(false)} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 p-1.5 rounded-full hover:bg-gray-100 dark:hover:bg-[#333]"><X size={18} /></button>
+                              </div>
                           </div>
                           <div className="flex border-b border-gray-100 dark:border-[#333] px-4">
                               <button type="button" onClick={() => setEditModalTab('steps')} className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${editModalTab === 'steps' ? 'border-indigo-600 text-indigo-600 dark:text-indigo-400' : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'}`}>
@@ -761,7 +783,7 @@ const BusinessProcessesView: React.FC<BusinessProcessesViewProps> = ({
                                   <div className="space-y-4">
                                       <div>
                                           <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 mb-1">Название процесса</label>
-                                          <input required value={title} onChange={e => setTitle(e.target.value)} className="w-full border border-gray-300 dark:border-gray-600 rounded px-3 py-2 text-sm bg-white dark:bg-[#333] text-gray-900 dark:text-gray-100" placeholder="Например: Согласование договора"/>
+                                          <input value={title} onChange={e => setTitle(e.target.value)} className="w-full border border-gray-300 dark:border-gray-600 rounded px-3 py-2 text-sm bg-white dark:bg-[#333] text-gray-900 dark:text-gray-100" placeholder="Например: Согласование договора"/>
                                       </div>
                                       <div>
                                           <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 mb-1">Описание</label>
@@ -820,11 +842,10 @@ const BusinessProcessesView: React.FC<BusinessProcessesViewProps> = ({
                                                   <div className="flex items-center gap-2 mb-3">
                                                       <span className="text-xs font-bold text-gray-400 w-6 h-6 rounded-full bg-white dark:bg-[#252525] flex items-center justify-center border border-gray-200 dark:border-[#444] shrink-0">{index + 1}</span>
                                                       <input 
-                                                          required 
                                                           value={step.title} 
                                                           onChange={e => handleUpdateStep(step.id, { title: e.target.value })}
                                                           className="flex-1 bg-white dark:bg-[#252525] border border-gray-300 dark:border-[#555] rounded px-3 py-2 text-sm font-medium text-gray-800 dark:text-gray-100 placeholder-gray-400 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                                                          placeholder="Название шага"
+                                                          placeholder="Название шага *"
                                                       />
                                                   </div>
                                                   <textarea 
@@ -905,14 +926,9 @@ const BusinessProcessesView: React.FC<BusinessProcessesViewProps> = ({
                                   </div>}
                               </div>
 
-                              <div className="p-4 border-t border-gray-100 dark:border-[#333] bg-white dark:bg-[#252525] flex justify-between items-center shrink-0">
-                                   {editingProcess && (
-                                       <button type="button" onClick={handleDelete} className="text-red-500 text-sm hover:underline hover:text-red-600 flex items-center gap-1"><Trash2 size={14}/> Удалить</button>
-                                   )}
-                                   <div className="flex gap-2 ml-auto">
-                                      <button type="button" onClick={() => setIsModalOpen(false)} className="px-4 py-2 text-sm font-medium text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-[#303030] rounded-lg">Отмена</button>
-                                      <button type="submit" className="px-4 py-2 text-sm font-medium bg-indigo-600 text-white hover:bg-indigo-700 rounded-lg shadow-sm flex items-center gap-2"><Save size={16}/> Сохранить</button>
-                                   </div>
+                              <div className="p-4 border-t border-gray-100 dark:border-[#333] bg-white dark:bg-[#252525] flex justify-end items-center gap-2 shrink-0">
+                                   <button type="button" onClick={() => setIsModalOpen(false)} className="px-4 py-2 text-sm font-medium text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-[#303030] rounded-lg">Отмена</button>
+                                   <button type="submit" className="px-4 py-2 text-sm font-medium bg-indigo-600 text-white hover:bg-indigo-700 rounded-lg shadow-sm flex items-center gap-2"><Save size={16}/> Сохранить</button>
                               </div>
                           </form>
                       </div>
@@ -1182,6 +1198,34 @@ const BusinessProcessesView: React.FC<BusinessProcessesViewProps> = ({
                 )}
               </div>
             )}
+
+            <div className="flex flex-wrap items-center gap-2 mt-3 text-[11px] sm:text-xs text-gray-600 dark:text-gray-400">
+              {activeTab === 'processes' ? (
+                <>
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-gray-100 dark:bg-[#2a2a2a] border border-gray-200/80 dark:border-[#444]">
+                    <Network size={13} className="text-indigo-500 shrink-0" />
+                    Шаблонов: <strong className="text-gray-900 dark:text-white">{uniqueProcesses.filter(p => !p.isArchived).length}</strong>
+                  </span>
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-blue-50 dark:bg-blue-950/40 border border-blue-100 dark:border-blue-900/50 text-blue-800 dark:text-blue-200">
+                    <Play size={13} className="shrink-0" />
+                    Сейчас в работе: <strong>{allInstances.filter(({ instance: i }) => i.status === 'active').length}</strong>
+                  </span>
+                </>
+              ) : (
+                <>
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-gray-100 dark:bg-[#2a2a2a] border border-gray-200/80 dark:border-[#444]">
+                    В списке: <strong className="text-gray-900 dark:text-white">{filteredInstances.length}</strong>
+                    {showCompletedInstances === 'hide' && allInstances.some(({ instance: i }) => i.status === 'completed') && (
+                      <span className="text-gray-500 dark:text-gray-500">(завершённые скрыты)</span>
+                    )}
+                  </span>
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-100 dark:border-emerald-900/40 text-emerald-800 dark:text-emerald-200">
+                    <CheckCircle2 size={13} />
+                    Завершено всего: {allInstances.filter(({ instance: i }) => i.status === 'completed').length}
+                  </span>
+                </>
+              )}
+            </div>
           </div>
         </div>
       </div>
@@ -1341,13 +1385,25 @@ const BusinessProcessesView: React.FC<BusinessProcessesViewProps> = ({
         </div>
       </div>
 
-      {/* Create/Edit Modal */}
+      {/* Create/Edit Modal (список процессов — без вкладки «Схема», упрощённый конструктор) */}
       {isModalOpen && (
         <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-[90] animate-in fade-in duration-200" onClick={handleBackdropClick}>
           <div className="bg-white dark:bg-[#252525] rounded-xl shadow-2xl w-full max-w-2xl overflow-hidden border border-gray-200 dark:border-[#333] flex flex-col max-h-[90vh]" onClick={e => e.stopPropagation()}>
-            <div className="p-4 border-b border-gray-100 dark:border-[#333] flex justify-between items-center bg-white dark:bg-[#252525] shrink-0">
-              <h3 className="font-bold text-gray-800 dark:text-white">{editingProcess ? 'Редактировать процесс' : 'Новый процесс'}</h3>
-              <button onClick={() => setIsModalOpen(false)} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 p-1 rounded-full hover:bg-gray-100 dark:hover:bg-[#333]"><X size={18} /></button>
+            <div className="p-4 border-b border-gray-100 dark:border-[#333] flex justify-between items-center gap-2 bg-white dark:bg-[#252525] shrink-0">
+              <h3 className="font-bold text-gray-800 dark:text-white truncate">{editingProcess ? 'Редактировать процесс' : 'Новый процесс'}</h3>
+              <div className="flex items-center gap-1 shrink-0">
+                {editingProcess && (
+                  <button
+                    type="button"
+                    onClick={(e) => { e.stopPropagation(); handleDelete(); }}
+                    className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-sm font-medium text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40"
+                  >
+                    <Trash2 size={16} />
+                    <span className="hidden sm:inline">Удалить</span>
+                  </button>
+                )}
+                <button type="button" onClick={() => setIsModalOpen(false)} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 p-1.5 rounded-full hover:bg-gray-100 dark:hover:bg-[#333]"><X size={18} /></button>
+              </div>
             </div>
             
             <form onSubmit={handleSubmit} className="flex-1 overflow-hidden flex flex-col">
@@ -1355,62 +1411,76 @@ const BusinessProcessesView: React.FC<BusinessProcessesViewProps> = ({
                 <div className="space-y-4">
                   <div>
                     <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 mb-1">Название процесса</label>
-                    <input required value={title} onChange={e => setTitle(e.target.value)} className="w-full border border-gray-300 dark:border-gray-600 rounded px-3 py-2 text-sm bg-white dark:bg-[#333] text-gray-900 dark:text-gray-100" placeholder="Например: Согласование договора"/>
+                    <input value={title} onChange={e => setTitle(e.target.value)} className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2.5 text-sm bg-white dark:bg-[#333] text-gray-900 dark:text-gray-100" placeholder="Например: Согласование договора"/>
                   </div>
                   <div>
                     <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 mb-1">Описание</label>
-                    <textarea value={description} onChange={e => setDescription(e.target.value)} className="w-full h-20 border border-gray-300 dark:border-gray-600 rounded px-3 py-2 text-sm bg-white dark:bg-[#333] text-gray-900 dark:text-gray-100 resize-none"/>
+                    <textarea value={description} onChange={e => setDescription(e.target.value)} className="w-full h-24 border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-[#333] text-gray-900 dark:text-gray-100 resize-none"/>
                   </div>
                 </div>
 
-                <div className="border-t border-gray-200 dark:border-[#333] pt-4">
+                <div className="border-t border-gray-200 dark:border-[#333] pt-5">
                   <div className="flex justify-between items-center mb-4">
-                    <h4 className="font-bold text-gray-700 dark:text-gray-200 text-sm">Шаги процесса</h4>
-                    <button type="button" onClick={handleAddStep} className="text-indigo-600 hover:text-indigo-700 text-xs font-medium flex items-center gap-1"><Plus size={14}/> Добавить шаг</button>
+                    <div>
+                      <h4 className="font-bold text-gray-800 dark:text-gray-100 text-sm">Шаги процесса</h4>
+                      <p className="text-[11px] text-gray-500 dark:text-gray-400 mt-0.5">Порядок сверху вниз. Кому назначается шаг — справа.</p>
+                    </div>
+                    <button type="button" onClick={handleAddStep} className="text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 text-xs font-semibold flex items-center gap-1 px-2 py-1 rounded-lg border border-indigo-200 dark:border-indigo-800 bg-indigo-50/50 dark:bg-indigo-950/30"><Plus size={14}/> Добавить шаг</button>
                   </div>
                   
                   <div className="space-y-4">
+                    {steps.length === 0 && (
+                      <p className="text-sm text-gray-500 dark:text-gray-400 py-6 text-center border border-dashed border-gray-200 dark:border-[#444] rounded-xl">
+                        Нажмите «Добавить шаг», чтобы собрать цепочку согласований или действий.
+                      </p>
+                    )}
                     {steps.map((step, index) => (
-                      <div key={step.id} className="bg-gray-50 dark:bg-[#303030] p-4 rounded-lg border border-gray-200 dark:border-[#444] relative group">
-                        <button type="button" onClick={() => handleRemoveStep(step.id)} className="absolute top-2 right-2 text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"><Trash2 size={14}/></button>
-                        <div className="flex items-center gap-2 mb-2">
-                          <span className="text-xs font-bold text-gray-400 w-6 h-6 rounded-full bg-white dark:bg-[#252525] flex items-center justify-center border border-gray-200 dark:border-[#444]">{index + 1}</span>
+                      <div key={step.id} className="relative pl-3 border-l-2 border-indigo-200 dark:border-indigo-800 bg-gray-50/80 dark:bg-[#2a2a2a] p-4 rounded-r-xl border border-gray-200/80 dark:border-[#444] group">
+                        <button type="button" onClick={() => handleRemoveStep(step.id)} className="absolute top-3 right-3 text-gray-400 hover:text-red-500 p-1 rounded-md hover:bg-white/80 dark:hover:bg-[#333] opacity-80 group-hover:opacity-100 transition-opacity" title="Убрать шаг"><Trash2 size={16}/></button>
+                        <div className="flex items-start gap-3 mb-3 pr-10">
+                          <span className="text-xs font-bold text-white w-7 h-7 rounded-full bg-indigo-600 dark:bg-indigo-500 flex items-center justify-center shrink-0 shadow-sm">{index + 1}</span>
                           <input 
-                            required 
                             value={step.title} 
                             onChange={e => handleUpdateStep(step.id, { title: e.target.value })}
-                            className="flex-1 bg-transparent border-none focus:ring-0 p-0 text-sm font-bold text-gray-800 dark:text-gray-100 placeholder-gray-400"
-                            placeholder="Название шага"
+                            className="flex-1 min-w-0 bg-white dark:bg-[#252525] border border-gray-300 dark:border-[#555] rounded-lg px-3 py-2 text-sm font-medium text-gray-800 dark:text-gray-100 placeholder-gray-400 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                            placeholder="Название шага *"
                           />
                         </div>
-                        <input 
-                          value={step.description}
+                        <textarea 
+                          value={step.description || ''}
                           onChange={e => handleUpdateStep(step.id, { description: e.target.value })}
-                          className="w-full bg-transparent border-none focus:ring-0 p-0 text-xs text-gray-600 dark:text-gray-400 placeholder-gray-400 mb-3"
-                          placeholder="Описание действий..."
+                          rows={2}
+                          className="w-full bg-white dark:bg-[#252525] border border-gray-200 dark:border-[#555] rounded-lg px-3 py-2 text-xs text-gray-600 dark:text-gray-400 placeholder-gray-400 mb-3 resize-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                          placeholder="Описание действий (необязательно)..."
                         />
-                        <div className="flex gap-2">
-                          <TaskSelect
-                            value={step.assigneeType}
-                            onChange={(val) => handleUpdateStep(step.id, { assigneeType: val as any, assigneeId: '' })}
-                            options={[
-                              { value: 'position', label: 'Должность' },
-                              { value: 'user', label: 'Сотрудник' }
-                            ]}
-                            className="w-1/3 text-xs"
-                          />
-                          <TaskSelect
-                            value={step.assigneeId}
-                            onChange={(val) => handleUpdateStep(step.id, { assigneeId: val })}
-                            options={[
-                              { value: '', label: 'Выберите...' },
-                              ...(step.assigneeType === 'position' 
-                                ? orgPositions.map(p => ({ value: p.id, label: p.title }))
-                                : users.map(u => ({ value: u.id, label: u.name }))
-                              )
-                            ]}
-                            className="flex-1 text-xs"
-                          />
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                          <div>
+                            <span className="text-[10px] font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-1 block">Кому</span>
+                            <TaskSelect
+                              value={step.assigneeType}
+                              onChange={(val) => handleUpdateStep(step.id, { assigneeType: val as any, assigneeId: '' })}
+                              options={[
+                                { value: 'position', label: 'Должность' },
+                                { value: 'user', label: 'Сотрудник' }
+                              ]}
+                              className="w-full text-xs"
+                            />
+                          </div>
+                          <div>
+                            <span className="text-[10px] font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-1 block">Выбор</span>
+                            <TaskSelect
+                              value={step.assigneeId}
+                              onChange={(val) => handleUpdateStep(step.id, { assigneeId: val })}
+                              options={[
+                                { value: '', label: 'Выберите...' },
+                                ...(step.assigneeType === 'position' 
+                                  ? orgPositions.map(p => ({ value: p.id, label: p.title }))
+                                  : users.map(u => ({ value: u.id, label: u.name }))
+                                )
+                              ]}
+                              className="w-full text-xs"
+                            />
+                          </div>
                         </div>
                       </div>
                     ))}
@@ -1418,14 +1488,9 @@ const BusinessProcessesView: React.FC<BusinessProcessesViewProps> = ({
                 </div>
               </div>
 
-              <div className="p-4 border-t border-gray-100 dark:border-[#333] bg-white dark:bg-[#252525] flex justify-between items-center shrink-0">
-                {editingProcess && (
-                  <button type="button" onClick={handleDelete} className="text-red-500 text-sm hover:underline hover:text-red-600 flex items-center gap-1"><Trash2 size={14}/> Удалить</button>
-                )}
-                <div className="flex gap-2 ml-auto">
-                  <button type="button" onClick={() => setIsModalOpen(false)} className="px-4 py-2 text-sm font-medium text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-[#303030] rounded-lg">Отмена</button>
-                  <button type="submit" className="px-4 py-2 text-sm font-medium bg-indigo-600 text-white hover:bg-indigo-700 rounded-lg shadow-sm flex items-center gap-2"><Save size={16}/> Сохранить</button>
-                </div>
+              <div className="p-4 border-t border-gray-100 dark:border-[#333] bg-white dark:bg-[#252525] flex justify-end items-center gap-2 shrink-0">
+                <button type="button" onClick={() => setIsModalOpen(false)} className="px-4 py-2 text-sm font-medium text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-[#303030] rounded-lg">Отмена</button>
+                <button type="submit" className="px-4 py-2 text-sm font-medium bg-indigo-600 text-white hover:bg-indigo-700 rounded-lg shadow-sm flex items-center gap-2"><Save size={16}/> Сохранить</button>
               </div>
             </form>
           </div>

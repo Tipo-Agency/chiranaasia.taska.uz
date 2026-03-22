@@ -351,6 +351,8 @@ export interface Task {
   source?: string; // 'Задача', 'Беклог', 'Функционал', или название контент-плана
   category?: string; // Категория функции (ID из functionalityCategories)
   taskId?: string; // ID связанной задачи (для функций)
+  /** Родительская задача (подзадачи) */
+  parentTaskId?: string | null;
   createdByUserId?: string; // ID автора (для идей)
   createdAt?: string; // ISO дата создания
   // Поля для purchase_request:

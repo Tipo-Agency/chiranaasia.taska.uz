@@ -1,12 +1,14 @@
 
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Project, Task, User, StatusOption, PriorityOption, TableCollection, TaskAttachment, Doc } from '../types';
-import { X, Calendar as CalendarIcon, Users, Tag, Plus, CheckCircle2, Archive, AlignLeft, Paperclip, Send, File as FileIcon, Image as ImageIcon, MessageSquare, Download, Flag, Link as LinkIcon, Check, ChevronDown, Folder, ExternalLink, FileText, User as UserIcon } from 'lucide-react';
+import { X, Calendar as CalendarIcon, Users, Tag, Plus, CheckCircle2, Archive, AlignLeft, Paperclip, Send, File as FileIcon, Image as ImageIcon, MessageSquare, Download, Flag, Link as LinkIcon, Check, ChevronDown, Folder, ExternalLink, FileText, User as UserIcon, ListTree } from 'lucide-react';
 import { DynamicIcon } from './AppIcons';
 import { STANDARD_CATEGORIES } from './FunctionalityView';
 import { FilePreviewModal } from './FilePreviewModal';
 import { getTodayLocalDate, getDateDaysFromNow, normalizeDateForInput } from '../utils/dateUtils';
 import { DateInput } from './ui/DateInput';
+import { Button } from './ui';
+import { TaskSelect } from './TaskSelect';
 
 interface TaskModalProps {
   users: User[];
@@ -24,12 +26,15 @@ interface TaskModalProps {
   onAddAttachment?: (taskId: string, file: File) => void;
   onAddDocAttachment?: (taskId: string, docId: string) => void; // Прикрепить документ
   task?: Partial<Task> | null; // Changed to Partial to accept pre-filled data
+  /** Все задачи — для родительской задачи и подзадач */
+  allTasks?: Task[];
 }
 
 const TaskModal: React.FC<TaskModalProps> = ({ 
     users, projects, statuses, priorities, currentUser, tables = [], docs = [],
     onSave, onClose, onCreateProject, onDelete, 
-    onAddComment, onAddAttachment, onAddDocAttachment, task 
+    onAddComment, onAddAttachment, onAddDocAttachment, task,
+    allTasks = [],
 }) => {
   // Определяем тип задачи (идея/функция/задача)
   const taskType = useMemo(() => {
@@ -59,6 +64,7 @@ const TaskModal: React.FC<TaskModalProps> = ({
   const [status, setStatus] = useState<string>(statuses[0]?.name || '');
   const [contentPostId, setContentPostId] = useState<string | undefined>(undefined);
   const [category, setCategory] = useState<string>('');
+  const [parentTaskId, setParentTaskId] = useState<string>('');
   
   // Comment Input
   const [commentText, setCommentText] = useState('');
@@ -83,7 +89,27 @@ const TaskModal: React.FC<TaskModalProps> = ({
     endDate: string;
     status: string;
     category: string;
+    parentTaskId: string;
   } | null>(null);
+
+  const parentTaskOptions = useMemo(() => {
+    const sid = currentTask?.id;
+    const rows = allTasks.filter(t =>
+      !t.isArchived &&
+      (t.entityType === 'task' || !t.entityType) &&
+      t.id !== sid &&
+      t.parentTaskId !== sid
+    );
+    return [
+      { value: '', label: 'Нет (корневая)' },
+      ...rows.map(t => ({ value: t.id, label: (t.title || 'Без названия').slice(0, 100) })),
+    ];
+  }, [allTasks, currentTask?.id]);
+
+  const childTasks = useMemo(
+    () => allTasks.filter(t => t.parentTaskId === currentTask?.id && !t.isArchived),
+    [allTasks, currentTask?.id]
+  );
 
   // Обновляем currentTask при изменении task пропа (для синхронизации комментариев)
   useEffect(() => {
@@ -107,6 +133,7 @@ const TaskModal: React.FC<TaskModalProps> = ({
         const newEndDate = normalizeDateForInput(currentTask.endDate) || getTodayLocalDate();
         const newStatus = currentTask.status || statuses[0]?.name || '';
         const newCategory = currentTask.category || '';
+        const newParent = currentTask.parentTaskId || '';
         
         setTitle(newTitle);
         setDescription(newDescription);
@@ -119,6 +146,7 @@ const TaskModal: React.FC<TaskModalProps> = ({
         setStatus(newStatus);
         setContentPostId(currentTask.contentPostId);
         setCategory(newCategory);
+        setParentTaskId(newParent);
         setPrevTaskId(currentTask.id);
         
         // Сохраняем исходные значения
@@ -132,7 +160,8 @@ const TaskModal: React.FC<TaskModalProps> = ({
           startDate: newStartDate,
           endDate: newEndDate,
           status: newStatus,
-          category: newCategory
+          category: newCategory,
+          parentTaskId: newParent,
         };
     } else if (currentTask && !currentTask.id && prevTaskId !== 'new_prefilled') {
         // New task with pre-filled data (e.g. contentPostId, dealId)
@@ -146,6 +175,7 @@ const TaskModal: React.FC<TaskModalProps> = ({
         const newStartDate = normalizeDateForInput(currentTask.startDate) || getTodayLocalDate();
         const newEndDate = normalizeDateForInput(currentTask.endDate) || getTodayLocalDate();
         const newCategory = currentTask.category || '';
+        const newParent = currentTask.parentTaskId || '';
         
         setTitle(newTitle);
         setDescription(newDescription);
@@ -158,6 +188,7 @@ const TaskModal: React.FC<TaskModalProps> = ({
         setEndDate(newEndDate);
         setContentPostId(currentTask.contentPostId);
         setCategory(newCategory);
+        setParentTaskId(newParent);
         setPrevTaskId('new_prefilled');
         
         // Сохраняем исходные значения
@@ -171,7 +202,8 @@ const TaskModal: React.FC<TaskModalProps> = ({
           startDate: newStartDate,
           endDate: newEndDate,
           status: newStatus,
-          category: newCategory
+          category: newCategory,
+          parentTaskId: newParent,
         };
     } else if (!currentTask && prevTaskId !== 'new') {
         // Completely new task
@@ -181,6 +213,7 @@ const TaskModal: React.FC<TaskModalProps> = ({
         setAssigneeIds([currentUser.id]);
         setStatus(statuses[0]?.name || '');
         setContentPostId(undefined);
+        setParentTaskId('');
         setPrevTaskId('new');
         
         // Сохраняем исходные значения (пустые для новой задачи)
@@ -194,7 +227,8 @@ const TaskModal: React.FC<TaskModalProps> = ({
           startDate: getTodayLocalDate(),
           endDate: getTodayLocalDate(),
           status: statuses[0]?.name || '',
-          category: ''
+          category: '',
+          parentTaskId: '',
         };
     }
   }, [currentTask, currentUser, prevTaskId, priorities, statuses]);
@@ -235,6 +269,7 @@ const TaskModal: React.FC<TaskModalProps> = ({
       dealId: currentTask?.dealId, // Сохраняем dealId из исходной задачи
       source, // Используем определенный source
       category: taskType === 'feature' ? (category || undefined) : currentTask?.category, // Сохраняем category для функций
+      parentTaskId: parentTaskId || null,
       createdAt: currentTask?.createdAt || new Date().toISOString(), // Добавляем createdAt
       createdByUserId: currentTask?.createdByUserId || currentUser?.id // Постановщик - текущий пользователь (или из задачи, если редактирование)
     });
@@ -250,7 +285,8 @@ const TaskModal: React.FC<TaskModalProps> = ({
       startDate,
       endDate,
       status,
-      category
+      category,
+      parentTaskId,
     };
     
     // Закрываем модалку после сохранения
@@ -286,7 +322,8 @@ const TaskModal: React.FC<TaskModalProps> = ({
       initial.projectId !== projectId ||
       initial.assigneeId !== assigneeId ||
       initialAssigneeIds !== currentAssigneeIds ||
-      initial.category !== category
+      initial.category !== category ||
+      (initial.parentTaskId || '') !== (parentTaskId || '')
     );
     
     if (taskType === 'idea') {
@@ -543,18 +580,18 @@ const TaskModal: React.FC<TaskModalProps> = ({
 
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-end md:items-center justify-center z-[100] animate-in fade-in duration-200 p-0 md:p-4" onClick={handleBackdropClick} style={{ paddingTop: 'env(safe-area-inset-top)', paddingBottom: 'env(safe-area-inset-bottom)' }}>
-      <div className="bg-white dark:bg-[#1e1e1e] w-full h-full md:h-[85vh] md:max-w-5xl md:rounded-xl shadow-2xl flex flex-col md:flex-row overflow-hidden border-0 md:border border-gray-200 dark:border-gray-800 rounded-t-2xl md:rounded-xl" onClick={e => e.stopPropagation()}>
+      <div className="bg-white dark:bg-[#1e1e1e] w-full h-full md:max-h-[min(680px,92vh)] md:max-w-5xl md:rounded-xl shadow-2xl flex flex-col md:flex-row overflow-hidden border-0 md:border border-gray-200 dark:border-gray-800 rounded-t-2xl md:rounded-xl" onClick={e => e.stopPropagation()}>
         
         {/* LEFT COLUMN: DETAILS */}
         <div className="flex-1 flex flex-col min-w-0 border-b md:border-b-0 md:border-r border-gray-200 dark:border-gray-800 bg-white dark:bg-[#1e1e1e] h-auto md:h-auto min-h-0">
             {/* Header */}
-            <div className="p-3 md:p-4 border-b border-gray-100 dark:border-gray-800 flex justify-between items-start shrink-0">
-                <div className="flex-1 mr-2 md:mr-4 min-w-0">
-                    <label className="block text-[10px] uppercase font-bold text-gray-400 mb-1 ml-1">{taskTypeLabel}</label>
+            <div className="p-3 md:p-3 border-b border-gray-100 dark:border-gray-800 flex justify-between items-start shrink-0">
+                <div className="flex-1 mr-2 md:mr-3 min-w-0">
+                    <label className="block text-[10px] uppercase font-bold text-gray-400 mb-1 ml-0.5">{taskTypeLabel}</label>
                     <input 
                         value={title}
                         onChange={e => setTitle(e.target.value)}
-                        className="w-full text-sm font-semibold bg-white dark:bg-[#252525] border border-gray-300 dark:border-gray-700 rounded-lg px-3 py-2.5 focus:ring-2 focus:ring-blue-500/20 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-600"
+                        className="w-full text-sm font-semibold bg-white dark:bg-[#252525] border border-gray-300 dark:border-gray-700 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500/20 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-600"
                         placeholder={`Введите название ${taskTypeLabel.toLowerCase()}...`}
                     />
                 </div>
@@ -576,12 +613,12 @@ const TaskModal: React.FC<TaskModalProps> = ({
             </div>
 
             {/* Properties Grid */}
-            <div className="p-4 md:p-6 space-y-4 md:space-y-6 overflow-y-auto custom-scrollbar flex-1 min-h-0">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-x-4 md:gap-x-8 gap-y-4 md:gap-y-5">
+            <div className="p-3 md:p-4 space-y-3 overflow-y-auto custom-scrollbar flex-1 min-h-0">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-x-3 md:gap-x-6 gap-y-2.5 md:gap-y-3">
                     {/* Status - скрыт для идей */}
                     {taskType !== 'idea' && (
-                        <div className="flex items-center gap-3">
-                            <div className="w-28 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase flex items-center gap-2"><CheckCircle2 size={16}/> Статус</div>
+                        <div className="flex items-center gap-2 md:gap-3">
+                            <div className="w-24 shrink-0 text-[10px] font-semibold text-gray-500 dark:text-gray-400 uppercase flex items-center gap-2"><CheckCircle2 size={16} className="shrink-0 text-gray-400" strokeWidth={2} /> Статус</div>
                             <StatusPrioritySelect
                                 value={status}
                                 options={statuses}
@@ -594,8 +631,8 @@ const TaskModal: React.FC<TaskModalProps> = ({
 
                     {/* Priority - скрыт для идей и функций */}
                     {taskType !== 'idea' && taskType !== 'feature' && (
-                        <div className="flex items-center gap-3">
-                            <div className="w-28 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase flex items-center gap-2"><Flag size={16}/> Приоритет</div>
+                        <div className="flex items-center gap-2 md:gap-3">
+                            <div className="w-24 shrink-0 text-[10px] font-semibold text-gray-500 dark:text-gray-400 uppercase flex items-center gap-2"><Flag size={16} className="shrink-0 text-gray-400" strokeWidth={2} /> Приоритет</div>
                             <StatusPrioritySelect
                                 value={priority}
                                 options={priorities}
@@ -607,12 +644,12 @@ const TaskModal: React.FC<TaskModalProps> = ({
                     )}
 
                     {/* Assignee Multiple */}
-                    <div className="flex items-center gap-3">
-                        <div className="w-28 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase flex items-center gap-2"><Users size={18}/> Исполнители</div>
+                    <div className="flex items-center gap-2 md:gap-3">
+                        <div className="w-24 shrink-0 text-[10px] font-semibold text-gray-500 dark:text-gray-400 uppercase flex items-center gap-2"><Users size={16} className="shrink-0 text-gray-400" strokeWidth={2} /> Исполнители</div>
                         <div className="flex-1 relative" ref={assigneeDropdownRef}>
                             <div 
                                 onClick={() => setIsAssigneeDropdownOpen(!isAssigneeDropdownOpen)}
-                                className="flex items-center gap-2 cursor-pointer bg-gray-50 dark:bg-[#252525] border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2.5 min-h-[44px] hover:bg-gray-100 dark:hover:bg-[#303030] transition-colors"
+                                className="flex items-center gap-2 cursor-pointer bg-gray-50 dark:bg-[#252525] border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2 min-h-[40px] hover:bg-gray-100 dark:hover:bg-[#303030] transition-colors"
                             >
                                 {assigneeIds.length > 0 ? (
                                     <div className="flex items-center gap-2 flex-1 min-w-0">
@@ -660,8 +697,8 @@ const TaskModal: React.FC<TaskModalProps> = ({
                     {currentTask?.id && currentTask?.createdByUserId && (() => {
                         const creator = users.find(u => u.id === currentTask.createdByUserId);
                         return creator ? (
-                            <div className="flex items-center gap-3">
-                                <div className="w-28 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase flex items-center gap-2"><UserIcon size={16}/> Постановщик</div>
+                            <div className="flex items-center gap-2 md:gap-3">
+                                <div className="w-24 shrink-0 text-[10px] font-semibold text-gray-500 dark:text-gray-400 uppercase flex items-center gap-2"><UserIcon size={16} className="shrink-0 text-gray-400" strokeWidth={2} /> Постановщик</div>
                                 <div className="flex-1 flex items-center gap-2 bg-gray-50 dark:bg-[#252525] border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2.5">
                                     <img src={creator.avatar} className="w-8 h-8 rounded-full border border-gray-200 dark:border-gray-600 object-cover object-center" />
                                     <span className="text-sm font-medium text-gray-700 dark:text-gray-300">{creator.name}</span>
@@ -671,8 +708,8 @@ const TaskModal: React.FC<TaskModalProps> = ({
                     })()}
 
                     {/* Module */}
-                    <div className="flex items-center gap-3">
-                        <div className="w-28 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase flex items-center gap-2"><Tag size={16}/> Модуль</div>
+                    <div className="flex items-center gap-2 md:gap-3">
+                        <div className="w-24 shrink-0 text-[10px] font-semibold text-gray-500 dark:text-gray-400 uppercase flex items-center gap-2"><Tag size={16} className="shrink-0 text-gray-400" strokeWidth={2} /> Модуль</div>
                         <ModuleSelect
                             value={projectId}
                             options={projects}
@@ -683,8 +720,8 @@ const TaskModal: React.FC<TaskModalProps> = ({
 
                     {/* Category - только для функций */}
                     {taskType === 'feature' && (
-                        <div className="flex items-center gap-3">
-                            <div className="w-28 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase flex items-center gap-2"><Folder size={16}/> Категория</div>
+                        <div className="flex items-center gap-2 md:gap-3">
+                            <div className="w-24 shrink-0 text-[10px] font-semibold text-gray-500 dark:text-gray-400 uppercase flex items-center gap-2"><Folder size={16} className="shrink-0 text-gray-400" strokeWidth={2} /> Категория</div>
                             <select
                                 value={category}
                                 onChange={e => setCategory(e.target.value)}
@@ -702,7 +739,7 @@ const TaskModal: React.FC<TaskModalProps> = ({
                     {/* Dates - скрыты для идей */}
                     {taskType !== 'idea' && (
                         <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-3 col-span-1 md:col-span-2">
-                            <div className="w-full sm:w-28 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase flex items-center gap-2 shrink-0"><CalendarIcon size={18}/> Сроки</div>
+                            <div className="w-full sm:w-24 text-[10px] font-semibold text-gray-500 dark:text-gray-400 uppercase flex items-center gap-2 shrink-0"><CalendarIcon size={16} className="shrink-0 text-gray-400" strokeWidth={2} /> Сроки</div>
                             <div className="flex items-center gap-2 flex-1 w-full sm:w-auto">
                                 <DateInput
                                     value={startDate}
@@ -718,31 +755,60 @@ const TaskModal: React.FC<TaskModalProps> = ({
                             </div>
                         </div>
                     )}
+
+                    {taskType === 'task' && (
+                      <>
+                        <div className="flex items-center gap-2 md:gap-3 col-span-1 md:col-span-2">
+                          <div className="w-24 shrink-0 text-[10px] font-semibold text-gray-500 dark:text-gray-400 uppercase flex items-center gap-2">
+                            <ListTree size={16} className="shrink-0 text-gray-400" strokeWidth={2} /> Родитель
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <TaskSelect
+                              value={parentTaskId}
+                              onChange={setParentTaskId}
+                              options={parentTaskOptions}
+                              placeholder=""
+                            />
+                          </div>
+                        </div>
+                        {currentTask?.id && childTasks.length > 0 && (
+                          <div className="col-span-1 md:col-span-2 md:pl-[7.25rem]">
+                            <div className="text-[10px] font-semibold text-gray-500 dark:text-gray-400 uppercase mb-1">Подзадачи ({childTasks.length})</div>
+                            <ul className="space-y-0.5 max-h-24 overflow-y-auto custom-scrollbar text-sm text-gray-700 dark:text-gray-300">
+                              {childTasks.map(ch => (
+                                <li key={ch.id} className="truncate pl-1 border-l-2 border-[#3337AD]/40">· {ch.title || 'Без названия'}</li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+                      </>
+                    )}
                 </div>
 
                 {/* Description */}
-                <div className="mt-8">
-                    <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 mb-2 uppercase flex items-center gap-2">
-                        <AlignLeft size={16}/> Описание
+                <div className="mt-4">
+                    <label className="block text-[10px] font-bold text-gray-500 dark:text-gray-400 mb-1.5 uppercase flex items-center gap-2">
+                        <AlignLeft size={16} className="text-gray-400" strokeWidth={2} /> Описание
                     </label>
                     <textarea 
                         value={description}
                         onChange={e => setDescription(e.target.value)}
-                        className="w-full min-h-[150px] bg-white dark:bg-[#1e1e1e] border border-gray-200 dark:border-gray-700 rounded-lg p-3 text-sm text-gray-800 dark:text-gray-200 focus:ring-2 focus:ring-blue-500/20 outline-none resize-y placeholder-gray-400 dark:placeholder-gray-600"
+                        rows={3}
+                        className="w-full min-h-[72px] max-h-40 bg-white dark:bg-[#1e1e1e] border border-gray-200 dark:border-gray-700 rounded-lg p-2.5 text-sm text-gray-800 dark:text-gray-200 focus:ring-2 focus:ring-blue-500/20 outline-none resize-y placeholder-gray-400 dark:placeholder-gray-600"
                         placeholder="Добавьте описание задачи..."
                     />
                 </div>
 
                 {/* Attachments */}
-                <div className="mt-6">
+                <div className="mt-4">
                     <div className="flex items-center justify-between mb-2">
-                        <label className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase flex items-center gap-2">
-                            <Paperclip size={16}/> Вложения
+                        <label className="text-[10px] font-bold text-gray-500 dark:text-gray-400 uppercase flex items-center gap-2">
+                            <Paperclip size={16} className="text-gray-400" strokeWidth={2} /> Вложения
                         </label>
                         <button 
                             type="button" 
                             onClick={() => setIsAttachmentModalOpen(true)}
-                            className="text-sm text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 font-medium flex items-center gap-1.5 px-2 py-1 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded transition-colors"
+                            className="text-xs text-[#3337AD] dark:text-[#8b8ee0] font-medium flex items-center gap-1 px-2 py-1 hover:bg-[#3337AD]/10 dark:hover:bg-[#3337AD]/20 rounded transition-colors"
                         >
                             <Plus size={14}/> Добавить
                         </button>
@@ -780,15 +846,17 @@ const TaskModal: React.FC<TaskModalProps> = ({
                     )}
                 </div>
                 
-                {/* Footer Save Button (Visible mainly on desktop or bottom of scroll) */}
-                <div className="mt-8 pt-4 border-t border-gray-100 dark:border-gray-800 flex justify-end pb-10 md:pb-0">
-                    <button 
+                {/* Footer Save */}
+                <div className="mt-4 pt-3 border-t border-gray-100 dark:border-gray-800 flex justify-end pb-8 md:pb-3">
+                    <Button
                         type="button"
-                        onClick={() => handleSubmit()} 
-                        className="bg-blue-600 text-white px-6 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 shadow-sm transition-colors w-full md:w-auto"
+                        variant="primary"
+                        size="sm"
+                        className="w-full md:w-auto"
+                        onClick={() => handleSubmit()}
                     >
-                        {currentTask?.id ? 'Сохранить изменения' : `Создать ${taskTypeLabel.toLowerCase()}`}
-                    </button>
+                        {currentTask?.id ? 'Сохранить' : `Создать ${taskTypeLabel.toLowerCase()}`}
+                    </Button>
                 </div>
             </div>
         </div>

@@ -199,7 +199,7 @@ function MainApp() {
                     return (
                         <TaskModal 
                             users={state.users} projects={state.projects} statuses={state.statuses} priorities={state.priorities}
-                            currentUser={state.currentUser} tables={state.tables} docs={state.docs} onSave={actions.saveTask} onClose={actions.closeTaskModal} 
+                            currentUser={state.currentUser} tables={state.tables} docs={state.docs} allTasks={state.tasks} onSave={actions.saveTask} onClose={actions.closeTaskModal} 
                             onCreateProject={actions.quickCreateProject} onDelete={actions.deleteTask}
                             onAddComment={actions.addTaskComment} onAddAttachment={actions.addTaskAttachment}
                             onAddDocAttachment={actions.addTaskDocAttachment}
@@ -244,7 +244,7 @@ function MainApp() {
                 return (
                     <TaskModal 
                         users={state.users} projects={state.projects} statuses={state.statuses} priorities={state.priorities}
-                        currentUser={state.currentUser} tables={state.tables} docs={state.docs} onSave={actions.saveTask} onClose={actions.closeTaskModal} 
+                        currentUser={state.currentUser} tables={state.tables} docs={state.docs} allTasks={state.tasks} onSave={actions.saveTask} onClose={actions.closeTaskModal} 
                         onCreateProject={actions.quickCreateProject} onDelete={actions.deleteTask}
                         onAddComment={actions.addTaskComment} onAddAttachment={actions.addTaskAttachment}
                         onAddDocAttachment={actions.addTaskDocAttachment}

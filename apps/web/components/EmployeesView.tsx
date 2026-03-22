@@ -5,6 +5,7 @@ import { UserCheck, Plus, Search, Trash2, Edit2, Calendar, FileText, X, Save, Us
 import { TaskSelect } from './TaskSelect';
 import { getDefaultAvatarForId } from '../constants/avatars';
 import { formatDate, normalizeDateForInput } from '../utils/dateUtils';
+import { DateInput } from './ui/DateInput';
 
 interface EmployeesViewProps {
   employees: EmployeeInfo[];
@@ -122,8 +123,7 @@ const EmployeesView: React.FC<EmployeesViewProps> = ({
   // Backdrops
   const handleCardBackdrop = (e: React.MouseEvent) => {
       if (e.target === e.currentTarget) {
-          if(window.confirm("Сохранить изменения?")) handleSubmit();
-          else setIsModalOpen(false);
+          setIsModalOpen(false);
       }
   };
 
@@ -328,12 +328,28 @@ const EmployeesView: React.FC<EmployeesViewProps> = ({
        {isModalOpen && (
         <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-[80] animate-in fade-in duration-200" onClick={handleCardBackdrop}>
             <div className="bg-white dark:bg-[#252525] rounded-xl shadow-2xl w-full max-w-md overflow-hidden border border-gray-200 dark:border-[#333]" onClick={e => e.stopPropagation()}>
-                <div className="p-4 border-b border-gray-100 dark:border-[#333] flex justify-between items-center bg-white dark:bg-[#252525]">
-                    <h3 className="font-bold text-gray-800 dark:text-white">{editingInfo ? 'Сотрудник' : 'Новый сотрудник'}</h3>
-                    <button onClick={() => setIsModalOpen(false)} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 p-1 rounded-full hover:bg-gray-100 dark:hover:bg-[#333]"><X size={18} /></button>
+                <div className="p-4 border-b border-gray-100 dark:border-[#333] flex justify-between items-center gap-2 bg-white dark:bg-[#252525]">
+                    <h3 className="font-bold text-gray-800 dark:text-white truncate">{editingInfo ? 'Сотрудник' : 'Новый сотрудник'}</h3>
+                    <div className="flex items-center gap-1 shrink-0">
+                        {editingInfo && (
+                            <button
+                                type="button"
+                                onClick={(e) => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    handleDelete();
+                                }}
+                                className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-sm font-medium text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40"
+                            >
+                                <Trash2 size={16} />
+                                <span className="hidden sm:inline">Удалить</span>
+                            </button>
+                        )}
+                        <button type="button" onClick={() => setIsModalOpen(false)} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 p-1.5 rounded-full hover:bg-gray-100 dark:hover:bg-[#333]"><X size={18} /></button>
+                    </div>
                 </div>
                 
-                <form onSubmit={handleSubmit} className="p-6 space-y-4">
+                <form onSubmit={handleSubmit} className="p-5 space-y-4">
                     <div>
                         <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 mb-1">Сотрудник (из пользователей)</label>
                         <TaskSelect
@@ -351,25 +367,22 @@ const EmployeesView: React.FC<EmployeesViewProps> = ({
                         <input required value={position} onChange={e => setPosition(e.target.value)} className="w-full border border-gray-300 dark:border-gray-600 rounded px-3 py-2 text-sm bg-white dark:bg-[#333] text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-purple-500" placeholder="Маркетолог"/>
                     </div>
                     
-                    <div className="grid grid-cols-2 gap-4">
-                        <div>
-                            <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 mb-1">Дата найма</label>
-                            <input type="date" value={normalizeDateForInput(hireDate) || hireDate} onChange={e => setHireDate(e.target.value)} className="w-full border border-gray-300 dark:border-gray-600 rounded px-3 py-2 text-sm bg-white dark:bg-[#333] text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-purple-500"/>
-                        </div>
-                        <div>
-                            <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 mb-1">Дата рождения</label>
-                            <input type="date" value={normalizeDateForInput(birthDate) || birthDate} onChange={e => setBirthDate(e.target.value)} className="w-full border border-gray-300 dark:border-gray-600 rounded px-3 py-2 text-sm bg-white dark:bg-[#333] text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-purple-500"/>
-                        </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <DateInput
+                            label="Дата найма"
+                            value={normalizeDateForInput(hireDate) || ''}
+                            onChange={setHireDate}
+                        />
+                        <DateInput
+                            label="Дата рождения"
+                            value={normalizeDateForInput(birthDate) || ''}
+                            onChange={setBirthDate}
+                        />
                     </div>
 
-                    <div className="flex justify-between items-center pt-2">
-                         {editingInfo && (
-                             <button type="button" onClick={handleDelete} className="text-red-500 text-sm hover:underline hover:text-red-600 flex items-center gap-1"><Trash2 size={14}/> Удалить</button>
-                         )}
-                         <div className="flex gap-2 ml-auto">
-                            <button type="button" onClick={() => setIsModalOpen(false)} className="px-4 py-2 text-sm font-medium text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-[#303030] rounded-lg">Отмена</button>
-                            <button type="submit" className="px-4 py-2 text-sm font-medium bg-purple-600 text-white hover:bg-purple-700 rounded-lg shadow-sm flex items-center gap-2"><Save size={16}/> Сохранить</button>
-                         </div>
+                    <div className="flex justify-end items-center gap-2 pt-2 border-t border-gray-100 dark:border-[#333] mt-2">
+                         <button type="button" onClick={() => setIsModalOpen(false)} className="px-4 py-2 text-sm font-medium text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-[#303030] rounded-lg">Отмена</button>
+                         <button type="submit" className="px-4 py-2 text-sm font-medium bg-purple-600 text-white hover:bg-purple-700 rounded-lg shadow-sm flex items-center gap-2"><Save size={16}/> Сохранить</button>
                     </div>
                 </form>
             </div>

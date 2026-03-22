@@ -143,6 +143,7 @@ export const useTaskLogic = (showNotification: (msg: string) => void, currentUse
                 dealId: taskData.dealId,
                 source: taskData.source || 'Задача',
                 category: taskData.category,
+                parentTaskId: taskData.parentTaskId !== undefined ? taskData.parentTaskId : undefined,
                 createdAt: taskData.createdAt || new Date().toISOString(),
                 createdByUserId: taskData.createdByUserId
             };
@@ -189,6 +190,7 @@ export const useTaskLogic = (showNotification: (msg: string) => void, currentUse
             dealId: taskData.dealId,
             source: taskData.source || 'Задача',
             category: taskData.category,
+            parentTaskId: taskData.parentTaskId !== undefined ? taskData.parentTaskId : null,
             createdAt: taskData.createdAt || now,
             updatedAt: now,
             createdByUserId: taskData.createdByUserId || currentUser?.id // Если не указан, используем текущего пользователя
