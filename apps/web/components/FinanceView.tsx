@@ -118,6 +118,9 @@ const FinanceView: React.FC<FinanceViewProps> = ({
   const [planDetailIncome, setPlanDetailIncome] = useState(0);
   const [planDetailExpenses, setPlanDetailExpenses] = useState<Record<string, number>>({});
   const [planDetailSelectedCategories, setPlanDetailSelectedCategories] = useState<string[]>([]);
+  /** Дропдаун «Добавить статью» на детальной странице плана — хуки на уровне FinanceView (нельзя в renderPlanDetail: React #310). */
+  const [planDetailCategoryDropdownOpen, setPlanDetailCategoryDropdownOpen] = useState(false);
+  const planDetailCategoryDropdownRef = useRef<HTMLDivElement>(null);
   
   // Синхронизация состояний детальных страниц при изменении выбранных элементов
   useEffect(() => {
@@ -162,7 +165,44 @@ const FinanceView: React.FC<FinanceViewProps> = ({
       setPlanDetailExpenses({});
       setPlanDetailSelectedCategories([]);
     }
+    setPlanDetailCategoryDropdownOpen(false);
   }, [selectedPlanDoc]);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (planDetailCategoryDropdownRef.current && !planDetailCategoryDropdownRef.current.contains(event.target as Node)) {
+        setPlanDetailCategoryDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const calculatePlanDetailPercentAmount = useCallback((catId: string): number => {
+    const cat = categories.find(c => c.id === catId);
+    if (!cat || cat.type !== 'percent') return 0;
+    const percent = planDetailExpenses[catId] || 0;
+    return (planDetailIncome * percent) / 100;
+  }, [categories, planDetailExpenses, planDetailIncome]);
+
+  const planDetailTotalPercentExpenses = useMemo(() => {
+    return planDetailSelectedCategories
+      .filter(catId => {
+        const cat = categories.find(c => c.id === catId);
+        return cat && cat.type === 'percent';
+      })
+      .reduce((sum, catId) => sum + calculatePlanDetailPercentAmount(catId), 0);
+  }, [planDetailSelectedCategories, planDetailExpenses, planDetailIncome, categories, calculatePlanDetailPercentAmount]);
+
+  const planDetailTotalExpenses = useMemo(() => {
+    const fixedTotal = planDetailSelectedCategories
+      .filter(catId => {
+        const cat = categories.find(c => c.id === catId);
+        return cat && cat.type === 'fixed';
+      })
+      .reduce((sum, catId) => sum + (planDetailExpenses[catId] || 0), 0);
+    return planDetailTotalPercentExpenses + fixedTotal;
+  }, [planDetailSelectedCategories, planDetailExpenses, planDetailTotalPercentExpenses, categories]);
 
   // Фильтруем финансовые планирования
   const filteredPlannings = useMemo(() => {
@@ -899,40 +939,8 @@ const FinanceView: React.FC<FinanceViewProps> = ({
       };
     };
     
-    const calculatePercentAmount = (catId: string): number => {
-      const cat = categories.find(c => c.id === catId);
-      if (!cat || cat.type !== 'percent') return 0;
-      const percent = planDetailExpenses[catId] || 0;
-      return (planDetailIncome * percent) / 100;
-    };
-    
-    // Вычисляем сумму процентных расходов
-    const totalPercentExpenses = useMemo(() => {
-      return planDetailSelectedCategories
-        .filter(catId => {
-          const cat = categories.find(c => c.id === catId);
-          return cat && cat.type === 'percent';
-        })
-        .reduce((sum, catId) => sum + calculatePercentAmount(catId), 0);
-    }, [planDetailSelectedCategories, planDetailExpenses, planDetailIncome, categories]);
-    
-    // Вычисляем остаток для фиксированных расходов
-    const remainingForFixed = planDetailIncome - totalPercentExpenses;
-    
-    // Добавление статьи через дропдаун
-    const [isCategoryDropdownOpen, setIsCategoryDropdownOpen] = useState(false);
-    const categoryDropdownRef = useRef<HTMLDivElement>(null);
-    
-    useEffect(() => {
-      const handleClickOutside = (event: MouseEvent) => {
-        if (categoryDropdownRef.current && !categoryDropdownRef.current.contains(event.target as Node)) {
-          setIsCategoryDropdownOpen(false);
-        }
-      };
-      document.addEventListener('mousedown', handleClickOutside);
-      return () => document.removeEventListener('mousedown', handleClickOutside);
-    }, []);
-    
+    const remainingForFixed = planDetailIncome - planDetailTotalPercentExpenses;
+
     const availableCategories = categories.filter(cat => !planDetailSelectedCategories.includes(cat.id));
     
     const addCategory = (catId: string) => {
@@ -940,7 +948,7 @@ const FinanceView: React.FC<FinanceViewProps> = ({
         setPlanDetailSelectedCategories([...planDetailSelectedCategories, catId]);
         setPlanDetailExpenses({ ...planDetailExpenses, [catId]: 0 });
       }
-      setIsCategoryDropdownOpen(false);
+      setPlanDetailCategoryDropdownOpen(false);
     };
     
     const removeCategory = (catId: string) => {
@@ -974,26 +982,7 @@ const FinanceView: React.FC<FinanceViewProps> = ({
       onSaveFinancialPlanDocument(updated);
     };
     
-    // Вычисляем общую сумму расходов (процентные + фиксированные)
-    const totalExpenses = useMemo(() => {
-      const percentTotal = planDetailSelectedCategories
-        .filter(catId => {
-          const cat = categories.find(c => c.id === catId);
-          return cat && cat.type === 'percent';
-        })
-        .reduce((sum, catId) => sum + calculatePercentAmount(catId), 0);
-      
-      const fixedTotal = planDetailSelectedCategories
-        .filter(catId => {
-          const cat = categories.find(c => c.id === catId);
-          return cat && cat.type === 'fixed';
-        })
-        .reduce((sum, catId) => sum + (planDetailExpenses[catId] || 0), 0);
-      
-      return percentTotal + fixedTotal;
-    }, [planDetailSelectedCategories, planDetailExpenses, planDetailIncome, categories]);
-    
-    const balance = planDetailIncome - totalExpenses;
+    const balance = planDetailIncome - planDetailTotalExpenses;
     
     return (
       <div className="space-y-6">
@@ -1059,16 +1048,16 @@ const FinanceView: React.FC<FinanceViewProps> = ({
           <div className="p-4 border-b border-gray-200 dark:border-[#333] flex items-center justify-between">
             <h3 className="font-bold text-gray-800 dark:text-white">Расходы по статьям</h3>
             {availableCategories.length > 0 && (
-              <div className="relative" ref={categoryDropdownRef}>
+              <div className="relative" ref={planDetailCategoryDropdownRef}>
                 <button
-                  onClick={() => setIsCategoryDropdownOpen(!isCategoryDropdownOpen)}
+                  onClick={() => setPlanDetailCategoryDropdownOpen(!planDetailCategoryDropdownOpen)}
                   className="px-3 py-1.5 bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 rounded-lg flex items-center gap-2"
                 >
                   <Plus size={14} />
                   Добавить статью
-                  <ChevronDown size={14} className={`transition-transform ${isCategoryDropdownOpen ? 'rotate-180' : ''}`} />
+                  <ChevronDown size={14} className={`transition-transform ${planDetailCategoryDropdownOpen ? 'rotate-180' : ''}`} />
                 </button>
-                {isCategoryDropdownOpen && (
+                {planDetailCategoryDropdownOpen && (
                   <div className="absolute top-full right-0 mt-1 w-64 bg-white dark:bg-[#252525] border border-gray-200 dark:border-[#333] rounded-lg shadow-xl z-50 max-h-64 overflow-y-auto custom-scrollbar">
                     {availableCategories.map(cat => (
                       <div
@@ -1104,7 +1093,7 @@ const FinanceView: React.FC<FinanceViewProps> = ({
                         return cat && cat.type === 'percent';
                       }).map(catId => {
                         const cat = categories.find(c => c.id === catId)!;
-                        const percentAmount = calculatePercentAmount(catId);
+                        const percentAmount = calculatePlanDetailPercentAmount(catId);
                         return (
                           <div key={catId} className="flex items-center gap-3 p-3 rounded-lg border bg-gray-50 dark:bg-[#303030] border-gray-200 dark:border-[#444]">
                             <div className="flex-1 flex items-center gap-3">
@@ -1201,7 +1190,7 @@ const FinanceView: React.FC<FinanceViewProps> = ({
           <div className="p-4 border-t border-gray-200 dark:border-[#333] bg-gray-50 dark:bg-[#303030]">
             <div className="flex items-center justify-between">
               <span className="font-bold text-gray-900 dark:text-white">Итого расходов:</span>
-              <span className="font-bold text-gray-900 dark:text-white">{totalExpenses.toLocaleString()} UZS</span>
+              <span className="font-bold text-gray-900 dark:text-white">{planDetailTotalExpenses.toLocaleString()} UZS</span>
             </div>
             <div className="flex items-center justify-between mt-2">
               <span className="font-bold text-gray-900 dark:text-white">Остаток:</span>
