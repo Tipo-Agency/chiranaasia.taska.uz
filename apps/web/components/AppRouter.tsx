@@ -143,6 +143,7 @@ export const AppRouter: React.FC<AppRouterProps> = (props) => {
               onNavigateToMeetings={() => actions.setCurrentView('meetings')}
               onNavigateToDeals={() => actions.setCurrentView('sales-funnel')}
               onNavigateToDocs={() => actions.setCurrentView('docs')}
+              onOpenDocument={actions.handleDocClick}
               clients={props.clients}
               accountsReceivable={props.accountsReceivable}
           />
@@ -190,9 +191,22 @@ export const AppRouter: React.FC<AppRouterProps> = (props) => {
   if (view === 'chat') {
       return (
           <PageLayout>
-              <Container safeArea className="py-4 h-full flex flex-col min-h-0">
-                  <div className="flex-1 min-h-[60vh]">
-                      <MiniMessenger users={props.users} currentUser={props.currentUser} />
+              <Container safeArea className="py-4 h-full flex flex-col min-h-0 max-w-6xl mx-auto w-full">
+                  <div className="flex-1 min-h-[70vh]">
+                      <MiniMessenger
+                        users={props.users}
+                        currentUser={props.currentUser}
+                        docs={props.docs}
+                        onOpenDocument={props.actions.handleDocClick}
+                        onOpenDocumentsModule={() => props.actions.setCurrentView('docs')}
+                        onCreateTask={() => props.actions.openTaskModal(null)}
+                        onStartProcess={() => {
+                          props.actions.setCurrentView('business-processes');
+                          setTimeout(() => window.dispatchEvent(new CustomEvent('openCreateProcessModal')), 120);
+                        }}
+                        onOpenDeals={() => props.actions.setCurrentView('sales-funnel')}
+                        onOpenMeetings={() => props.actions.setCurrentView('meetings')}
+                      />
                   </div>
               </Container>
           </PageLayout>

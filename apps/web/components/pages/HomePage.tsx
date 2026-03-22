@@ -71,6 +71,8 @@ interface HomePageProps {
   onNavigateToMeetings: () => void;
   onNavigateToDeals?: () => void;
   onNavigateToDocs?: () => void;
+  /** Открыть документ из чата (редактор / ссылка) */
+  onOpenDocument?: (doc: Doc) => void;
   onSendMessage?: (payload: { text: string; attachments?: MessageAttachment[]; recipientId?: string | null }) => void;
   onLoadMessages?: () => void;
 }
@@ -102,6 +104,7 @@ export const HomePage: React.FC<HomePageProps> = ({
   onNavigateToMeetings,
   onNavigateToDeals,
   onNavigateToDocs,
+  onOpenDocument,
   onSendMessage,
 }) => {
   const [showBirthdayModal, setShowBirthdayModal] = useState(false);
@@ -349,7 +352,17 @@ export const HomePage: React.FC<HomePageProps> = ({
                 )}
                 {inboxTab === 'messages' && (
                   <div className="h-[320px] -mx-4">
-                    <MiniMessenger users={users} currentUser={currentUser} />
+                    <MiniMessenger
+                      users={users}
+                      currentUser={currentUser}
+                      docs={docs}
+                      onOpenDocument={onOpenDocument}
+                      onOpenDocumentsModule={onNavigateToDocs}
+                      onCreateTask={onQuickCreateTask}
+                      onStartProcess={onQuickCreateProcess}
+                      onOpenDeals={onNavigateToDeals}
+                      onOpenMeetings={onNavigateToMeetings}
+                    />
                   </div>
                 )}
               </div>

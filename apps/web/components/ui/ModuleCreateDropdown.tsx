@@ -4,7 +4,7 @@
  * Цвет кнопки задаётся через className (акцент модуля).
  */
 import React, { useState, useEffect, useRef } from 'react';
-import { Plus, ChevronDown } from 'lucide-react';
+import { Plus, ChevronDown, type LucideIcon } from 'lucide-react';
 
 export interface ModuleCreateMenuItem {
   id: string;

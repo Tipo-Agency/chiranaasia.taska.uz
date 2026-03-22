@@ -1,6 +1,4 @@
-import { Task, Deal, PurchaseRequest } from '../types';
-
-export type ChatEntityType = 'task' | 'deal' | 'request';
+export type ChatEntityType = 'task' | 'deal' | 'request' | 'doc' | 'file';
 
 export interface ChatMessageLocal {
   id: string;
@@ -11,6 +9,15 @@ export interface ChatMessageLocal {
   isSystem?: boolean;
   entityType?: ChatEntityType;
   entityId?: string;
+  /** Ссылка на документ из модуля «Документы» */
+  docId?: string;
+  docTitle?: string;
+  /** Прикреплённый файл */
+  fileName?: string;
+  fileSize?: number;
+  fileMime?: string;
+  /** Для небольших изображений / превью */
+  fileDataUrl?: string;
 }
 
 const STORAGE_KEY = 'local_chat_messages_v1';
@@ -35,7 +42,7 @@ function writeAll(messages: ChatMessageLocal[]): void {
 export const chatLocalService = {
   getMessagesForUser(userId: string): ChatMessageLocal[] {
     return readAll().filter(
-      m => m.fromId === userId || m.toId === userId || m.toId === '__all__'
+      (m) => m.fromId === userId || m.toId === userId || m.toId === '__all__'
     );
   },
 
@@ -46,6 +53,12 @@ export const chatLocalService = {
     isSystem?: boolean;
     entityType?: ChatEntityType;
     entityId?: string;
+    docId?: string;
+    docTitle?: string;
+    fileName?: string;
+    fileSize?: number;
+    fileMime?: string;
+    fileDataUrl?: string;
   }): ChatMessageLocal {
     const all = readAll();
     const msg: ChatMessageLocal = {
@@ -58,15 +71,13 @@ export const chatLocalService = {
     return msg;
   },
 
-  addSystemMessageForEntity(
-    opts: {
-      actorId: string;
-      targetUserId: string;
-      text: string;
-      entityType?: ChatEntityType;
-      entityId?: string;
-    }
-  ) {
+  addSystemMessageForEntity(opts: {
+    actorId: string;
+    targetUserId: string;
+    text: string;
+    entityType?: ChatEntityType;
+    entityId?: string;
+  }) {
     return chatLocalService.addMessage({
       fromId: opts.actorId,
       toId: opts.targetUserId,
@@ -77,4 +88,3 @@ export const chatLocalService = {
     });
   },
 };
-

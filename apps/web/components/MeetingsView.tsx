@@ -1,8 +1,23 @@
 
 import React, { useState, useMemo } from 'react';
 import { Meeting, User, TableCollection, Client, Deal } from '../types';
-import { Calendar, Users, X, List, LayoutGrid, Clock, Repeat, Check, Trash2, Box, Briefcase, Building2, CalendarDays } from 'lucide-react';
-import { ModuleCreateDropdown } from './ui';
+import {
+  Calendar,
+  X,
+  List,
+  LayoutGrid,
+  Clock,
+  Repeat,
+  Check,
+  Trash2,
+  Box,
+  Briefcase,
+  Building2,
+  CalendarDays,
+  ChevronLeft,
+  ChevronRight,
+  Plus,
+} from 'lucide-react';
 import { TaskSelect } from './TaskSelect';
 import { normalizeDateForInput } from '../utils/dateUtils';
 
@@ -24,6 +39,10 @@ const MeetingsView: React.FC<MeetingsViewProps> = ({ meetings = [], users, clien
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingMeeting, setEditingMeeting] = useState<Meeting | null>(null);
   const [meetingTypeFilter, setMeetingTypeFilter] = useState<'all' | 'client' | 'work'>('all');
+  const [calendarMonth, setCalendarMonth] = useState(() => {
+    const t = new Date();
+    return { month: t.getMonth(), year: t.getFullYear() };
+  });
   
   // Form State
   const [meetingType, setMeetingType] = useState<'client' | 'work'>('work');
@@ -162,16 +181,33 @@ const MeetingsView: React.FC<MeetingsViewProps> = ({ meetings = [], users, clien
   };
 
   const handleBackdropClick = (e: React.MouseEvent) => {
-      if (e.target === e.currentTarget) {
-          if(window.confirm("Сохранить изменения?")) handleCreate();
-          else setIsModalOpen(false);
+      if (e.target === e.currentTarget) setIsModalOpen(false);
+  };
+
+  const goCalendarToday = () => {
+    const t = new Date();
+    setCalendarMonth({ month: t.getMonth(), year: t.getFullYear() });
+  };
+
+  const shiftCalendarMonth = (delta: number) => {
+    setCalendarMonth((prev) => {
+      let m = prev.month + delta;
+      let y = prev.year;
+      while (m < 0) {
+        m += 12;
+        y -= 1;
       }
+      while (m > 11) {
+        m -= 12;
+        y += 1;
+      }
+      return { month: m, year: y };
+    });
   };
 
   const renderCalendar = () => {
-      const today = new Date();
-      const currentMonth = today.getMonth();
-      const currentYear = today.getFullYear();
+      const currentMonth = calendarMonth.month;
+      const currentYear = calendarMonth.year;
       const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
       const firstDay = new Date(currentYear, currentMonth, 1).getDay();
       
@@ -181,16 +217,47 @@ const MeetingsView: React.FC<MeetingsViewProps> = ({ meetings = [], users, clien
       for (let i = 0; i < startOffset; i++) days.push(null);
       for (let i = 1; i <= daysInMonth; i++) days.push(i);
 
+      const monthLabel = new Date(currentYear, currentMonth, 1).toLocaleString('ru-RU', { month: 'long', year: 'numeric' });
+
       return (
           <div className="rounded-2xl border border-gray-200 dark:border-[#333] bg-white dark:bg-[#191919] shadow-sm overflow-hidden">
-              <div className="flex flex-wrap items-center justify-between gap-3 border-b border-gray-100 dark:border-[#333] bg-gradient-to-r from-teal-50/90 to-cyan-50/80 dark:from-teal-950/40 dark:to-cyan-950/30 px-5 py-4">
-                  <div className="flex items-center gap-2">
-                    <CalendarDays className="text-teal-600 dark:text-teal-400 shrink-0" size={22} />
-                    <span className="capitalize font-semibold text-gray-900 dark:text-white text-base">
-                      {today.toLocaleString('ru-RU', { month: 'long', year: 'numeric' })}
-                    </span>
+              <div className="flex flex-col sm:flex-row sm:flex-wrap items-stretch sm:items-center justify-between gap-3 border-b border-gray-100 dark:border-[#333] bg-gradient-to-r from-teal-50/90 to-cyan-50/80 dark:from-teal-950/40 dark:to-cyan-950/30 px-4 sm:px-5 py-3 sm:py-4">
+                  <div className="flex items-center justify-between sm:justify-start gap-2 min-w-0 flex-1">
+                    <button
+                      type="button"
+                      onClick={() => shiftCalendarMonth(-1)}
+                      className="p-2 rounded-xl border border-teal-200/80 dark:border-teal-800 bg-white/80 dark:bg-[#1a1a1a] text-teal-700 dark:text-teal-300 hover:bg-teal-50 dark:hover:bg-teal-950/50 transition-colors shrink-0"
+                      title="Предыдущий месяц"
+                      aria-label="Предыдущий месяц"
+                    >
+                      <ChevronLeft size={20} />
+                    </button>
+                    <div className="flex items-center gap-2 min-w-0 flex-1 justify-center sm:justify-start">
+                      <CalendarDays className="text-teal-600 dark:text-teal-400 shrink-0 hidden sm:block" size={22} />
+                      <span className="capitalize font-semibold text-gray-900 dark:text-white text-base truncate text-center sm:text-left">
+                        {monthLabel}
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => shiftCalendarMonth(1)}
+                      className="p-2 rounded-xl border border-teal-200/80 dark:border-teal-800 bg-white/80 dark:bg-[#1a1a1a] text-teal-700 dark:text-teal-300 hover:bg-teal-50 dark:hover:bg-teal-950/50 transition-colors shrink-0"
+                      title="Следующий месяц"
+                      aria-label="Следующий месяц"
+                    >
+                      <ChevronRight size={20} />
+                    </button>
                   </div>
-                  <p className="text-xs text-gray-600 dark:text-gray-400">Перетащите встречу на другой день, чтобы перенести</p>
+                  <div className="flex items-center justify-center sm:justify-end gap-2">
+                    <button
+                      type="button"
+                      onClick={goCalendarToday}
+                      className="px-3 py-1.5 rounded-xl text-xs font-semibold bg-teal-600 text-white hover:bg-teal-700 shadow-sm"
+                    >
+                      Сегодня
+                    </button>
+                  </div>
+                  <p className="text-[11px] text-gray-600 dark:text-gray-400 text-center sm:text-right w-full sm:w-auto sm:max-w-[220px]">Перетащите карточку на другой день, чтобы перенести</p>
               </div>
               <div className="grid grid-cols-7 border-b border-gray-200 dark:border-[#333] bg-gray-50 dark:bg-[#252525]">
                   {['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'].map(d => (
@@ -213,29 +280,52 @@ const MeetingsView: React.FC<MeetingsViewProps> = ({ meetings = [], users, clien
                           } catch (e) { return false; }
                       }) : [];
                       
+                      const isToday =
+                        day &&
+                        new Date().toDateString() === new Date(currentYear, currentMonth, day).toDateString();
+
                       return (
                         <div 
                             key={idx} 
-                            className={`min-h-[108px] border-r border-b border-gray-100 dark:border-[#2a2a2a] p-1.5 transition-colors ${!day ? 'bg-gray-50/40 dark:bg-[#0f0f0f]' : 'hover:bg-teal-50/30 dark:hover:bg-teal-950/20'}`}
+                            className={`min-h-[128px] border-r border-b border-gray-100 dark:border-[#2a2a2a] p-1.5 transition-colors ${!day ? 'bg-gray-50/40 dark:bg-[#0f0f0f]' : 'hover:bg-teal-50/30 dark:hover:bg-teal-950/20'}`}
                             onDragOver={day ? onDragOver : undefined}
                             onDrop={day ? (e) => onDrop(e, dateStr) : undefined}
                         >
                             {day && (
                                 <>
-                                    <div className={`text-right text-xs font-semibold mb-1.5 px-0.5 ${new Date().toDateString() === new Date(currentYear, currentMonth, day).toDateString() ? 'text-teal-600 dark:text-teal-400' : 'text-gray-500 dark:text-gray-500'}`}>{day}</div>
-                                    <div className="space-y-1">
-                                        {dayMeetings.map(m => (
+                                    <div className={`text-right text-xs font-bold mb-1 px-0.5 ${isToday ? 'text-teal-600 dark:text-teal-400' : 'text-gray-500 dark:text-gray-500'}`}>
+                                      {isToday ? (
+                                        <span className="inline-flex items-center justify-end gap-1">
+                                          <span className="rounded-full bg-teal-600 text-white px-1.5 py-0.5 text-[10px]">{day}</span>
+                                        </span>
+                                      ) : (
+                                        day
+                                      )}
+                                    </div>
+                                    <div className="space-y-1.5">
+                                        {dayMeetings.map(m => {
+                                          const pCount = (m.participantIds || []).length;
+                                          const typeShort = m.type === 'client' ? 'Клиент' : 'Рабочая';
+                                          return (
                                             <div 
                                                 key={m.id} 
                                                 draggable
                                                 onDragStart={(e) => onDragStart(e, m.id)}
                                                 onClick={(e) => { e.stopPropagation(); handleOpenEdit(m); }}
-                                                className="text-[10px] leading-tight bg-white dark:bg-teal-950/50 text-teal-900 dark:text-teal-100 px-1.5 py-1.5 rounded-lg border border-teal-200/80 dark:border-teal-800 truncate cursor-pointer shadow-sm hover:border-teal-400 dark:hover:border-teal-600" 
-                                                title={m.title}
+                                                className="bg-white dark:bg-teal-950/55 text-teal-950 dark:text-teal-50 px-2 py-1.5 rounded-xl border border-teal-200/90 dark:border-teal-800 cursor-pointer shadow-sm hover:border-teal-500 dark:hover:border-teal-500 hover:shadow transition-all" 
+                                                title={`${m.time} — ${m.title}`}
                                             >
-                                                <span className="font-semibold opacity-80">{m.time}</span> {m.title}
+                                                <div className="text-[11px] font-bold text-teal-700 dark:text-teal-200 tabular-nums">{m.time}</div>
+                                                <div className="text-[11px] font-semibold leading-snug line-clamp-2 mt-0.5">{m.title}</div>
+                                                <div className="flex flex-wrap items-center gap-1 mt-1">
+                                                  <span className="text-[9px] uppercase tracking-wide font-semibold px-1 py-0.5 rounded bg-teal-100/90 dark:bg-teal-900/60 text-teal-800 dark:text-teal-200">{typeShort}</span>
+                                                  {pCount > 0 && (
+                                                    <span className="text-[9px] text-gray-600 dark:text-gray-400">{pCount} уч.</span>
+                                                  )}
+                                                </div>
                                             </div>
-                                        ))}
+                                          );
+                                        })}
                                     </div>
                                 </>
                             )}
@@ -246,8 +336,6 @@ const MeetingsView: React.FC<MeetingsViewProps> = ({ meetings = [], users, clien
           </div>
       );
   };
-
-  const upcomingCount = filteredMeetings.filter(m => new Date(m.date) >= new Date(new Date().toDateString())).length;
 
   return (
     <div className="h-full flex flex-col min-h-0 bg-gray-50/50 dark:bg-[#141414]">
@@ -263,34 +351,21 @@ const MeetingsView: React.FC<MeetingsViewProps> = ({ meetings = [], users, clien
                 <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
                   Планирование, календарь и итоги переговоров
                 </p>
-                <div className="flex flex-wrap gap-2 mt-3">
-                  <span className="inline-flex items-center gap-1.5 rounded-full bg-white dark:bg-[#252525] border border-gray-200 dark:border-[#333] px-3 py-1 text-xs font-medium text-gray-700 dark:text-gray-200">
-                    <Users size={12} className="text-teal-600" />
-                    Всего: <strong>{filteredMeetings.length}</strong>
-                  </span>
-                  <span className="inline-flex items-center gap-1.5 rounded-full bg-teal-50 dark:bg-teal-950/50 border border-teal-100 dark:border-teal-900 px-3 py-1 text-xs font-medium text-teal-800 dark:text-teal-200">
-                    Ближайшие: <strong>{upcomingCount}</strong>
-                  </span>
-                </div>
               </div>
             </div>
-            <ModuleCreateDropdown
-              buttonClassName="bg-teal-600 hover:bg-teal-700 text-white shrink-0"
-              items={[
-                {
-                  id: 'meeting',
-                  label: 'Новая встреча',
-                  icon: Calendar,
-                  onClick: handleOpenCreate,
-                  iconClassName: 'text-teal-600 dark:text-teal-400',
-                },
-              ]}
-            />
+            <button
+              type="button"
+              onClick={handleOpenCreate}
+              title="Новая встреча"
+              aria-label="Новая встреча"
+              className="inline-flex items-center justify-center w-11 h-11 shrink-0 rounded-xl bg-teal-600 hover:bg-teal-700 text-white shadow-md shadow-teal-600/20 self-end sm:mt-1 transition-colors"
+            >
+              <Plus size={22} strokeWidth={2.5} />
+            </button>
           </div>
           
           <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
             <div className="flex flex-wrap items-center gap-1.5 rounded-2xl bg-white dark:bg-[#1a1a1a] border border-gray-200 dark:border-[#333] p-1 shadow-sm">
-              <span className="pl-3 pr-1 text-[10px] font-bold uppercase tracking-wider text-gray-400 hidden sm:inline">Тип</span>
               <button 
                 type="button"
                 onClick={() => setMeetingTypeFilter('all')} 
@@ -450,37 +525,44 @@ const MeetingsView: React.FC<MeetingsViewProps> = ({ meetings = [], users, clien
         </div>
       </div>
 
-      {/* Create/Edit Modal */}
+      {/* Create/Edit Modal — один скролл по центру, шапка и футер фиксированы */}
       {isModalOpen && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={handleBackdropClick}>
-            <div className="bg-white dark:bg-[#252525] rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden flex flex-col max-h-[90vh] border border-gray-200 dark:border-[#333]" onClick={e => e.stopPropagation()}>
-                {/* Header - стандартизированный дизайн */}
-                <div className="p-4 border-b border-gray-100 dark:border-[#333] flex justify-between items-center bg-white dark:bg-[#252525] shrink-0">
-                    <h3 className="font-bold text-gray-800 dark:text-white">{editingMeeting ? 'Редактировать встречу' : 'Новая встреча'}</h3>
-                    <button onClick={() => setIsModalOpen(false)} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 p-1 rounded-full hover:bg-gray-100 dark:hover:bg-[#333]"><X size={18} /></button>
+            <div
+              className="bg-white dark:bg-[#252525] rounded-2xl shadow-2xl w-full max-w-xl border border-gray-200 dark:border-[#333] flex flex-col max-h-[min(92vh,840px)] min-h-0"
+              onClick={e => e.stopPropagation()}
+            >
+                <div className="px-5 py-4 border-b border-gray-100 dark:border-[#333] flex justify-between items-start gap-3 shrink-0 bg-gradient-to-r from-teal-50/50 to-white dark:from-teal-950/20 dark:to-[#252525]">
+                    <div>
+                      <h3 className="text-lg font-bold text-gray-900 dark:text-white leading-tight">
+                        {editingMeeting ? 'Редактировать встречу' : 'Новая встреча'}
+                      </h3>
+                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Заполните поля ниже — список участников прокручивается отдельно при необходимости.</p>
+                    </div>
+                    <button type="button" onClick={() => setIsModalOpen(false)} className="text-gray-400 hover:text-gray-700 dark:hover:text-white p-2 rounded-xl hover:bg-gray-100 dark:hover:bg-[#333] shrink-0" aria-label="Закрыть">
+                      <X size={20} />
+                    </button>
                 </div>
 
-                {/* Form */}
-                <form onSubmit={handleCreate} className="flex-1 overflow-y-auto custom-scrollbar">
-                    <div className="p-6 space-y-5">
-                        {/* Meeting Type */}
+                <form onSubmit={handleCreate} className="flex flex-col flex-1 min-h-0">
+                    <div className="flex-1 min-h-0 overflow-y-auto custom-scrollbar px-5 py-5 space-y-4">
                         <div>
-                            <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Тип встречи</label>
-                            <div className="grid grid-cols-2 gap-3">
+                            <label className="block text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-2">Тип</label>
+                            <div className="grid grid-cols-2 gap-2">
                                 <button
                                     type="button"
                                     onClick={() => {
                                         setMeetingType('work');
                                         setRecurrence('none');
                                     }}
-                                    className={`px-4 py-3 rounded-lg border-2 transition-all flex items-center gap-2 ${
+                                    className={`px-3 py-2.5 rounded-xl border-2 transition-all flex items-center gap-2 text-sm ${
                                         meetingType === 'work'
-                                            ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300'
-                                            : 'border-gray-200 dark:border-[#444] bg-white dark:bg-[#1e1e1e] text-gray-700 dark:text-gray-300 hover:border-gray-300 dark:hover:border-[#555]'
+                                            ? 'border-teal-500 bg-teal-50 dark:bg-teal-950/40 text-teal-900 dark:text-teal-100'
+                                            : 'border-gray-200 dark:border-[#444] bg-white dark:bg-[#1e1e1e] text-gray-700 dark:text-gray-300'
                                     }`}
                                 >
-                                    <Building2 size={18} />
-                                    <span className="font-medium">Рабочая встреча</span>
+                                    <Building2 size={17} />
+                                    <span className="font-medium">Рабочая</span>
                                 </button>
                                 <button
                                     type="button"
@@ -488,22 +570,21 @@ const MeetingsView: React.FC<MeetingsViewProps> = ({ meetings = [], users, clien
                                         setMeetingType('client');
                                         setRecurrence('none');
                                     }}
-                                    className={`px-4 py-3 rounded-lg border-2 transition-all flex items-center gap-2 ${
+                                    className={`px-3 py-2.5 rounded-xl border-2 transition-all flex items-center gap-2 text-sm ${
                                         meetingType === 'client'
-                                            ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300'
-                                            : 'border-gray-200 dark:border-[#444] bg-white dark:bg-[#1e1e1e] text-gray-700 dark:text-gray-300 hover:border-gray-300 dark:hover:border-[#555]'
+                                            ? 'border-teal-500 bg-teal-50 dark:bg-teal-950/40 text-teal-900 dark:text-teal-100'
+                                            : 'border-gray-200 dark:border-[#444] bg-white dark:bg-[#1e1e1e] text-gray-700 dark:text-gray-300'
                                     }`}
                                 >
-                                    <Briefcase size={18} />
+                                    <Briefcase size={17} />
                                     <span className="font-medium">С клиентом</span>
                                 </button>
                             </div>
                         </div>
 
-                        {/* Deal Selection (only for client meetings) */}
                         {meetingType === 'client' && (
                             <div>
-                                <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Сделка <span className="text-red-500">*</span></label>
+                                <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1.5">Сделка <span className="text-red-500">*</span></label>
                                 <TaskSelect
                                     value={selectedDealId}
                                     onChange={setSelectedDealId}
@@ -522,50 +603,47 @@ const MeetingsView: React.FC<MeetingsViewProps> = ({ meetings = [], users, clien
                             </div>
                         )}
 
-                        {/* Title */}
                         <div>
-                            <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Тема встречи</label>
+                            <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1.5">Тема</label>
                             <input 
                                 required 
                                 type="text" 
                                 value={title} 
                                 onChange={e => setTitle(e.target.value)} 
-                                className="w-full bg-white dark:bg-[#1e1e1e] text-gray-900 dark:text-gray-100 border border-gray-300 dark:border-[#444] rounded-lg px-4 py-3 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all" 
-                                placeholder={meetingType === 'client' ? 'Например: Презентация проекта' : 'Например: Еженедельная планерка'}
+                                className="w-full bg-white dark:bg-[#1e1e1e] text-gray-900 dark:text-gray-100 border border-gray-300 dark:border-[#444] rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-teal-500/40 focus:border-teal-500 outline-none" 
+                                placeholder={meetingType === 'client' ? 'Например: Презентация проекта' : 'Например: Планёрка команды'}
                             />
                         </div>
                         
-                        {/* Date & Time */}
-                        <div className="grid grid-cols-2 gap-4">
+                        <div className="grid grid-cols-2 gap-3">
                             <div>
-                                <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Дата</label>
+                                <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1.5">Дата</label>
                                 <input 
                                     required 
                                     type="date" 
                                     value={normalizeDateForInput(date) || date} 
                                     onChange={e => setDate(e.target.value)} 
-                                    className="w-full bg-white dark:bg-[#1e1e1e] text-gray-900 dark:text-gray-100 border border-gray-300 dark:border-[#444] rounded-lg px-4 py-3 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
+                                    className="w-full bg-white dark:bg-[#1e1e1e] text-gray-900 dark:text-gray-100 border border-gray-300 dark:border-[#444] rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-teal-500/40 outline-none"
                                 />
                             </div>
                             <div>
-                                <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Время</label>
+                                <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1.5">Время</label>
                                 <input 
                                     required 
                                     type="time" 
                                     value={time} 
                                     onChange={e => setTime(e.target.value)} 
-                                    className="w-full bg-white dark:bg-[#1e1e1e] text-gray-900 dark:text-gray-100 border border-gray-300 dark:border-[#444] rounded-lg px-4 py-3 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
+                                    className="w-full bg-white dark:bg-[#1e1e1e] text-gray-900 dark:text-gray-100 border border-gray-300 dark:border-[#444] rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-teal-500/40 outline-none"
                                 />
                             </div>
                         </div>
 
-                        {/* Recurrence (only for work meetings) */}
                         {meetingType === 'work' && (
                             <div>
-                                <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Повторение</label>
+                                <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1.5">Повторение</label>
                                 <TaskSelect
                                     value={recurrence}
-                                    onChange={(val) => setRecurrence(val as any)}
+                                    onChange={(val) => setRecurrence(val as 'none' | 'daily' | 'weekly' | 'monthly')}
                                     options={[
                                         { value: 'none', label: 'Не повторять' },
                                         { value: 'daily', label: 'Ежедневно' },
@@ -577,10 +655,9 @@ const MeetingsView: React.FC<MeetingsViewProps> = ({ meetings = [], users, clien
                             </div>
                         )}
 
-                        {/* Participants */}
                         <div>
-                            <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Участники</label>
-                            <div className="border border-gray-200 dark:border-[#444] rounded-lg max-h-48 overflow-y-auto custom-scrollbar bg-white dark:bg-[#1e1e1e] divide-y divide-gray-100 dark:divide-[#333]">
+                            <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1.5">Участники</label>
+                            <div className="border border-gray-200 dark:border-[#444] rounded-xl max-h-[min(200px,28vh)] overflow-y-auto custom-scrollbar bg-gray-50/50 dark:bg-[#1a1a1a] divide-y divide-gray-100 dark:divide-[#333]">
                                 {users.length === 0 ? (
                                     <div className="p-4 text-center text-sm text-gray-400 dark:text-gray-500">Нет сотрудников</div>
                                 ) : (
@@ -590,13 +667,13 @@ const MeetingsView: React.FC<MeetingsViewProps> = ({ meetings = [], users, clien
                                             <div 
                                                 key={u.id}
                                                 onClick={() => toggleParticipant(u.id)}
-                                                className={`flex items-center gap-3 p-3 cursor-pointer transition-all hover:bg-gray-50 dark:hover:bg-[#2a2a2a] ${isSelected ? 'bg-blue-50 dark:bg-blue-900/20 border-l-2 border-l-blue-500' : ''}`}
+                                                className={`flex items-center gap-3 p-2.5 cursor-pointer transition-colors hover:bg-white/80 dark:hover:bg-[#252525] ${isSelected ? 'bg-teal-50/80 dark:bg-teal-950/30' : ''}`}
                                             >
-                                                <div className={`w-5 h-5 rounded border-2 flex items-center justify-center shrink-0 transition-all ${isSelected ? 'bg-blue-600 border-blue-600' : 'border-gray-300 dark:border-gray-600 bg-white dark:bg-[#252525]'}`}>
+                                                <div className={`w-5 h-5 rounded-md border-2 flex items-center justify-center shrink-0 ${isSelected ? 'bg-teal-600 border-teal-600' : 'border-gray-300 dark:border-gray-600 bg-white dark:bg-[#252525]'}`}>
                                                     {isSelected && <Check size={12} className="text-white" />}
                                                 </div>
-                                                <img src={u.avatar} className="w-8 h-8 rounded-full border-2 border-gray-200 dark:border-[#444] object-cover object-center" alt={u.name} />
-                                                <span className={`text-sm font-medium ${isSelected ? 'text-gray-900 dark:text-gray-100' : 'text-gray-600 dark:text-gray-400'}`}>{u.name}</span>
+                                                <img src={u.avatar} className="w-7 h-7 rounded-full object-cover" alt="" />
+                                                <span className={`text-sm ${isSelected ? 'font-semibold text-gray-900 dark:text-white' : 'text-gray-600 dark:text-gray-400'}`}>{u.name}</span>
                                             </div>
                                         );
                                     })
@@ -605,23 +682,20 @@ const MeetingsView: React.FC<MeetingsViewProps> = ({ meetings = [], users, clien
                         </div>
                     </div>
 
-                    {/* Footer - стандартизированный дизайн */}
-                    <div className="p-4 border-t border-gray-100 dark:border-[#333] bg-white dark:bg-[#252525] flex justify-between items-center shrink-0">
-                        <div className="flex gap-2 ml-auto">
-                            <button 
-                                type="button" 
-                                onClick={() => setIsModalOpen(false)}
-                                className="px-4 py-2 text-sm font-medium text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-[#303030] rounded-lg"
-                            >
-                                Отмена
-                            </button>
-                            <button 
-                                type="submit" 
-                                className="px-4 py-2 text-sm font-medium bg-teal-600 text-white hover:bg-teal-700 rounded-lg shadow-sm flex items-center gap-2"
-                            >
-                                {editingMeeting ? 'Сохранить' : 'Создать встречу'}
-                            </button>
-                        </div>
+                    <div className="px-5 py-4 border-t border-gray-100 dark:border-[#333] bg-gray-50/80 dark:bg-[#1f1f1f] flex justify-end gap-2 shrink-0">
+                        <button 
+                            type="button" 
+                            onClick={() => setIsModalOpen(false)}
+                            className="px-4 py-2.5 text-sm font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-200/80 dark:hover:bg-[#333] rounded-xl"
+                        >
+                            Отмена
+                        </button>
+                        <button 
+                            type="submit" 
+                            className="px-5 py-2.5 text-sm font-semibold bg-teal-600 text-white hover:bg-teal-700 rounded-xl shadow-sm"
+                        >
+                            {editingMeeting ? 'Сохранить' : 'Создать встречу'}
+                        </button>
                     </div>
                 </form>
             </div>
