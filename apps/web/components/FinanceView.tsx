@@ -3,7 +3,7 @@ import React, { useState, useRef, useMemo, useEffect, useCallback } from 'react'
 import { TaskSelect } from './TaskSelect';
 import { FinanceCategory, Fund, FinancePlan, PurchaseRequest, Department, User, Role, FinancialPlanDocument, FinancialPlanning, Bdr } from '../types';
 import { Wallet, Plus, X, Edit2, Trash2, PieChart, TrendingUp, DollarSign, Check, AlertCircle, Calendar, Settings, ArrowLeft, ArrowRight, Save, FileText, Clock, CheckCircle2, ChevronDown } from 'lucide-react';
-import { Tabs, Button, Card } from './ui';
+import { Tabs, Button, Card, ModulePageShell, ModulePageHeader, MODULE_PAGE_GUTTER } from './ui';
 import { BankStatementsView } from './finance/BankStatementsView';
 import { BdrView } from './finance/BdrView';
 import { FilterConfig } from './FiltersPanel';
@@ -1419,17 +1419,16 @@ const FinanceView: React.FC<FinanceViewProps> = ({
   };
 
   return (
-    <div className="h-full flex flex-col min-h-0">
-      <div className="max-w-7xl mx-auto w-full pt-8 px-6 flex-shrink-0">
+    <ModulePageShell>
+      <div className={`${MODULE_PAGE_GUTTER} pt-8 pb-4 flex-shrink-0`}>
        <div className="mb-6">
-            <div className="flex justify-between items-center mb-4">
-                <div>
-                    <h1 className="text-lg md:text-2xl font-bold text-gray-800 dark:text-white truncate">Финансовое планирование</h1>
-                    <p className="hidden md:block text-xs text-gray-500 dark:text-gray-400 mt-1">
-                        Планирование и контроль финансов
-                    </p>
-                </div>
-                <div className="flex items-center gap-2">
+            <ModulePageHeader
+              icon={<Wallet size={24} strokeWidth={2} />}
+              title="Финансовое планирование"
+              description="Планирование и контроль финансов"
+              accent="emerald"
+              actions={
+                <div className="flex items-center gap-2 flex-wrap justify-end">
                     {activeTab === 'planning' && (
                         <button
                             onClick={() => setShowPlanningFilters(!showPlanningFilters)}
@@ -1495,10 +1494,11 @@ const FinanceView: React.FC<FinanceViewProps> = ({
                       <span className="sm:hidden">+</span>
                     </Button>
                 </div>
-            </div>
+              }
+            />
             
             {/* TABS */}
-            <div className="mb-4">
+            <div className="mb-4 mt-4">
                 <Tabs
                     tabs={[
                         { id: 'planning', label: 'Планирование' },
@@ -1587,7 +1587,7 @@ const FinanceView: React.FC<FinanceViewProps> = ({
        </div>
        </div>
        <div className="flex-1 min-h-0 overflow-hidden">
-         <div className="max-w-7xl mx-auto w-full px-6 pb-20 h-full overflow-y-auto custom-scrollbar">
+         <div className={`${MODULE_PAGE_GUTTER} pb-20 h-full overflow-y-auto custom-scrollbar`}>
            {activeTab === 'planning' && (
              selectedPlanning ? renderPlanningDetail() : renderPlanningList()
            )}
@@ -1781,7 +1781,7 @@ const FinanceView: React.FC<FinanceViewProps> = ({
             </div>
         </div>
        )}
-    </div>
+    </ModulePageShell>
   );
 };
 

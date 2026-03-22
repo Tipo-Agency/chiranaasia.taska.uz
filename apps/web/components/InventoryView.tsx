@@ -6,11 +6,10 @@ import {
   Package,
   ArrowLeftRight,
   ClipboardCheck,
-  Building2,
   BarChart3,
 } from 'lucide-react';
 import { Button } from './ui/Button';
-import { ModuleCreateDropdown } from './ui';
+import { ModuleCreateDropdown, ModulePageShell, ModulePageHeader, ModuleSegmentedControl, MODULE_PAGE_GUTTER } from './ui';
 
 interface InventoryViewProps {
   departments: Department[];
@@ -181,41 +180,16 @@ const InventoryView: React.FC<InventoryViewProps> = ({
     setToWarehouseId('');
   };
 
-  const totalQty = useMemo(
-    () => balancesForView.reduce((s, b) => s + (Number(b.quantity) || 0), 0),
-    [balancesForView]
-  );
-
   return (
-    <div className="h-full flex flex-col min-h-0 bg-slate-50/80 dark:bg-[#121212]">
-      <div className="max-w-7xl mx-auto w-full pt-6 md:pt-8 px-4 sm:px-6 flex-shrink-0">
-        <div className="mb-5">
-          <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
-            <div className="flex items-start gap-3 min-w-0">
-              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-emerald-600 to-green-700 text-white shadow-lg shadow-emerald-600/25">
-                <Layers size={24} strokeWidth={2} />
-              </div>
-              <div>
-                <h1 className="text-xl md:text-2xl font-bold text-gray-900 dark:text-white tracking-tight">Склад</h1>
-                <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
-                  Остатки, номенклатура, движения и инвентаризация
-                </p>
-                <div className="flex flex-wrap gap-2 mt-3">
-                  <span className="inline-flex items-center gap-1.5 rounded-full bg-white dark:bg-[#1e1e1e] border border-gray-200 dark:border-[#333] px-3 py-1 text-xs font-medium text-gray-700 dark:text-gray-200">
-                    <Building2 size={12} className="text-emerald-600" />
-                    Складов: <strong>{filteredWarehouses.length}</strong>
-                  </span>
-                  <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-100 dark:border-emerald-900 px-3 py-1 text-xs font-medium text-emerald-900 dark:text-emerald-200">
-                    <BarChart3 size={12} />
-                    Позиций на экране: <strong>{balancesForView.length}</strong>
-                    {activeTab === 'balances' && balancesForView.length > 0 && (
-                      <> · Σ <strong>{totalQty.toLocaleString('ru-RU')}</strong> ед.</>
-                    )}
-                  </span>
-                </div>
-              </div>
-            </div>
-            <div className="flex flex-wrap items-center gap-2 shrink-0">
+    <ModulePageShell>
+      <div className={`${MODULE_PAGE_GUTTER} pt-6 md:pt-8 flex-shrink-0`}>
+        <div className="mb-5 space-y-5">
+          <ModulePageHeader
+            accent="emerald"
+            icon={<Layers size={24} strokeWidth={2} />}
+            title="Склад"
+            description="Остатки, номенклатура, движения и инвентаризация"
+            actions={
               <ModuleCreateDropdown
                 buttonClassName="bg-emerald-600 hover:bg-emerald-700 text-white"
                 items={[
@@ -242,40 +216,24 @@ const InventoryView: React.FC<InventoryViewProps> = ({
                   },
                 ]}
               />
-            </div>
-          </div>
+            }
+          />
+          <ModuleSegmentedControl
+            variant="accent"
+            accent="emerald"
+            value={activeTab}
+            onChange={(v) => setActiveTab(v as typeof activeTab)}
+            options={[
+              { value: 'balances', label: 'Остатки', icon: <BarChart3 size={16} strokeWidth={2} /> },
+              { value: 'items', label: 'Номенклатура', icon: <Package size={16} strokeWidth={2} /> },
+              { value: 'movements', label: 'Журнал', icon: <ArrowLeftRight size={16} strokeWidth={2} /> },
+              { value: 'revisions', label: 'Ревизии', icon: <ClipboardCheck size={16} strokeWidth={2} /> },
+            ]}
+          />
         </div>
       </div>
       <div className="flex-1 overflow-y-auto custom-scrollbar min-h-0">
-        <div className="max-w-7xl mx-auto w-full px-4 sm:px-6 pb-20">
-
-          <div className="flex flex-wrap items-center gap-2 mb-4">
-            {(
-              [
-                { id: 'balances' as const, label: 'Остатки', icon: BarChart3 },
-                { id: 'items' as const, label: 'Номенклатура', icon: Package },
-                { id: 'movements' as const, label: 'Журнал', icon: ArrowLeftRight },
-                { id: 'revisions' as const, label: 'Ревизии', icon: ClipboardCheck },
-              ] as const
-            ).map(tab => {
-              const Icon = tab.icon;
-              return (
-                <button
-                  key={tab.id}
-                  type="button"
-                  onClick={() => setActiveTab(tab.id)}
-                  className={`inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition-all ${
-                    activeTab === tab.id
-                      ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/25'
-                      : 'bg-white dark:bg-[#1a1a1a] text-gray-600 dark:text-gray-300 border border-gray-200 dark:border-[#333] hover:border-emerald-300 dark:hover:border-emerald-800'
-                  }`}
-                >
-                  <Icon size={16} strokeWidth={2} />
-                  {tab.label}
-                </button>
-              );
-            })}
-          </div>
+        <div className={`${MODULE_PAGE_GUTTER} pb-20`}>
 
           <div className="rounded-2xl border border-gray-200 dark:border-[#333] bg-white dark:bg-[#191919] p-4 sm:p-5 mb-4 shadow-sm">
             <p className="text-[11px] font-bold uppercase tracking-wide text-gray-400 dark:text-gray-500 mb-2">Контекст</p>
@@ -741,7 +699,7 @@ const InventoryView: React.FC<InventoryViewProps> = ({
           </div>
         </div>
       </div>
-    </div>
+    </ModulePageShell>
   );
 };
 

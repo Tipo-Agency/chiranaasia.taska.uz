@@ -3,6 +3,7 @@ import React, { useState } from 'react';
 import { Department, User } from '../types';
 import { Plus, X, Edit2, Trash2, Building, User as UserIcon, GitFork } from 'lucide-react';
 import { TaskSelect } from './TaskSelect';
+import { ModulePageShell, ModulePageHeader, MODULE_PAGE_GUTTER } from './ui';
 
 interface DepartmentsViewProps {
   departments: Department[];
@@ -57,29 +58,22 @@ const DepartmentsView: React.FC<DepartmentsViewProps> = ({ departments, users, o
   };
 
   return (
-    <div className="h-full flex flex-col min-h-0">
-      <div className="max-w-5xl mx-auto w-full pt-8 px-6 flex-shrink-0">
-       <div className="mb-6">
-            <div className="flex justify-between items-center mb-4">
-                <div className="flex items-center gap-3">
-                    <div className="bg-orange-100 dark:bg-orange-900/30 p-2 rounded-lg text-orange-600 dark:text-orange-400">
-                        <GitFork size={24} />
-                    </div>
-                    <div>
-                        <h1 className="text-3xl font-bold text-gray-800 dark:text-white">Подразделения</h1>
-                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                            Управление структурой подразделений компании
-                        </p>
-                    </div>
-                </div>
-                <button onClick={handleOpenCreate} className="px-4 py-2 rounded-lg bg-orange-600 text-white text-sm font-medium hover:bg-orange-700 flex items-center gap-2 shadow-sm">
+    <ModulePageShell>
+      <div className={`${MODULE_PAGE_GUTTER} max-w-5xl pt-8 pb-4 flex-shrink-0`}>
+            <ModulePageHeader
+              icon={<GitFork size={24} strokeWidth={2} />}
+              title="Подразделения"
+              description="Управление структурой подразделений компании"
+              accent="orange"
+              actions={
+                <button onClick={handleOpenCreate} className="px-4 py-2 rounded-xl bg-orange-600 text-white text-sm font-medium hover:bg-orange-700 flex items-center gap-2 shadow-sm">
                     <Plus size={18} /> Создать
                 </button>
-            </div>
-       </div>
+              }
+            />
        </div>
        <div className="flex-1 overflow-y-auto custom-scrollbar min-h-0">
-         <div className="max-w-5xl mx-auto w-full px-6 pb-20">
+         <div className={`${MODULE_PAGE_GUTTER} max-w-5xl pb-20`}>
        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
            {departments.filter(dep => !dep.isArchived).map(dep => {
                const head = users.find(u => u.id === dep.headId);
@@ -165,7 +159,7 @@ const DepartmentsView: React.FC<DepartmentsViewProps> = ({ departments, users, o
             </div>
         </div>
        )}
-    </div>
+    </ModulePageShell>
   );
 };
 

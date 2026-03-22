@@ -3,7 +3,7 @@ import { PartnerLogo, News, Case, Tag } from '../../types';
 import { api } from '../../backend/api';
 import { uploadFile } from '../../services/localStorageService';
 import { Plus, Edit2, Trash2, Image as ImageIcon, Globe, Tag as TagIcon, FileText, Briefcase, X, Check, Bold, Italic, Underline, Heading1, Heading2, List, ListOrdered, Quote, Monitor, Smartphone, Eye } from 'lucide-react';
-import { Card } from '../ui';
+import { Card, ModulePageShell, ModulePageHeader, ModuleSegmentedControl, MODULE_PAGE_GUTTER } from '../ui';
 
 interface SitesViewProps {
   currentUser: any;
@@ -168,43 +168,33 @@ export const SitesView: React.FC<SitesViewProps> = ({ currentUser }) => {
   }
 
   return (
-    <div className="h-full w-full overflow-auto bg-white dark:bg-[#191919]">
-      <div className="p-6 space-y-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-800 dark:text-white">Управление сайтами</h1>
-            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Контент для tipa.uz</p>
-          </div>
-          <div className="flex items-center gap-2 text-sm text-gray-500">
-            <Globe size={16} />
-            <span>tipa.uz</span>
-          </div>
-        </div>
+    <ModulePageShell>
+      <div className={`${MODULE_PAGE_GUTTER} py-6 md:py-8 space-y-6`}>
+        <ModulePageHeader
+          accent="cyan"
+          icon={<Globe size={24} strokeWidth={2} />}
+          title="Управление сайтами"
+          description="Контент для tipa.uz"
+          actions={
+            <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400 px-3 py-2 rounded-xl border border-gray-200 dark:border-[#333] bg-white dark:bg-[#191919]">
+              <Globe size={16} />
+              <span>tipa.uz</span>
+            </div>
+          }
+        />
 
-        {/* Tabs */}
-        <div className="flex gap-2 border-b border-gray-200 dark:border-gray-700">
-          {[
-            { id: 'logos' as TabType, label: 'Логотипы партнеров', icon: ImageIcon },
-            { id: 'news' as TabType, label: 'Новости', icon: FileText },
-            { id: 'cases' as TabType, label: 'Кейсы', icon: Briefcase },
-            { id: 'tags' as TabType, label: 'Теги', icon: TagIcon },
-          ].map(tab => (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
-                activeTab === tab.id
-                  ? 'border-blue-600 text-blue-600 dark:text-blue-400'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'
-              }`}
-            >
-              <div className="flex items-center gap-2">
-                <tab.icon size={16} />
-                <span>{tab.label}</span>
-              </div>
-            </button>
-          ))}
-        </div>
+        <ModuleSegmentedControl
+          variant="accent"
+          accent="cyan"
+          value={activeTab}
+          onChange={(v) => setActiveTab(v as TabType)}
+          options={[
+            { value: 'logos', label: 'Логотипы', icon: <ImageIcon size={16} /> },
+            { value: 'news', label: 'Новости', icon: <FileText size={16} /> },
+            { value: 'cases', label: 'Кейсы', icon: <Briefcase size={16} /> },
+            { value: 'tags', label: 'Теги', icon: <TagIcon size={16} /> },
+          ]}
+        />
 
         {/* Content */}
         <div className="mt-6">
@@ -260,7 +250,7 @@ export const SitesView: React.FC<SitesViewProps> = ({ currentUser }) => {
         )}
         </div>
       </div>
-    </div>
+    </ModulePageShell>
   );
 };
 

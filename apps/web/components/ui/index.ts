@@ -1,5 +1,11 @@
 export { StandardModal } from './StandardModal';
 export { ModuleHeader } from './ModuleHeader';
+export { ModulePageShell } from './ModulePageShell';
+export { ModulePageHeader } from './ModulePageHeader';
+export { ModuleSegmentedControl } from './ModuleSegmentedControl';
+export type { ModuleSegmentOption } from './ModuleSegmentedControl';
+export { MODULE_PAGE_GUTTER } from './moduleAccent';
+export type { ModuleAccentKey } from './moduleAccent';
 export { Button } from './Button';
 export { Input } from './Input';
 export { Textarea } from './Textarea';

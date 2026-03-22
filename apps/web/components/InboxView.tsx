@@ -1,7 +1,8 @@
 
 import React from 'react';
 import { ActivityLog } from '../types';
-import { Check, Clock, User as UserIcon } from 'lucide-react';
+import { Check, Clock, User as UserIcon, Inbox } from 'lucide-react';
+import { ModulePageShell, ModulePageHeader, MODULE_PAGE_GUTTER } from './ui';
 
 interface InboxViewProps {
   activities: ActivityLog[];
@@ -9,26 +10,27 @@ interface InboxViewProps {
 }
 
 const InboxView: React.FC<InboxViewProps> = ({ activities, onMarkAllRead }) => {
+  const unread = activities.filter((a) => !a.read).length;
   return (
-    <div className="max-w-3xl mx-auto w-full pt-8 px-4">
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold text-gray-800 dark:text-white flex items-center gap-2">
-            Входящие
-            {activities.filter(a => !a.read).length > 0 && (
-                <span className="text-sm bg-red-500 text-white px-2 py-0.5 rounded-full">
-                    {activities.filter(a => !a.read).length}
-                </span>
-            )}
-        </h1>
-        <button 
-            onClick={onMarkAllRead}
-            className="text-sm text-gray-500 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 flex items-center gap-1 px-3 py-1.5 rounded hover:bg-gray-100 dark:hover:bg-[#333] transition-colors"
-        >
-            <Check size={16} /> Прочитать все
-        </button>
-      </div>
+    <ModulePageShell>
+      <div className={`${MODULE_PAGE_GUTTER} max-w-3xl pt-6 md:pt-8 pb-8`}>
+        <ModulePageHeader
+          accent="indigo"
+          icon={<Inbox size={24} strokeWidth={2} />}
+          title="Входящие"
+          description={unread > 0 ? `Непрочитанных: ${unread}` : 'Уведомления и события'}
+          actions={
+            <button
+              type="button"
+              onClick={onMarkAllRead}
+              className="text-sm font-medium text-[#3337AD] dark:text-indigo-300 hover:underline flex items-center gap-1.5 px-3 py-2 rounded-xl border border-gray-200 dark:border-[#333] bg-white dark:bg-[#191919] hover:bg-gray-50 dark:hover:bg-[#252525] transition-colors"
+            >
+              <Check size={16} /> Прочитать все
+            </button>
+          }
+        />
 
-      <div className="bg-white dark:bg-[#252525] border border-gray-200 dark:border-[#333] rounded-xl shadow-sm overflow-hidden">
+      <div className="mt-6 bg-white dark:bg-[#252525] border border-gray-200 dark:border-[#333] rounded-2xl shadow-sm overflow-hidden">
         {activities.length === 0 ? (
             <div className="p-12 text-center text-gray-400 dark:text-gray-500 flex flex-col items-center">
                 <Clock size={48} className="mb-4 opacity-20" />
@@ -67,7 +69,8 @@ const InboxView: React.FC<InboxViewProps> = ({ activities, onMarkAllRead }) => {
             </div>
         )}
       </div>
-    </div>
+      </div>
+    </ModulePageShell>
   );
 };
 

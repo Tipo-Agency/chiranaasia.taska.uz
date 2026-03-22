@@ -4,6 +4,7 @@ import { Task, Deal, User, FinancePlan, Contract } from '../types';
 import { PieChart, TrendingUp, DollarSign, CheckCircle2, User as UserIcon, BarChart3, Clock, Wallet, Download, FileText, Filter, Layers, X, Eye } from 'lucide-react';
 import { ResponsiveTable } from './features/common/ResponsiveTable';
 import { UserAvatar } from './features/common/UserAvatar';
+import { ModulePageShell, ModulePageHeader, ModuleSegmentedControl, MODULE_PAGE_GUTTER } from './ui';
 
 interface AnalyticsViewProps {
   tasks: Task[];
@@ -436,60 +437,42 @@ const AnalyticsView: React.FC<AnalyticsViewProps> = ({ tasks, deals, users, fina
   );
 
   return (
-    <div className="h-full flex flex-col min-h-0">
-      <div className="max-w-7xl mx-auto w-full pt-8 px-6 flex-shrink-0">
-       <div className="mb-6">
-            <div className="flex justify-between items-center mb-4">
-                <div>
-                    <h1 className="text-lg md:text-2xl font-bold text-gray-800 dark:text-white truncate">Аналитика и Отчеты</h1>
-                    <p className="hidden md:block text-xs text-gray-500 dark:text-gray-400 mt-1">
-                        Аналитика и отчетность
-                    </p>
-                </div>
-                <div className="flex items-center gap-2 bg-gray-100 dark:bg-[#252525] rounded-full p-1 text-xs">
-                    <button onClick={() => setPeriod('month')} className={`px-3 py-1.5 rounded-full ${period === 'month' ? 'bg-white dark:bg-[#191919] text-gray-900 dark:text-white shadow-sm' : 'text-gray-600 dark:text-gray-300'}`}>Месяц</button>
-                    <button onClick={() => setPeriod('quarter')} className={`px-3 py-1.5 rounded-full ${period === 'quarter' ? 'bg-white dark:bg-[#191919] text-gray-900 dark:text-white shadow-sm' : 'text-gray-600 dark:text-gray-300'}`}>Квартал</button>
-                    <button onClick={() => setPeriod('year')} className={`px-3 py-1.5 rounded-full ${period === 'year' ? 'bg-white dark:bg-[#191919] text-gray-900 dark:text-white shadow-sm' : 'text-gray-600 dark:text-gray-300'}`}>Год</button>
-                </div>
-            </div>
-
-            {/* TABS */}
-            <div className="flex items-center gap-2 bg-gray-100 dark:bg-[#252525] rounded-full p-1 text-xs">
-                <button 
-                    onClick={() => setActiveTab('dashboard')} 
-                    className={`px-3 py-1.5 rounded-full flex items-center gap-1 ${
-                        activeTab === 'dashboard'
-                            ? 'bg-white dark:bg-[#191919] text-gray-900 dark:text-white shadow-sm'
-                            : 'text-gray-600 dark:text-gray-300'
-                    }`}
-                >
-                    Дашборд
-                </button>
-                <button 
-                    onClick={() => setActiveTab('statistics')} 
-                    className={`px-3 py-1.5 rounded-full flex items-center gap-1 ${
-                        activeTab === 'statistics'
-                            ? 'bg-white dark:bg-[#191919] text-gray-900 dark:text-white shadow-sm'
-                            : 'text-gray-600 dark:text-gray-300'
-                    }`}
-                >
-                    Статистика
-                </button>
-                <button 
-                    onClick={() => setActiveTab('reports')} 
-                    className={`px-3 py-1.5 rounded-full flex items-center gap-1 ${
-                        activeTab === 'reports'
-                            ? 'bg-white dark:bg-[#191919] text-gray-900 dark:text-white shadow-sm'
-                            : 'text-gray-600 dark:text-gray-300'
-                    }`}
-                >
-                    Отчеты
-                </button>
-            </div>
-       </div>
-       </div>
+    <ModulePageShell>
+      <div className={`${MODULE_PAGE_GUTTER} pt-6 md:pt-8 flex-shrink-0`}>
+        <div className="mb-6 space-y-5">
+          <ModulePageHeader
+            accent="sky"
+            icon={<BarChart3 size={24} strokeWidth={2} />}
+            title="Аналитика и отчёты"
+            description="Аналитика и отчётность"
+            actions={
+              <ModuleSegmentedControl
+                variant="neutral"
+                value={period}
+                onChange={(v) => setPeriod(v as 'month' | 'quarter' | 'year')}
+                options={[
+                  { value: 'month', label: 'Месяц' },
+                  { value: 'quarter', label: 'Квартал' },
+                  { value: 'year', label: 'Год' },
+                ]}
+              />
+            }
+          />
+          <ModuleSegmentedControl
+            variant="accent"
+            accent="sky"
+            value={activeTab}
+            onChange={(v) => setActiveTab(v as 'dashboard' | 'statistics' | 'reports')}
+            options={[
+              { value: 'dashboard', label: 'Дашборд' },
+              { value: 'statistics', label: 'Статистика' },
+              { value: 'reports', label: 'Отчёты' },
+            ]}
+          />
+        </div>
+      </div>
        <div className="flex-1 overflow-y-auto custom-scrollbar min-h-0">
-         <div className="max-w-7xl mx-auto w-full px-6 pb-20">
+         <div className={`${MODULE_PAGE_GUTTER} pb-20`}>
        {activeTab === 'dashboard' && renderDashboard()}
        {activeTab === 'statistics' && renderStatistics()}
        {activeTab === 'reports' && renderReports()}
@@ -512,7 +495,7 @@ const AnalyticsView: React.FC<AnalyticsViewProps> = ({ tasks, deals, users, fina
            </div>
          </div>
        )}
-    </div>
+    </ModulePageShell>
   );
 };
 

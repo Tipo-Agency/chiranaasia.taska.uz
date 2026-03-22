@@ -6,6 +6,8 @@ import GanttView from './GanttView';
 import { Plus, X } from 'lucide-react';
 import { Filter } from 'lucide-react';
 import { TaskSelect } from './TaskSelect';
+import { ModulePageShell, ModulePageHeader, ModuleSegmentedControl, MODULE_PAGE_GUTTER } from './ui';
+import { CheckSquare } from 'lucide-react';
 
 // Константы
 const COMPLETED_STATUSES = ['Выполнено', 'Done', 'Завершено'];
@@ -184,77 +186,58 @@ export const TasksView: React.FC<TasksViewProps> = ({
 
 
   return (
-    <div className="h-full flex flex-col min-h-0">
-      <div className="max-w-7xl mx-auto w-full pt-8 px-6 flex-shrink-0">
-        <div className="mb-6">
-          <div className="flex justify-between items-center mb-4">
-            <div>
-              <h1 className="text-lg md:text-2xl font-bold text-gray-800 dark:text-white truncate">Задачи</h1>
-              <p className="hidden md:block text-xs text-gray-500 dark:text-gray-400 mt-1">
-                Управление всеми задачами системы
-              </p>
-            </div>
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => setShowFilters(!showFilters)}
-                className={`px-3 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-colors ${
-                  showFilters || hasActiveFilters
-                    ? 'bg-blue-600 text-white hover:bg-blue-700'
-                    : 'bg-gray-100 dark:bg-[#252525] text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-[#303030]'
-                }`}
-              >
-                <Filter size={16} />
-                <span className="hidden sm:inline">Фильтры</span>
-                {hasActiveFilters && (
-                  <span className="bg-white/20 dark:bg-white/20 text-white px-1.5 py-0.5 rounded text-xs font-semibold">
-                    {taskFilters.filter(f => f.value && f.value !== 'all' && f.value !== '' && f.value !== 'hide').length}
-                  </span>
-                )}
-              </button>
-              <button
-                onClick={onCreateTask}
-                className="px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 flex items-center gap-2 shadow-sm"
-              >
-                <Plus size={18} />
-                <span className="hidden sm:inline">Создать</span>
-              </button>
-            </div>
-          </div>
+    <ModulePageShell>
+      <div className={`${MODULE_PAGE_GUTTER} pt-6 md:pt-8 flex-shrink-0`}>
+        <div className="mb-6 space-y-5">
+          <ModulePageHeader
+            accent="indigo"
+            icon={<CheckSquare size={24} strokeWidth={2} />}
+            title="Задачи"
+            description="Управление всеми задачами системы"
+            actions={
+              <>
+                <button
+                  type="button"
+                  onClick={() => setShowFilters(!showFilters)}
+                  className={`px-3 py-2 rounded-xl text-sm font-medium flex items-center gap-2 transition-colors ${
+                    showFilters || hasActiveFilters
+                      ? 'bg-[#3337AD] text-white hover:bg-[#292b8a] shadow-sm'
+                      : 'bg-white dark:bg-[#1a1a1a] border border-gray-200 dark:border-[#333] text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-[#252525]'
+                  }`}
+                >
+                  <Filter size={16} />
+                  <span className="hidden sm:inline">Фильтры</span>
+                  {hasActiveFilters && (
+                    <span className="bg-white/20 text-white px-1.5 py-0.5 rounded text-xs font-semibold">
+                      {taskFilters.filter((f) => f.value && f.value !== 'all' && f.value !== '' && f.value !== 'hide').length}
+                    </span>
+                  )}
+                </button>
+                <button
+                  type="button"
+                  onClick={onCreateTask}
+                  className="px-4 py-2 rounded-xl bg-[#3337AD] text-white text-sm font-semibold hover:bg-[#292b8a] flex items-center gap-2 shadow-md shadow-[#3337AD]/25"
+                >
+                  <Plus size={18} />
+                  <span className="hidden sm:inline">Создать</span>
+                </button>
+              </>
+            }
+          />
 
-          {/* Переключение видов — ширина как в воронке (inline) */}
+          <ModuleSegmentedControl
+            variant="accent"
+            accent="indigo"
+            value={viewMode}
+            onChange={(v) => setViewMode(v as ViewMode)}
+            options={[
+              { value: ViewMode.TABLE, label: 'Таблица' },
+              { value: ViewMode.KANBAN, label: 'Канбан' },
+              { value: ViewMode.GANTT, label: 'Гант' },
+            ]}
+          />
+
           <div className="mb-4">
-            <div className="inline-flex items-center gap-2 bg-gray-100 dark:bg-[#252525] rounded-full p-1 text-xs mb-4">
-              <button
-                onClick={() => setViewMode(ViewMode.TABLE)}
-                className={`px-3 py-1.5 rounded-full ${
-                  viewMode === ViewMode.TABLE
-                    ? 'bg-white dark:bg-[#191919] text-gray-900 dark:text-white shadow-sm'
-                    : 'text-gray-600 dark:text-gray-300'
-                }`}
-              >
-                Таблица
-              </button>
-              <button
-                onClick={() => setViewMode(ViewMode.KANBAN)}
-                className={`px-3 py-1.5 rounded-full ${
-                  viewMode === ViewMode.KANBAN
-                    ? 'bg-white dark:bg-[#191919] text-gray-900 dark:text-white shadow-sm'
-                    : 'text-gray-600 dark:text-gray-300'
-                }`}
-              >
-                Канбан
-              </button>
-              <button
-                onClick={() => setViewMode(ViewMode.GANTT)}
-                className={`px-3 py-1.5 rounded-full ${
-                  viewMode === ViewMode.GANTT
-                    ? 'bg-white dark:bg-[#191919] text-gray-900 dark:text-white shadow-sm'
-                    : 'text-gray-600 dark:text-gray-300'
-                }`}
-              >
-                Гант
-              </button>
-            </div>
             {showFilters && (
               <div className="mb-4 p-4 bg-gray-50 dark:bg-[#252525] rounded-lg border border-gray-200 dark:border-[#333]">
                 <div 
@@ -295,7 +278,7 @@ export const TasksView: React.FC<TasksViewProps> = ({
       </div>
       
       <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden">
-        <div className="max-w-7xl mx-auto w-full px-6 pb-24 h-full">
+        <div className={`${MODULE_PAGE_GUTTER} pb-24 h-full`}>
           {viewMode === ViewMode.TABLE && (
             <TableView
               tasks={filteredTasks}
@@ -335,6 +318,6 @@ export const TasksView: React.FC<TasksViewProps> = ({
           )}
         </div>
       </div>
-    </div>
+    </ModulePageShell>
   );
 };

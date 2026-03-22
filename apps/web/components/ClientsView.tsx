@@ -13,6 +13,7 @@ import {
   OneTimeDealModal,
   AccountsReceivableModal,
 } from './clients';
+import { ModulePageShell, MODULE_PAGE_GUTTER } from './ui';
 
 interface ClientsViewProps {
   clients: Client[];
@@ -209,8 +210,8 @@ const ClientsView: React.FC<ClientsViewProps> = ({
   };
 
   return (
-    <div className="h-full flex flex-col min-h-0">
-      <div className="max-w-7xl mx-auto w-full pt-8 px-6 flex-shrink-0">
+    <ModulePageShell>
+      <div className={`${MODULE_PAGE_GUTTER} pt-6 md:pt-8 flex-shrink-0 space-y-5`}>
         <ClientsHeader
           searchQuery={searchQuery}
           onSearchChange={setSearchQuery}
@@ -227,10 +228,10 @@ const ClientsView: React.FC<ClientsViewProps> = ({
         />
 
         <ClientsTabs activeTab={activeTab} onTabChange={setActiveTab} />
-                </div>
+      </div>
 
       <div className="flex-1 min-h-0 overflow-hidden">
-        <div className="max-w-7xl mx-auto w-full px-6 pb-24 md:pb-32 h-full overflow-y-auto overflow-x-hidden custom-scrollbar">
+        <div className={`${MODULE_PAGE_GUTTER} pb-24 md:pb-32 h-full overflow-y-auto overflow-x-hidden custom-scrollbar`}>
           {activeTab === 'clients' && (
             <ClientsTab
               clients={filteredClients}
@@ -322,7 +323,7 @@ const ClientsView: React.FC<ClientsViewProps> = ({
           onDelete={onDeleteAccountsReceivable}
         />
        )}
-    </div>
+    </ModulePageShell>
   );
 };
 

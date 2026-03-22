@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { TableCollection, User, Role } from '../types';
 import { DynamicIcon } from './AppIcons';
 import { Instagram, Archive, Layers, Plus, Edit2, Trash2, Grid, List } from 'lucide-react';
+import { ModulePageShell, ModulePageHeader, ModuleSegmentedControl, MODULE_PAGE_GUTTER } from './ui';
 
 interface SpacesTabsViewProps {
   tables: TableCollection[];
@@ -59,67 +60,42 @@ export const SpacesTabsView: React.FC<SpacesTabsViewProps> = ({
   const currentSpaces = tables.filter(t => t.type === activeTab && !t.isArchived);
 
   return (
-    <div className="h-full flex flex-col min-h-0 bg-white dark:bg-[#191919]">
-      {/* Header */}
-      <div className="border-b border-gray-200 dark:border-[#333] bg-white dark:bg-[#191919] shrink-0">
-        <div className="max-w-7xl mx-auto px-6">
-          <div className="flex items-center justify-between py-4">
-            <div className="flex items-center gap-3">
-              <div className="bg-indigo-100 dark:bg-indigo-900/30 p-2 rounded-lg text-indigo-600 dark:text-indigo-400">
-                {getTypeIcon(activeTab)}
-              </div>
-              <div>
-                <h1 className="text-2xl font-bold text-gray-900 dark:text-white">{getTypeLabel(activeTab)}</h1>
-                <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-                  {currentSpaces.length} {currentSpaces.length === 1 ? 'пространство' : 'пространств'}
-                </p>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-2">
-              {/* View Mode Toggle */}
-              <div className="flex items-center gap-1 bg-gray-100 dark:bg-[#252525] rounded-lg p-1">
-                <button
-                  onClick={() => setViewMode('grid')}
-                  className={`p-1.5 rounded transition-colors ${
-                    viewMode === 'grid'
-                      ? 'bg-white dark:bg-[#191919] text-gray-900 dark:text-white'
-                      : 'text-gray-600 dark:text-gray-400'
-                  }`}
-                  title="Плитка"
-                >
-                  <Grid size={16} />
-                </button>
-                <button
-                  onClick={() => setViewMode('list')}
-                  className={`p-1.5 rounded transition-colors ${
-                    viewMode === 'list'
-                      ? 'bg-white dark:bg-[#191919] text-gray-900 dark:text-white'
-                      : 'text-gray-600 dark:text-gray-400'
-                  }`}
-                  title="Список"
-                >
-                  <List size={16} />
-                </button>
-              </div>
-
-              {/* Create Button */}
+    <ModulePageShell>
+      <div className={`${MODULE_PAGE_GUTTER} pt-6 md:pt-8 pb-4 border-b border-gray-200 dark:border-[#333] shrink-0`}>
+        <ModulePageHeader
+          accent="indigo"
+          icon={React.cloneElement(getTypeIcon(activeTab) as React.ReactElement, { size: 24, strokeWidth: 2 })}
+          title={getTypeLabel(activeTab)}
+          description={`${currentSpaces.length} ${currentSpaces.length === 1 ? 'пространство' : 'пространств'}`}
+          actions={
+            <>
+              <ModuleSegmentedControl
+                variant="accent"
+                accent="indigo"
+                value={viewMode}
+                onChange={(v) => setViewMode(v as ViewMode)}
+                options={[
+                  { value: 'grid', label: 'Плитка', icon: <Grid size={16} /> },
+                  { value: 'list', label: 'Список', icon: <List size={16} /> },
+                ]}
+              />
               {currentUser.role === Role.ADMIN && (
                 <button
+                  type="button"
                   onClick={() => onCreateTable(activeTab)}
-                  className="px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 flex items-center gap-2 shadow-sm"
+                  className="px-4 py-2 rounded-xl bg-[#3337AD] text-white text-sm font-semibold hover:bg-[#292b8a] flex items-center gap-2 shadow-md"
                 >
                   <Plus size={18} /> Создать
                 </button>
               )}
-            </div>
-          </div>
-        </div>
+            </>
+          }
+        />
       </div>
 
       {/* Content */}
       <div className="flex-1 overflow-y-auto overflow-x-hidden custom-scrollbar min-h-0">
-        <div className="max-w-7xl mx-auto w-full px-6 py-6 pb-24 md:pb-32">
+        <div className={`${MODULE_PAGE_GUTTER} py-6 pb-24 md:pb-32`}>
           {currentSpaces.length === 0 ? (
             <div className="text-center py-20">
               <div className="text-gray-400 dark:text-gray-500 mb-4 inline-block">
@@ -237,6 +213,6 @@ export const SpacesTabsView: React.FC<SpacesTabsViewProps> = ({
           )}
         </div>
       </div>
-    </div>
+    </ModulePageShell>
   );
 };

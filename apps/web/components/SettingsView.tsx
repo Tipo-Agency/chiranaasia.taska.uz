@@ -1,7 +1,8 @@
 
 import React, { useState, useEffect } from 'react';
 import { Project, Role, Task, User, StatusOption, PriorityOption, NotificationPreferences, AutomationRule, TableCollection, Deal, Department, FinanceCategory, Fund, SalesFunnel, Doc, ContentPost, EmployeeInfo, Client, Contract, BusinessProcess, Meeting } from '../types';
-import { User as UserIcon, Briefcase, Archive, List, BarChart2, Bell, Zap, Users, Building2, Wallet, TrendingUp, X, Layout, PiggyBank, PlugZap, ShieldAlert } from 'lucide-react';
+import { User as UserIcon, Briefcase, Archive, List, BarChart2, Bell, Zap, Users, Building2, Wallet, TrendingUp, X, Layout, PiggyBank, PlugZap, ShieldAlert, Settings } from 'lucide-react';
+import { ModulePageHeader } from './ui/ModulePageHeader';
 import { ProfileSettings } from './settings/ProfileSettings';
 import { SystemLogsSettings } from './settings/SystemLogsSettings';
 import { SpaceSettings } from './settings/SpaceSettings';
@@ -263,21 +264,27 @@ const SettingsView: React.FC<SettingsViewProps> = ({
   );
 
   return (
-    <div className="h-full flex flex-col bg-gray-50 dark:bg-[#121212]">
+    <div className="h-full flex flex-col bg-gray-50/50 dark:bg-[#141414]">
       {/* Шапка настроек */}
-      <div className="border-b border-gray-200 dark:border-[#333] bg-white dark:bg-[#191919] px-6 py-4 flex items-center justify-between">
-        <div>
-          <h1 className="text-xl font-bold text-gray-900 dark:text-white">Настройки системы</h1>
-          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-            Управление пользователями, модулями, справочниками, уведомлениями и интеграциями tipa.taska.uz.
-          </p>
+      <div className="border-b border-gray-200 dark:border-[#333] bg-white dark:bg-[#191919] px-4 sm:px-6 py-4">
+        <div className="max-w-5xl mx-auto flex items-start justify-between gap-4">
+          <ModulePageHeader
+            accent="slate"
+            icon={<Settings size={24} strokeWidth={2} />}
+            title="Настройки системы"
+            description="Пользователи, модули, справочники, уведомления и интеграции tipa.taska.uz"
+            className="mb-0 flex-1"
+            actions={
+              <button
+                type="button"
+                onClick={onClose}
+                className="inline-flex items-center gap-1 px-3 py-2 rounded-xl text-sm font-medium text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-[#252525] shrink-0"
+              >
+                <X size={16} /> Закрыть
+              </button>
+            }
+          />
         </div>
-        <button
-          onClick={onClose}
-          className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium text-gray-500 hover:bg-gray-100 dark:hover:bg-[#252525]"
-        >
-          <X size={14}/> Закрыть
-        </button>
       </div>
 
       {/* Основное содержимое с горизонтальным меню настроек */}

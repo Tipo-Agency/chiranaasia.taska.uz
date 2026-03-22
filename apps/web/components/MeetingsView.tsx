@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import { TaskSelect } from './TaskSelect';
 import { normalizeDateForInput } from '../utils/dateUtils';
+import { ModulePageShell, ModulePageHeader, ModuleSegmentedControl, MODULE_PAGE_GUTTER } from './ui';
 
 interface MeetingsViewProps {
   meetings: Meeting[];
@@ -338,78 +339,53 @@ const MeetingsView: React.FC<MeetingsViewProps> = ({ meetings = [], users, clien
   };
 
   return (
-    <div className="h-full flex flex-col min-h-0 bg-gray-50/50 dark:bg-[#141414]">
-      <div className="max-w-7xl mx-auto w-full pt-6 md:pt-8 px-4 sm:px-6 flex-shrink-0">
-        <div className="mb-5">
-          <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mb-5">
-            <div className="flex items-start gap-3 min-w-0">
-              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-teal-500 to-cyan-600 text-white shadow-lg shadow-teal-500/20">
-                <CalendarDays size={24} strokeWidth={2} />
-              </div>
-              <div className="min-w-0">
-                <h1 className="text-xl md:text-2xl font-bold text-gray-900 dark:text-white tracking-tight">Встречи</h1>
-                <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
-                  Планирование, календарь и итоги переговоров
-                </p>
-              </div>
-            </div>
-            <button
-              type="button"
-              onClick={handleOpenCreate}
-              title="Новая встреча"
-              aria-label="Новая встреча"
-              className="inline-flex items-center justify-center w-11 h-11 shrink-0 rounded-xl bg-teal-600 hover:bg-teal-700 text-white shadow-md shadow-teal-600/20 self-end sm:mt-1 transition-colors"
-            >
-              <Plus size={22} strokeWidth={2.5} />
-            </button>
-          </div>
-          
+    <ModulePageShell>
+      <div className={`${MODULE_PAGE_GUTTER} pt-6 md:pt-8 flex-shrink-0`}>
+        <div className="mb-5 space-y-5">
+          <ModulePageHeader
+            accent="teal"
+            icon={<CalendarDays size={24} strokeWidth={2} />}
+            title="Встречи"
+            description="Планирование, календарь и итоги переговоров"
+            actions={
+              <button
+                type="button"
+                onClick={handleOpenCreate}
+                title="Новая встреча"
+                aria-label="Новая встреча"
+                className="inline-flex items-center justify-center w-11 h-11 rounded-xl bg-teal-600 hover:bg-teal-700 text-white shadow-md shadow-teal-600/20 transition-colors"
+              >
+                <Plus size={22} strokeWidth={2.5} />
+              </button>
+            }
+          />
+
           <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
-            <div className="flex flex-wrap items-center gap-1.5 rounded-2xl bg-white dark:bg-[#1a1a1a] border border-gray-200 dark:border-[#333] p-1 shadow-sm">
-              <button 
-                type="button"
-                onClick={() => setMeetingTypeFilter('all')} 
-                className={`px-3 py-2 rounded-xl text-sm font-medium transition-colors ${meetingTypeFilter === 'all' ? 'bg-gray-900 dark:bg-white text-white dark:text-gray-900 shadow-sm' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-[#252525]'}`}
-              >
-                Все
-              </button>
-              <button 
-                type="button"
-                onClick={() => setMeetingTypeFilter('client')} 
-                className={`px-3 py-2 rounded-xl text-sm font-medium transition-colors ${meetingTypeFilter === 'client' ? 'bg-gray-900 dark:bg-white text-white dark:text-gray-900 shadow-sm' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-[#252525]'}`}
-              >
-                С клиентами
-              </button>
-              <button 
-                type="button"
-                onClick={() => setMeetingTypeFilter('work')} 
-                className={`px-3 py-2 rounded-xl text-sm font-medium transition-colors ${meetingTypeFilter === 'work' ? 'bg-gray-900 dark:bg-white text-white dark:text-gray-900 shadow-sm' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-[#252525]'}`}
-              >
-                Рабочие
-              </button>
-            </div>
-            
-            <div className="flex items-center gap-1.5 rounded-2xl bg-white dark:bg-[#1a1a1a] border border-gray-200 dark:border-[#333] p-1 shadow-sm self-start">
-              <button
-                type="button"
-                onClick={() => setViewMode('list')}
-                className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-colors ${viewMode === 'list' ? 'bg-teal-600 text-white shadow-sm' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-[#252525]'}`}
-              >
-                <List size={16} /> Список
-              </button>
-              <button
-                type="button"
-                onClick={() => setViewMode('calendar')}
-                className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-colors ${viewMode === 'calendar' ? 'bg-teal-600 text-white shadow-sm' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-[#252525]'}`}
-              >
-                <LayoutGrid size={16} /> Календарь
-              </button>
-            </div>
+            <ModuleSegmentedControl
+              variant="neutral"
+              value={meetingTypeFilter}
+              onChange={(v) => setMeetingTypeFilter(v)}
+              options={[
+                { value: 'all', label: 'Все' },
+                { value: 'client', label: 'С клиентами' },
+                { value: 'work', label: 'Рабочие' },
+              ]}
+            />
+            <ModuleSegmentedControl
+              variant="accent"
+              accent="teal"
+              value={viewMode}
+              onChange={(v) => setViewMode(v)}
+              options={[
+                { value: 'list', label: 'Список', icon: <List size={16} /> },
+                { value: 'calendar', label: 'Календарь', icon: <LayoutGrid size={16} /> },
+              ]}
+            />
           </div>
         </div>
       </div>
       <div className="flex-1 min-h-0 overflow-hidden">
-        <div className="max-w-7xl mx-auto w-full px-4 sm:px-6 pb-20 h-full overflow-y-auto custom-scrollbar">
+        <div className={`${MODULE_PAGE_GUTTER} pb-20 h-full overflow-y-auto custom-scrollbar`}>
       {viewMode === 'calendar' ? renderCalendar() : (
         <div className="grid gap-4">
             {filteredMeetings.length === 0 ? (
@@ -701,7 +677,7 @@ const MeetingsView: React.FC<MeetingsViewProps> = ({ meetings = [], users, clien
             </div>
         </div>
       )}
-    </div>
+    </ModulePageShell>
   );
 };
 

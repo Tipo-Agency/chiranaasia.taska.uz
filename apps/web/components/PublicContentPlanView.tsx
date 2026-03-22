@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { ContentPost, TableCollection } from '../types';
 import { Calendar, Instagram, Send, Youtube, Linkedin } from 'lucide-react';
 import { api } from '../backend/api';
+import { ModulePageShell, ModulePageHeader, ModuleSegmentedControl, MODULE_PAGE_GUTTER } from './ui';
 
 interface PublicContentPlanViewProps {
   tableId: string;
@@ -153,47 +154,26 @@ const PublicContentPlanView: React.FC<PublicContentPlanViewProps> = ({ tableId }
   });
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-[#121212]">
-      <div className="max-w-7xl mx-auto px-4 py-8 space-y-4">
-        {/* Header */}
-        <div className="mb-2">
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">{table.name}</h1>
-          <p className="text-gray-500 dark:text-gray-400">Публичный контент-план</p>
-        </div>
+    <ModulePageShell className="min-h-screen">
+      <div className={`${MODULE_PAGE_GUTTER} py-8 space-y-4`}>
+        <ModulePageHeader
+          icon={<Calendar size={24} strokeWidth={2} />}
+          title={table.name}
+          description="Публичный контент-план"
+          accent="yellow"
+        />
 
-        {/* View Mode Tabs */}
-        <div className="flex items-center gap-2 bg-white dark:bg-[#252525] rounded-lg p-1 shadow-sm">
-          <button 
-            onClick={() => setViewMode('calendar')} 
-            className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-              viewMode === 'calendar' 
-                ? 'bg-blue-600 text-white' 
-                : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-[#333]'
-            }`}
-          >
-            Календарь
-          </button>
-          <button 
-            onClick={() => setViewMode('table')} 
-            className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-              viewMode === 'table' 
-                ? 'bg-blue-600 text-white' 
-                : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-[#333]'
-            }`}
-          >
-            Список
-          </button>
-          <button 
-            onClick={() => setViewMode('gantt')} 
-            className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-              viewMode === 'gantt' 
-                ? 'bg-blue-600 text-white' 
-                : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-[#333]'
-            }`}
-          >
-            Таймлайн
-          </button>
-        </div>
+        <ModuleSegmentedControl
+          value={viewMode}
+          onChange={setViewMode}
+          variant="accent"
+          accent="yellow"
+          options={[
+            { value: 'calendar', label: 'Календарь' },
+            { value: 'table', label: 'Список' },
+            { value: 'gantt', label: 'Таймлайн' },
+          ]}
+        />
 
         {/* Format filter */}
         <div className="flex flex-wrap items-center gap-2 text-xs">
@@ -386,7 +366,7 @@ const PublicContentPlanView: React.FC<PublicContentPlanViewProps> = ({ tableId }
           )}
         </div>
       </div>
-    </div>
+    </ModulePageShell>
   );
 };
 

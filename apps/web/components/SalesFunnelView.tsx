@@ -7,7 +7,7 @@ import { Plus, KanbanSquare, List as ListIcon, X, Send, MessageSquare, Instagram
 // import { instagramService } from '../services/instagramService';
 import { DynamicIcon } from './AppIcons';
 import { TaskSelect } from './TaskSelect';
-import { Button } from './ui';
+import { Button, ModulePageShell, ModulePageHeader, ModuleSegmentedControl, MODULE_PAGE_GUTTER } from './ui';
 import { api } from '../backend/api';
 
 interface SalesFunnelViewProps {
@@ -460,71 +460,46 @@ const SalesFunnelView: React.FC<SalesFunnelViewProps> = ({ deals, clients, users
   }
 
   return (
-    <div className="h-full flex flex-col min-h-0">
-      <div className="max-w-7xl mx-auto w-full pt-8 px-6 flex-shrink-0">
-        <div className="mb-6">
-          <div className="flex justify-between items-center mb-4">
-            <div>
-              <h1 className="text-lg md:text-2xl font-bold text-gray-800 dark:text-white truncate">Воронка продаж</h1>
-              <p className="hidden md:block text-xs text-gray-500 dark:text-gray-400 mt-1">
-                Управление сделками и продажами
-              </p>
-            </div>
-            <div className="flex items-center gap-2 sm:gap-3 flex-wrap justify-end">
-              <div className="min-w-[160px] sm:min-w-[180px]">
-                <TaskSelect
-                  value={selectedFunnelId}
-                  onChange={setSelectedFunnelId}
-                  options={salesFunnels.map(f => ({ value: f.id, label: f.name }))}
-                  className="bg-white dark:bg-[#333] border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100"
-                />
-              </div>
-              <Button variant="primary" size="sm" icon={Plus} onClick={handleOpenCreate}>
-                <span className="hidden sm:inline">Создать</span>
-                <span className="sm:hidden">+</span>
-              </Button>
-            </div>
-          </div>
-          {/* View Mode Tabs */}
-          <div className="flex items-center gap-2 bg-gray-100 dark:bg-[#252525] rounded-full p-1 text-xs">
-            <button
-              onClick={() => setViewMode('kanban')}
-              className={`px-2 md:px-3 py-1.5 rounded-full ${
-                viewMode === 'kanban'
-                  ? 'bg-white dark:bg-[#191919] text-gray-900 dark:text-white shadow-sm'
-                  : 'text-gray-600 dark:text-gray-300'
-              }`}
-            >
-              <span className="hidden xs:inline">Канбан</span>
-              <span className="xs:hidden">Канбан</span>
-            </button>
-            <button
-              onClick={() => setViewMode('list')}
-              className={`px-2 md:px-3 py-1.5 rounded-full ${
-                viewMode === 'list'
-                  ? 'bg-white dark:bg-[#191919] text-gray-900 dark:text-white shadow-sm'
-                  : 'text-gray-600 dark:text-gray-300'
-              }`}
-            >
-              <span className="hidden xs:inline">Список</span>
-              <span className="xs:hidden">Список</span>
-            </button>
-            <button
-              onClick={() => setViewMode('rejected')}
-              className={`px-2 md:px-3 py-1.5 rounded-full ${
-                viewMode === 'rejected'
-                  ? 'bg-white dark:bg-[#191919] text-gray-900 dark:text-white shadow-sm'
-                  : 'text-gray-600 dark:text-gray-300'
-              }`}
-            >
-              <span className="hidden xs:inline">Отказы</span>
-              <span className="xs:hidden">Отказы</span>
-            </button>
-          </div>
+    <ModulePageShell>
+      <div className={`${MODULE_PAGE_GUTTER} pt-6 md:pt-8 flex-shrink-0`}>
+        <div className="mb-6 space-y-5">
+          <ModulePageHeader
+            accent="violet"
+            icon={<TrendingUp size={24} strokeWidth={2} />}
+            title="Воронка продаж"
+            description="Управление сделками и продажами"
+            actions={
+              <>
+                <div className="min-w-[160px] sm:min-w-[180px]">
+                  <TaskSelect
+                    value={selectedFunnelId}
+                    onChange={setSelectedFunnelId}
+                    options={salesFunnels.map((f) => ({ value: f.id, label: f.name }))}
+                    className="bg-white dark:bg-[#333] border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100"
+                  />
+                </div>
+                <Button variant="primary" size="sm" icon={Plus} onClick={handleOpenCreate}>
+                  <span className="hidden sm:inline">Создать</span>
+                  <span className="sm:hidden">+</span>
+                </Button>
+              </>
+            }
+          />
+          <ModuleSegmentedControl
+            variant="accent"
+            accent="violet"
+            value={viewMode}
+            onChange={(v) => setViewMode(v as 'kanban' | 'list' | 'rejected')}
+            options={[
+              { value: 'kanban', label: 'Канбан' },
+              { value: 'list', label: 'Список' },
+              { value: 'rejected', label: 'Отказы' },
+            ]}
+          />
         </div>
       </div>
       <div className="flex-1 min-h-0 overflow-hidden">
-        <div className="max-w-7xl mx-auto w-full px-6 pb-24 md:pb-32 h-full overflow-y-auto overflow-x-hidden custom-scrollbar">
+        <div className={`${MODULE_PAGE_GUTTER} pb-24 md:pb-32 h-full overflow-y-auto overflow-x-hidden custom-scrollbar`}>
           {viewMode === 'kanban' ? (
               <div className="h-full flex flex-col gap-4">
                   <div className="flex h-full overflow-x-auto gap-3 md:gap-4 pb-4">
@@ -1041,7 +1016,7 @@ const SalesFunnelView: React.FC<SalesFunnelViewProps> = ({ deals, clients, users
               </div>
           </div>
       )}
-    </div>
+    </ModulePageShell>
   );
 };
 

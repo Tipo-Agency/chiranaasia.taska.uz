@@ -1,8 +1,10 @@
 /**
- * ViewModeToggle - переключатель режимов отображения (Таблица/Канбан/Гант)
+ * ViewModeToggle — Таблица / Канбан / Гант в стиле модулей.
  */
 import React from 'react';
 import { ViewMode } from '../../../types';
+import { ModuleSegmentedControl } from '../../ui/ModuleSegmentedControl';
+import { LayoutGrid, Table2, BarChart3 } from 'lucide-react';
 
 interface ViewModeToggleProps {
   viewMode: ViewMode;
@@ -14,37 +16,16 @@ export const ViewModeToggle: React.FC<ViewModeToggleProps> = ({
   onViewModeChange,
 }) => {
   return (
-    <div className="flex items-center gap-2 bg-gray-100 dark:bg-[#252525] rounded-full p-1 text-xs mb-4">
-      <button
-        onClick={() => onViewModeChange(ViewMode.TABLE)}
-        className={`px-3 py-1.5 rounded-full transition-colors ${
-          viewMode === ViewMode.TABLE
-            ? 'bg-white dark:bg-[#191919] text-gray-900 dark:text-white shadow-sm'
-            : 'text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white'
-        }`}
-      >
-        Таблица
-      </button>
-      <button
-        onClick={() => onViewModeChange(ViewMode.KANBAN)}
-        className={`px-3 py-1.5 rounded-full transition-colors ${
-          viewMode === ViewMode.KANBAN
-            ? 'bg-white dark:bg-[#191919] text-gray-900 dark:text-white shadow-sm'
-            : 'text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white'
-        }`}
-      >
-        Канбан
-      </button>
-      <button
-        onClick={() => onViewModeChange(ViewMode.GANTT)}
-        className={`px-3 py-1.5 rounded-full transition-colors ${
-          viewMode === ViewMode.GANTT
-            ? 'bg-white dark:bg-[#191919] text-gray-900 dark:text-white shadow-sm'
-            : 'text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white'
-        }`}
-      >
-        Гант
-      </button>
-    </div>
+    <ModuleSegmentedControl
+      variant="accent"
+      accent="indigo"
+      value={viewMode}
+      onChange={(v) => onViewModeChange(v as ViewMode)}
+      options={[
+        { value: ViewMode.TABLE, label: 'Таблица', icon: <Table2 size={16} /> },
+        { value: ViewMode.KANBAN, label: 'Канбан', icon: <LayoutGrid size={16} /> },
+        { value: ViewMode.GANTT, label: 'Гант', icon: <BarChart3 size={16} /> },
+      ]}
+    />
   );
 };

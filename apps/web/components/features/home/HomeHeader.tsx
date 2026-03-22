@@ -3,8 +3,9 @@
  */
 import React from 'react';
 import { User } from '../../../types';
-import { CheckCircle2, Briefcase, Network, ShoppingCart } from 'lucide-react';
+import { CheckCircle2, Briefcase, Network, ShoppingCart, LayoutGrid } from 'lucide-react';
 import { ModuleCreateDropdown } from '../../ui/ModuleCreateDropdown';
+import { ModulePageHeader } from '../../ui/ModulePageHeader';
 
 interface HomeHeaderProps {
   user: User;
@@ -35,48 +36,50 @@ export const HomeHeader: React.FC<HomeHeaderProps> = ({
   const formattedDate = `${dayOfWeek.charAt(0).toUpperCase() + dayOfWeek.slice(1)}, ${dayOfMonth}`;
 
   return (
-    <div className="flex flex-wrap justify-between items-center gap-4 mb-6">
-      <div>
-        <h1 className="text-2xl md:text-3xl font-bold text-gray-900 dark:text-white mb-1">
-          {greeting}, {user.name}!
-        </h1>
-        <p className="text-sm text-gray-500 dark:text-gray-400">{formattedDate}</p>
-      </div>
-      <ModuleCreateDropdown
-        buttonClassName="bg-[#3337AD] hover:bg-[#292b8a] text-white"
-        items={[
-          {
-            id: 'task',
-            label: 'Задача',
-            icon: CheckCircle2,
-            onClick: onQuickCreateTask,
-            iconClassName: 'text-[#3337AD] dark:text-[#8b8ee0]',
-          },
-          {
-            id: 'deal',
-            label: 'Сделка',
-            icon: Briefcase,
-            onClick: onQuickCreateDeal,
-            iconClassName: 'text-[#3337AD] dark:text-[#8b8ee0]',
-          },
-          {
-            id: 'process',
-            label: 'Процесс',
-            icon: Network,
-            onClick: onQuickCreateProcess,
-            iconClassName: 'text-[#3337AD] dark:text-[#8b8ee0]',
-          },
-          {
-            id: 'purchase',
-            label: 'Заявка на приобретение',
-            icon: ShoppingCart,
-            onClick: () => {
-              if (onQuickCreatePurchaseRequest) onQuickCreatePurchaseRequest();
-              else onQuickCreateTask();
-            },
-            iconClassName: 'text-[#3337AD] dark:text-[#8b8ee0]',
-          },
-        ]}
+    <div className="mb-6">
+      <ModulePageHeader
+        icon={<LayoutGrid size={24} strokeWidth={2} />}
+        title={`${greeting}, ${user.name}!`}
+        description={`${formattedDate} · Командный центр`}
+        accent="indigo"
+        actions={
+          <ModuleCreateDropdown
+            buttonClassName="bg-[#3337AD] hover:bg-[#292b8a] text-white rounded-xl"
+            items={[
+              {
+                id: 'task',
+                label: 'Задача',
+                icon: CheckCircle2,
+                onClick: onQuickCreateTask,
+                iconClassName: 'text-[#3337AD] dark:text-[#8b8ee0]',
+              },
+              {
+                id: 'deal',
+                label: 'Сделка',
+                icon: Briefcase,
+                onClick: onQuickCreateDeal,
+                iconClassName: 'text-[#3337AD] dark:text-[#8b8ee0]',
+              },
+              {
+                id: 'process',
+                label: 'Процесс',
+                icon: Network,
+                onClick: onQuickCreateProcess,
+                iconClassName: 'text-[#3337AD] dark:text-[#8b8ee0]',
+              },
+              {
+                id: 'purchase',
+                label: 'Заявка на приобретение',
+                icon: ShoppingCart,
+                onClick: () => {
+                  if (onQuickCreatePurchaseRequest) onQuickCreatePurchaseRequest();
+                  else onQuickCreateTask();
+                },
+                iconClassName: 'text-[#3337AD] dark:text-[#8b8ee0]',
+              },
+            ]}
+          />
+        }
       />
     </div>
   );

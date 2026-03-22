@@ -11,6 +11,7 @@ import ContentPlanView from '../ContentPlanView';
 import DocumentsView from '../DocumentsView';
 import { AlertCircle, LayoutList, Kanban, BarChart3, ListFilter, EyeOff, Plus, CheckSquare } from 'lucide-react';
 import { Button } from '../ui/Button';
+import { ModulePageShell, ModulePageHeader, ModuleSegmentedControl, MODULE_PAGE_GUTTER } from '../ui';
 
 interface SpaceModuleProps {
   activeTable: TableCollection;
@@ -96,69 +97,38 @@ export const SpaceModule: React.FC<SpaceModuleProps> = ({
   switch (activeTable.type) {
     case 'tasks':
         return (
-            <div className="h-full flex flex-col min-h-0">
-                <div className="max-w-7xl mx-auto w-full pt-4 md:pt-8 px-3 md:px-6 flex-shrink-0">
-                    <div className="mb-4 md:mb-6">
-                        <div className="flex justify-between items-start md:items-center mb-3 md:mb-4 gap-2">
-                            <div className="flex items-center gap-2 md:gap-3 min-w-0 flex-1">
-                                <div className="bg-blue-100 dark:bg-blue-900/30 p-1.5 md:p-2 rounded-lg text-blue-600 dark:text-blue-400 shrink-0">
-                                    <CheckSquare size={20} className="md:w-6 md:h-6" />
-                                </div>
-                                <div className="min-w-0">
-                                    <h1 className="text-xl md:text-3xl font-bold text-gray-800 dark:text-white truncate">Задачи</h1>
-                                    <p className="text-[10px] md:text-xs text-gray-500 dark:text-gray-400 mt-0.5 md:mt-1 hidden sm:block">
-                                        Управление задачами и проектами
-                                    </p>
-                                </div>
-                            </div>
-                            <Button
-                                variant="primary"
-                                size="sm"
-                                icon={Plus}
-                                onClick={() => actions.openTaskModal(null)}
-                                className="shrink-0"
-                            >
-                                <span className="hidden sm:inline">Создать</span>
-                            </Button>
-                        </div>
-                        
-                        {/* View Mode Tabs and Filters */}
+            <ModulePageShell>
+                <div className={`${MODULE_PAGE_GUTTER} pt-4 md:pt-8 flex-shrink-0`}>
+                    <div className="mb-4 md:mb-6 space-y-4">
+                        <ModulePageHeader
+                            accent="indigo"
+                            icon={<CheckSquare size={24} strokeWidth={2} />}
+                            title="Задачи"
+                            description="Управление задачами и проектами"
+                            actions={
+                                <Button
+                                    variant="primary"
+                                    size="sm"
+                                    icon={Plus}
+                                    onClick={() => actions.openTaskModal(null)}
+                                    className="shrink-0"
+                                >
+                                    <span className="hidden sm:inline">Создать</span>
+                                </Button>
+                            }
+                        />
                         <div className="flex flex-wrap items-center justify-between gap-2 md:gap-3">
-                            <div className="inline-flex items-center rounded-full bg-gray-100 dark:bg-[#252525] p-1 text-xs">
-                                <button
-                                    onClick={() => actions.setViewMode(ViewMode.TABLE)}
-                                    className={`flex items-center gap-1 px-3 py-1.5 rounded-full ${
-                                        viewMode === ViewMode.TABLE
-                                            ? 'bg-white dark:bg-[#191919] text-gray-900 dark:text-white shadow-sm'
-                                            : 'text-gray-600 dark:text-gray-300'
-                                    }`}
-                                >
-                                    <LayoutList size={14} />
-                                    Таблица
-                                </button>
-                                <button
-                                    onClick={() => actions.setViewMode(ViewMode.KANBAN)}
-                                    className={`flex items-center gap-1 px-3 py-1.5 rounded-full ${
-                                        viewMode === ViewMode.KANBAN
-                                            ? 'bg-white dark:bg-[#191919] text-gray-900 dark:text-white shadow-sm'
-                                            : 'text-gray-600 dark:text-gray-300'
-                                    }`}
-                                >
-                                    <Kanban size={14} />
-                                    Канбан
-                                </button>
-                                <button
-                                    onClick={() => actions.setViewMode(ViewMode.GANTT)}
-                                    className={`flex items-center gap-1 px-3 py-1.5 rounded-full ${
-                                        viewMode === ViewMode.GANTT
-                                            ? 'bg-white dark:bg-[#191919] text-gray-900 dark:text-white shadow-sm'
-                                            : 'text-gray-600 dark:text-gray-300'
-                                    }`}
-                                >
-                                    <BarChart3 size={14} />
-                                    Гант
-                                </button>
-                            </div>
+                            <ModuleSegmentedControl
+                                variant="accent"
+                                accent="indigo"
+                                value={viewMode}
+                                onChange={(v) => actions.setViewMode(v as ViewMode)}
+                                options={[
+                                    { value: ViewMode.TABLE, label: 'Таблица', icon: <LayoutList size={16} /> },
+                                    { value: ViewMode.KANBAN, label: 'Канбан', icon: <Kanban size={16} /> },
+                                    { value: ViewMode.GANTT, label: 'Гант', icon: <BarChart3 size={16} /> },
+                                ]}
+                            />
 
                             <div className="flex flex-wrap items-center gap-1.5 md:gap-2 text-[10px] md:text-xs">
                                 <div className="flex items-center gap-1">
@@ -225,7 +195,7 @@ export const SpaceModule: React.FC<SpaceModuleProps> = ({
                 </div>
                 
                 <div className="flex-1 overflow-y-auto overflow-x-hidden custom-scrollbar min-h-0">
-                    <div className="max-w-7xl mx-auto w-full px-3 md:px-6 pb-24 md:pb-32">
+                    <div className={`${MODULE_PAGE_GUTTER} pb-24 md:pb-32`}>
                     {viewMode === ViewMode.TABLE && (
                         <TableView 
                             tasks={filteredTasks} 
@@ -261,7 +231,7 @@ export const SpaceModule: React.FC<SpaceModuleProps> = ({
                     )}
                     </div>
                 </div>
-            </div>
+            </ModulePageShell>
         );
 
     case 'backlog':

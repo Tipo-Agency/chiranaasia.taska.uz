@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import { EmployeeInfo, User, OrgPosition, Department } from '../types';
 import { UserCheck, Search, Trash2, Edit2, Calendar, FileText, X, Save, User as UserIcon, Phone, Send, Cake, Network, Building2, UserPlus } from 'lucide-react';
-import { ModuleCreateDropdown } from './ui';
+import { ModuleCreateDropdown, ModulePageShell, ModulePageHeader, ModuleSegmentedControl, MODULE_PAGE_GUTTER } from './ui';
 import { TaskSelect } from './TaskSelect';
 import { getDefaultAvatarForId } from '../constants/avatars';
 import { formatDate, normalizeDateForInput } from '../utils/dateUtils';
@@ -288,51 +288,54 @@ const EmployeesView: React.FC<EmployeesViewProps> = ({
   };
 
   return (
-    <div className="h-full flex flex-col min-h-0">
-      <div className="max-w-7xl mx-auto w-full pt-8 px-6 flex-shrink-0">
-       <div className="mb-6">
-            <div className="flex justify-between items-center mb-4">
-                <div>
-                    <h1 className="text-lg md:text-2xl font-bold text-gray-800 dark:text-white truncate">Сотрудники</h1>
-                    <p className="hidden md:block text-xs text-gray-500 dark:text-gray-400 mt-1">
-                        Управление сотрудниками и организационной структурой
-                    </p>
-                </div>
-                <ModuleCreateDropdown
-                  buttonClassName="bg-purple-600 hover:bg-purple-700 text-white"
-                  items={
-                    activeTab === 'cards'
-                      ? [
-                          {
-                            id: 'employee',
-                            label: 'Сотрудник',
-                            icon: UserPlus,
-                            onClick: handleOpenCreate,
-                            iconClassName: 'text-purple-600 dark:text-purple-400',
-                          },
-                        ]
-                      : [
-                          {
-                            id: 'position',
-                            label: 'Должность в оргсхеме',
-                            icon: Building2,
-                            onClick: handleOpenPosCreate,
-                            iconClassName: 'text-purple-600 dark:text-purple-400',
-                          },
-                        ]
-                  }
-                />
-            </div>
-            
-            {/* TABS */}
-            <div className="flex items-center gap-2 bg-gray-100 dark:bg-[#252525] rounded-full p-1 text-xs">
-              <button onClick={() => setActiveTab('cards')} className={`px-3 py-1.5 rounded-full ${activeTab === 'cards' ? 'bg-white dark:bg-[#191919] text-gray-900 dark:text-white shadow-sm' : 'text-gray-600 dark:text-gray-300'}`}>Карточки</button>
-              <button onClick={() => setActiveTab('orgchart')} className={`px-3 py-1.5 rounded-full ${activeTab === 'orgchart' ? 'bg-white dark:bg-[#191919] text-gray-900 dark:text-white shadow-sm' : 'text-gray-600 dark:text-gray-300'}`}>Оргсхема</button>
-            </div>
-       </div>
-       </div>
+    <ModulePageShell>
+      <div className={`${MODULE_PAGE_GUTTER} pt-6 md:pt-8 flex-shrink-0`}>
+        <div className="mb-6 space-y-5">
+          <ModulePageHeader
+            accent="violet"
+            icon={<UserCheck size={24} strokeWidth={2} />}
+            title="Сотрудники"
+            description="Управление сотрудниками и организационной структурой"
+            actions={
+              <ModuleCreateDropdown
+                buttonClassName="bg-violet-600 hover:bg-violet-700 text-white"
+                items={
+                  activeTab === 'cards'
+                    ? [
+                        {
+                          id: 'employee',
+                          label: 'Сотрудник',
+                          icon: UserPlus,
+                          onClick: handleOpenCreate,
+                          iconClassName: 'text-violet-600 dark:text-violet-400',
+                        },
+                      ]
+                    : [
+                        {
+                          id: 'position',
+                          label: 'Должность в оргсхеме',
+                          icon: Building2,
+                          onClick: handleOpenPosCreate,
+                          iconClassName: 'text-violet-600 dark:text-violet-400',
+                        },
+                      ]
+                }
+              />
+            }
+          />
+          <ModuleSegmentedControl
+            variant="neutral"
+            value={activeTab}
+            onChange={(v) => setActiveTab(v as 'cards' | 'orgchart')}
+            options={[
+              { value: 'cards', label: 'Карточки' },
+              { value: 'orgchart', label: 'Оргсхема' },
+            ]}
+          />
+        </div>
+      </div>
        <div className="flex-1 min-h-0 overflow-hidden">
-         <div className="max-w-7xl mx-auto w-full px-6 pb-20 h-full overflow-y-auto custom-scrollbar">
+         <div className={`${MODULE_PAGE_GUTTER} pb-20 h-full overflow-y-auto custom-scrollbar`}>
        {activeTab === 'cards' && renderCards()}
        {activeTab === 'orgchart' && renderOrgChart()}
          </div>
@@ -478,7 +481,7 @@ const EmployeesView: React.FC<EmployeesViewProps> = ({
             </div>
         </div>
        )}
-    </div>
+    </ModulePageShell>
   );
 };
 

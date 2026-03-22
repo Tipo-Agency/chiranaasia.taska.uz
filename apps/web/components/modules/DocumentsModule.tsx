@@ -24,7 +24,7 @@ export const DocumentsModule: React.FC<DocumentsModuleProps> = ({
   actions,
 }) => {
   return (
-    <div className="h-full flex flex-col min-h-0 bg-white dark:bg-[#191919]">
+    <div className="h-full flex flex-col min-h-0">
       <DocumentsView 
         docs={docs} 
         folders={folders} 

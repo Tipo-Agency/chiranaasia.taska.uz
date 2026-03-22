@@ -1,9 +1,11 @@
 /**
- * TasksHeader - заголовок страницы задач с фильтрами и действиями
+ * TasksHeader — шапка страницы задач (единый стиль с модулями).
  */
 import React from 'react';
 import { Button } from '../../ui/Button';
 import { Filter, Plus } from 'lucide-react';
+import { ModulePageHeader } from '../../ui/ModulePageHeader';
+import { CheckSquare } from 'lucide-react';
 
 interface TasksHeaderProps {
   showFilters: boolean;
@@ -21,17 +23,13 @@ export const TasksHeader: React.FC<TasksHeaderProps> = ({
   onCreateTask,
 }) => {
   return (
-    <div className="mb-6">
-      <div className="flex justify-between items-center mb-4">
-        <div>
-          <h1 className="text-lg md:text-2xl font-bold text-gray-800 dark:text-white truncate">
-            Задачи
-          </h1>
-          <p className="hidden md:block text-xs text-gray-500 dark:text-gray-400 mt-1">
-            Управление всеми задачами системы
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
+    <ModulePageHeader
+      accent="indigo"
+      icon={<CheckSquare size={24} strokeWidth={2} />}
+      title="Задачи"
+      description="Управление всеми задачами системы"
+      actions={
+        <>
           <Button
             variant={showFilters || hasActiveFilters ? 'primary' : 'secondary'}
             size="sm"
@@ -45,16 +43,11 @@ export const TasksHeader: React.FC<TasksHeaderProps> = ({
               </span>
             )}
           </Button>
-          <Button
-            variant="primary"
-            size="sm"
-            icon={Plus}
-            onClick={onCreateTask}
-          >
+          <Button variant="primary" size="sm" icon={Plus} onClick={onCreateTask}>
             <span className="hidden sm:inline">Создать</span>
           </Button>
-        </div>
-      </div>
-    </div>
+        </>
+      }
+    />
   );
 };

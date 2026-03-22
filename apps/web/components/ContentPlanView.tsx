@@ -4,6 +4,7 @@ import { createPortal } from 'react-dom';
 import { ContentPost, Task, TableCollection } from '../types';
 import { Calendar, Plus, X, FileText as FileTextIcon, Send, Youtube, Video, Image, FileText, Clock, List, LayoutGrid, KanbanSquare, Linkedin, Check, CheckSquare, ChevronLeft, ChevronRight, Trash2, Edit2, Instagram, CheckSquare2, Save, RefreshCw, MoreVertical } from 'lucide-react';
 import { DynamicIcon } from './AppIcons';
+import { ModulePageShell, ModulePageHeader, ModuleSegmentedControl, MODULE_PAGE_GUTTER } from './ui';
 import { TaskSelect } from './TaskSelect';
 import { api } from '../backend/api';
 import { normalizeDateForInput } from '../utils/dateUtils';
@@ -45,21 +46,6 @@ const ContentPlanView: React.FC<ContentPlanViewProps> = ({
     return 'bg-blue-600 hover:bg-blue-700';
   };
 
-  // Получаем цвет для иконки из цвета таблицы
-  const getIconBgColor = () => {
-    if (!activeTable?.color) return 'bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400';
-    // Если цвет уже содержит bg- и text-, используем его
-    if (activeTable.color.includes('bg-') && activeTable.color.includes('text-')) {
-      return activeTable.color;
-    }
-    // Иначе извлекаем цвет
-    const bgMatch = activeTable.color.match(/bg-(\w+)-(\d+)/);
-    if (bgMatch) {
-      const colorName = bgMatch[1];
-      return `bg-${colorName}-100 dark:bg-${colorName}-900/30 text-${colorName}-600 dark:text-${colorName}-400`;
-    }
-    return 'bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400';
-  };
   const [viewMode, setViewMode] = useState<'calendar' | 'table' | 'kanban' | 'gantt' | 'tasks'>('calendar');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingPost, setEditingPost] = useState<ContentPost | null>(null);
@@ -804,30 +790,22 @@ const ContentPlanView: React.FC<ContentPlanViewProps> = ({
   };
 
   return (
-    <div className="h-full flex flex-col min-h-0">
-      <div className="max-w-7xl mx-auto w-full pt-8 px-6 flex-shrink-0">
-        <div className="mb-6">
-          <div className="flex justify-between items-center mb-4">
-            <div className="flex items-center gap-3">
-              <div className={`${getIconBgColor()} p-2 rounded-lg`}>
-                <DynamicIcon name={activeTable?.icon || 'FileText'} className={activeTable?.color || 'text-blue-600'} size={24} />
-              </div>
-              <div>
-                <h1 className="text-lg md:text-2xl font-bold text-gray-800 dark:text-white truncate">{activeTable?.name || 'Контент-план'}</h1>
-                <p className="hidden md:block text-xs text-gray-500 dark:text-gray-400 mt-1">
-                  Планирование контента
-                </p>
-              </div>
-            </div>
-            <div className="flex items-center gap-3">
-              {/* Публичная ссылка на контент-план */}
-              <div className="bg-green-50 dark:bg-green-900/10 px-3 py-2 rounded-lg border border-green-200 dark:border-green-900/30">
-                <div className="flex items-center gap-2">
+    <ModulePageShell>
+      <div className={`${MODULE_PAGE_GUTTER} pt-8 pb-4 flex-shrink-0`}>
+        <ModulePageHeader
+          icon={<DynamicIcon name={activeTable?.icon || 'FileText'} className="text-white" size={24} />}
+          title={activeTable?.name || 'Контент-план'}
+          description="Планирование контента"
+          accent="yellow"
+          actions={
+            <div className="flex flex-wrap items-center gap-2 justify-end">
+              <div className="bg-green-50 dark:bg-green-900/10 px-3 py-2 rounded-xl border border-green-200 dark:border-green-900/30">
+                <div className="flex flex-wrap items-center gap-2">
                   <span className="text-xs text-green-700 dark:text-green-300 font-medium">Публичная ссылка:</span>
                   <input 
                     readOnly
                     value={`${window.location.origin}/content-plan/${tableId}`}
-                    className="text-xs text-gray-700 dark:text-gray-300 bg-transparent border-none outline-none w-48"
+                    className="text-xs text-gray-700 dark:text-gray-300 bg-transparent border-none outline-none min-w-0 max-w-[12rem] sm:max-w-xs"
                   />
                   <button 
                     type="button"
@@ -844,40 +822,36 @@ const ContentPlanView: React.FC<ContentPlanViewProps> = ({
               <button 
                 onClick={refreshData} 
                 disabled={isRefreshing}
-                className="px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 text-sm font-medium flex items-center gap-2 hover:bg-gray-50 dark:hover:bg-[#2a2a2a] disabled:opacity-50 disabled:cursor-not-allowed"
+                className="px-3 py-2 rounded-xl border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 text-sm font-medium flex items-center gap-2 hover:bg-gray-50 dark:hover:bg-[#2a2a2a] disabled:opacity-50 disabled:cursor-not-allowed"
                 title="Обновить данные"
               >
                 <RefreshCw size={16} className={isRefreshing ? 'animate-spin' : ''} /> 
                 {isRefreshing ? 'Обновление...' : 'Обновить'}
               </button>
-              <button onClick={handleOpenCreate} className={`px-4 py-2 rounded-lg ${getButtonColor()} text-white text-sm font-medium flex items-center gap-2 shadow-sm`}>
+              <button onClick={handleOpenCreate} className={`px-4 py-2 rounded-xl ${getButtonColor()} text-white text-sm font-medium flex items-center gap-2 shadow-sm`}>
                 <Plus size={18} /> Создать
               </button>
             </div>
-          </div>
-          
-          {/* View Mode Tabs */}
-          <div className="flex items-center gap-2 bg-gray-100 dark:bg-[#252525] rounded-full p-1 text-xs">
-            <button onClick={() => setViewMode('calendar')} className={`px-3 py-1.5 rounded-full ${viewMode === 'calendar' ? 'bg-white dark:bg-[#191919] text-gray-900 dark:text-white shadow-sm' : 'text-gray-600 dark:text-gray-300'}`}>
-              Календарь
-            </button>
-            <button onClick={() => setViewMode('table')} className={`px-3 py-1.5 rounded-full ${viewMode === 'table' ? 'bg-white dark:bg-[#191919] text-gray-900 dark:text-white shadow-sm' : 'text-gray-600 dark:text-gray-300'}`}>
-              Список
-            </button>
-            <button onClick={() => setViewMode('kanban')} className={`px-3 py-1.5 rounded-full ${viewMode === 'kanban' ? 'bg-white dark:bg-[#191919] text-gray-900 dark:text-white shadow-sm' : 'text-gray-600 dark:text-gray-300'}`}>
-              Доска
-            </button>
-            <button onClick={() => setViewMode('gantt')} className={`px-3 py-1.5 rounded-full ${viewMode === 'gantt' ? 'bg-white dark:bg-[#191919] text-gray-900 dark:text-white shadow-sm' : 'text-gray-600 dark:text-gray-300'}`}>
-              Таймлайн
-            </button>
-            <button onClick={() => setViewMode('tasks')} className={`px-3 py-1.5 rounded-full ${viewMode === 'tasks' ? 'bg-white dark:bg-[#191919] text-gray-900 dark:text-white shadow-sm' : 'text-gray-600 dark:text-gray-300'}`}>
-              Задачи
-            </button>
-          </div>
+          }
+        />
+        <div className="mt-4">
+          <ModuleSegmentedControl
+            value={viewMode}
+            onChange={setViewMode}
+            variant="accent"
+            accent="yellow"
+            options={[
+              { value: 'calendar', label: 'Календарь' },
+              { value: 'table', label: 'Список' },
+              { value: 'kanban', label: 'Доска' },
+              { value: 'gantt', label: 'Таймлайн' },
+              { value: 'tasks', label: 'Задачи' },
+            ]}
+          />
         </div>
       </div>
       <div className="flex-1 overflow-y-auto custom-scrollbar min-h-0">
-        <div className="max-w-7xl mx-auto w-full px-6 pb-20">
+        <div className={`${MODULE_PAGE_GUTTER} pb-20`}>
           {viewMode === 'calendar' && renderCalendar()}
           {viewMode === 'table' && renderTable()}
           {viewMode === 'kanban' && renderKanban()}
@@ -1048,7 +1022,7 @@ const ContentPlanView: React.FC<ContentPlanViewProps> = ({
             </div>
         </div>
       )}
-    </div>
+    </ModulePageShell>
   );
 };
 

@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { Task, User, StatusOption, Project } from '../types';
 import { CheckCircle2, Plus, Trash2, Edit2, Search, Play, Layers, Folder, ChevronDown } from 'lucide-react';
+import { ModulePageShell, ModulePageHeader, MODULE_PAGE_GUTTER } from './ui';
 
 interface FunctionalityViewProps {
   features: Task[]; // Все функции из всех functionality таблиц
@@ -141,21 +142,23 @@ const FunctionalityView: React.FC<FunctionalityViewProps> = ({
   };
 
   return (
-    <div className="pt-6 px-6 pb-20 h-full flex flex-col">
+    <ModulePageShell>
+    <div className={`${MODULE_PAGE_GUTTER} pt-8 pb-20 h-full flex flex-col`}>
         {/* Header Stats */}
-        <div className="mb-8 bg-white dark:bg-[#252525] p-6 rounded-xl border border-gray-200 dark:border-[#333] shadow-sm">
-            <div className="flex justify-between items-center mb-4">
-                <div>
-                    <h1 className="text-3xl font-bold text-gray-800 dark:text-white">Функционал</h1>
-                    <p className="hidden sm:block text-xs text-gray-500 dark:text-gray-400 mt-1">
-                        Функции проектов
-                    </p>
-                </div>
+        <div className="mb-8 bg-white dark:bg-[#1a1a1a] p-6 rounded-2xl border border-gray-200 dark:border-[#333] shadow-sm">
+            <ModulePageHeader
+              icon={<Layers size={24} strokeWidth={2} />}
+              title="Функционал"
+              description="Функции проектов"
+              accent="sky"
+              actions={
                 <div className="text-right">
-                    <div className="text-3xl font-bold text-blue-600 dark:text-blue-400">{progress}%</div>
+                    <div className="text-3xl font-bold text-sky-600 dark:text-sky-400 tabular-nums">{progress}%</div>
                     <div className="text-xs text-gray-500 dark:text-gray-400 uppercase font-semibold">Готовность системы</div>
                 </div>
-            </div>
+              }
+              className="mb-4"
+            />
             <div className="w-full bg-gray-100 dark:bg-[#333] rounded-full h-3 overflow-hidden">
                 <div 
                     className="bg-blue-600 h-full rounded-full transition-all duration-500 ease-out relative"
@@ -353,6 +356,7 @@ const FunctionalityView: React.FC<FunctionalityViewProps> = ({
             )}
         </div>
     </div>
+    </ModulePageShell>
   );
 };
 

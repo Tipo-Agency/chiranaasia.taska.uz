@@ -2,7 +2,15 @@
 import React, { useState, useMemo } from 'react';
 import { Doc, Folder, TableCollection, Task, TaskAttachment, User } from '../types';
 import { FileText, Folder as FolderIcon, Plus, LayoutGrid, List as ListIcon, Trash2, ExternalLink, ChevronRight, FolderPlus, X, Save, Box, FileText as FileTextIcon, Paperclip, Image as ImageIcon, Download, File as FileIcon, Edit2, Calendar, Users } from 'lucide-react';
-import { Tabs, Button, ModuleCreateDropdown } from './ui';
+import {
+  Tabs,
+  Button,
+  ModuleCreateDropdown,
+  ModulePageShell,
+  ModulePageHeader,
+  ModuleSegmentedControl,
+  MODULE_PAGE_GUTTER,
+} from './ui';
 import { FilePreviewModal } from './FilePreviewModal';
 import { isImageFile } from '../utils/fileUtils';
 import { WeeklyPlansModal, ProtocolsModal } from './documents/PlanningModals';
@@ -238,63 +246,65 @@ const DocumentsView: React.FC<DocumentsViewProps> = ({
 
   return (
     <>
-    <div className="h-full flex flex-col min-h-0">
-      <div className="max-w-7xl mx-auto w-full pt-8 px-6 flex-shrink-0">
-        <div className="mb-6">
-          <div className="flex justify-between items-center mb-4">
-            <div>
-              <h1 className="text-lg md:text-2xl font-bold text-gray-800 dark:text-white truncate">Документы</h1>
-              <p className="hidden md:block text-xs text-gray-500 dark:text-gray-400 mt-1">
-                Управление документами и папками
-              </p>
-            </div>
-            {activeTab === 'docs' && (
-              <ModuleCreateDropdown
-                buttonClassName="bg-yellow-600 hover:bg-yellow-700 text-white"
-                items={[
-                  {
-                    id: 'doc',
-                    label: 'Документ',
-                    icon: FileTextIcon,
-                    onClick: () => onAddDoc(currentFolderId || undefined),
-                    iconClassName: 'text-yellow-600 dark:text-yellow-400',
-                  },
-                  ...(!currentFolderId
-                    ? [
-                        {
-                          id: 'folder',
-                          label: 'Папка',
-                          icon: FolderPlus,
-                          onClick: () => setIsFolderModalOpen(true),
-                          iconClassName: 'text-yellow-600 dark:text-yellow-400',
-                        },
-                      ]
-                    : []),
-                ]}
-              />
-            )}
-          </div>
-          
-          {/* Tabs: Документы / Вложения + планы и протоколы в модалках */}
-          <div className="mb-4 flex flex-col gap-3">
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-              <Tabs
-                  tabs={[
-                      { id: 'docs', label: 'Документы' },
-                      { id: 'attachments', label: 'Вложения' },
+    <ModulePageShell>
+      <div className={`${MODULE_PAGE_GUTTER} pt-6 md:pt-8 flex-shrink-0`}>
+        <div className="mb-6 space-y-5">
+          <ModulePageHeader
+            accent="amber"
+            icon={<FileTextIcon size={24} strokeWidth={2} />}
+            title="Документы"
+            description="Управление документами и папками"
+            actions={
+              activeTab === 'docs' ? (
+                <ModuleCreateDropdown
+                  buttonClassName="bg-amber-600 hover:bg-amber-700 text-white"
+                  items={[
+                    {
+                      id: 'doc',
+                      label: 'Документ',
+                      icon: FileTextIcon,
+                      onClick: () => onAddDoc(currentFolderId || undefined),
+                      iconClassName: 'text-amber-600 dark:text-amber-400',
+                    },
+                    ...(!currentFolderId
+                      ? [
+                          {
+                            id: 'folder',
+                            label: 'Папка',
+                            icon: FolderPlus,
+                            onClick: () => setIsFolderModalOpen(true),
+                            iconClassName: 'text-amber-600 dark:text-amber-400',
+                          },
+                        ]
+                      : []),
                   ]}
-                  activeTab={activeTab}
-                  onChange={(tabId) => setActiveTab(tabId as 'docs' | 'attachments')}
+                />
+              ) : null
+            }
+          />
+
+          {/* Вкладки + вид + планы и протоколы */}
+          <div className="flex flex-col gap-3">
+            <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
+              <Tabs
+                tabs={[
+                  { id: 'docs', label: 'Документы' },
+                  { id: 'attachments', label: 'Вложения' },
+                ]}
+                activeTab={activeTab}
+                onChange={(tabId) => setActiveTab(tabId as 'docs' | 'attachments')}
               />
               {activeTab === 'docs' && (
-                <div className="flex items-center gap-2 bg-gray-100 dark:bg-[#252525] rounded-full p-1 text-xs self-start sm:self-auto">
-                  <button type="button" onClick={() => setViewMode('grid')} className={`px-3 py-1.5 rounded-full ${viewMode === 'grid' ? 'bg-white dark:bg-[#191919] text-gray-900 dark:text-white shadow-sm' : 'text-gray-600 dark:text-gray-300'}`}>
-                    Плитка
-                  </button>
-                  <button type="button" onClick={() => setViewMode('list')} className={`px-3 py-1.5 rounded-full ${viewMode === 'list' ? 'bg-white dark:bg-[#191919] text-gray-900 dark:text-white shadow-sm' : 'text-gray-600 dark:text-gray-300'}`}>
-                    Список
-                  </button>
-                </div>
+                <ModuleSegmentedControl
+                  variant="accent"
+                  accent="amber"
+                  value={viewMode}
+                  onChange={(v) => setViewMode(v)}
+                  options={[
+                    { value: 'grid', label: 'Плитка' },
+                    { value: 'list', label: 'Список' },
+                  ]}
+                />
               )}
             </div>
             <div className="flex flex-wrap gap-2">
@@ -320,7 +330,7 @@ const DocumentsView: React.FC<DocumentsViewProps> = ({
         </div>
       </div>
       <div className="flex-1 min-h-0 overflow-hidden">
-        <div className="max-w-7xl mx-auto w-full px-6 pb-20 h-full overflow-y-auto custom-scrollbar">
+        <div className={`${MODULE_PAGE_GUTTER} pb-20 h-full overflow-y-auto custom-scrollbar`}>
           {activeTab === 'docs' ? (
             <>
               {renderBreadcrumbs()}
@@ -547,7 +557,7 @@ const DocumentsView: React.FC<DocumentsViewProps> = ({
         tasks={tasks}
         onOpenTask={onOpenTask}
       />
-    </div>
+    </ModulePageShell>
     </>
   );
 };

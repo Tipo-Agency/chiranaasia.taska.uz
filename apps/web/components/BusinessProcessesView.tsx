@@ -4,7 +4,7 @@ import { BusinessProcess, ProcessStep, ProcessStepBranch, OrgPosition, User, Tas
 import { Network, Plus, Edit2, Trash2, ChevronRight, User as UserIcon, Building2, Save, X, ArrowDown, Play, CheckCircle2, Clock, FileText, ArrowLeft, Calendar, Users, Layers3, PauseCircle } from 'lucide-react';
 import { TaskSelect } from './TaskSelect';
 import { ProcessCard } from './features/processes/ProcessCard';
-import { ModuleCreateDropdown } from './ui';
+import { ModuleCreateDropdown, ModulePageShell, ModulePageHeader, ModuleSegmentedControl, MODULE_PAGE_GUTTER } from './ui';
 
 interface BusinessProcessesViewProps {
   processes: BusinessProcess[];
@@ -1114,19 +1114,17 @@ const BusinessProcessesView: React.FC<BusinessProcessesViewProps> = ({
 
   // Список процессов
   return (
-    <div className="h-full flex flex-col min-h-0">
-      <div className="max-w-7xl mx-auto w-full pt-8 px-6 flex-shrink-0">
-        <div className="mb-6">
-          <div className="flex justify-between items-center mb-4">
-            <div>
-              <h1 className="text-lg md:text-2xl font-bold text-gray-800 dark:text-white truncate">Бизнес-процессы</h1>
-              <p className="hidden md:block text-xs text-gray-500 dark:text-gray-400 mt-1">
-                Шаблоны, запуски в работе и завершённые экземпляры — на отдельных вкладках
-              </p>
-            </div>
-            <div className="flex items-center gap-2">
+    <ModulePageShell>
+      <div className={`${MODULE_PAGE_GUTTER} pt-6 md:pt-8 flex-shrink-0`}>
+        <div className="mb-6 space-y-5">
+          <ModulePageHeader
+            accent="indigo"
+            icon={<Network size={24} strokeWidth={2} />}
+            title="Бизнес-процессы"
+            description="Шаблоны, запуски в работе и завершённые экземпляры — на отдельных вкладках"
+            actions={
               <ModuleCreateDropdown
-                buttonClassName="bg-indigo-600 hover:bg-indigo-700 text-white"
+                buttonClassName="bg-[#3337AD] hover:bg-[#292b8a] text-white"
                 items={[
                   {
                     id: 'template',
@@ -1148,49 +1146,19 @@ const BusinessProcessesView: React.FC<BusinessProcessesViewProps> = ({
                     : []),
                 ]}
               />
-            </div>
-          </div>
-          
-          {/* Вкладки: шаблоны | в работе | завершённые */}
-          <div className="mb-4">
-            <div className="flex flex-wrap items-center gap-1.5 bg-gray-100 dark:bg-[#252525] rounded-full p-1 text-xs mb-3">
-              <button
-                type="button"
-                onClick={() => setActiveTab('templates')}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full transition-colors ${
-                  activeTab === 'templates'
-                    ? 'bg-white dark:bg-[#191919] text-gray-900 dark:text-white shadow-sm'
-                    : 'text-gray-600 dark:text-gray-300'
-                }`}
-              >
-                <Layers3 size={14} className="opacity-80 shrink-0" />
-                Шаблоны
-              </button>
-              <button
-                type="button"
-                onClick={() => setActiveTab('running')}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full transition-colors ${
-                  activeTab === 'running'
-                    ? 'bg-white dark:bg-[#191919] text-gray-900 dark:text-white shadow-sm'
-                    : 'text-gray-600 dark:text-gray-300'
-                }`}
-              >
-                <Play size={14} className="opacity-80 shrink-0" />
-                В работе
-              </button>
-              <button
-                type="button"
-                onClick={() => setActiveTab('completed')}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full transition-colors ${
-                  activeTab === 'completed'
-                    ? 'bg-white dark:bg-[#191919] text-gray-900 dark:text-white shadow-sm'
-                    : 'text-gray-600 dark:text-gray-300'
-                }`}
-              >
-                <CheckCircle2 size={14} className="opacity-80 shrink-0" />
-                Завершённые
-              </button>
-            </div>
+            }
+          />
+
+          <ModuleSegmentedControl
+            variant="neutral"
+            value={activeTab}
+            onChange={(v) => setActiveTab(v as 'templates' | 'running' | 'completed')}
+            options={[
+              { value: 'templates', label: 'Шаблоны', icon: <Layers3 size={14} /> },
+              { value: 'running', label: 'В работе', icon: <Play size={14} /> },
+              { value: 'completed', label: 'Завершённые', icon: <CheckCircle2 size={14} /> },
+            ]}
+          />
 
             <div className="flex flex-wrap items-center gap-2 text-[11px] sm:text-xs text-gray-600 dark:text-gray-400">
               {activeTab === 'templates' && (
@@ -1228,12 +1196,11 @@ const BusinessProcessesView: React.FC<BusinessProcessesViewProps> = ({
                 </span>
               )}
             </div>
-          </div>
         </div>
       </div>
       
       <div className="flex-1 min-h-0 overflow-hidden">
-        <div className="max-w-7xl mx-auto w-full px-6 pb-20 h-full overflow-y-auto custom-scrollbar">
+        <div className={`${MODULE_PAGE_GUTTER} pb-20 h-full overflow-y-auto custom-scrollbar`}>
           {activeTab === 'templates' ? (
             processes.length === 0 ? (
             <div className="bg-white dark:bg-[#252525] border border-gray-200 dark:border-[#333] rounded-xl p-12 text-center">
@@ -1530,7 +1497,7 @@ const BusinessProcessesView: React.FC<BusinessProcessesViewProps> = ({
           </div>
         </div>
       )}
-    </div>
+    </ModulePageShell>
   );
 };
 

@@ -19,6 +19,7 @@ import {
 } from '../../types';
 import { PageLayout } from '../ui/PageLayout';
 import { Container } from '../ui/Container';
+import { MODULE_PAGE_GUTTER } from '../ui';
 import {
   TasksHeader,
   ViewModeToggle,
@@ -201,8 +202,8 @@ export const TasksPage: React.FC<TasksPageProps> = ({
   }, []);
 
   return (
-    <PageLayout>
-      <Container safeArea className="py-6 pb-24 md:pb-32">
+    <PageLayout contentClassName="bg-gray-50/50 dark:bg-[#141414]">
+      <Container safeArea maxWidth="full" padding={false} className={`${MODULE_PAGE_GUTTER} py-6 pb-24 md:pb-32`}>
         <TasksHeader
           showFilters={showFilters}
           hasActiveFilters={hasActiveFilters}
@@ -211,10 +212,9 @@ export const TasksPage: React.FC<TasksPageProps> = ({
           onCreateTask={onCreateTask}
         />
 
-        <ViewModeToggle
-          viewMode={viewMode}
-          onViewModeChange={setViewMode}
-        />
+        <div className="mb-4">
+          <ViewModeToggle viewMode={viewMode} onViewModeChange={setViewMode} />
+        </div>
 
         {showFilters && (
           <TasksFilters

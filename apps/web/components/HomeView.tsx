@@ -1,8 +1,8 @@
 
 import React, { useState, useEffect } from 'react';
 import { Task, User, ActivityLog, Meeting, FinancePlan, PurchaseRequest, Deal, ContentPost, Role, EmployeeInfo } from '../types';
-import { CheckCircle2, Clock, Calendar, ArrowRight, Wallet, TrendingUp, Briefcase, Zap, Plus, X } from 'lucide-react';
-import { Button } from './ui';
+import { CheckCircle2, Clock, Calendar, ArrowRight, Wallet, TrendingUp, Briefcase, Zap, Plus, X, LayoutGrid } from 'lucide-react';
+import { Button, ModulePageShell, ModulePageHeader, MODULE_PAGE_GUTTER } from './ui';
 import { getTodayLocalDate, parseLocalDate, isOverdue } from '../utils/dateUtils';
 
 interface HomeViewProps {
@@ -192,31 +192,29 @@ const HomeView: React.FC<HomeViewProps> = ({
         </div>
       )}
 
-      <div className="max-w-7xl mx-auto w-full px-6 pb-20 pt-8 h-full flex flex-col overflow-hidden bg-white dark:bg-[#191919]">
-        <div className="flex flex-wrap justify-between items-center gap-4 mb-4 shrink-0">
-          <div className="flex items-center gap-4">
-            <div>
-              <h1 className="text-xl font-bold text-gray-800 dark:text-white">{greeting}, {currentUser?.name || 'Пользователь'}</h1>
-              <p className="text-xs text-gray-500 dark:text-gray-400 hidden sm:block">Командный центр</p>
-            </div>
-            <div className="text-right hidden sm:block">
-              <div className="text-sm font-bold text-gray-800 dark:text-white">{formattedDate}</div>
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
-            <button onClick={onQuickCreateTask} className="p-2.5 bg-white dark:bg-[#252525] text-blue-600 dark:text-blue-400 rounded-lg text-xs font-bold hover:shadow-md transition-all flex items-center gap-1.5 shadow-sm border border-blue-100 dark:border-blue-900/30">
+      <ModulePageShell className="h-full">
+      <div className={`${MODULE_PAGE_GUTTER} pb-20 pt-8 h-full flex flex-col overflow-hidden`}>
+        <ModulePageHeader
+          icon={<LayoutGrid size={24} strokeWidth={2} />}
+          title={`${greeting}, ${currentUser?.name || 'Пользователь'}`}
+          description={`${formattedDate} · Командный центр`}
+          accent="indigo"
+          actions={
+            <div className="flex flex-wrap items-center gap-2">
+            <button onClick={onQuickCreateTask} className="p-2.5 bg-white dark:bg-[#252525] text-blue-600 dark:text-blue-400 rounded-xl text-xs font-bold hover:shadow-md transition-all flex items-center gap-1.5 shadow-sm border border-blue-100 dark:border-blue-900/30">
               <CheckCircle2 size={18}/> Задача
             </button>
-            <button onClick={onQuickCreateDeal} className="p-2.5 bg-white dark:bg-[#252525] text-green-600 dark:text-green-400 rounded-lg text-xs font-bold hover:shadow-md transition-all flex items-center gap-1.5 shadow-sm border border-green-100 dark:border-green-900/30">
+            <button onClick={onQuickCreateDeal} className="p-2.5 bg-white dark:bg-[#252525] text-green-600 dark:text-green-400 rounded-xl text-xs font-bold hover:shadow-md transition-all flex items-center gap-1.5 shadow-sm border border-green-100 dark:border-green-900/30">
               <Briefcase size={18}/> Сделка
             </button>
-            <button onClick={onQuickCreateProcess} className="p-2.5 bg-white dark:bg-[#252525] text-purple-600 dark:text-purple-400 rounded-lg text-xs font-bold hover:shadow-md transition-all flex items-center gap-1.5 shadow-sm border border-purple-100 dark:border-purple-900/30">
+            <button onClick={onQuickCreateProcess} className="p-2.5 bg-white dark:bg-[#252525] text-purple-600 dark:text-purple-400 rounded-xl text-xs font-bold hover:shadow-md transition-all flex items-center gap-1.5 shadow-sm border border-purple-100 dark:border-purple-900/30">
               <Zap size={18}/> Процесс
             </button>
-          </div>
-        </div>
+            </div>
+          }
+        />
 
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 flex-1 min-h-0">
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 flex-1 min-h-0 mt-4">
         <div className="lg:col-span-3 grid grid-cols-1 md:grid-cols-2 gap-4 h-full min-h-0">
             {/* ЗАДАЧИ НА СЕГОДНЯ */}
             <div className="bg-white dark:bg-[#1e1e1e] rounded-xl border border-gray-200 dark:border-[#333] shadow-sm p-4 flex flex-col h-full overflow-hidden">
@@ -297,7 +295,8 @@ const HomeView: React.FC<HomeViewProps> = ({
             )}
         </div>
       </div>
-    </div>
+      </div>
+    </ModulePageShell>
     </>
   );
 };

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Task, User, StatusOption, TableCollection } from '../types';
 import { Archive, Plus, Trash2, Edit2, Search, Play } from 'lucide-react';
+import { ModulePageShell, ModulePageHeader, MODULE_PAGE_GUTTER } from './ui';
 
 interface BacklogViewProps {
   backlogTasks: Task[]; // Задачи из беклога
@@ -40,21 +41,22 @@ const BacklogView: React.FC<BacklogViewProps> = ({
   };
 
   return (
-    <div className="pt-6 px-6 pb-20 h-full flex flex-col">
+    <ModulePageShell>
+    <div className={`${MODULE_PAGE_GUTTER} pt-8 pb-20 h-full flex flex-col`}>
         {/* Header */}
-        <div className="mb-8 bg-white dark:bg-[#252525] p-6 rounded-xl border border-gray-200 dark:border-[#333] shadow-sm">
-            <div className="flex justify-between items-center mb-4">
-                <div>
-                    <h1 className="text-3xl font-bold text-gray-800 dark:text-white">Бэклог</h1>
-                    <p className="hidden sm:block text-xs text-gray-500 dark:text-gray-400 mt-1">
-                        Идеи для реализации
-                    </p>
-                </div>
+        <div className="mb-8 bg-white dark:bg-[#1a1a1a] p-6 rounded-2xl border border-gray-200 dark:border-[#333] shadow-sm">
+            <ModulePageHeader
+              icon={<Archive size={24} strokeWidth={2} />}
+              title="Бэклог"
+              description="Идеи для реализации"
+              accent="orange"
+              actions={
                 <div className="text-right">
-                    <div className="text-3xl font-bold text-orange-600 dark:text-orange-400">{filteredTasks.length}</div>
+                    <div className="text-3xl font-bold text-orange-600 dark:text-orange-400 tabular-nums">{filteredTasks.length}</div>
                     <div className="text-xs text-gray-500 dark:text-gray-400 uppercase font-semibold">Идей в беклоге</div>
                 </div>
-            </div>
+              }
+            />
         </div>
 
         {/* Toolbar */}
@@ -168,6 +170,7 @@ const BacklogView: React.FC<BacklogViewProps> = ({
             )}
         </div>
     </div>
+    </ModulePageShell>
   );
 };
 
