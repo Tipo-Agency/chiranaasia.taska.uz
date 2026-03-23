@@ -104,7 +104,8 @@ export const WorkdeskView: React.FC<WorkdeskViewProps> = ({
 
   return (
     <PageLayout>
-      <Container safeArea className="py-4 overflow-y-auto">
+      {/* Внешний scroll дает `PageLayout` (main overflow-auto), поэтому не делаем вложенный scroll тут. */}
+      <Container safeArea className="py-4">
         <div className="max-w-6xl mx-auto space-y-4">
           <Tabs
             tabs={[
