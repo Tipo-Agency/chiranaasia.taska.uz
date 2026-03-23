@@ -28,7 +28,7 @@ export const ModuleCreateIconButton: React.FC<ModuleCreateIconButtonProps> = ({
       disabled={disabled}
       title={label}
       aria-label={label}
-      className={`inline-flex items-center justify-center w-11 h-11 rounded-xl shrink-0 transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${fab} ${className}`}
+      className={`order-first inline-flex items-center justify-center w-11 h-11 rounded-xl shrink-0 transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${fab} ${className}`}
       {...rest}
     >
       <Plus size={22} strokeWidth={2.5} />

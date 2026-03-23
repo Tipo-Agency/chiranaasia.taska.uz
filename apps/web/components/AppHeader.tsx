@@ -75,25 +75,25 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
 
   const getPageHeader = (view: string) => {
     switch(view) {
-      case 'home': return { title: 'Рабочий стол', icon: <Home size={20} /> };
-      case 'tasks': return { title: 'Задачи', icon: <CheckSquare size={20} /> };
-      case 'inbox': return { title: 'Входящие', icon: <Bell size={20} /> };
-      case 'chat': return { title: 'Чат', icon: <MessageCircle size={20} /> };
-      case 'search': return { title: 'Поиск', icon: <Search size={20} /> };
-      case 'settings': return { title: 'Настройки', icon: <Settings size={20} /> };
-      case 'analytics': return { title: 'Аналитика', icon: <PieChart size={20} /> };
-      case 'sales-funnel': return { title: 'Воронка продаж', icon: <BarChart3 size={20} /> };
-      case 'clients': return { title: 'Клиенты', icon: <Briefcase size={20} /> };
-      case 'finance': return { title: 'Финансовое планирование', icon: <Wallet size={20} /> };
-      case 'business-processes': return { title: 'Бизнес-процессы', icon: <Network size={20} /> };
-      case 'employees': return { title: 'Сотрудники', icon: <UserCheck size={20} /> };
-      case 'spaces': return { title: 'Пространство', icon: <Layers size={20} /> };
-      case 'meetings': return { title: 'Встречи', icon: <Users size={20} /> };
-      case 'docs': return { title: 'Документы', icon: <FileText size={20} /> };
-      case 'doc-editor': return { title: 'Редактор документа', icon: <FileText size={20} /> };
-      case 'sites': return { title: 'Сайты', icon: <Globe size={20} /> };
-      case 'inventory': return { title: 'Склад', icon: <Package size={20} /> };
-      default: return { title: view, icon: <Settings size={20} /> };
+      case 'home': return { title: 'Рабочий стол', icon: <Home size={18} />, iconBox: 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300' };
+      case 'tasks': return { title: 'Задачи', icon: <CheckSquare size={18} />, iconBox: 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300' };
+      case 'inbox': return { title: 'Входящие', icon: <Bell size={18} />, iconBox: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300' };
+      case 'chat': return { title: 'Чат', icon: <MessageCircle size={18} />, iconBox: 'bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-300' };
+      case 'search': return { title: 'Поиск', icon: <Search size={18} />, iconBox: 'bg-slate-100 text-slate-700 dark:bg-slate-900/30 dark:text-slate-300' };
+      case 'settings': return { title: 'Настройки', icon: <Settings size={18} />, iconBox: 'bg-slate-100 text-slate-700 dark:bg-slate-900/30 dark:text-slate-300' };
+      case 'analytics': return { title: 'Аналитика', icon: <PieChart size={18} />, iconBox: 'bg-cyan-100 text-cyan-700 dark:bg-cyan-900/30 dark:text-cyan-300' };
+      case 'sales-funnel': return { title: 'Воронка продаж', icon: <BarChart3 size={18} />, iconBox: 'bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-300' };
+      case 'clients': return { title: 'Клиенты', icon: <Briefcase size={18} />, iconBox: 'bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-300' };
+      case 'finance': return { title: 'Финансы', icon: <Wallet size={18} />, iconBox: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300' };
+      case 'business-processes': return { title: 'Бизнес-процессы', icon: <Network size={18} />, iconBox: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300' };
+      case 'employees': return { title: 'Сотрудники', icon: <UserCheck size={18} />, iconBox: 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300' };
+      case 'spaces': return { title: 'Пространство', icon: <Layers size={18} />, iconBox: 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300' };
+      case 'meetings': return { title: 'Встречи', icon: <Users size={18} />, iconBox: 'bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-300' };
+      case 'docs': return { title: 'Документы', icon: <FileText size={18} />, iconBox: 'bg-slate-100 text-slate-700 dark:bg-slate-900/30 dark:text-slate-300' };
+      case 'doc-editor': return { title: 'Редактор документа', icon: <FileText size={18} />, iconBox: 'bg-slate-100 text-slate-700 dark:bg-slate-900/30 dark:text-slate-300' };
+      case 'sites': return { title: 'Сайты', icon: <Globe size={18} />, iconBox: 'bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-300' };
+      case 'inventory': return { title: 'Склад', icon: <Package size={18} />, iconBox: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300' };
+      default: return { title: view, icon: <Settings size={18} />, iconBox: 'bg-slate-100 text-slate-700 dark:bg-slate-900/30 dark:text-slate-300' };
     }
   };
 
@@ -101,7 +101,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
   const moduleSettingsTab = getModuleSettingsTab(currentView);
 
   return (
-    <div className="h-14 md:h-14 border-b border-gray-200 dark:border-[#333] flex items-center justify-between px-3 md:px-4 bg-white dark:bg-[#191919] shrink-0 z-20">
+    <div className="h-14 md:h-14 border-b border-gray-200 dark:border-[#333] flex items-center justify-between px-3 md:px-4 bg-white/95 dark:bg-[#191919]/95 backdrop-blur shrink-0 z-20">
       <div className="flex items-center gap-2 md:gap-3 overflow-hidden min-w-0 flex-1">
         <button 
           onClick={onMobileMenuToggle} 
@@ -111,10 +111,12 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
         </button>
         
         {currentView === 'table' && activeTable ? (
-          <div className="flex items-center gap-1 min-w-0 flex-1">
+          <div className="flex items-center gap-2 min-w-0 flex-1">
             <div className="flex items-center gap-2 group cursor-pointer min-w-0 flex-1" onClick={onEditTable}>
-              <DynamicIcon name={activeTable.icon} className={`${activeTable.color} shrink-0`} />
-              <h2 className="font-semibold text-gray-800 dark:text-white truncate text-sm md:text-base">
+              <div className="h-8 w-8 rounded-xl bg-indigo-100 dark:bg-indigo-900/30 flex items-center justify-center shrink-0">
+                <DynamicIcon name={activeTable.icon} className={`${activeTable.color} shrink-0`} />
+              </div>
+              <h2 className="font-semibold text-gray-900 dark:text-white truncate text-sm md:text-base">
                 {activeTable.name}
               </h2>
               {currentUser.role === Role.ADMIN && (
@@ -131,8 +133,8 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
             </button>
           </div>
         ) : (
-          <div className="flex items-center gap-1.5 text-gray-800 dark:text-white font-semibold min-w-0">
-            <div className="text-gray-500 dark:text-gray-400 shrink-0">{headerInfo.icon}</div>
+          <div className="flex items-center gap-2 text-gray-800 dark:text-white font-semibold min-w-0">
+            <div className={`h-8 w-8 rounded-xl flex items-center justify-center shrink-0 ${headerInfo.iconBox}`}>{headerInfo.icon}</div>
             <span className="truncate text-sm md:text-base">{headerInfo.title}</span>
             {moduleSettingsTab && (
               <button
