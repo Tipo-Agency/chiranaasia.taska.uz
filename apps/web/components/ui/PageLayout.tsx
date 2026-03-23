@@ -25,7 +25,7 @@ export const PageLayout: React.FC<PageLayoutProps> = ({
   contentClassName = '',
 }) => {
   return (
-    <SafeAreaAll className={`flex flex-col h-screen w-full ${className}`}>
+    <SafeAreaAll className={`flex flex-col h-full min-h-0 w-full ${className}`}>
       {header && (
         <header className="shrink-0">
           {header}

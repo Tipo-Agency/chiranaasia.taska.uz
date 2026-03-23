@@ -10,7 +10,6 @@ import {
   FileText,
   Link2,
   Plus,
-  CheckSquare,
   GitBranch,
   Briefcase,
   Calendar,
@@ -19,7 +18,7 @@ import {
   Search,
   Info,
 } from 'lucide-react';
-import { User, Doc, Task, Deal, Meeting } from '../../../types';
+import { User, Doc, Task, Deal, Meeting, BusinessProcess } from '../../../types';
 import { chatLocalService, ChatMessageLocal } from '../../../services/chatLocalService';
 
 const TO_ALL_ID = '__all__';
@@ -39,11 +38,16 @@ export interface MiniMessengerProps {
   onOpenDocument?: (doc: Doc) => void;
   /** Перейти в модуль документов */
   onOpenDocumentsModule?: () => void;
-  onCreateTask?: () => void;
-  onStartProcess?: () => void;
   onOpenDeals?: () => void;
   onOpenMeetings?: () => void;
   onCreateEntity?: (type: 'task' | 'deal' | 'meeting' | 'doc', title: string) => Promise<{ id: string; label: string } | null> | { id: string; label: string } | null;
+  onUpdateEntity?: (
+    type: 'task' | 'deal' | 'meeting' | 'doc',
+    id: string,
+    patch: Record<string, unknown>
+  ) => Promise<boolean> | boolean;
+  processTemplates?: BusinessProcess[];
+  onStartProcessTemplate?: (processId: string) => Promise<{ id: string; label: string } | null> | { id: string; label: string } | null;
 }
 
 function formatDayLabel(d: Date): string {
@@ -66,11 +70,12 @@ export const MiniMessenger: React.FC<MiniMessengerProps> = ({
   meetings = [],
   onOpenDocument,
   onOpenDocumentsModule,
-  onCreateTask,
-  onStartProcess,
   onOpenDeals,
   onOpenMeetings,
   onCreateEntity,
+  onUpdateEntity,
+  processTemplates = [],
+  onStartProcessTemplate,
 }) => {
   const colleagues = useMemo(
     () => users.filter((u) => u.id !== currentUser.id && !u.isArchived),
@@ -79,13 +84,19 @@ export const MiniMessenger: React.FC<MiniMessengerProps> = ({
   const [activeId, setActiveId] = useState<string | null>(TO_ALL_ID);
   const [messages, setMessages] = useState<ChatMessageLocal[]>([]);
   const [input, setInput] = useState('');
-  const [entityPickerOpen, setEntityPickerOpen] = useState(false);
+  const [activePanel, setActivePanel] = useState<null | 'entity' | 'create' | 'process'>(null);
   const [entityType, setEntityType] = useState<'task' | 'deal' | 'meeting' | 'doc'>('task');
   const [entitySearch, setEntitySearch] = useState('');
   const [selectedEntity, setSelectedEntity] = useState<{ type: 'task' | 'deal' | 'meeting' | 'doc'; id: string } | null>(null);
-  const [createEntityOpen, setCreateEntityOpen] = useState(false);
   const [createEntityType, setCreateEntityType] = useState<'task' | 'deal' | 'meeting' | 'doc'>('task');
   const [createEntityTitle, setCreateEntityTitle] = useState('');
+  const [processSearch, setProcessSearch] = useState('');
+  const [editModalOpen, setEditModalOpen] = useState(false);
+  const [editTitle, setEditTitle] = useState('');
+  const [editSecondaryA, setEditSecondaryA] = useState('');
+  const [editSecondaryB, setEditSecondaryB] = useState('');
+  const [editMeetingDate, setEditMeetingDate] = useState('');
+  const [editMeetingTime, setEditMeetingTime] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -99,6 +110,28 @@ export const MiniMessenger: React.FC<MiniMessengerProps> = ({
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, activeId]);
+
+  useEffect(() => {
+    if (!editModalOpen) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setEditModalOpen(false);
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [editModalOpen]);
+
+  const canSaveEdit = useMemo(() => {
+    if (!selectedEntity) return false;
+    const titleOk = editTitle.trim().length > 0;
+    if (!titleOk) return false;
+    if (selectedEntity.type === 'meeting') {
+      return editMeetingDate.trim().length > 0 && editMeetingTime.trim().length > 0;
+    }
+    if (selectedEntity.type === 'task') return editSecondaryA.trim().length > 0;
+    if (selectedEntity.type === 'deal') return editSecondaryA.trim().length > 0;
+    if (selectedEntity.type === 'doc') return editSecondaryA.trim().length > 0;
+    return true;
+  }, [selectedEntity, editTitle, editSecondaryA, editSecondaryB, editMeetingDate, editMeetingTime]);
 
   const threadMessages = useMemo(() => {
     if (activeId === TO_ALL_ID) {
@@ -143,7 +176,14 @@ export const MiniMessenger: React.FC<MiniMessengerProps> = ({
       .filter((m) => !q || (m.title || '').toLowerCase().includes(q))
       .slice(0, 80)
       .map((m) => ({ id: m.id, label: m.title || 'Встреча', subtitle: `${m.date || ''} ${m.time || ''}`.trim() }));
-  }, [entityType, entitySearch, tasks, deals, meetings]);
+  }, [entityType, entitySearch, tasks, deals, meetings, docs]);
+
+  const filteredProcessTemplates = useMemo(() => {
+    const q = processSearch.trim().toLowerCase();
+    const list = (processTemplates || []).filter((p) => !p.isArchived);
+    if (!q) return list.slice(0, 80);
+    return list.filter((p) => (p.title || '').toLowerCase().includes(q)).slice(0, 80);
+  }, [processTemplates, processSearch]);
 
   const sendText = () => {
     const text = input.trim();
@@ -170,7 +210,7 @@ export const MiniMessenger: React.FC<MiniMessengerProps> = ({
       entityId: id,
     });
     refresh();
-    setEntityPickerOpen(false);
+    setActivePanel(null);
     setEntitySearch('');
   };
 
@@ -191,8 +231,23 @@ export const MiniMessenger: React.FC<MiniMessengerProps> = ({
       entityId,
     });
     refresh();
-    setCreateEntityOpen(false);
+    setActivePanel(null);
     setCreateEntityTitle('');
+  };
+
+  const startFromTemplate = async (processId: string, title: string) => {
+    if (!activeId) return;
+    const started = onStartProcessTemplate ? await onStartProcessTemplate(processId) : null;
+    chatLocalService.addMessage({
+      fromId: currentUser.id,
+      toId: activeId === TO_ALL_ID ? TO_ALL_ID : activeId,
+      text: `🚀 ${started?.label || title}`,
+      entityType: 'task',
+      entityId: started?.id || `proc-${processId}-${Date.now()}`,
+    });
+    refresh();
+    setActivePanel(null);
+    setProcessSearch('');
   };
 
   const onFileSelected = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -417,15 +472,21 @@ export const MiniMessenger: React.FC<MiniMessengerProps> = ({
               />
               <ToolbarBtn
                 title="Привязать сущность"
-                onClick={() => setEntityPickerOpen((v) => !v)}
+                onClick={() => setActivePanel((v) => (v === 'entity' ? null : 'entity'))}
                 icon={<Link2 size={18} />}
-                active={entityPickerOpen}
+                active={activePanel === 'entity'}
               />
               <ToolbarBtn
                 title="Создать сущность"
-                onClick={() => setCreateEntityOpen((v) => !v)}
+                onClick={() => setActivePanel((v) => (v === 'create' ? null : 'create'))}
                 icon={<Plus size={18} />}
-                active={createEntityOpen}
+                active={activePanel === 'create'}
+              />
+              <ToolbarBtn
+                title="Запустить бизнес-процесс"
+                onClick={() => setActivePanel((v) => (v === 'process' ? null : 'process'))}
+                icon={<GitBranch size={18} />}
+                active={activePanel === 'process'}
               />
               {onOpenDocumentsModule && (
                 <ToolbarBtn
@@ -434,15 +495,11 @@ export const MiniMessenger: React.FC<MiniMessengerProps> = ({
                   icon={<FolderOpen size={18} />}
                 />
               )}
-              {onCreateTask && (
-                <ToolbarBtn title="Создать задачу" onClick={() => onCreateTask()} icon={<CheckSquare size={18} />} />
-              )}
-              {onStartProcess && <ToolbarBtn title="Запустить бизнес-процесс" onClick={() => onStartProcess()} icon={<GitBranch size={18} />} />}
             </div>
 
             <input ref={fileInputRef} type="file" className="hidden" onChange={onFileSelected} />
 
-            {entityPickerOpen && (
+            {activePanel === 'entity' && (
               <div className="mb-2 rounded-xl border border-gray-200 dark:border-[#444] bg-white dark:bg-[#1e1e1e] shadow-lg overflow-hidden">
                 <div className="flex items-center gap-2 px-3 py-2 border-b border-gray-100 dark:border-[#333]">
                   <div className="inline-flex items-center rounded-lg border border-gray-200 dark:border-[#444] overflow-hidden text-xs">
@@ -467,7 +524,7 @@ export const MiniMessenger: React.FC<MiniMessengerProps> = ({
                   <button
                     type="button"
                     className="p-1 rounded-lg hover:bg-gray-100 dark:hover:bg-[#333]"
-                    onClick={() => setEntityPickerOpen(false)}
+                    onClick={() => setActivePanel(null)}
                   >
                     <X size={16} />
                   </button>
@@ -492,7 +549,7 @@ export const MiniMessenger: React.FC<MiniMessengerProps> = ({
               </div>
             )}
 
-            {createEntityOpen && (
+            {activePanel === 'create' && (
               <div className="mb-2 rounded-xl border border-gray-200 dark:border-[#444] bg-white dark:bg-[#1e1e1e] shadow-lg overflow-hidden p-3">
                 <div className="flex items-center gap-2 mb-2">
                   <div className="inline-flex items-center rounded-lg border border-gray-200 dark:border-[#444] overflow-hidden text-xs">
@@ -510,7 +567,7 @@ export const MiniMessenger: React.FC<MiniMessengerProps> = ({
                   <button
                     type="button"
                     className="ml-auto p-1 rounded-lg hover:bg-gray-100 dark:hover:bg-[#333]"
-                    onClick={() => setCreateEntityOpen(false)}
+                    onClick={() => setActivePanel(null)}
                   >
                     <X size={16} />
                   </button>
@@ -529,6 +586,44 @@ export const MiniMessenger: React.FC<MiniMessengerProps> = ({
                   >
                     Создать и прикрепить
                   </button>
+                </div>
+              </div>
+            )}
+
+            {activePanel === 'process' && (
+              <div className="mb-2 rounded-xl border border-gray-200 dark:border-[#444] bg-white dark:bg-[#1e1e1e] shadow-lg overflow-hidden">
+                <div className="flex items-center gap-2 px-3 py-2 border-b border-gray-100 dark:border-[#333]">
+                  <Search size={16} className="text-gray-400 shrink-0" />
+                  <input
+                    value={processSearch}
+                    onChange={(e) => setProcessSearch(e.target.value)}
+                    placeholder="Поиск шаблона процесса…"
+                    className="flex-1 min-w-0 bg-transparent text-sm text-gray-900 dark:text-gray-100 outline-none placeholder:text-gray-400"
+                  />
+                  <button
+                    type="button"
+                    className="p-1 rounded-lg hover:bg-gray-100 dark:hover:bg-[#333]"
+                    onClick={() => setActivePanel(null)}
+                  >
+                    <X size={16} />
+                  </button>
+                </div>
+                <div className="max-h-52 overflow-y-auto custom-scrollbar p-1">
+                  {filteredProcessTemplates.length === 0 ? (
+                    <p className="text-xs text-gray-500 px-3 py-4 text-center">Нет шаблонов</p>
+                  ) : (
+                    filteredProcessTemplates.map((p) => (
+                      <button
+                        key={p.id}
+                        type="button"
+                        onClick={() => startFromTemplate(p.id, p.title)}
+                        className="w-full text-left px-3 py-2 rounded-lg text-sm text-gray-800 dark:text-gray-100 hover:bg-[#3337AD]/10"
+                      >
+                        <div className="truncate">{p.title}</div>
+                        {p.description ? <div className="text-xs text-gray-500 dark:text-gray-400 truncate">{p.description}</div> : null}
+                      </button>
+                    ))
+                  )}
                 </div>
               </div>
             )}
@@ -605,6 +700,47 @@ export const MiniMessenger: React.FC<MiniMessengerProps> = ({
                       Открыть раздел встреч
                     </button>
                   )}
+                  {onUpdateEntity && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (!selectedEntity) return;
+                        if (selectedEntity.type === 'task') {
+                          const t = tasks.find((x) => x.id === selectedEntity.id);
+                          setEditTitle(t?.title || '');
+                          setEditSecondaryA((t as any)?.status || '');
+                          setEditSecondaryB((t as any)?.description || '');
+                          setEditMeetingDate('');
+                          setEditMeetingTime('');
+                        } else if (selectedEntity.type === 'deal') {
+                          const d = deals.find((x) => x.id === selectedEntity.id);
+                          setEditTitle(d?.title || '');
+                          setEditSecondaryA((d as any)?.stage || '');
+                          setEditSecondaryB(String((d as any)?.amount || ''));
+                          setEditMeetingDate('');
+                          setEditMeetingTime('');
+                        } else if (selectedEntity.type === 'meeting') {
+                          const m = meetings.find((x) => x.id === selectedEntity.id);
+                          setEditTitle(m?.title || '');
+                          setEditMeetingDate(m?.date || '');
+                          setEditMeetingTime(m?.time || '');
+                          setEditSecondaryA('');
+                          setEditSecondaryB((m as any)?.summary || '');
+                        } else {
+                          const d = docs.find((x) => x.id === selectedEntity.id);
+                          setEditTitle(d?.title || '');
+                          setEditSecondaryA((d as any)?.type || 'internal');
+                          setEditSecondaryB((d as any)?.content || '');
+                          setEditMeetingDate('');
+                          setEditMeetingTime('');
+                        }
+                        setEditModalOpen(true);
+                      }}
+                      className="block text-xs text-[#3337AD] hover:underline mt-1"
+                    >
+                      Открыть модалку редактирования
+                    </button>
+                  )}
                 </div>
               </div>
             ) : (
@@ -614,6 +750,93 @@ export const MiniMessenger: React.FC<MiniMessengerProps> = ({
           </div>
         )}
       </div>
+      {editModalOpen && selectedEntity && onUpdateEntity && (
+        <div className="fixed inset-0 z-[120] bg-black/40 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setEditModalOpen(false)}>
+          <div className="w-full max-w-lg rounded-2xl border border-gray-200 dark:border-[#333] bg-white dark:bg-[#252525] p-4" onClick={(e) => e.stopPropagation()}>
+            <h4 className="font-semibold text-gray-900 dark:text-white mb-3">Редактирование сущности</h4>
+            <div className="space-y-2">
+              <input value={editTitle} onChange={(e) => setEditTitle(e.target.value)} placeholder="Название" className="w-full rounded-lg border border-gray-300 dark:border-[#444] bg-transparent px-3 py-2 text-sm" />
+              {selectedEntity.type === 'task' && (
+                <>
+                  <input value={editSecondaryA} onChange={(e) => setEditSecondaryA(e.target.value)} placeholder="Статус" className="w-full rounded-lg border border-gray-300 dark:border-[#444] bg-transparent px-3 py-2 text-sm" />
+                  <textarea value={editSecondaryB} onChange={(e) => setEditSecondaryB(e.target.value)} placeholder="Описание" className="w-full rounded-lg border border-gray-300 dark:border-[#444] bg-transparent px-3 py-2 text-sm min-h-[84px]" />
+                </>
+              )}
+
+              {selectedEntity.type === 'deal' && (
+                <>
+                  <input value={editSecondaryA} onChange={(e) => setEditSecondaryA(e.target.value)} placeholder="Этап" className="w-full rounded-lg border border-gray-300 dark:border-[#444] bg-transparent px-3 py-2 text-sm" />
+                  <input
+                    value={editSecondaryB}
+                    onChange={(e) => setEditSecondaryB(e.target.value)}
+                    type="number"
+                    step="1"
+                    placeholder="Сумма"
+                    className="w-full rounded-lg border border-gray-300 dark:border-[#444] bg-transparent px-3 py-2 text-sm"
+                  />
+                </>
+              )}
+
+              {selectedEntity.type === 'meeting' && (
+                <>
+                  <div className="flex gap-2">
+                    <input
+                      value={editMeetingDate}
+                      onChange={(e) => setEditMeetingDate(e.target.value)}
+                      type="date"
+                      className="flex-1 rounded-lg border border-gray-300 dark:border-[#444] bg-transparent px-3 py-2 text-sm"
+                    />
+                    <input
+                      value={editMeetingTime}
+                      onChange={(e) => setEditMeetingTime(e.target.value)}
+                      type="time"
+                      step={60}
+                      className="flex-1 rounded-lg border border-gray-300 dark:border-[#444] bg-transparent px-3 py-2 text-sm"
+                    />
+                  </div>
+                  <textarea value={editSecondaryB} onChange={(e) => setEditSecondaryB(e.target.value)} placeholder="Описание встречи" className="w-full rounded-lg border border-gray-300 dark:border-[#444] bg-transparent px-3 py-2 text-sm min-h-[84px]" />
+                </>
+              )}
+
+              {selectedEntity.type === 'doc' && (
+                <>
+                  <input value={editSecondaryA} onChange={(e) => setEditSecondaryA(e.target.value)} placeholder="Тип (internal/link)" className="w-full rounded-lg border border-gray-300 dark:border-[#444] bg-transparent px-3 py-2 text-sm" />
+                  <textarea value={editSecondaryB} onChange={(e) => setEditSecondaryB(e.target.value)} placeholder="Content (для internal)" className="w-full rounded-lg border border-gray-300 dark:border-[#444] bg-transparent px-3 py-2 text-sm min-h-[84px]" />
+                </>
+              )}
+            </div>
+            <div className="mt-3 flex justify-end gap-2">
+              <button type="button" onClick={() => setEditModalOpen(false)} className="px-3 py-2 rounded-lg border border-gray-300 dark:border-[#444] text-sm">Отмена</button>
+              <button
+                type="button"
+                onClick={async () => {
+                  const patch: Record<string, unknown> = { title: editTitle };
+                  if (selectedEntity.type === 'task') {
+                    patch.status = editSecondaryA;
+                    patch.description = editSecondaryB;
+                  } else if (selectedEntity.type === 'deal') {
+                    patch.stage = editSecondaryA;
+                    patch.amount = Number(editSecondaryB || '0') || 0;
+                  } else if (selectedEntity.type === 'meeting') {
+                    patch.date = editMeetingDate;
+                    patch.time = editMeetingTime;
+                    patch.summary = editSecondaryB;
+                  } else {
+                    patch.type = editSecondaryA || 'internal';
+                    if (editSecondaryB) patch.content = editSecondaryB;
+                  }
+                  await onUpdateEntity(selectedEntity.type, selectedEntity.id, patch);
+                  setEditModalOpen(false);
+                }}
+                disabled={!canSaveEdit}
+                className={`px-3 py-2 rounded-lg bg-[#3337AD] text-white text-sm ${!canSaveEdit ? 'opacity-50 cursor-not-allowed' : ''}`}
+              >
+                Сохранить
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

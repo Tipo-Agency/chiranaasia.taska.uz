@@ -152,6 +152,96 @@ export const AppRouter: React.FC<AppRouterProps> = (props) => {
     return { id: doc.id, label: doc.title };
   };
 
+  const updateEntityFromChat = async (
+    type: 'task' | 'deal' | 'meeting' | 'doc',
+    id: string,
+    patch: Record<string, unknown>
+  ): Promise<boolean> => {
+    if (type === 'task') {
+      const current = props.allTasks.find((t) => t.id === id);
+      if (!current) return false;
+      await actions.saveTask({ ...current, ...patch });
+      return true;
+    }
+    if (type === 'deal') {
+      const current = props.deals.find((d) => d.id === id);
+      if (!current) return false;
+      await actions.saveDeal({ ...current, ...patch });
+      return true;
+    }
+    if (type === 'meeting') {
+      const current = props.meetings.find((m) => m.id === id);
+      if (!current) return false;
+      await actions.saveMeeting({ ...current, ...patch });
+      return true;
+    }
+    const current = props.docs.find((d) => d.id === id);
+    if (!current) return false;
+    await actions.saveDoc({ ...current, ...patch });
+    return true;
+  };
+
+  const startBusinessProcessFromTemplate = async (processId: string): Promise<{ id: string; label: string } | null> => {
+    const selected = props.businessProcesses.find((p) => p.id === processId && !p.isArchived);
+    if (!selected || !selected.steps?.length) return null;
+    const firstStep = selected.steps[0];
+    let assigneeId: string | null = null;
+    if (firstStep.assigneeType === 'position') {
+      assigneeId = props.orgPositions.find((p) => p.id === firstStep.assigneeId)?.holderUserId || null;
+    } else {
+      assigneeId = firstStep.assigneeId || null;
+    }
+    if (!assigneeId) return null;
+
+    const instanceId = `inst-${Date.now()}`;
+    const taskId = `task-${Date.now()}`;
+    const now = new Date();
+    const today = now.toISOString().slice(0, 10);
+    const nextWeek = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+
+    const latestVersion =
+      props.businessProcesses
+        .filter((p) => p.id === selected.id)
+        .sort((a, b) => (b.version || 1) - (a.version || 1))[0] || selected;
+
+    const updatedProcess: BusinessProcess = {
+      ...latestVersion,
+      instances: [
+        ...(latestVersion.instances || []),
+        {
+          id: instanceId,
+          processId: latestVersion.id,
+          processVersion: latestVersion.version || 1,
+          currentStepId: firstStep.id,
+          status: 'active',
+          startedAt: now.toISOString(),
+          taskIds: [taskId],
+        },
+      ],
+    };
+
+    await actions.saveProcess(updatedProcess);
+    await actions.saveTask({
+      id: taskId,
+      entityType: 'task',
+      tableId: '',
+      title: `${latestVersion.title}: ${firstStep.title}`,
+      description: firstStep.description || '',
+      status: 'Не начато',
+      priority: props.priorities?.[1]?.name || props.priorities?.[0]?.name || 'Средний',
+      assigneeId,
+      source: 'Процесс',
+      startDate: today,
+      endDate: nextWeek,
+      processId: latestVersion.id,
+      processInstanceId: instanceId,
+      stepId: firstStep.id,
+      createdAt: now.toISOString(),
+      createdByUserId: props.currentUser.id,
+    });
+    return { id: taskId, label: `${latestVersion.title}: ${firstStep.title}` };
+  };
+
   // Проверка на наличие currentUser
   if (!props.currentUser) {
     return (
@@ -177,26 +267,14 @@ export const AppRouter: React.FC<AppRouterProps> = (props) => {
               docs={props.docs}
               accountsReceivable={props.accountsReceivable}
               onOpenTask={actions.openTaskModal}
-              onQuickCreateTask={() => actions.openTaskModal(null)}
-              onQuickCreateProcess={() => {
-                actions.setCurrentView('business-processes');
-                setTimeout(() => {
-                  const event = new CustomEvent('openCreateProcessModal');
-                  window.dispatchEvent(event);
-                }, 100);
-              }}
-              onQuickCreateDeal={() => {
-                actions.setCurrentView('sales-funnel');
-                setTimeout(() => {
-                  const event = new CustomEvent('openCreateDealModal');
-                  window.dispatchEvent(event);
-                }, 100);
-              }}
               onNavigateToTasks={() => actions.setCurrentView('tasks')}
               onNavigateToMeetings={() => actions.setCurrentView('meetings')}
               onNavigateToDeals={() => actions.setCurrentView('sales-funnel')}
               onOpenDocument={actions.handleDocClick}
               onCreateEntity={createEntityFromChat}
+              onUpdateEntity={updateEntityFromChat}
+              processTemplates={props.businessProcesses}
+              onStartProcessTemplate={startBusinessProcessFromTemplate}
           />
       );
   }
@@ -253,14 +331,12 @@ export const AppRouter: React.FC<AppRouterProps> = (props) => {
                         meetings={props.meetings}
                         onOpenDocument={props.actions.handleDocClick}
                         onOpenDocumentsModule={() => props.actions.setCurrentView('docs')}
-                        onCreateTask={() => props.actions.openTaskModal(null)}
-                        onStartProcess={() => {
-                          props.actions.setCurrentView('business-processes');
-                          setTimeout(() => window.dispatchEvent(new CustomEvent('openCreateProcessModal')), 120);
-                        }}
                         onOpenDeals={() => props.actions.setCurrentView('sales-funnel')}
                         onOpenMeetings={() => props.actions.setCurrentView('meetings')}
                         onCreateEntity={createEntityFromChat}
+                        onUpdateEntity={updateEntityFromChat}
+                        processTemplates={props.businessProcesses}
+                        onStartProcessTemplate={startBusinessProcessFromTemplate}
                       />
                   </div>
               </Container>
@@ -475,26 +551,14 @@ export const AppRouter: React.FC<AppRouterProps> = (props) => {
           docs={props.docs}
           accountsReceivable={props.accountsReceivable}
           onOpenTask={actions.openTaskModal}
-          onQuickCreateTask={() => actions.openTaskModal(null)}
-          onQuickCreateProcess={() => {
-            actions.setCurrentView('business-processes');
-            setTimeout(() => {
-              const event = new CustomEvent('openCreateProcessModal');
-              window.dispatchEvent(event);
-            }, 100);
-          }}
-          onQuickCreateDeal={() => {
-            actions.setCurrentView('sales-funnel');
-            setTimeout(() => {
-              const event = new CustomEvent('openCreateDealModal');
-              window.dispatchEvent(event);
-            }, 100);
-          }}
           onNavigateToTasks={() => actions.setCurrentView('tasks')}
           onNavigateToMeetings={() => actions.setCurrentView('meetings')}
           onNavigateToDeals={() => actions.setCurrentView('sales-funnel')}
           onOpenDocument={actions.handleDocClick}
           onCreateEntity={createEntityFromChat}
+          onUpdateEntity={updateEntityFromChat}
+          processTemplates={props.businessProcesses}
+          onStartProcessTemplate={startBusinessProcessFromTemplate}
       />
   );
 };

@@ -6,7 +6,7 @@ import { MiniMessenger } from '../features/chat/MiniMessenger';
 import { WeeklyPlansView } from '../documents/WeeklyPlansView';
 import { StatsCards } from '../features/home/StatsCards';
 import { Calendar, CheckSquare, Briefcase, BarChart3, MessageCircle } from 'lucide-react';
-import { Deal, FinancePlan, Meeting, Task, User, Doc } from '../../types';
+import { Deal, FinancePlan, Meeting, Task, User, Doc, BusinessProcess } from '../../types';
 
 type WorkdeskTab = 'chat' | 'weekly' | 'tasks' | 'deals' | 'meetings' | 'analytics';
 
@@ -24,9 +24,14 @@ interface WorkdeskViewProps {
   onNavigateToDeals: () => void;
   onNavigateToMeetings: () => void;
   onOpenDocument?: (doc: Doc) => void;
-  onQuickCreateTask: () => void;
-  onQuickCreateProcess: () => void;
+  processTemplates?: BusinessProcess[];
+  onStartProcessTemplate?: (processId: string) => Promise<{ id: string; label: string } | null> | { id: string; label: string } | null;
   onCreateEntity?: (type: 'task' | 'deal' | 'meeting' | 'doc', title: string) => Promise<{ id: string; label: string } | null> | { id: string; label: string } | null;
+  onUpdateEntity?: (
+    type: 'task' | 'deal' | 'meeting' | 'doc',
+    id: string,
+    patch: Record<string, unknown>
+  ) => Promise<boolean> | boolean;
 }
 
 export const WorkdeskView: React.FC<WorkdeskViewProps> = ({
@@ -43,9 +48,10 @@ export const WorkdeskView: React.FC<WorkdeskViewProps> = ({
   onNavigateToDeals,
   onNavigateToMeetings,
   onOpenDocument,
-  onQuickCreateTask,
-  onQuickCreateProcess,
+  processTemplates = [],
+  onStartProcessTemplate,
   onCreateEntity,
+  onUpdateEntity,
 }) => {
   const [activeTab, setActiveTab] = useState<WorkdeskTab>('chat');
 
@@ -145,9 +151,10 @@ export const WorkdeskView: React.FC<WorkdeskViewProps> = ({
                 deals={myDeals}
                 meetings={myMeetings}
                 onOpenDocument={onOpenDocument}
-                onCreateTask={onQuickCreateTask}
-                onStartProcess={onQuickCreateProcess}
                 onCreateEntity={onCreateEntity}
+                onUpdateEntity={onUpdateEntity}
+                processTemplates={processTemplates}
+                onStartProcessTemplate={onStartProcessTemplate}
               />
             </div>
           )}

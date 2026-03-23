@@ -219,13 +219,84 @@ function MainApp() {
                       setChatPanelOpen(false);
                     }}
                     onOpenDocumentsModule={() => actions.setCurrentView('docs')}
-                    onCreateTask={() => actions.openTaskModal(null)}
-                    onStartProcess={() => {
-                      actions.setCurrentView('business-processes');
-                      setTimeout(() => window.dispatchEvent(new CustomEvent('openCreateProcessModal')), 120);
-                    }}
                     onOpenDeals={() => actions.setCurrentView('sales-funnel')}
                     onOpenMeetings={() => actions.setCurrentView('meetings')}
+                    processTemplates={state.businessProcesses}
+                    onStartProcessTemplate={async (processId) => {
+                      const selected = state.businessProcesses.find((p) => p.id === processId && !p.isArchived);
+                      if (!selected || !selected.steps?.length) return null;
+                      const firstStep = selected.steps[0];
+                      const assigneeId =
+                        firstStep.assigneeType === 'position'
+                          ? state.orgPositions.find((p) => p.id === firstStep.assigneeId)?.holderUserId || null
+                          : firstStep.assigneeId || null;
+                      if (!assigneeId) return null;
+                      const instanceId = `inst-${Date.now()}`;
+                      const taskId = `task-${Date.now()}`;
+                      const now = new Date();
+                      const latestVersion =
+                        state.businessProcesses
+                          .filter((p) => p.id === selected.id)
+                          .sort((a, b) => (b.version || 1) - (a.version || 1))[0] || selected;
+                      await actions.saveProcess({
+                        ...latestVersion,
+                        instances: [
+                          ...(latestVersion.instances || []),
+                          {
+                            id: instanceId,
+                            processId: latestVersion.id,
+                            processVersion: latestVersion.version || 1,
+                            currentStepId: firstStep.id,
+                            status: 'active',
+                            startedAt: now.toISOString(),
+                            taskIds: [taskId],
+                          },
+                        ],
+                      });
+                      await actions.saveTask({
+                        id: taskId,
+                        entityType: 'task',
+                        tableId: '',
+                        title: `${latestVersion.title}: ${firstStep.title}`,
+                        description: firstStep.description || '',
+                        status: 'Не начато',
+                        priority: state.priorities?.[1]?.name || state.priorities?.[0]?.name || 'Средний',
+                        assigneeId,
+                        source: 'Процесс',
+                        startDate: now.toISOString().slice(0, 10),
+                        endDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10),
+                        processId: latestVersion.id,
+                        processInstanceId: instanceId,
+                        stepId: firstStep.id,
+                        createdAt: now.toISOString(),
+                        createdByUserId: state.currentUser.id,
+                      });
+                      return { id: taskId, label: `${latestVersion.title}: ${firstStep.title}` };
+                    }}
+                    onUpdateEntity={async (type, id, patch) => {
+                      if (type === 'task') {
+                        const current = state.tasks.find((t) => t.id === id);
+                        if (!current) return false;
+                        await actions.saveTask({ ...current, ...patch });
+                        return true;
+                      }
+                      if (type === 'deal') {
+                        const current = state.deals.find((d) => d.id === id);
+                        if (!current) return false;
+                        await actions.saveDeal({ ...current, ...patch });
+                        return true;
+                      }
+                      if (type === 'meeting') {
+                        const current = state.meetings.find((m) => m.id === id);
+                        if (!current) return false;
+                        await actions.saveMeeting({ ...current, ...patch });
+                        return true;
+                      }
+                      const current = state.docs.find((d) => d.id === id);
+                      if (!current) return false;
+                      await actions.saveDoc({ ...current, ...patch });
+                      return true;
+                    }}
                     onClose={() => setChatPanelOpen(false)}
                     className="rounded-none border-0 h-full min-h-0 flex-1"
                   />
