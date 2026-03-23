@@ -1,4 +1,5 @@
 """FastAPI application entry point."""
+import asyncio
 import logging
 import os
 import sys
@@ -12,6 +13,8 @@ from fastapi.staticfiles import StaticFiles
 from app.config import get_settings
 from app.database import engine, Base, AsyncSessionLocal
 from app.logging_handlers import SystemLogHandler
+from app.services.notification_delivery import run_pending_deliveries
+from app.services.notification_retention import run_notification_retention
 from app.routers import (
     admin,
     auth,
@@ -25,6 +28,8 @@ from app.routers import (
     statuses,
     priorities,
     notification_prefs,
+    notification_events,
+    notifications,
     automation,
     clients,
     deals,
@@ -63,7 +68,46 @@ async def lifespan(app: FastAPI):
         command.upgrade(alembic_cfg, "head")
     except Exception as e:
         print(f"Migration warning: {e}", file=sys.stderr)
+
+    stop_flag = {"stop": False}
+
+    async def _delivery_loop():
+        while not stop_flag["stop"]:
+            try:
+                async with AsyncSessionLocal() as session:
+                    await run_pending_deliveries(session, limit=200)
+                    await session.commit()
+            except Exception as ex:
+                logging.getLogger("uvicorn.error").warning("Delivery loop error: %s", ex)
+            await asyncio.sleep(5)
+
+    async def _retention_loop():
+        while not stop_flag["stop"]:
+            try:
+                async with AsyncSessionLocal() as session:
+                    await run_notification_retention(
+                        session,
+                        days=settings.NOTIFICATIONS_RETENTION_DAYS,
+                    )
+                    await session.commit()
+            except Exception as ex:
+                logging.getLogger("uvicorn.error").warning("Retention loop error: %s", ex)
+            await asyncio.sleep(max(60, settings.NOTIFICATIONS_RETENTION_INTERVAL_SECONDS))
+
+    delivery_task = asyncio.create_task(_delivery_loop())
+    retention_task = asyncio.create_task(_retention_loop())
     yield
+    stop_flag["stop"] = True
+    delivery_task.cancel()
+    retention_task.cancel()
+    try:
+        await delivery_task
+    except Exception:
+        pass
+    try:
+        await retention_task
+    except Exception:
+        pass
 
 
 app = FastAPI(
@@ -93,6 +137,8 @@ app.include_router(messages.router, prefix=settings.API_PREFIX, tags=["messages"
 app.include_router(statuses.router, prefix=settings.API_PREFIX, tags=["statuses"])
 app.include_router(priorities.router, prefix=settings.API_PREFIX, tags=["priorities"])
 app.include_router(notification_prefs.router, prefix=settings.API_PREFIX, tags=["notification-prefs"])
+app.include_router(notification_events.router, prefix=settings.API_PREFIX, tags=["notification-events"])
+app.include_router(notifications.router, prefix=settings.API_PREFIX, tags=["notifications"])
 app.include_router(automation.router, prefix=settings.API_PREFIX, tags=["automation"])
 app.include_router(clients.router, prefix=settings.API_PREFIX, tags=["clients"])
 app.include_router(deals.router, prefix=settings.API_PREFIX, tags=["deals"])

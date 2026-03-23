@@ -5,6 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
 from app.models.content import Meeting
+from app.services.domain_events import emit_domain_event
 
 router = APIRouter(prefix="/meetings", tags=["meetings"])
 
@@ -66,5 +67,22 @@ async def update_meetings(meetings: list[dict], db: AsyncSession = Depends(get_d
                 recurrence=m.get("recurrence", "none"),
                 is_archived=m.get("isArchived", False),
             ))
+            await db.flush()
+            await emit_domain_event(
+                db,
+                event_type="meeting.created",
+                org_id="default",
+                entity_type="meeting",
+                entity_id=mid,
+                source="meetings-router",
+                actor_id=m.get("createdByUserId"),
+                payload={
+                    "meetingId": mid,
+                    "title": m.get("title", ""),
+                    "date": m.get("date"),
+                    "time": m.get("time"),
+                    "participantIds": m.get("participantIds", []),
+                },
+            )
     await db.commit()
     return {"ok": True}

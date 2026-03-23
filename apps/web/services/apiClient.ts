@@ -81,6 +81,51 @@ export const adminEndpoint = {
   testBotDailySummary: () => post<{ ok: boolean; error?: string }>('/admin/bot/test-daily-summary'),
   testBotNewDeal: () => post<{ ok: boolean; error?: string }>('/admin/bot/test-new-deal'),
   testBotCongrats: () => post<{ ok: boolean; error?: string }>('/admin/bot/test-congrats'),
+  getRedisMonitor: () =>
+    get<{
+      redis_ok: boolean;
+      redis_error?: string;
+      redis_url: string;
+      stream_name: string;
+      stream_length?: number;
+      stream_last_generated_id?: string;
+      stream_groups?: number;
+      events_total: number;
+      events_published: number;
+      deliveries_pending: number;
+      deliveries_failed: number;
+      deliveries_sent: number;
+      stream_group_details?: Array<{
+        name?: string;
+        consumers?: number;
+        pending?: number;
+        lag?: number | null;
+        last_delivered_id?: string;
+      }>;
+    }>('/admin/redis/monitor'),
+  runNotificationDeliveries: (limit = 500) =>
+    post<{ ok: boolean; processed: number; sent: number; failed: number; skipped: number }>(
+      `/admin/notifications/run-deliveries?limit=${encodeURIComponent(String(limit))}`
+    ),
+  runNotificationRetention: (days?: number) =>
+    post<{ ok: boolean; days: number; archived_notifications: number; deleted_events: number; deleted_deliveries: number }>(
+      `/admin/notifications/run-retention${typeof days === 'number' ? `?days=${encodeURIComponent(String(days))}` : ''}`
+    ),
+  getFailedDeliveries: (limit = 20, channel?: string, query?: string) =>
+    get<Array<{
+      id: string;
+      notification_id: string;
+      channel: string;
+      attempts: string;
+      last_error?: string;
+      updated_at?: string;
+      notification_title?: string;
+      recipient_id?: string;
+    }>>(`/admin/notifications/failed-deliveries?limit=${encodeURIComponent(String(limit))}${channel ? `&channel=${encodeURIComponent(channel)}` : ''}${query ? `&q=${encodeURIComponent(query)}` : ''}`),
+  requeueFailedDeliveries: (limit = 200) =>
+    post<{ ok: boolean; requeued: number }>(`/admin/notifications/requeue-failed?limit=${encodeURIComponent(String(limit))}`),
+  requeueFailedDeliveryById: (deliveryId: string) =>
+    post<{ ok: boolean; requeued: number }>(`/admin/notifications/requeue-failed/${encodeURIComponent(deliveryId)}`),
 };
 
 // Auth / Users
@@ -139,8 +184,10 @@ export const prioritiesEndpoint = {
 
 // Notification prefs
 export const notificationPrefsEndpoint = {
-  get: () => get<unknown>('/notification-prefs'),
-  update: (prefs: unknown) => put<{ ok: boolean }>('/notification-prefs', prefs),
+  get: (userId?: string) =>
+    get<unknown>(`/notification-prefs${userId ? `?user_id=${encodeURIComponent(userId)}` : ''}`),
+  update: (prefs: unknown, userId?: string) =>
+    put<{ ok: boolean }>(`/notification-prefs${userId ? `?user_id=${encodeURIComponent(userId)}` : ''}`, prefs),
 };
 
 // Automation
@@ -154,6 +201,39 @@ export const notificationQueueEndpoint = {
   add: async (_task: { type: string; userId: string; message: string; chatId: string; metadata?: Record<string, unknown> }) => {
     // TODO: implement on backend if needed
     return Promise.resolve();
+  },
+};
+
+// Centralized notification events / center
+export const notificationEventsEndpoint = {
+  publish: (event: unknown) => post<{ id: string; published: boolean; streamId?: string }>('/notification-events/publish', event),
+  recent: (limit = 50) => get<unknown[]>(`/notification-events/recent?limit=${limit}`),
+};
+
+export const notificationsEndpoint = {
+  list: (userId: string, unreadOnly = false, limit = 50) =>
+    get<unknown[]>(
+      `/notifications?user_id=${encodeURIComponent(userId)}&unread_only=${String(unreadOnly)}&limit=${String(limit)}`
+    ),
+  markRead: (notificationId: string, isRead = true) =>
+    post<{ ok: boolean }>(`/notifications/${encodeURIComponent(notificationId)}/read`, { isRead }),
+  runDeliveries: (limit = 100) =>
+    post<{ ok: boolean; processed: number; sent: number; failed: number; skipped: number }>(
+      `/notifications/deliveries/run?limit=${String(limit)}`
+    ),
+  unreadCount: (userId: string) =>
+    get<{ userId: string; unreadCount: number }>(
+      `/notifications/unread-count?user_id=${encodeURIComponent(userId)}`
+    ),
+  runRetention: (days?: number) =>
+    post<{ ok: boolean; days: number; archived_notifications: number; deleted_events: number; deleted_deliveries: number }>(
+      `/notifications/retention/run${typeof days === "number" ? `?days=${String(days)}` : ""}`
+    ),
+  wsUrl: (userId: string) => {
+    const base = API_BASE.startsWith("http")
+      ? API_BASE.replace(/^http/, "ws")
+      : `${typeof window !== "undefined" ? window.location.origin.replace(/^http/, "ws") : ""}${API_BASE}`;
+    return `${base}/notifications/ws/${encodeURIComponent(userId)}`;
   },
 };
 

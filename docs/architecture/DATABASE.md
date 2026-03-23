@@ -40,6 +40,9 @@
 |---------|--------|------------|
 | `notification_prefs` | `NotificationPreferences` | Настройки уведомлений (в т.ч. Telegram group id и служебные поля) |
 | `automation_rules` | `AutomationRule` | Правила автоматизации |
+| `notification_events` | `NotificationEvent` | Канонический журнал доменных событий для шины уведомлений |
+| `notifications` | `Notification` | Уведомления для центра уведомлений пользователя |
+| `notification_deliveries` | `NotificationDelivery` | Статусы доставки по каналам (in-app/chat/telegram/email) |
 
 ### CRM
 

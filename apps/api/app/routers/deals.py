@@ -6,6 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_db
 from app.models.client import Deal
 from app.utils import row_to_deal
+from app.services.domain_events import emit_domain_event
 
 router = APIRouter(prefix="/deals", tags=["deals"])
 
@@ -23,6 +24,7 @@ async def update_deals(deals: list[dict], db: AsyncSession = Depends(get_db)):
         if not did:
             continue
         existing = await db.get(Deal, did)
+        prev_assignee = existing.assignee_id if existing else None
         def str_val(v):
             return str(v) if v is not None else None
         if existing:
@@ -86,6 +88,40 @@ async def update_deals(deals: list[dict], db: AsyncSession = Depends(get_db)):
                 payment_day=str(d.get("paymentDay")) if d.get("paymentDay") is not None else None,
                 updated_at=d.get("updatedAt"),
             ))
+        await db.flush()
+
+        assignee = d.get("assigneeId") or (existing.assignee_id if existing else None)
+        actor_id = d.get("createdByUserId")
+        if existing is None and assignee:
+            await emit_domain_event(
+                db,
+                event_type="deal.assigned",
+                org_id="default",
+                entity_type="deal",
+                entity_id=did,
+                source="deals-router",
+                actor_id=actor_id,
+                payload={
+                    "dealId": did,
+                    "title": d.get("title", ""),
+                    "assigneeId": assignee,
+                },
+            )
+        elif existing and assignee and assignee != prev_assignee:
+            await emit_domain_event(
+                db,
+                event_type="deal.assigned",
+                org_id="default",
+                entity_type="deal",
+                entity_id=did,
+                source="deals-router",
+                actor_id=actor_id,
+                payload={
+                    "dealId": did,
+                    "title": d.get("title", existing.title),
+                    "assigneeId": assignee,
+                },
+            )
     await db.commit()
     return {"ok": True}
 
@@ -116,6 +152,23 @@ async def create_deal(deal: dict, db: AsyncSession = Depends(get_db)):
         comments=deal.get("comments", []),
         is_archived=False,
     ))
+    await db.flush()
+    assignee = deal.get("assigneeId")
+    if assignee:
+        await emit_domain_event(
+            db,
+            event_type="deal.assigned",
+            org_id="default",
+            entity_type="deal",
+            entity_id=did,
+            source="deals-router",
+            actor_id=deal.get("createdByUserId"),
+            payload={
+                "dealId": did,
+                "title": deal.get("title", "Новая сделка"),
+                "assigneeId": assignee,
+            },
+        )
     await db.commit()
     result = await db.get(Deal, did)
     return row_to_deal(result)

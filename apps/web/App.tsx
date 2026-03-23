@@ -15,6 +15,16 @@ import PublicContentPlanView from './components/PublicContentPlanView';
 import { MiniMessenger } from './components/features/chat/MiniMessenger';
 import { MessageCircle } from 'lucide-react';
 import { useAppLogic } from './frontend/hooks/useAppLogic';
+import { api } from './backend/api';
+
+interface SystemNotification {
+  id: string;
+  title: string;
+  body: string;
+  priority?: string;
+  isRead?: boolean;
+  createdAt?: string;
+}
 
 /** Синхронно из pathname — чтобы не монтировать useAppLogic на публичной странице (избегаем React #310). */
 function getPublicContentPlanIdFromPath(): string | null {
@@ -27,6 +37,8 @@ function MainApp() {
   const { state, actions } = useAppLogic();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [chatPanelOpen, setChatPanelOpen] = useState(false);
+  const [systemNotifications, setSystemNotifications] = useState<SystemNotification[]>([]);
+  const [unreadNotificationsCount, setUnreadNotificationsCount] = useState(0);
 
   if (state.isLoading) return <div className="h-screen flex items-center justify-center bg-gray-50 dark:bg-[#121212] dark:text-white">Загрузка...</div>;
 
@@ -34,7 +46,75 @@ function MainApp() {
     return <LoginView users={state.users} onLogin={user => { actions.login(user); }} />;
   }
 
-  const unreadNotifications = state.activityLogs.filter(a => !a.read);
+  useEffect(() => {
+    if (!state.currentUser?.id) return;
+    let mounted = true;
+    api.notifications
+      .list(state.currentUser.id, false, 100)
+      .then((list) => {
+        if (!mounted) return;
+        const typed = (list || []) as SystemNotification[];
+        setSystemNotifications(typed);
+        setUnreadNotificationsCount(typed.filter((n) => !n.isRead).length);
+      })
+      .catch(() => {});
+
+    api.notifications
+      .unreadCount(state.currentUser.id)
+      .then((res) => {
+        if (!mounted) return;
+        setUnreadNotificationsCount(res.unreadCount || 0);
+      })
+      .catch(() => {});
+
+    const ws = new WebSocket(api.notifications.wsUrl(state.currentUser.id));
+    ws.onmessage = (evt) => {
+      try {
+        const data = JSON.parse(evt.data);
+        if (data?.type === 'notification.created' && data.notification && mounted) {
+          setSystemNotifications((prev) => [
+            {
+              id: data.notification.id,
+              title: data.notification.title,
+              body: data.notification.body,
+              priority: data.notification.priority,
+              isRead: false,
+              createdAt: new Date().toISOString(),
+            },
+            ...prev,
+          ]);
+          setUnreadNotificationsCount((prev) => prev + 1);
+        }
+      } catch {
+        // ignore malformed ws payload
+      }
+    };
+    const pollId = window.setInterval(() => {
+      api.notifications
+        .unreadCount(state.currentUser.id)
+        .then((res) => {
+          if (!mounted) return;
+          setUnreadNotificationsCount(res.unreadCount || 0);
+        })
+        .catch(() => {});
+    }, 30000);
+    return () => {
+      mounted = false;
+      window.clearInterval(pollId);
+      try {
+        ws.close();
+      } catch {
+        // ignore close errors
+      }
+    };
+  }, [state.currentUser?.id]);
+
+  const handleMarkAllNotificationsRead = async () => {
+    const unread = systemNotifications.filter((n) => !n.isRead);
+    await Promise.all(unread.map((n) => api.notifications.markRead(n.id, true).catch(() => {})));
+    setSystemNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })));
+    setUnreadNotificationsCount(0);
+  };
 
   const handleOpenEditCurrentTable = () => {
       if (state.activeTable) actions.openEditTable(state.activeTable);
@@ -68,7 +148,7 @@ function MainApp() {
             onOpenSettings={() => { actions.openSettings('users'); }}
             onDeleteTable={actions.deleteTable}
             onEditTable={actions.openEditTable}
-            unreadCount={unreadNotifications.length}
+            unreadCount={unreadNotificationsCount}
             activeSpaceTab={state.activeSpaceTab}
             onNavigateToType={(type) => {
               actions.setCurrentView('spaces');
@@ -84,13 +164,13 @@ function MainApp() {
               activeTable={state.activeTable}
               currentUser={state.currentUser}
               searchQuery={state.searchQuery}
-              unreadNotificationsCount={unreadNotifications.length}
-              activityLogs={state.activityLogs}
+              unreadNotificationsCount={unreadNotificationsCount}
+              activityLogs={systemNotifications}
               onToggleDarkMode={actions.toggleDarkMode}
               onSearchChange={actions.setSearchQuery}
               onSearchFocus={() => { if(state.currentView !== 'search') actions.setCurrentView('search'); }}
               onNavigateToInbox={() => actions.setCurrentView('inbox')}
-              onMarkAllRead={actions.markAllRead}
+              onMarkAllRead={handleMarkAllNotificationsRead}
               onOpenSettings={(tab?: string) => { actions.openSettings(tab || 'users'); }}
               onLogout={actions.logout}
               onEditTable={handleOpenEditCurrentTable}

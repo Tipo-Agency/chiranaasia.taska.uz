@@ -21,6 +21,9 @@ export const DEFAULT_PRIORITIES: PriorityOption[] = [
 ];
 
 export const DEFAULT_NOTIFICATION_PREFS: NotificationPreferences = {
+    channels: { in_app: true, chat: true, telegram: false, email: false },
+    quietHours: { enabled: false, start: '22:00', end: '08:00', timezone: 'Asia/Tashkent' },
+    types: {},
     // Задачи
     newTask: { telegramPersonal: true, telegramGroup: false },
     statusChange: { telegramPersonal: true, telegramGroup: false },

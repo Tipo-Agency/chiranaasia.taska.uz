@@ -2,10 +2,10 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { ActivityLog, User, Task, Deal, PurchaseRequest, Role } from '../../types';
 import { PageLayout } from '../ui/PageLayout';
 import { Container } from '../ui/Container';
-import { ActivityItem } from '../features/activity/ActivityItem';
 import { Button } from '../ui/Button';
 import { CheckCircle2, Bell, Inbox, Send, MessageCircle, Users as UsersIcon, Paperclip } from 'lucide-react';
 import { chatLocalService, ChatMessageLocal } from '../../services/chatLocalService';
+import { api } from '../../backend/api';
 
 type TabId = 'inbox' | 'outbox' | 'notifications' | 'chat';
 
@@ -17,6 +17,15 @@ interface InboxCard {
   status?: string;
   amount?: number;
   dateLabel?: string;
+}
+
+interface SystemNotification {
+  id: string;
+  title: string;
+  body: string;
+  priority?: string;
+  isRead?: boolean;
+  createdAt?: string;
 }
 
 interface InboxPageProps {
@@ -41,6 +50,7 @@ export const InboxPage: React.FC<InboxPageProps> = ({
   const unreadCount = activities.filter(a => !a.read).length;
 
   const [activeTab, setActiveTab] = useState<TabId>('inbox');
+  const [systemNotifications, setSystemNotifications] = useState<SystemNotification[]>([]);
 
   // --- ВХОДЯЩИЕ / ИСХОДЯЩИЕ ---
 
@@ -159,6 +169,49 @@ export const InboxPage: React.FC<InboxPageProps> = ({
     setChatMessages(chatLocalService.getMessagesForUser(currentUser.id));
   }, [currentUser.id]);
 
+  useEffect(() => {
+    let mounted = true;
+    api.notifications
+      .list(currentUser.id, false, 100)
+      .then((list) => {
+        if (!mounted) return;
+        setSystemNotifications((list || []) as SystemNotification[]);
+      })
+      .catch(() => {});
+
+    const wsUrl = api.notifications.wsUrl(currentUser.id);
+    const ws = new WebSocket(wsUrl);
+    ws.onmessage = (evt) => {
+      try {
+        const data = JSON.parse(evt.data);
+        if (data?.type === 'notification.created' && data.notification && mounted) {
+          setSystemNotifications((prev) => [
+            {
+              id: data.notification.id,
+              title: data.notification.title,
+              body: data.notification.body,
+              priority: data.notification.priority,
+              isRead: false,
+              createdAt: new Date().toISOString(),
+            },
+            ...prev,
+          ]);
+        }
+      } catch {
+        // ignore malformed message
+      }
+    };
+
+    return () => {
+      mounted = false;
+      try {
+        ws.close();
+      } catch {
+        // ignore
+      }
+    };
+  }, [currentUser.id]);
+
   const currentChatMessages = useMemo(() => {
     if (!activeChatUserId) return [];
     return chatMessages
@@ -270,7 +323,7 @@ export const InboxPage: React.FC<InboxPageProps> = ({
           {/* Контент вкладок */}
           {activeTab === 'notifications' && (
             <div>
-              {activities.length === 0 ? (
+              {systemNotifications.length === 0 ? (
                 <div className="text-center py-12 text-gray-500 dark:text-gray-400">
                   <Bell size={48} className="mx-auto mb-4 opacity-20" />
                   <p className="text-lg">Нет уведомлений</p>
@@ -278,12 +331,35 @@ export const InboxPage: React.FC<InboxPageProps> = ({
               ) : (
                 <div className="bg-white dark:bg-[#252525] border border-gray-200 dark:border-[#333] rounded-xl shadow-sm overflow-hidden">
                   <div className="divide-y divide-gray-100 dark:divide-[#333]">
-                    {activities.map((activity) => (
-                      <ActivityItem
-                        key={activity.id}
-                        activity={activity}
-                        users={users}
-                      />
+                    {systemNotifications.map((n) => (
+                      <button
+                        key={n.id}
+                        type="button"
+                        onClick={() => {
+                          api.notifications.markRead(n.id, true).catch(() => {});
+                          setSystemNotifications((prev) =>
+                            prev.map((x) => (x.id === n.id ? { ...x, isRead: true } : x))
+                          );
+                        }}
+                        className={`w-full text-left p-4 hover:bg-gray-50 dark:hover:bg-[#303030] transition-colors ${
+                          n.isRead ? '' : 'bg-blue-50/40 dark:bg-blue-900/10'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between gap-3">
+                          <div className="text-sm font-semibold text-gray-900 dark:text-white">{n.title}</div>
+                          {n.priority && (
+                            <span className="text-[10px] px-2 py-0.5 rounded-full bg-gray-100 dark:bg-[#333] text-gray-600 dark:text-gray-300">
+                              {n.priority}
+                            </span>
+                          )}
+                        </div>
+                        <div className="text-xs text-gray-600 dark:text-gray-300 mt-1">{n.body}</div>
+                        {n.createdAt && (
+                          <div className="text-[10px] text-gray-400 dark:text-gray-500 mt-2">
+                            {new Date(n.createdAt).toLocaleString('ru-RU')}
+                          </div>
+                        )}
+                      </button>
                     ))}
                   </div>
                 </div>

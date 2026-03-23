@@ -11,15 +11,17 @@ import {
   RefreshCw,
   Loader2,
   Send,
+  Radio,
 } from 'lucide-react';
 import { adminEndpoint, systemEndpoint } from '../../services/apiClient';
 
-type TabId = 'db' | 'errors' | 'load' | 'tests' | 'bot';
+type TabId = 'db' | 'errors' | 'load' | 'tests' | 'bot' | 'redis';
 
 const TABS: { id: TabId; label: string; icon: React.ReactNode }[] = [
   { id: 'db', label: 'База данных', icon: <Database size={18} /> },
   { id: 'errors', label: 'Ошибки', icon: <AlertCircle size={18} /> },
   { id: 'load', label: 'Нагрузка', icon: <Activity size={18} /> },
+  { id: 'redis', label: 'Redis шина', icon: <Radio size={18} /> },
   { id: 'tests', label: 'Тесты', icon: <Play size={18} /> },
   { id: 'bot', label: 'Telegram бот', icon: <Send size={18} /> },
 ];
@@ -66,6 +68,7 @@ export const AdminView: React.FC = () => {
           {activeTab === 'db' && <DbTab onAuthError={setAuthError} />}
           {activeTab === 'errors' && <ErrorsTab onAuthError={setAuthError} />}
           {activeTab === 'load' && <LoadTab onAuthError={setAuthError} />}
+          {activeTab === 'redis' && <RedisTab onAuthError={setAuthError} />}
           {activeTab === 'tests' && <TestsTab onAuthError={setAuthError} />}
           {activeTab === 'bot' && <BotTab onAuthError={setAuthError} />}
         </main>
@@ -392,6 +395,316 @@ function LoadTab({ onAuthError }: { onAuthError: (msg: string) => void }) {
             </table>
           </div>
         </div>
+      )}
+    </div>
+  );
+}
+
+function RedisTab({ onAuthError }: { onAuthError: (msg: string) => void }) {
+  const [loading, setLoading] = useState(true);
+  const [monitor, setMonitor] = useState<{
+    redis_ok: boolean;
+    redis_error?: string;
+    redis_url: string;
+    stream_name: string;
+    stream_length?: number;
+    stream_last_generated_id?: string;
+    stream_groups?: number;
+    events_total: number;
+    events_published: number;
+    deliveries_pending: number;
+    deliveries_failed: number;
+    deliveries_sent: number;
+    stream_group_details?: Array<{
+      name?: string;
+      consumers?: number;
+      pending?: number;
+      lag?: number | null;
+      last_delivered_id?: string;
+    }>;
+  } | null>(null);
+  const [failedRows, setFailedRows] = useState<Array<{
+    id: string;
+    notification_id: string;
+    channel: string;
+    attempts: string;
+    last_error?: string;
+    updated_at?: string;
+    notification_title?: string;
+    recipient_id?: string;
+  }>>([]);
+  const [actionLoading, setActionLoading] = useState<null | 'deliveries' | 'retention' | 'requeue'>(null);
+  const [actionResult, setActionResult] = useState<string | null>(null);
+  const [failedChannelFilter, setFailedChannelFilter] = useState('');
+  const [failedQuery, setFailedQuery] = useState('');
+  const [rowRequeueLoadingId, setRowRequeueLoadingId] = useState<string | null>(null);
+
+  const load = async () => {
+    setLoading(true);
+    try {
+      const [data, failed] = await Promise.all([
+        adminEndpoint.getRedisMonitor(),
+        adminEndpoint.getFailedDeliveries(50, failedChannelFilter || undefined, failedQuery || undefined),
+      ]);
+      setMonitor(data);
+      setFailedRows(failed || []);
+    } catch (e) {
+      if (String(e).includes('401') || String(e).includes('403')) onAuthError(String(e));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    load();
+    const timer = window.setInterval(load, 10000);
+    return () => window.clearInterval(timer);
+  }, [failedChannelFilter, failedQuery]);
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <h2 className="font-semibold text-lg">Монитор шины Redis + доставок</h2>
+        <button
+          type="button"
+          onClick={load}
+          disabled={loading}
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gray-100 dark:bg-[#252525] text-sm"
+        >
+          <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
+          Обновить
+        </button>
+      </div>
+
+      {loading && !monitor ? (
+        <div className="flex items-center gap-2 text-gray-500">
+          <Loader2 size={18} className="animate-spin" />
+          Загрузка…
+        </div>
+      ) : monitor ? (
+        <>
+          <div className="grid gap-4 md:grid-cols-3">
+            <div className="p-4 rounded-xl border border-gray-200 dark:border-[#333] bg-gray-50 dark:bg-[#252525]">
+              <p className="text-sm text-gray-500 dark:text-gray-400">Redis</p>
+              <p className={`text-xl font-semibold ${monitor.redis_ok ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+                {monitor.redis_ok ? 'OK' : 'DOWN'}
+              </p>
+              {!monitor.redis_ok && monitor.redis_error && (
+                <p className="text-xs text-red-600 dark:text-red-400 mt-1 break-all">{monitor.redis_error}</p>
+              )}
+            </div>
+            <div className="p-4 rounded-xl border border-gray-200 dark:border-[#333] bg-gray-50 dark:bg-[#252525]">
+              <p className="text-sm text-gray-500 dark:text-gray-400">Стрим</p>
+              <p className="text-lg font-semibold text-[#3337AD] break-all">{monitor.stream_name}</p>
+              <p className="text-xs text-gray-500 mt-1">len: {monitor.stream_length ?? 0}, groups: {monitor.stream_groups ?? 0}</p>
+            </div>
+            <div className="p-4 rounded-xl border border-gray-200 dark:border-[#333] bg-gray-50 dark:bg-[#252525]">
+              <p className="text-sm text-gray-500 dark:text-gray-400">События</p>
+              <p className="text-sm">Всего: <span className="font-semibold">{monitor.events_total}</span></p>
+              <p className="text-sm">Опубликовано: <span className="font-semibold">{monitor.events_published}</span></p>
+            </div>
+          </div>
+
+          <div className="p-4 rounded-xl border border-gray-200 dark:border-[#333] bg-white dark:bg-[#252525]">
+            <h3 className="font-medium mb-3">Очередь доставок</h3>
+            <div className="grid gap-3 sm:grid-cols-3">
+              <div className="rounded-lg border border-gray-200 dark:border-[#333] p-3">
+                <p className="text-xs text-gray-500">Pending</p>
+                <p className="text-2xl font-semibold">{monitor.deliveries_pending}</p>
+              </div>
+              <div className="rounded-lg border border-gray-200 dark:border-[#333] p-3">
+                <p className="text-xs text-gray-500">Failed</p>
+                <p className={`text-2xl font-semibold ${monitor.deliveries_failed > 0 ? 'text-red-600 dark:text-red-400' : ''}`}>
+                  {monitor.deliveries_failed}
+                </p>
+              </div>
+              <div className="rounded-lg border border-gray-200 dark:border-[#333] p-3">
+                <p className="text-xs text-gray-500">Sent</p>
+                <p className="text-2xl font-semibold text-green-600 dark:text-green-400">{monitor.deliveries_sent}</p>
+              </div>
+            </div>
+          </div>
+          {monitor.stream_group_details && monitor.stream_group_details.length > 0 && (
+            <div className="p-4 rounded-xl border border-gray-200 dark:border-[#333] bg-white dark:bg-[#252525]">
+              <h3 className="font-medium mb-3">Consumer groups / lag</h3>
+              <div className="overflow-x-auto border border-gray-200 dark:border-[#333] rounded-lg">
+                <table className="w-full text-sm">
+                  <thead className="bg-gray-50 dark:bg-[#202020] border-b border-gray-200 dark:border-[#333]">
+                    <tr>
+                      <th className="text-left px-3 py-2">Group</th>
+                      <th className="text-left px-3 py-2">Consumers</th>
+                      <th className="text-left px-3 py-2">Pending</th>
+                      <th className="text-left px-3 py-2">Lag</th>
+                      <th className="text-left px-3 py-2">Last delivered ID</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {monitor.stream_group_details.map((g, idx) => (
+                      <tr key={`${g.name || 'group'}-${idx}`} className="border-b border-gray-100 dark:border-[#333]">
+                        <td className="px-3 py-2">{g.name || '—'}</td>
+                        <td className="px-3 py-2">{g.consumers ?? 0}</td>
+                        <td className="px-3 py-2">{g.pending ?? 0}</td>
+                        <td className={`px-3 py-2 ${(g.lag || 0) > 0 ? 'text-amber-600 dark:text-amber-400' : ''}`}>{g.lag ?? '—'}</td>
+                        <td className="px-3 py-2 font-mono text-xs">{g.last_delivered_id || '—'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          <div className="p-4 rounded-xl border border-gray-200 dark:border-[#333] bg-white dark:bg-[#252525]">
+            <h3 className="font-medium mb-3">Операционные действия</h3>
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={async () => {
+                  setActionLoading('deliveries');
+                  setActionResult(null);
+                  try {
+                    const res = await adminEndpoint.runNotificationDeliveries(500);
+                    setActionResult(`Deliveries: processed=${res.processed}, sent=${res.sent}, failed=${res.failed}`);
+                    await load();
+                  } finally {
+                    setActionLoading(null);
+                  }
+                }}
+                disabled={actionLoading !== null}
+                className="px-3 py-1.5 rounded-lg bg-[#3337AD] text-white text-sm disabled:opacity-50"
+              >
+                {actionLoading === 'deliveries' ? 'Выполняется…' : 'Run deliveries now'}
+              </button>
+              <button
+                type="button"
+                onClick={async () => {
+                  setActionLoading('retention');
+                  setActionResult(null);
+                  try {
+                    const res = await adminEndpoint.runNotificationRetention();
+                    setActionResult(`Retention(${res.days}d): archived=${res.archived_notifications}, events=${res.deleted_events}, deliveries=${res.deleted_deliveries}`);
+                    await load();
+                  } finally {
+                    setActionLoading(null);
+                  }
+                }}
+                disabled={actionLoading !== null}
+                className="px-3 py-1.5 rounded-lg bg-gray-800 text-white text-sm disabled:opacity-50"
+              >
+                {actionLoading === 'retention' ? 'Выполняется…' : 'Run retention now'}
+              </button>
+              <button
+                type="button"
+                onClick={async () => {
+                  setActionLoading('requeue');
+                  setActionResult(null);
+                  try {
+                    const res = await adminEndpoint.requeueFailedDeliveries(500);
+                    setActionResult(`Requeued failed: ${res.requeued}`);
+                    await load();
+                  } finally {
+                    setActionLoading(null);
+                  }
+                }}
+                disabled={actionLoading !== null}
+                className="px-3 py-1.5 rounded-lg bg-red-600 text-white text-sm disabled:opacity-50"
+              >
+                {actionLoading === 'requeue' ? 'Выполняется…' : 'Requeue failed'}
+              </button>
+            </div>
+            {actionResult && (
+              <p className="mt-3 text-sm text-gray-700 dark:text-gray-300">{actionResult}</p>
+            )}
+          </div>
+
+          <div className="p-4 rounded-xl border border-gray-200 dark:border-[#333] bg-white dark:bg-[#252525]">
+            <h3 className="font-medium mb-3">Последние failed deliveries</h3>
+            <div className="mb-3 flex flex-wrap gap-2">
+              <select
+                value={failedChannelFilter}
+                onChange={(e) => setFailedChannelFilter(e.target.value)}
+                className="rounded-lg border border-gray-300 dark:border-[#333] bg-white dark:bg-[#202020] px-2 py-1.5 text-sm"
+              >
+                <option value="">Все каналы</option>
+                <option value="telegram">telegram</option>
+                <option value="email">email</option>
+                <option value="chat">chat</option>
+                <option value="in_app">in_app</option>
+              </select>
+              <input
+                value={failedQuery}
+                onChange={(e) => setFailedQuery(e.target.value)}
+                placeholder="Поиск по ошибке/заголовку"
+                className="min-w-[220px] rounded-lg border border-gray-300 dark:border-[#333] bg-white dark:bg-[#202020] px-3 py-1.5 text-sm"
+              />
+            </div>
+            {failedRows.length === 0 ? (
+              <p className="text-sm text-gray-500">Нет failed доставок.</p>
+            ) : (
+              <div className="overflow-x-auto border border-gray-200 dark:border-[#333] rounded-lg">
+                <table className="w-full text-sm">
+                  <thead className="bg-gray-50 dark:bg-[#202020] border-b border-gray-200 dark:border-[#333]">
+                    <tr>
+                      <th className="text-left px-3 py-2">Время</th>
+                      <th className="text-left px-3 py-2">Канал</th>
+                      <th className="text-left px-3 py-2">Attempts</th>
+                      <th className="text-left px-3 py-2">Уведомление</th>
+                      <th className="text-left px-3 py-2">Ошибка</th>
+                      <th className="text-left px-3 py-2">Действие</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {failedRows.map((row) => (
+                      <tr key={row.id} className="border-b border-gray-100 dark:border-[#333]">
+                        <td className="px-3 py-2 whitespace-nowrap text-xs text-gray-500">
+                          {row.updated_at ? new Date(row.updated_at).toLocaleString() : '—'}
+                        </td>
+                        <td className="px-3 py-2">{row.channel}</td>
+                        <td className="px-3 py-2">{row.attempts}</td>
+                        <td className="px-3 py-2 max-w-[240px] truncate" title={row.notification_title || ''}>
+                          {row.notification_title || row.notification_id}
+                        </td>
+                        <td className="px-3 py-2 max-w-[320px] truncate text-red-600 dark:text-red-400" title={row.last_error || ''}>
+                          {row.last_error || '—'}
+                        </td>
+                        <td className="px-3 py-2">
+                          <button
+                            type="button"
+                            disabled={rowRequeueLoadingId !== null}
+                            onClick={async () => {
+                              setRowRequeueLoadingId(row.id);
+                              setActionResult(null);
+                              try {
+                                const res = await adminEndpoint.requeueFailedDeliveryById(row.id);
+                                setActionResult(res.requeued > 0 ? `Requeued delivery ${row.id}` : `Delivery ${row.id} не в failed`);
+                                await load();
+                              } finally {
+                                setRowRequeueLoadingId(null);
+                              }
+                            }}
+                            className="px-2 py-1 rounded bg-red-600 text-white text-xs disabled:opacity-50"
+                          >
+                            {rowRequeueLoadingId === row.id ? '...' : 'Requeue'}
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+
+          <div className="text-xs text-gray-500 dark:text-gray-400">
+            <p>Redis URL: <span className="font-mono break-all">{monitor.redis_url}</span></p>
+            {monitor.stream_last_generated_id && (
+              <p>Last stream id: <span className="font-mono break-all">{monitor.stream_last_generated_id}</span></p>
+            )}
+            <p>Автообновление: каждые 10 секунд.</p>
+          </div>
+        </>
+      ) : (
+        <p className="text-sm text-gray-500">Нет данных мониторинга.</p>
       )}
     </div>
   );

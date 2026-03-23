@@ -17,6 +17,19 @@ services:
       timeout: 5s
       retries: 5
 
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--appendonly", "yes"]
+    ports:
+      - "6379:6379"
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
   backend:
     build: ./apps/api
     ports:
@@ -25,9 +38,13 @@ services:
       DATABASE_URL: postgresql+asyncpg://taska:${DB_PASSWORD:-taska}@db:5432/taska
       SECRET_KEY: ${SECRET_KEY:-change-me-in-production}
       CORS_ORIGINS: "http://localhost:3000,http://127.0.0.1:3000"
+      REDIS_URL: redis://redis:6379/0
+      REDIS_EVENTS_STREAM: events.domain.v1
       TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
     depends_on:
       db:
+        condition: service_healthy
+      redis:
         condition: service_healthy
 
   # DB UI (dev tools): запускается только с профилем "tools"
@@ -68,3 +85,4 @@ services:
 volumes:
   pgdata:
   pgadmin-data:
+  redisdata:

@@ -46,6 +46,10 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
 }) => {
   const [showUserDropdown, setShowUserDropdown] = useState(false);
   const [showNotificationDropdown, setShowNotificationDropdown] = useState(false);
+  const getLogTitle = (log: any) => log?.title || log?.action || 'Уведомление';
+  const getLogBody = (log: any) => log?.body || log?.details || '';
+  const getLogTimestamp = (log: any) => log?.createdAt || log?.timestamp;
+  const isLogRead = (log: any) => Boolean(log?.isRead ?? log?.read);
 
   /** Вкладка настроек, относящаяся к текущему экрану (для кнопки-шестерёнки в шапке). */
   const getModuleSettingsTab = (view: string): string | null => {
@@ -205,13 +209,15 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
                     <div 
                       key={log.id} 
                       onClick={() => { setShowNotificationDropdown(false); onNavigateToInbox(); }}
-                      className={`p-3 border-b border-gray-100 dark:border-[#333] last:border-0 text-sm cursor-pointer hover:bg-gray-50 dark:hover:bg-[#303030] transition-colors ${!log.read ? 'bg-blue-50/50 dark:bg-blue-900/10' : ''}`}
+                      className={`p-3 border-b border-gray-100 dark:border-[#333] last:border-0 text-sm cursor-pointer hover:bg-gray-50 dark:hover:bg-[#303030] transition-colors ${!isLogRead(log) ? 'bg-blue-50/50 dark:bg-blue-900/10' : ''}`}
                     >
-                      <div className="font-medium text-gray-800 dark:text-gray-200">{log.action}</div>
-                      <div className="text-gray-500 dark:text-gray-400 text-xs truncate">{log.details}</div>
-                      <div className="text-[10px] text-gray-400 mt-1">
-                        {new Date(log.timestamp).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}
-                      </div>
+                      <div className="font-medium text-gray-800 dark:text-gray-200">{getLogTitle(log)}</div>
+                      <div className="text-gray-500 dark:text-gray-400 text-xs truncate">{getLogBody(log)}</div>
+                      {getLogTimestamp(log) && (
+                        <div className="text-[10px] text-gray-400 mt-1">
+                          {new Date(getLogTimestamp(log)).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}
+                        </div>
+                      )}
                     </div>
                   ))}
                   {activityLogs.length === 0 && (

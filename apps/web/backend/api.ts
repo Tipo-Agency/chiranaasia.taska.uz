@@ -14,6 +14,8 @@ import {
   notificationPrefsEndpoint,
   automationEndpoint,
   notificationQueueEndpoint,
+  notificationEventsEndpoint,
+  notificationsEndpoint,
   clientsEndpoint,
   contractsEndpoint,
   employeesEndpoint,
@@ -52,6 +54,8 @@ export const api = {
   notificationPrefs: notificationPrefsEndpoint,
   automation: automationEndpoint,
   notificationQueue: notificationQueueEndpoint,
+  notificationEvents: notificationEventsEndpoint,
+  notifications: notificationsEndpoint,
 
   clients: clientsEndpoint,
   contracts: contractsEndpoint,

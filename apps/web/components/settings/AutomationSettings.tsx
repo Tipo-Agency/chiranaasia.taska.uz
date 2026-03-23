@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo } from 'react';
 import { AutomationRule, NotificationPreferences, StatusOption } from '../../types';
-import { Zap, MessageSquare, Plus, Trash2, CheckSquare, Bell, FileText, Calendar, DollarSign, Users, Briefcase, Settings } from 'lucide-react';
+import { Zap, MessageSquare, Trash2, CheckSquare, FileText, Calendar, DollarSign, Users, Briefcase, Settings } from 'lucide-react';
 import { TaskSelect } from '../TaskSelect';
 import { Button } from '../ui';
 
@@ -69,6 +69,8 @@ export const AutomationSettings: React.FC<AutomationSettingsProps> = ({
     const [autoTarget, setAutoTarget] = useState<'assignee' | 'creator' | 'admin' | 'specific' | 'manager'>('assignee');
     const [autoActionType, setAutoActionType] = useState<'telegram_message' | 'approval_request'>('telegram_message');
     const [autoApprovalType, setAutoApprovalType] = useState<'purchase_request' | 'process_step' | 'document' | 'deal'>('purchase_request');
+    const safeChannels = notificationPrefs?.channels || { in_app: true, chat: true, telegram: false, email: false };
+    const safeQuietHours = notificationPrefs?.quietHours || { enabled: false, start: '22:00', end: '08:00', timezone: 'Asia/Tashkent' };
 
     const handleTogglePref = (key: keyof NotificationPreferences, channel: 'telegramPersonal' | 'telegramGroup') => {
         const currentPrefs = notificationPrefs || safePrefs;
@@ -103,6 +105,26 @@ export const AutomationSettings: React.FC<AutomationSettingsProps> = ({
         };
         onSaveRule(rule);
         setAutoName('');
+    };
+
+    const handleToggleGlobalChannel = (channel: 'in_app' | 'chat' | 'telegram' | 'email') => {
+        onUpdatePrefs({
+            ...(notificationPrefs || safePrefs),
+            channels: {
+                ...safeChannels,
+                [channel]: !safeChannels[channel],
+            },
+        });
+    };
+
+    const handleQuietHoursChange = (patch: Partial<NonNullable<NotificationPreferences['quietHours']>>) => {
+        onUpdatePrefs({
+            ...(notificationPrefs || safePrefs),
+            quietHours: {
+                ...safeQuietHours,
+                ...patch,
+            },
+        });
     };
 
     const getModuleTriggers = (module: AutomationRule['module']): { value: AutomationRule['trigger'], label: string }[] => {
@@ -273,6 +295,63 @@ export const AutomationSettings: React.FC<AutomationSettingsProps> = ({
                 </div>
 
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <div className="lg:col-span-2 bg-white dark:bg-[#252525] p-6 rounded-xl border border-gray-200 dark:border-[#333]">
+                        <h3 className="font-bold text-gray-800 dark:text-white mb-4">Глобальные каналы доставки</h3>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                            {[
+                                { key: 'in_app', label: 'В системе' },
+                                { key: 'chat', label: 'В чате' },
+                                { key: 'telegram', label: 'Telegram' },
+                                { key: 'email', label: 'Email' },
+                            ].map((channel) => (
+                                <label key={channel.key} className="flex items-center justify-between rounded-lg border border-gray-200 dark:border-[#333] px-3 py-2 text-sm cursor-pointer">
+                                    <span className="text-gray-700 dark:text-gray-300">{channel.label}</span>
+                                    <input
+                                        type="checkbox"
+                                        checked={Boolean(safeChannels[channel.key as keyof typeof safeChannels])}
+                                        onChange={() => handleToggleGlobalChannel(channel.key as 'in_app' | 'chat' | 'telegram' | 'email')}
+                                        className="rounded text-blue-600 focus:ring-0"
+                                    />
+                                </label>
+                            ))}
+                        </div>
+                        <div className="mt-5">
+                            <div className="flex items-center justify-between">
+                                <h4 className="font-semibold text-sm text-gray-800 dark:text-white">Тихие часы</h4>
+                                <label className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400 cursor-pointer">
+                                    <input
+                                        type="checkbox"
+                                        checked={Boolean(safeQuietHours.enabled)}
+                                        onChange={() => handleQuietHoursChange({ enabled: !safeQuietHours.enabled })}
+                                        className="rounded text-blue-600 focus:ring-0"
+                                    />
+                                    Включить
+                                </label>
+                            </div>
+                            <div className="mt-3 grid grid-cols-1 sm:grid-cols-3 gap-3">
+                                <input
+                                    type="time"
+                                    value={safeQuietHours.start || '22:00'}
+                                    onChange={(e) => handleQuietHoursChange({ start: e.target.value })}
+                                    className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-[#252525] text-gray-900 dark:text-gray-100"
+                                />
+                                <input
+                                    type="time"
+                                    value={safeQuietHours.end || '08:00'}
+                                    onChange={(e) => handleQuietHoursChange({ end: e.target.value })}
+                                    className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-[#252525] text-gray-900 dark:text-gray-100"
+                                />
+                                <input
+                                    type="text"
+                                    value={safeQuietHours.timezone || 'Asia/Tashkent'}
+                                    onChange={(e) => handleQuietHoursChange({ timezone: e.target.value })}
+                                    placeholder="Timezone"
+                                    className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-[#252525] text-gray-900 dark:text-gray-100"
+                                />
+                            </div>
+                        </div>
+                    </div>
+
                     {/* Настройки уведомлений для модуля */}
                     <div className="bg-white dark:bg-[#252525] p-6 rounded-xl border border-gray-200 dark:border-[#333]">
                         <h3 className="font-bold text-gray-800 dark:text-white mb-2">Настройки уведомлений</h3>

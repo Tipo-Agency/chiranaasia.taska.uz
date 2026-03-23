@@ -3,7 +3,14 @@ from app.database import Base
 from app.models.user import User
 from app.models.task import Task, Project
 from app.models.settings import TableCollection, StatusOption, PriorityOption, ActivityLog, InboxMessage
-from app.models.notification import NotificationPreferences, AutomationRule
+from app.models.notification import (
+    NotificationPreferences,
+    AutomationRule,
+    NotificationEvent,
+    Notification,
+    NotificationDelivery,
+    NotificationArchive,
+)
 from app.models.client import Client, Deal, EmployeeInfo, AccountsReceivable
 from app.models.content import Doc, Folder, Meeting, ContentPost
 from app.models.finance import Department, FinanceCategory, Fund, FinancePlan, PurchaseRequest
@@ -28,6 +35,10 @@ __all__ = [
     "InboxMessage",
     "NotificationPreferences",
     "AutomationRule",
+    "NotificationEvent",
+    "Notification",
+    "NotificationDelivery",
+    "NotificationArchive",
     "Client",
     "Deal",
     "EmployeeInfo",

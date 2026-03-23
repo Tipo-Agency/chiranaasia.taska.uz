@@ -8,7 +8,7 @@ from typing import Any, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
-from sqlalchemy import select, text
+from sqlalchemy import select, text, func, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth import get_current_user_admin
@@ -16,7 +16,11 @@ from app.config import get_settings
 from app.database import get_db, AsyncSessionLocal
 from app.models import Base
 from app.models.notification import NotificationPreferences as NPrefModel
+from app.models.notification import NotificationDelivery, Notification
 from app.models.user import User
+from app.services.event_bus import _get_redis
+from app.services.notification_delivery import run_pending_deliveries
+from app.services.notification_retention import run_notification_retention
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
@@ -102,6 +106,54 @@ class BotStatusResponse(BaseModel):
 class BotSendTestResponse(BaseModel):
     ok: bool
     error: Optional[str] = None
+
+
+class RedisMonitorResponse(BaseModel):
+    redis_ok: bool
+    redis_error: Optional[str] = None
+    redis_url: str
+    stream_name: str
+    stream_length: Optional[int] = None
+    stream_last_generated_id: Optional[str] = None
+    stream_groups: Optional[int] = None
+    events_total: int
+    events_published: int
+    deliveries_pending: int
+    deliveries_failed: int
+    deliveries_sent: int
+    stream_group_details: Optional[List[dict]] = None
+
+
+class DeliveryRunResponse(BaseModel):
+    ok: bool
+    processed: int
+    sent: int
+    failed: int
+    skipped: int
+
+
+class RetentionRunResponse(BaseModel):
+    ok: bool
+    days: int
+    archived_notifications: int
+    deleted_events: int
+    deleted_deliveries: int
+
+
+class FailedDeliveryRow(BaseModel):
+    id: str
+    notification_id: str
+    channel: str
+    attempts: str
+    last_error: Optional[str] = None
+    updated_at: Optional[str] = None
+    notification_title: Optional[str] = None
+    recipient_id: Optional[str] = None
+
+
+class RequeueFailedResponse(BaseModel):
+    ok: bool
+    requeued: int
 
 
 # --- Endpoints ---
@@ -317,3 +369,184 @@ async def admin_bot_test_congrats(
     )
     ok, err = await asyncio.to_thread(_send_telegram, chat_id, text)
     return BotSendTestResponse(ok=ok, error=err if not ok else None)
+
+
+@router.get("/redis/monitor", response_model=RedisMonitorResponse)
+async def admin_redis_monitor(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user_admin),
+):
+    settings = get_settings()
+    redis_ok = False
+    redis_error = None
+    stream_length = None
+    stream_last_generated_id = None
+    stream_groups = None
+    stream_group_details: list[dict] = []
+
+    try:
+        redis = await _get_redis()
+        if redis is None:
+            raise RuntimeError("redis_client_unavailable")
+        await redis.ping()
+        redis_ok = True
+        try:
+            xinfo = await redis.xinfo_stream(settings.REDIS_EVENTS_STREAM)
+            stream_length = int(xinfo.get("length", 0))
+            stream_last_generated_id = xinfo.get("last-generated-id")
+        except Exception:
+            stream_length = 0
+            stream_last_generated_id = None
+        try:
+            groups = await redis.xinfo_groups(settings.REDIS_EVENTS_STREAM)
+            stream_groups = len(groups or [])
+            for g in groups or []:
+                stream_group_details.append(
+                    {
+                        "name": g.get("name"),
+                        "consumers": int(g.get("consumers", 0)),
+                        "pending": int(g.get("pending", 0)),
+                        "lag": int(g.get("lag", 0)) if g.get("lag") is not None else None,
+                        "last_delivered_id": g.get("last-delivered-id"),
+                    }
+                )
+        except Exception:
+            stream_groups = 0
+    except Exception as exc:
+        redis_error = str(exc)
+
+    events_total = (
+        await db.execute(text("SELECT COUNT(*) FROM notification_events"))
+    ).scalar() or 0
+    events_published = (
+        await db.execute(text("SELECT COUNT(*) FROM notification_events WHERE published_to_stream = true"))
+    ).scalar() or 0
+    deliveries_pending = (
+        await db.execute(select(func.count(NotificationDelivery.id)).where(NotificationDelivery.status == "pending"))
+    ).scalar() or 0
+    deliveries_failed = (
+        await db.execute(select(func.count(NotificationDelivery.id)).where(NotificationDelivery.status == "failed"))
+    ).scalar() or 0
+    deliveries_sent = (
+        await db.execute(select(func.count(NotificationDelivery.id)).where(NotificationDelivery.status == "sent"))
+    ).scalar() or 0
+
+    return RedisMonitorResponse(
+        redis_ok=redis_ok,
+        redis_error=redis_error,
+        redis_url=settings.REDIS_URL,
+        stream_name=settings.REDIS_EVENTS_STREAM,
+        stream_length=stream_length,
+        stream_last_generated_id=stream_last_generated_id,
+        stream_groups=stream_groups,
+        events_total=int(events_total),
+        events_published=int(events_published),
+        deliveries_pending=int(deliveries_pending),
+        deliveries_failed=int(deliveries_failed),
+        deliveries_sent=int(deliveries_sent),
+        stream_group_details=stream_group_details,
+    )
+
+
+@router.post("/notifications/run-deliveries", response_model=DeliveryRunResponse)
+async def admin_run_deliveries(
+    limit: int = Query(default=500, ge=1, le=5000),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user_admin),
+):
+    result = await run_pending_deliveries(db, limit=limit)
+    await db.commit()
+    return DeliveryRunResponse(ok=True, **result)
+
+
+@router.post("/notifications/run-retention", response_model=RetentionRunResponse)
+async def admin_run_retention(
+    days: int = Query(default=None, ge=1, le=3650),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user_admin),
+):
+    retention_days = int(days or get_settings().NOTIFICATIONS_RETENTION_DAYS)
+    result = await run_notification_retention(db, days=retention_days)
+    await db.commit()
+    return RetentionRunResponse(ok=True, days=retention_days, **result)
+
+
+@router.get("/notifications/failed-deliveries", response_model=List[FailedDeliveryRow])
+async def admin_failed_deliveries(
+    limit: int = Query(default=20, ge=1, le=500),
+    channel: str = Query(default="", description="Filter by channel"),
+    q: str = Query(default="", description="Search in title/error"),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user_admin),
+):
+    stmt = (
+        select(NotificationDelivery, Notification)
+        .join(Notification, Notification.id == NotificationDelivery.notification_id, isouter=True)
+        .where(NotificationDelivery.status == "failed")
+    )
+    if channel:
+        stmt = stmt.where(NotificationDelivery.channel == channel)
+    if q:
+        like = f"%{q.lower()}%"
+        stmt = stmt.where(
+            or_(
+                func.lower(func.coalesce(NotificationDelivery.last_error, "")).like(like),
+                func.lower(func.coalesce(Notification.title, "")).like(like),
+            )
+        )
+    rows = (await db.execute(stmt.order_by(NotificationDelivery.updated_at.desc()).limit(limit))).all()
+    result: List[FailedDeliveryRow] = []
+    for d, n in rows:
+        result.append(
+            FailedDeliveryRow(
+                id=d.id,
+                notification_id=d.notification_id,
+                channel=d.channel,
+                attempts=d.attempts or "0",
+                last_error=d.last_error,
+                updated_at=d.updated_at.isoformat() if d.updated_at else None,
+                notification_title=(n.title if n else None),
+                recipient_id=(n.recipient_id if n else None),
+            )
+        )
+    return result
+
+
+@router.post("/notifications/requeue-failed", response_model=RequeueFailedResponse)
+async def admin_requeue_failed(
+    limit: int = Query(default=200, ge=1, le=5000),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user_admin),
+):
+    rows = (
+        await db.execute(
+            select(NotificationDelivery)
+            .where(NotificationDelivery.status == "failed")
+            .order_by(NotificationDelivery.updated_at.desc())
+            .limit(limit)
+        )
+    ).scalars().all()
+    for d in rows:
+        d.status = "pending"
+        d.attempts = "0"
+        d.last_error = None
+        d.next_attempt_at = None
+    await db.commit()
+    return RequeueFailedResponse(ok=True, requeued=len(rows))
+
+
+@router.post("/notifications/requeue-failed/{delivery_id}", response_model=RequeueFailedResponse)
+async def admin_requeue_failed_one(
+    delivery_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user_admin),
+):
+    d = await db.get(NotificationDelivery, delivery_id)
+    if not d or d.status != "failed":
+        return RequeueFailedResponse(ok=True, requeued=0)
+    d.status = "pending"
+    d.attempts = "0"
+    d.last_error = None
+    d.next_attempt_at = None
+    await db.commit()
+    return RequeueFailedResponse(ok=True, requeued=1)

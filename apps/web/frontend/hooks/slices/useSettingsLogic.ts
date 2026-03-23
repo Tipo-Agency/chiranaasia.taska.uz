@@ -85,7 +85,8 @@ export const useSettingsLogic = (showNotification: (msg: string) => void) => {
 
   const updateNotificationPrefs = (prefs: NotificationPreferences) => {
       setNotificationPrefs(prefs);
-      api.notificationPrefs.update(prefs).catch(() => showNotification('Ошибка сохранения уведомлений'));
+      const prefsUserId = (prefs as { id?: string })?.id;
+      api.notificationPrefs.update(prefs, prefsUserId).catch(() => showNotification('Ошибка сохранения уведомлений'));
       showNotification('Настройки уведомлений сохранены');
   };
 

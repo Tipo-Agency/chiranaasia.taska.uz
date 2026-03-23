@@ -5,6 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
 from app.models.content import Doc
+from app.services.domain_events import emit_domain_event
 
 router = APIRouter(prefix="/docs", tags=["docs"])
 
@@ -58,5 +59,22 @@ async def update_docs(docs: list[dict], db: AsyncSession = Depends(get_db)):
                 tags=d.get("tags", []),
                 is_archived=d.get("isArchived", False),
             ))
+        await db.flush()
+        recipient_ids = d.get("recipientIds") or []
+        if recipient_ids:
+            await emit_domain_event(
+                db,
+                event_type="document.shared",
+                org_id="default",
+                entity_type="doc",
+                entity_id=did,
+                source="docs-router",
+                actor_id=d.get("sharedByUserId") or d.get("createdByUserId"),
+                payload={
+                    "docId": did,
+                    "title": d.get("title", existing.title if existing else ""),
+                    "recipientIds": recipient_ids,
+                },
+            )
     await db.commit()
     return {"ok": True}

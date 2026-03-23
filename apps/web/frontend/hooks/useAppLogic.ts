@@ -307,6 +307,15 @@ export const useAppLogic = () => {
     }
   }, [authSlice.state.currentUser]);
 
+  useEffect(() => {
+    const uid = authSlice.state.currentUser?.id;
+    if (!uid) return;
+    api.notificationPrefs
+      .get(uid)
+      .then((prefs) => settingsSlice.setters.setNotificationPrefs(prefs as any))
+      .catch(() => {});
+  }, [authSlice.state.currentUser?.id]);
+
   // Один раз после входа: восстановить раздел из URL (F5 остаётся на /tasks и т.д.)
   useEffect(() => {
     if (isLoading || !authSlice.state.currentUser) return;

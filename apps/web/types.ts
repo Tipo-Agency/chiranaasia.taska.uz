@@ -459,6 +459,24 @@ export interface NotificationSetting {
 }
 
 export interface NotificationPreferences {
+    channels?: {
+        in_app?: boolean;
+        chat?: boolean;
+        telegram?: boolean;
+        email?: boolean;
+    };
+    quietHours?: {
+        enabled?: boolean;
+        start?: string;
+        end?: string;
+        timezone?: string;
+    };
+    types?: Record<string, {
+        in_app?: boolean;
+        chat?: boolean;
+        telegram?: boolean;
+        email?: boolean;
+    }>;
     // Задачи
     newTask: NotificationSetting;
     statusChange: NotificationSetting;

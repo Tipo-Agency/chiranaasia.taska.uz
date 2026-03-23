@@ -6,6 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_db
 from app.models.task import Task
 from app.utils import row_to_task
+from app.services.domain_events import emit_domain_event
 
 router = APIRouter(prefix="/tasks", tags=["tasks"])
 
@@ -24,6 +25,8 @@ async def update_tasks(tasks: list[dict], db: AsyncSession = Depends(get_db)):
         if not tid:
             continue
         existing = await db.get(Task, tid)
+        prev_assignee = existing.assignee_id if existing else None
+        prev_status = existing.status if existing else None
         data = {k: v for k, v in t.items() if v is not None}
         if existing:
             for k, v in data.items():
@@ -65,5 +68,65 @@ async def update_tasks(tasks: list[dict], db: AsyncSession = Depends(get_db)):
                 amount=str(data.get("amount")) if data.get("amount") is not None else None,
                 decision_date=data.get("decisionDate"),
             ))
+        await db.flush()
+
+        # Domain events for notification hub
+        assignee_id = data.get("assigneeId", (existing.assignee_id if existing else None))
+        title = data.get("title", (existing.title if existing else ""))
+        actor_id = data.get("createdByUserId") or data.get("requesterId")
+
+        if existing is None and assignee_id:
+            await emit_domain_event(
+                db,
+                event_type="task.assigned",
+                org_id="default",
+                entity_type="task",
+                entity_id=tid,
+                source="tasks-router",
+                actor_id=actor_id,
+                payload={
+                    "taskId": tid,
+                    "title": title,
+                    "assigneeId": assignee_id,
+                    "priority": data.get("priority"),
+                    "createdByUserId": data.get("createdByUserId"),
+                },
+            )
+        elif existing and assignee_id and assignee_id != prev_assignee:
+            await emit_domain_event(
+                db,
+                event_type="task.assigned",
+                org_id="default",
+                entity_type="task",
+                entity_id=tid,
+                source="tasks-router",
+                actor_id=actor_id,
+                payload={
+                    "taskId": tid,
+                    "title": title,
+                    "assigneeId": assignee_id,
+                    "priority": data.get("priority", existing.priority),
+                    "createdByUserId": data.get("createdByUserId", existing.created_by_user_id),
+                },
+            )
+
+        current_status = data.get("status", (existing.status if existing else None))
+        if existing and current_status and current_status != prev_status:
+            await emit_domain_event(
+                db,
+                event_type="task.status.changed",
+                org_id="default",
+                entity_type="task",
+                entity_id=tid,
+                source="tasks-router",
+                actor_id=actor_id,
+                payload={
+                    "taskId": tid,
+                    "title": title,
+                    "status": current_status,
+                    "assigneeId": data.get("assigneeId", existing.assignee_id),
+                    "createdByUserId": data.get("createdByUserId", existing.created_by_user_id),
+                },
+            )
     await db.commit()
     return {"ok": True}

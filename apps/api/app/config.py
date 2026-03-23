@@ -27,6 +27,20 @@ class Settings(BaseSettings):
     # Optional: same bot token for admin "test send" (sends to group from API)
     TELEGRAM_BOT_TOKEN: str = ""
 
+    # Redis / Event bus
+    REDIS_URL: str = "redis://localhost:6379/0"
+    REDIS_EVENTS_STREAM: str = "events.domain.v1"
+
+    # Email notifications
+    SMTP_HOST: str = ""
+    SMTP_PORT: int = 587
+    SMTP_USER: str = ""
+    SMTP_PASSWORD: str = ""
+    SMTP_FROM: str = "noreply@tipa.taska.uz"
+    SMTP_USE_TLS: bool = True
+    NOTIFICATIONS_RETENTION_DAYS: int = 90
+    NOTIFICATIONS_RETENTION_INTERVAL_SECONDS: int = 3600
+
     class Config:
         env_file = ".env"
         env_file_encoding = "utf-8"
