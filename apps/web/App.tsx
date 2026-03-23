@@ -125,6 +125,91 @@ function MainApp() {
       actions.setCurrentView('table');
   };
 
+  const myTasks = (state.tasks || [])
+    .filter(
+      (t) =>
+        !t.isArchived &&
+        t.entityType !== 'idea' &&
+        t.entityType !== 'feature' &&
+        (t.assigneeId === state.currentUser.id || t.assigneeIds?.includes(state.currentUser.id))
+    )
+    .slice(0, 30);
+
+  const myDeals = (state.deals || []).filter((d) => !d.isArchived && d.assigneeId === state.currentUser.id).slice(0, 30);
+
+  const myMeetings = (state.meetings || [])
+    .filter((m) => !m.isArchived && (m.participantIds || []).includes(state.currentUser.id))
+    .slice(0, 30);
+
+  const createEntityFromChat = async (
+    type: 'task' | 'deal' | 'meeting' | 'doc',
+    title: string
+  ): Promise<{ id: string; label: string } | null> => {
+    const now = new Date();
+    const today = now.toISOString().slice(0, 10);
+    const nowIso = now.toISOString();
+
+    if (type === 'task') {
+      const task = {
+        id: `chat-task-${Date.now()}`,
+        entityType: 'task',
+        tableId: '',
+        title,
+        status: state.statuses?.[0]?.name || 'Не начато',
+        priority: state.priorities?.[1]?.name || state.priorities?.[0]?.name || 'Средний',
+        assigneeId: state.currentUser.id,
+        projectId: null,
+        startDate: today,
+        endDate: today,
+        description: '',
+        createdByUserId: state.currentUser.id,
+        createdAt: nowIso,
+      };
+      await actions.saveTask(task);
+      return { id: task.id, label: task.title };
+    }
+
+    if (type === 'deal') {
+      const deal = {
+        id: `chat-deal-${Date.now()}`,
+        title,
+        amount: 0,
+        currency: 'UZS',
+        stage: 'new',
+        assigneeId: state.currentUser.id,
+        createdAt: nowIso,
+      };
+      await actions.saveDeal(deal);
+      return { id: deal.id, label: deal.title };
+    }
+
+    if (type === 'meeting') {
+      const meeting = {
+        id: `chat-meeting-${Date.now()}`,
+        tableId: 'meetings-system',
+        title,
+        date: today,
+        time: '10:00',
+        participantIds: [state.currentUser.id],
+        summary: '',
+        type: 'work',
+      };
+      await actions.saveMeeting(meeting);
+      return { id: meeting.id, label: meeting.title };
+    }
+
+    const doc = {
+      id: `chat-doc-${Date.now()}`,
+      tableId: 'docs-system',
+      title,
+      type: 'internal',
+      tags: [],
+      content: '',
+    };
+    await actions.saveDoc(doc);
+    return { id: doc.id, label: doc.title };
+  };
+
   return (
     <div 
       className={`flex h-screen w-full transition-colors duration-200 overflow-hidden ${state.darkMode ? 'dark bg-[#191919] text-gray-100' : 'bg-white text-gray-900'}`}
@@ -211,16 +296,14 @@ function MainApp() {
                     users={state.users}
                     currentUser={state.currentUser}
                     docs={state.docs}
-                    tasks={state.tasks}
-                    deals={state.deals}
-                    meetings={state.meetings}
+                    tasks={myTasks}
+                    deals={myDeals}
+                    meetings={myMeetings}
                     onOpenDocument={(doc) => {
                       actions.handleDocClick(doc);
                       setChatPanelOpen(false);
                     }}
-                    onOpenDocumentsModule={() => actions.setCurrentView('docs')}
-                    onOpenDeals={() => actions.setCurrentView('sales-funnel')}
-                    onOpenMeetings={() => actions.setCurrentView('meetings')}
+                    onCreateEntity={createEntityFromChat}
                     processTemplates={state.businessProcesses}
                     onStartProcessTemplate={async (processId) => {
                       const selected = state.businessProcesses.find((p) => p.id === processId && !p.isArchived);
@@ -298,7 +381,6 @@ function MainApp() {
                       return true;
                     }}
                     onClose={() => setChatPanelOpen(false)}
-                    className="rounded-none border-0 h-full min-h-0 flex-1"
                   />
                 </div>
               </div>
