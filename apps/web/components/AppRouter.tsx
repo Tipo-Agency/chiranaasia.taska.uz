@@ -11,6 +11,7 @@ import {
 
 import HomeView from './HomeView';
 import { HomePage } from './pages/HomePage';
+import { WorkdeskView } from './pages/WorkdeskView';
 import { TasksPage } from './pages/TasksPage';
 import { ClientsPage } from './pages/ClientsPage';
 import { InboxPage } from './pages/InboxPage';
@@ -102,28 +103,16 @@ export const AppRouter: React.FC<AppRouterProps> = (props) => {
   // 1. Global / Core Views
   if (view === 'home') {
       return (
-          <HomePage
+          <WorkdeskView
               currentUser={props.currentUser}
               tasks={props.filteredTasks}
-              recentActivity={props.activities}
               meetings={props.meetings}
               financePlan={props.financePlan}
-              purchaseRequests={props.purchaseRequests}
               deals={props.deals}
-              contentPosts={props.contentPosts}
-              employeeInfos={props.employeeInfos}
               users={props.users}
-              projects={props.projects}
-              statuses={props.statuses}
-              priorities={props.priorities}
               docs={props.docs}
-              departments={props.departments}
-              inboxMessages={props.inboxMessages}
-              outboxMessages={props.outboxMessages}
-              onSendMessage={actions.sendMessage}
-              onLoadMessages={actions.loadMessages}
+              accountsReceivable={props.accountsReceivable}
               onOpenTask={actions.openTaskModal}
-              onNavigateToInbox={() => actions.setCurrentView('inbox')}
               onQuickCreateTask={() => actions.openTaskModal(null)}
               onQuickCreateProcess={() => {
                 actions.setCurrentView('business-processes');
@@ -142,10 +131,7 @@ export const AppRouter: React.FC<AppRouterProps> = (props) => {
               onNavigateToTasks={() => actions.setCurrentView('tasks')}
               onNavigateToMeetings={() => actions.setCurrentView('meetings')}
               onNavigateToDeals={() => actions.setCurrentView('sales-funnel')}
-              onNavigateToDocs={() => actions.setCurrentView('docs')}
               onOpenDocument={actions.handleDocClick}
-              clients={props.clients}
-              accountsReceivable={props.accountsReceivable}
           />
       );
   }
@@ -197,6 +183,9 @@ export const AppRouter: React.FC<AppRouterProps> = (props) => {
                         users={props.users}
                         currentUser={props.currentUser}
                         docs={props.docs}
+                        tasks={props.allTasks}
+                        deals={props.deals}
+                        meetings={props.meetings}
                         onOpenDocument={props.actions.handleDocClick}
                         onOpenDocumentsModule={() => props.actions.setCurrentView('docs')}
                         onCreateTask={() => props.actions.openTaskModal(null)}
@@ -410,22 +399,16 @@ export const AppRouter: React.FC<AppRouterProps> = (props) => {
 
   // Fallback: если ничего не подошло, показываем home
   return (
-      <HomePage
+      <WorkdeskView
           currentUser={props.currentUser}
           tasks={props.filteredTasks}
-          recentActivity={props.activities}
           meetings={props.meetings}
           financePlan={props.financePlan}
-          purchaseRequests={props.purchaseRequests}
           deals={props.deals}
-          contentPosts={props.contentPosts}
-          employeeInfos={props.employeeInfos}
           users={props.users}
-          projects={props.projects}
-          statuses={props.statuses}
-          priorities={props.priorities}
+          docs={props.docs}
+          accountsReceivable={props.accountsReceivable}
           onOpenTask={actions.openTaskModal}
-          onNavigateToInbox={() => actions.setCurrentView('inbox')}
           onQuickCreateTask={() => actions.openTaskModal(null)}
           onQuickCreateProcess={() => {
             actions.setCurrentView('business-processes');
@@ -443,7 +426,8 @@ export const AppRouter: React.FC<AppRouterProps> = (props) => {
           }}
           onNavigateToTasks={() => actions.setCurrentView('tasks')}
           onNavigateToMeetings={() => actions.setCurrentView('meetings')}
-          onNavigateToDocs={() => actions.setCurrentView('docs')}
+          onNavigateToDeals={() => actions.setCurrentView('sales-funnel')}
+          onOpenDocument={actions.handleDocClick}
       />
   );
 };

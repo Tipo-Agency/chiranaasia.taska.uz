@@ -1,4 +1,4 @@
-export type ChatEntityType = 'task' | 'deal' | 'request' | 'doc' | 'file';
+export type ChatEntityType = 'task' | 'deal' | 'request' | 'doc' | 'file' | 'meeting' | 'client';
 
 export interface ChatMessageLocal {
   id: string;

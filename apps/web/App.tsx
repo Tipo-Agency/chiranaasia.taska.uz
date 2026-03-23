@@ -211,6 +211,9 @@ function MainApp() {
                     users={state.users}
                     currentUser={state.currentUser}
                     docs={state.docs}
+                    tasks={state.tasks}
+                    deals={state.deals}
+                    meetings={state.meetings}
                     onOpenDocument={(doc) => {
                       actions.handleDocClick(doc);
                       setChatPanelOpen(false);

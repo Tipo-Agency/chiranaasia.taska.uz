@@ -8,6 +8,7 @@ import {
   Users,
   Paperclip,
   FileText,
+  Link2,
   CheckSquare,
   GitBranch,
   Briefcase,
@@ -15,8 +16,9 @@ import {
   FolderOpen,
   X,
   Search,
+  Info,
 } from 'lucide-react';
-import { User, Doc } from '../../../types';
+import { User, Doc, Task, Deal, Meeting } from '../../../types';
 import { chatLocalService, ChatMessageLocal } from '../../../services/chatLocalService';
 
 const TO_ALL_ID = '__all__';
@@ -29,6 +31,9 @@ export interface MiniMessengerProps {
   className?: string;
   /** Документы для выбора и вставки в чат */
   docs?: Doc[];
+  tasks?: Task[];
+  deals?: Deal[];
+  meetings?: Meeting[];
   /** Открыть документ (редактор / ссылка) */
   onOpenDocument?: (doc: Doc) => void;
   /** Перейти в модуль документов */
@@ -54,6 +59,9 @@ export const MiniMessenger: React.FC<MiniMessengerProps> = ({
   onClose,
   className = '',
   docs = [],
+  tasks = [],
+  deals = [],
+  meetings = [],
   onOpenDocument,
   onOpenDocumentsModule,
   onCreateTask,
@@ -70,6 +78,10 @@ export const MiniMessenger: React.FC<MiniMessengerProps> = ({
   const [input, setInput] = useState('');
   const [docPickerOpen, setDocPickerOpen] = useState(false);
   const [docSearch, setDocSearch] = useState('');
+  const [entityPickerOpen, setEntityPickerOpen] = useState(false);
+  const [entityType, setEntityType] = useState<'task' | 'deal' | 'meeting'>('task');
+  const [entitySearch, setEntitySearch] = useState('');
+  const [selectedEntity, setSelectedEntity] = useState<{ type: 'task' | 'deal' | 'meeting' | 'doc'; id: string } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -106,6 +118,29 @@ export const MiniMessenger: React.FC<MiniMessengerProps> = ({
     return list.filter((d) => d.title.toLowerCase().includes(q)).slice(0, 80);
   }, [docs, docSearch]);
 
+  const filteredEntities = useMemo(() => {
+    const q = entitySearch.trim().toLowerCase();
+    if (entityType === 'task') {
+      const list = (tasks || []).filter((t) => !t.isArchived && t.entityType !== 'idea' && t.entityType !== 'feature');
+      return list
+        .filter((t) => !q || (t.title || '').toLowerCase().includes(q))
+        .slice(0, 80)
+        .map((t) => ({ id: t.id, label: t.title || 'Задача', subtitle: t.status || '' }));
+    }
+    if (entityType === 'deal') {
+      const list = (deals || []).filter((d) => !d.isArchived);
+      return list
+        .filter((d) => !q || (d.title || '').toLowerCase().includes(q))
+        .slice(0, 80)
+        .map((d) => ({ id: d.id, label: d.title || 'Сделка', subtitle: d.stage || '' }));
+    }
+    const list = (meetings || []).filter((m) => !m.isArchived);
+    return list
+      .filter((m) => !q || (m.title || '').toLowerCase().includes(q))
+      .slice(0, 80)
+      .map((m) => ({ id: m.id, label: m.title || 'Встреча', subtitle: `${m.date || ''} ${m.time || ''}`.trim() }));
+  }, [entityType, entitySearch, tasks, deals, meetings]);
+
   const sendText = () => {
     const text = input.trim();
     if (!text || !activeId) return;
@@ -135,6 +170,20 @@ export const MiniMessenger: React.FC<MiniMessengerProps> = ({
     refresh();
     setDocPickerOpen(false);
     setDocSearch('');
+  };
+
+  const attachEntity = (id: string, label: string) => {
+    if (!activeId) return;
+    chatLocalService.addMessage({
+      fromId: currentUser.id,
+      toId: activeId === TO_ALL_ID ? TO_ALL_ID : activeId,
+      text: `🔗 ${label}`,
+      entityType,
+      entityId: id,
+    });
+    refresh();
+    setEntityPickerOpen(false);
+    setEntitySearch('');
   };
 
   const onFileSelected = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -181,6 +230,44 @@ export const MiniMessenger: React.FC<MiniMessengerProps> = ({
       onClose?.();
     }
   };
+
+  const selectedEntityInfo = useMemo(() => {
+    if (!selectedEntity) return null;
+    if (selectedEntity.type === 'task') {
+      const t = tasks.find((x) => x.id === selectedEntity.id);
+      if (!t) return null;
+      return {
+        title: t.title || 'Задача',
+        subtitle: t.status || 'Без статуса',
+        body: t.description || 'Описание не заполнено',
+      };
+    }
+    if (selectedEntity.type === 'deal') {
+      const d = deals.find((x) => x.id === selectedEntity.id);
+      if (!d) return null;
+      return {
+        title: d.title || 'Сделка',
+        subtitle: d.stage || 'Без этапа',
+        body: `${(d.amount || 0).toLocaleString('ru-RU')} ${d.currency || ''}`.trim(),
+      };
+    }
+    if (selectedEntity.type === 'meeting') {
+      const m = meetings.find((x) => x.id === selectedEntity.id);
+      if (!m) return null;
+      return {
+        title: m.title || 'Встреча',
+        subtitle: `${m.date || ''} ${m.time || ''}`.trim(),
+        body: m.summary || 'Описание встречи отсутствует',
+      };
+    }
+    const doc = docs.find((x) => x.id === selectedEntity.id);
+    if (!doc) return null;
+    return {
+      title: doc.title || 'Документ',
+      subtitle: doc.type === 'link' ? 'Ссылка' : 'Внутренний документ',
+      body: doc.tags?.length ? `Теги: ${doc.tags.join(', ')}` : 'Без тегов',
+    };
+  }, [selectedEntity, tasks, deals, meetings, docs]);
 
   /** Группировка по дням для разделителей */
   const messagesWithDays: { key: string; label?: string; msg: ChatMessageLocal }[] = [];
@@ -303,6 +390,7 @@ export const MiniMessenger: React.FC<MiniMessengerProps> = ({
                     currentUser={currentUser}
                     onOpenDocument={onOpenDocument}
                     openLinkedDoc={openLinkedDoc}
+                    onSelectEntity={(type, id) => setSelectedEntity({ type, id })}
                   />
                 </React.Fragment>
               ))
@@ -324,6 +412,12 @@ export const MiniMessenger: React.FC<MiniMessengerProps> = ({
                 icon={<FileText size={18} />}
                 active={docPickerOpen}
               />
+              <ToolbarBtn
+                title="Привязать сущность"
+                onClick={() => setEntityPickerOpen((v) => !v)}
+                icon={<Link2 size={18} />}
+                active={entityPickerOpen}
+              />
               {onOpenDocumentsModule && (
                 <ToolbarBtn
                   title="Открыть модуль «Документы»"
@@ -334,15 +428,7 @@ export const MiniMessenger: React.FC<MiniMessengerProps> = ({
               {onCreateTask && (
                 <ToolbarBtn title="Создать задачу" onClick={() => onCreateTask()} icon={<CheckSquare size={18} />} />
               )}
-              {onStartProcess && (
-                <ToolbarBtn title="Запустить бизнес-процесс" onClick={() => onStartProcess()} icon={<GitBranch size={18} />} />
-              )}
-              {onOpenDeals && (
-                <ToolbarBtn title="Сделки / CRM" onClick={() => onOpenDeals()} icon={<Briefcase size={18} />} />
-              )}
-              {onOpenMeetings && (
-                <ToolbarBtn title="Встречи" onClick={() => onOpenMeetings()} icon={<Calendar size={18} />} />
-              )}
+              {onStartProcess && <ToolbarBtn title="Запустить бизнес-процесс" onClick={() => onStartProcess()} icon={<GitBranch size={18} />} />}
             </div>
 
             <input ref={fileInputRef} type="file" className="hidden" onChange={onFileSelected} />
@@ -385,6 +471,56 @@ export const MiniMessenger: React.FC<MiniMessengerProps> = ({
               </div>
             )}
 
+            {entityPickerOpen && (
+              <div className="mb-2 rounded-xl border border-gray-200 dark:border-[#444] bg-white dark:bg-[#1e1e1e] shadow-lg overflow-hidden">
+                <div className="flex items-center gap-2 px-3 py-2 border-b border-gray-100 dark:border-[#333]">
+                  <div className="inline-flex items-center rounded-lg border border-gray-200 dark:border-[#444] overflow-hidden text-xs">
+                    {(['task', 'deal', 'meeting'] as const).map((t) => (
+                      <button
+                        key={t}
+                        type="button"
+                        onClick={() => setEntityType(t)}
+                        className={`px-2.5 py-1.5 ${entityType === t ? 'bg-[#3337AD] text-white' : 'bg-transparent text-gray-600 dark:text-gray-300'}`}
+                      >
+                        {t === 'task' ? 'Задачи' : t === 'deal' ? 'Сделки' : 'Встречи'}
+                      </button>
+                    ))}
+                  </div>
+                  <Search size={16} className="text-gray-400 shrink-0" />
+                  <input
+                    value={entitySearch}
+                    onChange={(e) => setEntitySearch(e.target.value)}
+                    placeholder="Поиск сущности…"
+                    className="flex-1 min-w-0 bg-transparent text-sm text-gray-900 dark:text-gray-100 outline-none placeholder:text-gray-400"
+                  />
+                  <button
+                    type="button"
+                    className="p-1 rounded-lg hover:bg-gray-100 dark:hover:bg-[#333]"
+                    onClick={() => setEntityPickerOpen(false)}
+                  >
+                    <X size={16} />
+                  </button>
+                </div>
+                <div className="max-h-52 overflow-y-auto custom-scrollbar p-1">
+                  {filteredEntities.length === 0 ? (
+                    <p className="text-xs text-gray-500 px-3 py-4 text-center">Ничего не найдено</p>
+                  ) : (
+                    filteredEntities.map((item) => (
+                      <button
+                        key={item.id}
+                        type="button"
+                        onClick={() => attachEntity(item.id, item.label)}
+                        className="w-full text-left px-3 py-2 rounded-lg text-sm text-gray-800 dark:text-gray-100 hover:bg-[#3337AD]/10"
+                      >
+                        <div className="truncate">{item.label}</div>
+                        {item.subtitle ? <div className="text-xs text-gray-500 dark:text-gray-400 truncate">{item.subtitle}</div> : null}
+                      </button>
+                    ))
+                  )}
+                </div>
+              </div>
+            )}
+
             <div className="flex items-end gap-2">
               <textarea
                 ref={textareaRef}
@@ -414,6 +550,57 @@ export const MiniMessenger: React.FC<MiniMessengerProps> = ({
                 <Send size={18} />
               </button>
             </div>
+          </div>
+        </div>
+
+        <div className="hidden lg:flex w-72 border-l border-gray-200/80 dark:border-[#333] bg-white/70 dark:bg-[#1f1f1f]/85 p-3">
+          <div className="w-full rounded-xl border border-gray-200 dark:border-[#333] bg-white dark:bg-[#252525] p-3">
+            <div className="flex items-center gap-2 text-gray-700 dark:text-gray-200 mb-2">
+              <Info size={16} />
+              <h4 className="font-semibold text-sm">Контекст</h4>
+            </div>
+            {!selectedEntity ? (
+              <p className="text-xs text-gray-500 dark:text-gray-400">
+                Кликни по привязанной сущности в сообщении, чтобы увидеть детали.
+              </p>
+            ) : selectedEntityInfo ? (
+              <div className="space-y-2">
+                <p className="text-xs uppercase tracking-wide text-gray-500">
+                  {selectedEntity.type}
+                </p>
+                <h5 className="font-semibold text-sm text-gray-900 dark:text-white break-words">
+                  {selectedEntityInfo.title}
+                </h5>
+                <p className="text-xs text-gray-500 dark:text-gray-400 break-words">
+                  {selectedEntityInfo.subtitle}
+                </p>
+                <p className="text-sm text-gray-700 dark:text-gray-300 break-words">
+                  {selectedEntityInfo.body}
+                </p>
+                <div className="pt-1">
+                  {selectedEntity.type === 'deal' && onOpenDeals && (
+                    <button
+                      type="button"
+                      onClick={onOpenDeals}
+                      className="text-xs text-[#3337AD] hover:underline"
+                    >
+                      Открыть раздел сделок
+                    </button>
+                  )}
+                  {selectedEntity.type === 'meeting' && onOpenMeetings && (
+                    <button
+                      type="button"
+                      onClick={onOpenMeetings}
+                      className="text-xs text-[#3337AD] hover:underline"
+                    >
+                      Открыть раздел встреч
+                    </button>
+                  )}
+                </div>
+              </div>
+            ) : (
+              <p className="text-xs text-gray-500 dark:text-gray-400">Сущность не найдена (возможно, удалена).</p>
+            )}
           </div>
         </div>
       </div>
@@ -454,12 +641,14 @@ function MessageBubble({
   currentUser,
   onOpenDocument,
   openLinkedDoc,
+  onSelectEntity,
 }: {
   m: ChatMessageLocal;
   users: User[];
   currentUser: User;
   onOpenDocument?: (doc: Doc) => void;
   openLinkedDoc: (id: string) => void;
+  onSelectEntity: (type: 'task' | 'deal' | 'meeting' | 'doc', id: string) => void;
 }) {
   const isMe = m.fromId === currentUser.id;
   const senderName = m.isSystem
@@ -522,6 +711,23 @@ function MessageBubble({
           </div>
         )}
         {m.text ? <p className="whitespace-pre-wrap break-words leading-relaxed">{m.text}</p> : null}
+        {!m.docId && !m.fileName && m.entityType && m.entityId && (
+          <button
+            type="button"
+            onClick={() => {
+              if (m.entityType === 'task' || m.entityType === 'deal' || m.entityType === 'meeting' || m.entityType === 'doc') {
+                onSelectEntity(m.entityType, m.entityId);
+              }
+            }}
+            className={`mt-2 rounded-lg border px-2 py-1 text-xs ${
+              isMe && !m.isSystem
+                ? 'border-white/30 bg-white/15 hover:bg-white/20'
+                : 'border-gray-200 dark:border-[#444] bg-white/60 dark:bg-[#2a2a2a] hover:bg-gray-50 dark:hover:bg-[#333]'
+            }`}
+          >
+            {m.entityType.toUpperCase()} · открыть контекст
+          </button>
+        )}
       </div>
       <p className="text-[10px] text-gray-400 dark:text-gray-500 mt-1 px-0.5">
         {new Date(m.createdAt).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}
