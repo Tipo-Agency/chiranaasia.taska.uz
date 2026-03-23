@@ -9,6 +9,7 @@ import {
   Paperclip,
   FileText,
   Link2,
+  Plus,
   CheckSquare,
   GitBranch,
   Briefcase,
@@ -42,6 +43,7 @@ export interface MiniMessengerProps {
   onStartProcess?: () => void;
   onOpenDeals?: () => void;
   onOpenMeetings?: () => void;
+  onCreateEntity?: (type: 'task' | 'deal' | 'meeting' | 'doc', title: string) => Promise<{ id: string; label: string } | null> | { id: string; label: string } | null;
 }
 
 function formatDayLabel(d: Date): string {
@@ -68,6 +70,7 @@ export const MiniMessenger: React.FC<MiniMessengerProps> = ({
   onStartProcess,
   onOpenDeals,
   onOpenMeetings,
+  onCreateEntity,
 }) => {
   const colleagues = useMemo(
     () => users.filter((u) => u.id !== currentUser.id && !u.isArchived),
@@ -76,12 +79,13 @@ export const MiniMessenger: React.FC<MiniMessengerProps> = ({
   const [activeId, setActiveId] = useState<string | null>(TO_ALL_ID);
   const [messages, setMessages] = useState<ChatMessageLocal[]>([]);
   const [input, setInput] = useState('');
-  const [docPickerOpen, setDocPickerOpen] = useState(false);
-  const [docSearch, setDocSearch] = useState('');
   const [entityPickerOpen, setEntityPickerOpen] = useState(false);
-  const [entityType, setEntityType] = useState<'task' | 'deal' | 'meeting'>('task');
+  const [entityType, setEntityType] = useState<'task' | 'deal' | 'meeting' | 'doc'>('task');
   const [entitySearch, setEntitySearch] = useState('');
   const [selectedEntity, setSelectedEntity] = useState<{ type: 'task' | 'deal' | 'meeting' | 'doc'; id: string } | null>(null);
+  const [createEntityOpen, setCreateEntityOpen] = useState(false);
+  const [createEntityType, setCreateEntityType] = useState<'task' | 'deal' | 'meeting' | 'doc'>('task');
+  const [createEntityTitle, setCreateEntityTitle] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -111,13 +115,6 @@ export const MiniMessenger: React.FC<MiniMessengerProps> = ({
       .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
   }, [messages, activeId, currentUser.id]);
 
-  const filteredDocs = useMemo(() => {
-    const q = docSearch.trim().toLowerCase();
-    const list = (docs || []).filter((d) => !d.isArchived);
-    if (!q) return list.slice(0, 80);
-    return list.filter((d) => d.title.toLowerCase().includes(q)).slice(0, 80);
-  }, [docs, docSearch]);
-
   const filteredEntities = useMemo(() => {
     const q = entitySearch.trim().toLowerCase();
     if (entityType === 'task') {
@@ -133,6 +130,13 @@ export const MiniMessenger: React.FC<MiniMessengerProps> = ({
         .filter((d) => !q || (d.title || '').toLowerCase().includes(q))
         .slice(0, 80)
         .map((d) => ({ id: d.id, label: d.title || 'Сделка', subtitle: d.stage || '' }));
+    }
+    if (entityType === 'doc') {
+      const list = (docs || []).filter((d) => !d.isArchived);
+      return list
+        .filter((d) => !q || (d.title || '').toLowerCase().includes(q))
+        .slice(0, 80)
+        .map((d) => ({ id: d.id, label: d.title || 'Документ', subtitle: d.type === 'link' ? 'Ссылка' : 'Внутренний документ' }));
     }
     const list = (meetings || []).filter((m) => !m.isArchived);
     return list
@@ -156,22 +160,6 @@ export const MiniMessenger: React.FC<MiniMessengerProps> = ({
     }
   };
 
-  const attachDoc = (doc: Doc) => {
-    if (!activeId) return;
-    chatLocalService.addMessage({
-      fromId: currentUser.id,
-      toId: activeId === TO_ALL_ID ? TO_ALL_ID : activeId,
-      text: `📄 ${doc.title}`,
-      entityType: 'doc',
-      entityId: doc.id,
-      docId: doc.id,
-      docTitle: doc.title,
-    });
-    refresh();
-    setDocPickerOpen(false);
-    setDocSearch('');
-  };
-
   const attachEntity = (id: string, label: string) => {
     if (!activeId) return;
     chatLocalService.addMessage({
@@ -184,6 +172,27 @@ export const MiniMessenger: React.FC<MiniMessengerProps> = ({
     refresh();
     setEntityPickerOpen(false);
     setEntitySearch('');
+  };
+
+  const createAndAttachEntity = async () => {
+    const title = createEntityTitle.trim();
+    if (!title || !activeId) return;
+    let created: { id: string; label: string } | null = null;
+    if (onCreateEntity) {
+      created = await onCreateEntity(createEntityType, title);
+    }
+    const entityId = created?.id || `local-${createEntityType}-${Date.now()}`;
+    const entityLabel = created?.label || title;
+    chatLocalService.addMessage({
+      fromId: currentUser.id,
+      toId: activeId === TO_ALL_ID ? TO_ALL_ID : activeId,
+      text: `🆕 ${entityLabel}`,
+      entityType: createEntityType,
+      entityId,
+    });
+    refresh();
+    setCreateEntityOpen(false);
+    setCreateEntityTitle('');
   };
 
   const onFileSelected = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -407,16 +416,16 @@ export const MiniMessenger: React.FC<MiniMessengerProps> = ({
                 icon={<Paperclip size={18} />}
               />
               <ToolbarBtn
-                title="Документ из модуля"
-                onClick={() => setDocPickerOpen((v) => !v)}
-                icon={<FileText size={18} />}
-                active={docPickerOpen}
-              />
-              <ToolbarBtn
                 title="Привязать сущность"
                 onClick={() => setEntityPickerOpen((v) => !v)}
                 icon={<Link2 size={18} />}
                 active={entityPickerOpen}
+              />
+              <ToolbarBtn
+                title="Создать сущность"
+                onClick={() => setCreateEntityOpen((v) => !v)}
+                icon={<Plus size={18} />}
+                active={createEntityOpen}
               />
               {onOpenDocumentsModule && (
                 <ToolbarBtn
@@ -433,56 +442,18 @@ export const MiniMessenger: React.FC<MiniMessengerProps> = ({
 
             <input ref={fileInputRef} type="file" className="hidden" onChange={onFileSelected} />
 
-            {docPickerOpen && (
-              <div className="mb-2 rounded-xl border border-gray-200 dark:border-[#444] bg-white dark:bg-[#1e1e1e] shadow-lg overflow-hidden">
-                <div className="flex items-center gap-2 px-3 py-2 border-b border-gray-100 dark:border-[#333]">
-                  <Search size={16} className="text-gray-400 shrink-0" />
-                  <input
-                    value={docSearch}
-                    onChange={(e) => setDocSearch(e.target.value)}
-                    placeholder="Поиск документа…"
-                    className="flex-1 min-w-0 bg-transparent text-sm text-gray-900 dark:text-gray-100 outline-none placeholder:text-gray-400"
-                  />
-                  <button
-                    type="button"
-                    className="p-1 rounded-lg hover:bg-gray-100 dark:hover:bg-[#333]"
-                    onClick={() => setDocPickerOpen(false)}
-                  >
-                    <X size={16} />
-                  </button>
-                </div>
-                <div className="max-h-48 overflow-y-auto custom-scrollbar p-1">
-                  {filteredDocs.length === 0 ? (
-                    <p className="text-xs text-gray-500 px-3 py-4 text-center">Нет документов</p>
-                  ) : (
-                    filteredDocs.map((d) => (
-                      <button
-                        key={d.id}
-                        type="button"
-                        onClick={() => attachDoc(d)}
-                        className="w-full text-left px-3 py-2 rounded-lg text-sm text-gray-800 dark:text-gray-100 hover:bg-[#3337AD]/10 flex items-center gap-2"
-                      >
-                        <FileText size={16} className="text-[#3337AD] shrink-0" />
-                        <span className="truncate">{d.title}</span>
-                      </button>
-                    ))
-                  )}
-                </div>
-              </div>
-            )}
-
             {entityPickerOpen && (
               <div className="mb-2 rounded-xl border border-gray-200 dark:border-[#444] bg-white dark:bg-[#1e1e1e] shadow-lg overflow-hidden">
                 <div className="flex items-center gap-2 px-3 py-2 border-b border-gray-100 dark:border-[#333]">
                   <div className="inline-flex items-center rounded-lg border border-gray-200 dark:border-[#444] overflow-hidden text-xs">
-                    {(['task', 'deal', 'meeting'] as const).map((t) => (
+                    {(['task', 'deal', 'meeting', 'doc'] as const).map((t) => (
                       <button
                         key={t}
                         type="button"
                         onClick={() => setEntityType(t)}
                         className={`px-2.5 py-1.5 ${entityType === t ? 'bg-[#3337AD] text-white' : 'bg-transparent text-gray-600 dark:text-gray-300'}`}
                       >
-                        {t === 'task' ? 'Задачи' : t === 'deal' ? 'Сделки' : 'Встречи'}
+                        {t === 'task' ? 'Задачи' : t === 'deal' ? 'Сделки' : t === 'meeting' ? 'Встречи' : 'Документы'}
                       </button>
                     ))}
                   </div>
@@ -521,6 +492,47 @@ export const MiniMessenger: React.FC<MiniMessengerProps> = ({
               </div>
             )}
 
+            {createEntityOpen && (
+              <div className="mb-2 rounded-xl border border-gray-200 dark:border-[#444] bg-white dark:bg-[#1e1e1e] shadow-lg overflow-hidden p-3">
+                <div className="flex items-center gap-2 mb-2">
+                  <div className="inline-flex items-center rounded-lg border border-gray-200 dark:border-[#444] overflow-hidden text-xs">
+                    {(['task', 'deal', 'meeting', 'doc'] as const).map((t) => (
+                      <button
+                        key={t}
+                        type="button"
+                        onClick={() => setCreateEntityType(t)}
+                        className={`px-2.5 py-1.5 ${createEntityType === t ? 'bg-[#3337AD] text-white' : 'bg-transparent text-gray-600 dark:text-gray-300'}`}
+                      >
+                        {t === 'task' ? 'Задача' : t === 'deal' ? 'Сделка' : t === 'meeting' ? 'Встреча' : 'Документ'}
+                      </button>
+                    ))}
+                  </div>
+                  <button
+                    type="button"
+                    className="ml-auto p-1 rounded-lg hover:bg-gray-100 dark:hover:bg-[#333]"
+                    onClick={() => setCreateEntityOpen(false)}
+                  >
+                    <X size={16} />
+                  </button>
+                </div>
+                <div className="flex gap-2">
+                  <input
+                    value={createEntityTitle}
+                    onChange={(e) => setCreateEntityTitle(e.target.value)}
+                    placeholder="Название"
+                    className="flex-1 min-w-0 rounded-lg border border-gray-200 dark:border-[#444] bg-transparent px-3 py-2 text-sm"
+                  />
+                  <button
+                    type="button"
+                    onClick={createAndAttachEntity}
+                    className="px-3 py-2 rounded-lg bg-[#3337AD] text-white text-sm"
+                  >
+                    Создать и прикрепить
+                  </button>
+                </div>
+              </div>
+            )}
+
             <div className="flex items-end gap-2">
               <textarea
                 ref={textareaRef}
@@ -553,17 +565,14 @@ export const MiniMessenger: React.FC<MiniMessengerProps> = ({
           </div>
         </div>
 
-        <div className="hidden lg:flex w-72 border-l border-gray-200/80 dark:border-[#333] bg-white/70 dark:bg-[#1f1f1f]/85 p-3">
+        {selectedEntity && (
+          <div className="hidden lg:flex w-72 border-l border-gray-200/80 dark:border-[#333] bg-white/70 dark:bg-[#1f1f1f]/85 p-3">
           <div className="w-full rounded-xl border border-gray-200 dark:border-[#333] bg-white dark:bg-[#252525] p-3">
             <div className="flex items-center gap-2 text-gray-700 dark:text-gray-200 mb-2">
               <Info size={16} />
               <h4 className="font-semibold text-sm">Контекст</h4>
             </div>
-            {!selectedEntity ? (
-              <p className="text-xs text-gray-500 dark:text-gray-400">
-                Кликни по привязанной сущности в сообщении, чтобы увидеть детали.
-              </p>
-            ) : selectedEntityInfo ? (
+            {selectedEntityInfo ? (
               <div className="space-y-2">
                 <p className="text-xs uppercase tracking-wide text-gray-500">
                   {selectedEntity.type}
@@ -602,7 +611,8 @@ export const MiniMessenger: React.FC<MiniMessengerProps> = ({
               <p className="text-xs text-gray-500 dark:text-gray-400">Сущность не найдена (возможно, удалена).</p>
             )}
           </div>
-        </div>
+          </div>
+        )}
       </div>
     </div>
   );

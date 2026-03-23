@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Tabs } from '../ui/Tabs';
 import { PageLayout } from '../ui/PageLayout';
 import { Container } from '../ui/Container';
@@ -26,6 +26,7 @@ interface WorkdeskViewProps {
   onOpenDocument?: (doc: Doc) => void;
   onQuickCreateTask: () => void;
   onQuickCreateProcess: () => void;
+  onCreateEntity?: (type: 'task' | 'deal' | 'meeting' | 'doc', title: string) => Promise<{ id: string; label: string } | null> | { id: string; label: string } | null;
 }
 
 export const WorkdeskView: React.FC<WorkdeskViewProps> = ({
@@ -44,8 +45,20 @@ export const WorkdeskView: React.FC<WorkdeskViewProps> = ({
   onOpenDocument,
   onQuickCreateTask,
   onQuickCreateProcess,
+  onCreateEntity,
 }) => {
   const [activeTab, setActiveTab] = useState<WorkdeskTab>('chat');
+
+  useEffect(() => {
+    const id = window.requestAnimationFrame(() => {
+      const main = document.querySelector('main');
+      if (main && 'scrollTop' in main) {
+        (main as HTMLElement).scrollTop = 0;
+      }
+      window.scrollTo({ top: 0, behavior: 'auto' });
+    });
+    return () => window.cancelAnimationFrame(id);
+  }, []);
 
   const myTasks = useMemo(
     () =>
@@ -107,18 +120,20 @@ export const WorkdeskView: React.FC<WorkdeskViewProps> = ({
       {/* Внешний scroll дает `PageLayout` (main overflow-auto), поэтому не делаем вложенный scroll тут. */}
       <Container safeArea className="py-4">
         <div className="max-w-6xl mx-auto space-y-4">
-          <Tabs
-            tabs={[
-              { id: 'chat', label: 'Чат', icon: <MessageCircle size={14} /> },
-              { id: 'weekly', label: 'Недельные планы', icon: <Calendar size={14} /> },
-              { id: 'tasks', label: 'Задачи', icon: <CheckSquare size={14} /> },
-              { id: 'deals', label: 'Сделки', icon: <Briefcase size={14} /> },
-              { id: 'meetings', label: 'Встречи', icon: <Calendar size={14} /> },
-              { id: 'analytics', label: 'Аналитика', icon: <BarChart3 size={14} /> },
-            ]}
-            activeTab={activeTab}
-            onChange={(id) => setActiveTab(id as WorkdeskTab)}
-          />
+          <div className="sticky top-0 z-20 py-1 bg-white/95 dark:bg-[#191919]/95 backdrop-blur">
+            <Tabs
+              tabs={[
+                { id: 'chat', label: 'Чат', icon: <MessageCircle size={14} /> },
+                { id: 'weekly', label: 'Недельные планы', icon: <Calendar size={14} /> },
+                { id: 'tasks', label: 'Задачи', icon: <CheckSquare size={14} /> },
+                { id: 'deals', label: 'Сделки', icon: <Briefcase size={14} /> },
+                { id: 'meetings', label: 'Встречи', icon: <Calendar size={14} /> },
+                { id: 'analytics', label: 'Аналитика', icon: <BarChart3 size={14} /> },
+              ]}
+              activeTab={activeTab}
+              onChange={(id) => setActiveTab(id as WorkdeskTab)}
+            />
+          </div>
 
           {activeTab === 'chat' && (
             <div className="h-[min(74vh,780px)]">
@@ -132,6 +147,7 @@ export const WorkdeskView: React.FC<WorkdeskViewProps> = ({
                 onOpenDocument={onOpenDocument}
                 onCreateTask={onQuickCreateTask}
                 onStartProcess={onQuickCreateProcess}
+                onCreateEntity={onCreateEntity}
               />
             </div>
           )}

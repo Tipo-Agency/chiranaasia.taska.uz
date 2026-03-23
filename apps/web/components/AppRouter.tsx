@@ -87,6 +87,70 @@ interface AppRouterProps {
 
 export const AppRouter: React.FC<AppRouterProps> = (props) => {
   const { currentView, activeTable, actions } = props;
+  const createEntityFromChat = async (
+    type: 'task' | 'deal' | 'meeting' | 'doc',
+    title: string
+  ): Promise<{ id: string; label: string } | null> => {
+    const now = new Date();
+    const today = now.toISOString().slice(0, 10);
+    const nowIso = now.toISOString();
+    if (type === 'task') {
+      const task = {
+        id: `chat-task-${Date.now()}`,
+        entityType: 'task',
+        tableId: '',
+        title,
+        status: props.statuses?.[0]?.name || 'Не начато',
+        priority: props.priorities?.[1]?.name || props.priorities?.[0]?.name || 'Средний',
+        assigneeId: props.currentUser.id,
+        projectId: null,
+        startDate: today,
+        endDate: today,
+        description: '',
+        createdByUserId: props.currentUser.id,
+        createdAt: nowIso,
+      };
+      await actions.saveTask(task);
+      return { id: task.id, label: task.title };
+    }
+    if (type === 'deal') {
+      const deal = {
+        id: `chat-deal-${Date.now()}`,
+        title,
+        amount: 0,
+        currency: 'UZS',
+        stage: 'new',
+        assigneeId: props.currentUser.id,
+        createdAt: nowIso,
+      };
+      await actions.saveDeal(deal);
+      return { id: deal.id, label: deal.title };
+    }
+    if (type === 'meeting') {
+      const meeting = {
+        id: `chat-meeting-${Date.now()}`,
+        tableId: 'meetings-system',
+        title,
+        date: today,
+        time: '10:00',
+        participantIds: [props.currentUser.id],
+        summary: '',
+        type: 'work',
+      };
+      await actions.saveMeeting(meeting);
+      return { id: meeting.id, label: meeting.title };
+    }
+    const doc = {
+      id: `chat-doc-${Date.now()}`,
+      tableId: 'docs-system',
+      title,
+      type: 'internal',
+      tags: [],
+      content: '',
+    };
+    await actions.saveDoc(doc);
+    return { id: doc.id, label: doc.title };
+  };
 
   // Проверка на наличие currentUser
   if (!props.currentUser) {
@@ -132,6 +196,7 @@ export const AppRouter: React.FC<AppRouterProps> = (props) => {
               onNavigateToMeetings={() => actions.setCurrentView('meetings')}
               onNavigateToDeals={() => actions.setCurrentView('sales-funnel')}
               onOpenDocument={actions.handleDocClick}
+              onCreateEntity={createEntityFromChat}
           />
       );
   }
@@ -195,6 +260,7 @@ export const AppRouter: React.FC<AppRouterProps> = (props) => {
                         }}
                         onOpenDeals={() => props.actions.setCurrentView('sales-funnel')}
                         onOpenMeetings={() => props.actions.setCurrentView('meetings')}
+                        onCreateEntity={createEntityFromChat}
                       />
                   </div>
               </Container>
@@ -428,6 +494,7 @@ export const AppRouter: React.FC<AppRouterProps> = (props) => {
           onNavigateToMeetings={() => actions.setCurrentView('meetings')}
           onNavigateToDeals={() => actions.setCurrentView('sales-funnel')}
           onOpenDocument={actions.handleDocClick}
+          onCreateEntity={createEntityFromChat}
       />
   );
 };
