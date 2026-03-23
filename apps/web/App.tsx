@@ -40,12 +40,6 @@ function MainApp() {
   const [systemNotifications, setSystemNotifications] = useState<SystemNotification[]>([]);
   const [unreadNotificationsCount, setUnreadNotificationsCount] = useState(0);
 
-  if (state.isLoading) return <div className="h-screen flex items-center justify-center bg-gray-50 dark:bg-[#121212] dark:text-white">Загрузка...</div>;
-
-  if (!state.currentUser) {
-    return <LoginView users={state.users} onLogin={user => { actions.login(user); }} />;
-  }
-
   useEffect(() => {
     if (!state.currentUser?.id) return;
     let mounted = true;
@@ -108,6 +102,12 @@ function MainApp() {
       }
     };
   }, [state.currentUser?.id]);
+
+  if (state.isLoading) return <div className="h-screen flex items-center justify-center bg-gray-50 dark:bg-[#121212] dark:text-white">Загрузка...</div>;
+
+  if (!state.currentUser) {
+    return <LoginView users={state.users} onLogin={user => { actions.login(user); }} />;
+  }
 
   const handleMarkAllNotificationsRead = async () => {
     const unread = systemNotifications.filter((n) => !n.isRead);
