@@ -5,6 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
 from app.models.inventory import Warehouse, InventoryItem, StockMovement, InventoryRevision
+from app.services.domain_events import log_entity_mutation
 
 router = APIRouter(prefix="/inventory", tags=["inventory"])
 
@@ -76,6 +77,7 @@ async def update_warehouses(warehouses: list[dict], db: AsyncSession = Depends(g
         if not wid:
             continue
         existing = await db.get(Warehouse, wid)
+        is_new = existing is None
         if existing:
             existing.name = w.get("name", existing.name)
             existing.department_id = w.get("departmentId")
@@ -91,6 +93,16 @@ async def update_warehouses(warehouses: list[dict], db: AsyncSession = Depends(g
                 is_default="true" if w.get("isDefault") else "false",
                 is_archived="true" if w.get("isArchived") else "false",
             ))
+        await db.flush()
+        await log_entity_mutation(
+            db,
+            event_type="inventory.warehouse.created" if is_new else "inventory.warehouse.updated",
+            entity_type="warehouse",
+            entity_id=wid,
+            source="inventory-router",
+            payload={"name": w.get("name")},
+            actor_id=w.get("updatedByUserId"),
+        )
     await db.commit()
     return {"ok": True}
 
@@ -108,6 +120,7 @@ async def update_items(items: list[dict], db: AsyncSession = Depends(get_db)):
         if not iid:
             continue
         existing = await db.get(InventoryItem, iid)
+        is_new = existing is None
         if existing:
             existing.sku = i.get("sku", existing.sku)
             existing.name = i.get("name", existing.name)
@@ -125,6 +138,16 @@ async def update_items(items: list[dict], db: AsyncSession = Depends(get_db)):
                 notes=i.get("notes"),
                 is_archived="true" if i.get("isArchived") else "false",
             ))
+        await db.flush()
+        await log_entity_mutation(
+            db,
+            event_type="inventory.item.created" if is_new else "inventory.item.updated",
+            entity_type="inventory_item",
+            entity_id=iid,
+            source="inventory-router",
+            payload={"sku": i.get("sku"), "name": i.get("name")},
+            actor_id=i.get("updatedByUserId"),
+        )
     await db.commit()
     return {"ok": True}
 
@@ -142,6 +165,7 @@ async def update_movements(movements: list[dict], db: AsyncSession = Depends(get
         if not mid:
             continue
         existing = await db.get(StockMovement, mid)
+        is_new = existing is None
         if existing:
             existing.type = m.get("type", existing.type)
             existing.date = m.get("date", existing.date)
@@ -161,6 +185,16 @@ async def update_movements(movements: list[dict], db: AsyncSession = Depends(get
                 reason=m.get("reason"),
                 created_by_user_id=m.get("createdByUserId", ""),
             ))
+        await db.flush()
+        await log_entity_mutation(
+            db,
+            event_type="inventory.movement.created" if is_new else "inventory.movement.updated",
+            entity_type="stock_movement",
+            entity_id=mid,
+            source="inventory-router",
+            payload={"type": m.get("type"), "date": m.get("date")},
+            actor_id=m.get("createdByUserId"),
+        )
     await db.commit()
     return {"ok": True}
 
@@ -178,6 +212,7 @@ async def update_revisions(revisions: list[dict], db: AsyncSession = Depends(get
         if not rid:
             continue
         existing = await db.get(InventoryRevision, rid)
+        is_new = existing is None
         if existing:
             existing.number = r.get("number", existing.number)
             existing.warehouse_id = r.get("warehouseId", existing.warehouse_id)
@@ -199,5 +234,15 @@ async def update_revisions(revisions: list[dict], db: AsyncSession = Depends(get
                 created_by_user_id=r.get("createdByUserId", ""),
                 posted_at=r.get("postedAt"),
             ))
+        await db.flush()
+        await log_entity_mutation(
+            db,
+            event_type="inventory.revision.created" if is_new else "inventory.revision.updated",
+            entity_type="inventory_revision",
+            entity_id=rid,
+            source="inventory-router",
+            payload={"number": r.get("number"), "status": r.get("status")},
+            actor_id=r.get("createdByUserId"),
+        )
     await db.commit()
     return {"ok": True}

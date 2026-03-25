@@ -1,4 +1,5 @@
 """Redis-backed event bus helpers for domain events."""
+from __future__ import annotations
 import json
 import logging
 from datetime import datetime

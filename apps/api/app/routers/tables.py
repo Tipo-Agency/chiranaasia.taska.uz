@@ -7,6 +7,7 @@ from app.database import get_db
 from app.models.content import ContentPost
 from app.models.settings import TableCollection
 from app.utils import row_to_table
+from app.services.domain_events import log_entity_mutation
 
 router = APIRouter(prefix="/tables", tags=["tables"])
 
@@ -53,6 +54,7 @@ async def update_tables(tables: list[dict], db: AsyncSession = Depends(get_db)):
         if not tid:
             continue
         existing = await db.get(TableCollection, tid)
+        is_new = existing is None
         if existing:
             existing.name = t.get("name", existing.name)
             existing.type = t.get("type", existing.type)
@@ -70,5 +72,15 @@ async def update_tables(tables: list[dict], db: AsyncSession = Depends(get_db)):
                 is_system=t.get("isSystem", False),
                 is_archived=t.get("isArchived", False),
             ))
+        await db.flush()
+        row = await db.get(TableCollection, tid)
+        await log_entity_mutation(
+            db,
+            event_type="table.created" if is_new else "table.updated",
+            entity_type="table",
+            entity_id=tid,
+            source="tables-router",
+            payload={"name": row.name if row else t.get("name"), "type": row.type if row else t.get("type")},
+        )
     await db.commit()
     return {"ok": True}

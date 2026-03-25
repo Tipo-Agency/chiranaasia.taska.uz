@@ -196,12 +196,13 @@ export const automationEndpoint = {
   updateRules: (rules: unknown[]) => put<{ ok: boolean }>('/automation/rules', rules),
 };
 
-// Notification queue (for telegram bot)
+/**
+ * @deprecated Доставка Telegram/in-app идёт через notification hub на бэкенде
+ * (domain events → notifications → notification_deliveries). Не вызывать с фронта.
+ */
 export const notificationQueueEndpoint = {
-  add: async (_task: { type: string; userId: string; message: string; chatId: string; metadata?: Record<string, unknown> }) => {
-    // TODO: implement on backend if needed
-    return Promise.resolve();
-  },
+  add: async (_task: { type: string; userId: string; message: string; chatId: string; metadata?: Record<string, unknown> }) =>
+    Promise.resolve(),
 };
 
 // Centralized notification events / center
@@ -243,18 +244,95 @@ export const clientsEndpoint = {
   updateAll: (clients: unknown[]) => put<{ ok: boolean }>('/clients', clients),
 };
 
-// Deals (also contracts, oneTimeDeals)
+const isContractLikeDeal = (item: unknown): boolean => {
+  if (!item || typeof item !== 'object') return false;
+  const deal = item as Record<string, unknown>;
+  if (deal.dealKind === 'contract') return true;
+  // Для CRM-сделок backend тоже часто возвращает recurring=false по умолчанию,
+  // поэтому опираемся на наличие номера/договорных полей, а не на сам флаг recurring.
+  const hasNumber = typeof deal.number === 'string' && deal.number.trim().length > 0;
+  const hasContractDates = typeof deal.startDate === 'string' || typeof deal.endDate === 'string';
+  const hasPaymentMeta = deal.paymentDay != null || typeof deal.paidAmount === 'number' || typeof deal.paidDate === 'string';
+  return hasNumber || hasContractDates || hasPaymentMeta;
+};
+
+const isFunnelLikeDeal = (item: unknown): boolean => {
+  if (!item || typeof item !== 'object') return false;
+  const deal = item as Record<string, unknown>;
+  if (deal.dealKind === 'funnel') return true;
+  if (deal.dealKind === 'contract') return false;
+  const hasStage = typeof deal.stage === 'string' && deal.stage.trim().length > 0;
+  const hasTitle = typeof deal.title === 'string' && deal.title.trim().length > 0;
+  return hasStage && hasTitle;
+};
+
+const isRecurringContract = (item: unknown): boolean => {
+  if (!item || typeof item !== 'object') return false;
+  const deal = item as Record<string, unknown>;
+  return deal.recurring === true;
+};
+
+const isOneTimeSale = (item: unknown): boolean => {
+  if (!item || typeof item !== 'object') return false;
+  const deal = item as Record<string, unknown>;
+  return deal.recurring === false;
+};
+
+const mergeById = (left: unknown[], right: unknown[]): unknown[] => {
+  const map = new Map<string, unknown>();
+  for (const item of left) {
+    const id = item && typeof item === 'object' ? (item as Record<string, unknown>).id : undefined;
+    if (typeof id === 'string' && id) map.set(id, item);
+  }
+  for (const item of right) {
+    const id = item && typeof item === 'object' ? (item as Record<string, unknown>).id : undefined;
+    if (typeof id === 'string' && id) map.set(id, item);
+  }
+  return [...map.values()];
+};
+
+// CRM deals only
 export const dealsEndpoint = {
-  getAll: () => get<unknown[]>('/deals'),
-  updateAll: (deals: unknown[]) => put<{ ok: boolean }>('/deals', deals),
+  getAll: async () => {
+    const all = await get<unknown[]>('/deals');
+    // CRM поток: берём всё, что не похоже на договор/продажу.
+    // Не требуем строгую funnel-валидацию, чтобы не терять старые лиды.
+    return (all || []).filter((d) => !isContractLikeDeal(d));
+  },
+  updateAll: async (deals: unknown[]) => {
+    const all = await get<unknown[]>('/deals');
+    const preserved = (all || []).filter((d) => isContractLikeDeal(d));
+    return put<{ ok: boolean }>('/deals', mergeById(preserved, deals));
+  },
   create: (deal: unknown) => post<unknown>('/deals', deal),
   update: (id: string, updates: unknown) => patch<unknown>(`/deals/${id}`, updates),
   getById: (id: string) => get<unknown>(`/deals/${id}`),
   delete: (id: string) => del<{ ok: boolean }>(`/deals/${id}`),
 };
 
-export const contractsEndpoint = dealsEndpoint;
-export const oneTimeDealsEndpoint = dealsEndpoint;
+export const contractsEndpoint = {
+  getAll: async () => {
+    const all = await get<unknown[]>('/deals');
+    return (all || []).filter((d) => isContractLikeDeal(d) && isRecurringContract(d));
+  },
+  updateAll: async (contracts: unknown[]) => {
+    const all = await get<unknown[]>('/deals');
+    const preserved = (all || []).filter((d) => !isRecurringContract(d));
+    return put<{ ok: boolean }>('/deals', mergeById(preserved, contracts));
+  },
+};
+
+export const oneTimeDealsEndpoint = {
+  getAll: async () => {
+    const all = await get<unknown[]>('/deals');
+    return (all || []).filter((d) => isContractLikeDeal(d) && isOneTimeSale(d));
+  },
+  updateAll: async (sales: unknown[]) => {
+    const all = await get<unknown[]>('/deals');
+    const preserved = (all || []).filter((d) => !isOneTimeSale(d));
+    return put<{ ok: boolean }>('/deals', mergeById(preserved, sales));
+  },
+};
 
 // Employees
 export const employeesEndpoint = {
@@ -285,6 +363,7 @@ export interface WeeklyPlanApi {
   id: string;
   userId: string;
   weekStart: string;
+  weekEnd?: string;
   taskIds: string[];
   notes?: string;
   createdAt: string;
@@ -295,7 +374,11 @@ export interface ProtocolApi {
   id: string;
   title: string;
   weekStart: string;
+  weekEnd?: string;
+  departmentId?: string;
   participantIds: string[];
+  plannedIncome?: number;
+  actualIncome?: number;
   createdAt: string;
   updatedAt?: string;
 }
@@ -413,33 +496,6 @@ export const funnelsEndpoint = {
   create: (funnel: unknown) => post<unknown>('/funnels', funnel),
   update: (id: string, updates: unknown) => patch<unknown>(`/funnels/${id}`, updates),
   delete: (id: string) => del<{ ok: boolean }>(`/funnels/${id}`),
-};
-
-// Sites
-export const partnerLogosEndpoint = {
-  getAll: () => get<unknown[]>('/sites/partner-logos'),
-  updateAll: (logos: unknown[]) => put<{ ok: boolean }>('/sites/partner-logos', logos),
-};
-
-export const newsEndpoint = {
-  getAll: () => get<unknown[]>('/sites/news'),
-  updateAll: (news: unknown[]) => put<{ ok: boolean }>('/sites/news', news),
-  getPublished: () => get<unknown[]>('/sites/news/published'),
-};
-
-export const casesEndpoint = {
-  getAll: () => get<unknown[]>('/sites/cases'),
-  updateAll: (cases: unknown[]) => put<{ ok: boolean }>('/sites/cases', cases),
-  getPublished: () => get<unknown[]>('/sites/cases/published'),
-};
-
-export const tagsEndpoint = {
-  getAll: () => get<unknown[]>('/sites/tags'),
-  updateAll: (tags: unknown[]) => put<{ ok: boolean }>('/sites/tags', tags),
-};
-
-export const publicSitesEndpoint = {
-  getSiteData: () => get<{ partnerLogos: unknown[]; news: unknown[]; cases: unknown[]; tags: unknown[] }>('/sites/public/site-data'),
 };
 
 // Public content plan (no auth required)

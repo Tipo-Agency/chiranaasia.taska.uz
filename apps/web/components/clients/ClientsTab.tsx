@@ -1,10 +1,11 @@
 import React from 'react';
-import { Client, Contract, OneTimeDeal } from '../../types';
+import { Client, Contract, OneTimeDeal, User } from '../../types';
 import { Card } from '../ui';
 import { Edit2, Phone, Plus } from 'lucide-react';
 
 interface ClientsTabProps {
   clients: Client[];
+  users?: User[];
   contracts: Contract[];
   onEditClient: (client: Client) => void;
   onCreateContract: (clientId: string) => void;
@@ -12,6 +13,7 @@ interface ClientsTabProps {
 
 export const ClientsTab: React.FC<ClientsTabProps> = ({
   clients,
+  users = [],
   contracts,
   onEditClient,
   onCreateContract,
@@ -29,6 +31,7 @@ export const ClientsTab: React.FC<ClientsTabProps> = ({
       {clients.map(client => {
         if (!client) return null;
         const clientContracts = (contracts || []).filter(c => c && !c.isArchived && c.clientId === client.id);
+        const responsible = users.find((u) => u.id === client.responsibleUserId);
         return (
           <Card key={client.id} padding="lg" hover onClick={() => onEditClient(client)} className="relative flex flex-col h-full">
             <div className="flex justify-between items-start mb-4">
@@ -43,6 +46,9 @@ export const ClientsTab: React.FC<ClientsTabProps> = ({
             
             <div className="space-y-2 mb-4 flex-1">
               {client.phone && <div className="text-xs text-gray-600 dark:text-gray-400 flex items-center gap-2"><Phone size={12}/> {client.phone}</div>}
+              {responsible && (
+                <div className="text-xs text-gray-600 dark:text-gray-400">Ответственный: <span className="font-medium text-gray-800 dark:text-gray-200">{responsible.name}</span></div>
+              )}
               {clientContracts.length > 0 ? (
                 <div className="mt-3 bg-gray-50 dark:bg-[#303030] rounded p-2">
                   <div className="text-[10px] font-bold text-gray-400 uppercase mb-1">Договоры ({clientContracts.length})</div>

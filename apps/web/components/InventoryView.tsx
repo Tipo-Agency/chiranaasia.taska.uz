@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
 import { Department, Warehouse, InventoryItem, StockBalance, StockMovement, InventoryRevision } from '../types';
 import {
   Layers,
@@ -6,9 +6,18 @@ import {
   ArrowLeftRight,
   ClipboardCheck,
   BarChart3,
+  Upload,
+  X,
 } from 'lucide-react';
-import { Button } from './ui/Button';
-import { ModuleCreateDropdown, ModulePageShell, ModulePageHeader, ModuleSegmentedControl, MODULE_PAGE_GUTTER, ModuleCreateIconButton } from './ui';
+import {
+  ModuleCreateDropdown,
+  ModuleFilterIconButton,
+  ModulePageShell,
+  ModulePageHeader,
+  ModuleSegmentedControl,
+  MODULE_PAGE_GUTTER,
+  SystemAlertDialog,
+} from './ui';
 
 interface InventoryViewProps {
   departments: Department[];
@@ -55,9 +64,15 @@ const InventoryView: React.FC<InventoryViewProps> = ({
   const [activeTab, setActiveTab] = useState<'balances' | 'items' | 'movements' | 'revisions'>('balances');
   const [selectedDepartmentId, setSelectedDepartmentId] = useState<string>('');
   const [selectedWarehouseId, setSelectedWarehouseId] = useState<string>('');
-
-  // Form state: new warehouse
-  const [newWarehouseName, setNewWarehouseName] = useState('');
+  const [showFilters, setShowFilters] = useState(false);
+  const [search, setSearch] = useState('');
+  const [filterOnlyNonZero, setFilterOnlyNonZero] = useState(false);
+  const [filterCategory, setFilterCategory] = useState('');
+  const [alertMessage, setAlertMessage] = useState<string | null>(null);
+  const [isCreateItemOpen, setIsCreateItemOpen] = useState(false);
+  const [isCreateMovementOpen, setIsCreateMovementOpen] = useState(false);
+  const [isCreateRevisionOpen, setIsCreateRevisionOpen] = useState(false);
+  const importInputRef = useRef<HTMLInputElement>(null);
 
   // Form state: new item
   const [newItemSku, setNewItemSku] = useState('');
@@ -73,15 +88,19 @@ const InventoryView: React.FC<InventoryViewProps> = ({
   const [movementItemId, setMovementItemId] = useState<string>('');
   const [movementQty, setMovementQty] = useState<string>('');
   const [movementReason, setMovementReason] = useState<string>('');
+  const [movementWarehouseId, setMovementWarehouseId] = useState<string>('');
 
   // Revision: selected for edit
   const [editingRevisionId, setEditingRevisionId] = useState<string | null>(null);
 
-  const currentDepartment = departments.find(d => d.id === selectedDepartmentId) || null;
-
   const filteredWarehouses = useMemo(
     () => warehouses.filter(w => !w.isArchived && (selectedDepartmentId ? w.departmentId === selectedDepartmentId : true)),
     [warehouses, selectedDepartmentId]
+  );
+
+  const categories = useMemo(
+    () => Array.from(new Set(items.map((i) => i.category).filter(Boolean) as string[])).sort((a, b) => a.localeCompare(b)),
+    [items]
   );
 
   const balancesForView = useMemo(() => {
@@ -98,30 +117,47 @@ const InventoryView: React.FC<InventoryViewProps> = ({
           itemUnit: item?.unit || '',
         };
       })
+      .filter((b) => {
+        const itemName = b.itemName.toLowerCase();
+        const itemSku = b.itemSku.toLowerCase();
+        const q = search.trim().toLowerCase();
+        const item = items.find((i) => i.id === b.itemId);
+        if (filterOnlyNonZero && !b.quantity) return false;
+        if (filterCategory && (item?.category || '') !== filterCategory) return false;
+        if (!q) return true;
+        return itemName.includes(q) || itemSku.includes(q);
+      })
       .sort((a, b) => a.itemName.localeCompare(b.itemName));
-  }, [balances, items, filteredWarehouses, selectedWarehouseId]);
+  }, [balances, items, filteredWarehouses, selectedWarehouseId, search, filterOnlyNonZero, filterCategory]);
 
-  const handleCreateWarehouse = () => {
-    if (!newWarehouseName.trim()) {
-      alert('Введите название склада');
-      return;
-    }
-    if (!onSaveWarehouse) {
-      console.error('onSaveWarehouse не определена');
-      return;
-    }
-    const wh: Warehouse = {
-      id: `wh-${Date.now()}`,
-      name: newWarehouseName.trim(),
-      departmentId: selectedDepartmentId || undefined,
-    };
-    onSaveWarehouse(wh);
-    setNewWarehouseName('');
-  };
+  const filteredItems = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return items
+      .filter((item) => !item.isArchived)
+      .filter((item) => (filterCategory ? (item.category || '') === filterCategory : true))
+      .filter((item) => {
+        if (!q) return true;
+        return item.name.toLowerCase().includes(q) || item.sku.toLowerCase().includes(q);
+      })
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }, [items, search, filterCategory]);
+
+  const filteredMovements = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return movements
+      .slice()
+      .reverse()
+      .filter((m) => {
+        if (!q) return true;
+        const fromWh = m.fromWarehouseId ? warehouses.find((w) => w.id === m.fromWarehouseId)?.name : '';
+        const toWh = m.toWarehouseId ? warehouses.find((w) => w.id === m.toWarehouseId)?.name : '';
+        return [m.reason || '', fromWh || '', toWh || ''].some((v) => v.toLowerCase().includes(q));
+      });
+  }, [movements, search, warehouses]);
 
   const handleCreateItem = () => {
     if (!newItemName.trim()) {
-      alert('Введите название номенклатуры');
+      setAlertMessage('Введите название номенклатуры');
       return;
     }
     if (!onSaveItem) {
@@ -142,32 +178,33 @@ const InventoryView: React.FC<InventoryViewProps> = ({
     setNewItemUnit('');
     setNewItemCategory('');
     setNewItemNotes('');
+    setIsCreateItemOpen(false);
   };
 
   const handleCreateMovement = () => {
     const qty = Number(movementQty.replace(',', '.'));
     if (!movementItemId || (movementType !== 'adjustment' && (!qty || qty <= 0))) {
-      alert('Заполните номенклатуру и количество');
+      setAlertMessage('Заполните номенклатуру и количество');
       return;
     }
     if (movementType === 'adjustment' && qty === 0) {
-      alert('Для корректировки укажите ненулевое количество (положительное или отрицательное)');
+      setAlertMessage('Для корректировки укажите ненулевое количество (положительное или отрицательное)');
       return;
     }
-    if (movementType !== 'receipt' && movementType !== 'adjustment' && !fromWarehouseId) {
-      alert('Выберите склад-источник');
+    if (movementType !== 'receipt' && movementType !== 'adjustment' && !fromWarehouseId && !movementWarehouseId) {
+      setAlertMessage('Выберите склад-источник');
       return;
     }
-    if (movementType !== 'writeoff' && !toWarehouseId) {
-      alert('Выберите склад назначения');
+    if (movementType !== 'writeoff' && !toWarehouseId && !movementWarehouseId) {
+      setAlertMessage('Выберите склад назначения');
       return;
     }
     if (!onCreateMovement || !currentUserId) return;
 
     onCreateMovement({
       type: movementType,
-      fromWarehouseId: (movementType === 'transfer' || movementType === 'writeoff') ? fromWarehouseId || undefined : undefined,
-      toWarehouseId: (movementType === 'receipt' || movementType === 'transfer' || movementType === 'adjustment') ? toWarehouseId || undefined : undefined,
+      fromWarehouseId: (movementType === 'transfer' || movementType === 'writeoff') ? (fromWarehouseId || movementWarehouseId || undefined) : undefined,
+      toWarehouseId: (movementType === 'receipt' || movementType === 'transfer' || movementType === 'adjustment') ? (toWarehouseId || movementWarehouseId || undefined) : undefined,
       items: [{ itemId: movementItemId, quantity: qty }],
       reason: movementReason || undefined,
       createdByUserId: currentUserId,
@@ -177,6 +214,97 @@ const InventoryView: React.FC<InventoryViewProps> = ({
     setMovementItemId('');
     setFromWarehouseId('');
     setToWarehouseId('');
+    setMovementWarehouseId('');
+    setIsCreateMovementOpen(false);
+  };
+
+  const parseDelimitedBalances = (raw: string) => {
+    const rows = raw
+      .split(/\r?\n/)
+      .map((r) => r.trim())
+      .filter(Boolean)
+      .map((line) => line.split(/[;,|\t]/).map((c) => c.trim()));
+    if (rows.length < 2) return [];
+    const normalize = (v: string) => v.toLowerCase().replace(/\s+/g, '');
+    const header = rows[0].map(normalize);
+    const idxSku = header.findIndex((h) => ['sku', 'код', 'артикул'].includes(h));
+    const idxName = header.findIndex((h) => ['name', 'название', 'номенклатура'].includes(h));
+    const idxQty = header.findIndex((h) => ['qty', 'quantity', 'количество', 'остаток'].includes(h));
+    if (idxQty === -1 || (idxSku === -1 && idxName === -1)) return [];
+    return rows.slice(1).map((r) => ({
+      sku: idxSku >= 0 ? r[idxSku] || '' : '',
+      name: idxName >= 0 ? r[idxName] || '' : '',
+      qty: Number((r[idxQty] || '').replace(',', '.')),
+    }));
+  };
+
+  const handleImportBalances = async (file: File) => {
+    const ext = file.name.split('.').pop()?.toLowerCase();
+    if (ext !== 'csv' && ext !== 'txt') {
+      setAlertMessage('Пока поддержан импорт остатков из CSV/TXT (из Excel: Файл -> Сохранить как CSV).');
+      return;
+    }
+    const whId = selectedWarehouseId || filteredWarehouses[0]?.id;
+    if (!whId) {
+      setAlertMessage('Сначала выберите склад для загрузки остатков.');
+      return;
+    }
+    const text = await file.text();
+    const rows = parseDelimitedBalances(text);
+    if (!rows.length) {
+      setAlertMessage('Не удалось прочитать файл. Нужны колонки: SKU/Код или Название, и Количество.');
+      return;
+    }
+    const toImport = rows.filter((r) => Number.isFinite(r.qty) && r.qty > 0);
+    const itemBySku = new Map<string, InventoryItem>(items.map((it) => [it.sku.trim().toLowerCase(), it]));
+    const itemByName = new Map<string, InventoryItem>(items.map((it) => [it.name.trim().toLowerCase(), it]));
+    const movementItems: { itemId: string; quantity: number }[] = [];
+    const missing: string[] = [];
+    toImport.forEach((row) => {
+      const bySku = row.sku ? itemBySku.get(row.sku.trim().toLowerCase()) : undefined;
+      const byName = row.name ? itemByName.get(row.name.trim().toLowerCase()) : undefined;
+      const matched = bySku || byName;
+      if (!matched) {
+        missing.push(row.sku || row.name || 'Пустая строка');
+        return;
+      }
+      movementItems.push({ itemId: matched.id, quantity: row.qty });
+    });
+    if (!movementItems.length) {
+      setAlertMessage('Нет строк для импорта: номенклатура не найдена в справочнике.');
+      return;
+    }
+    onCreateMovement({
+      type: 'receipt',
+      toWarehouseId: whId,
+      items: movementItems,
+      reason: `Импорт остатков (${file.name})`,
+      createdByUserId: currentUserId,
+    });
+    if (missing.length) {
+      setAlertMessage(`Загружено: ${movementItems.length} поз. Не найдены в справочнике: ${missing.slice(0, 5).join(', ')}${missing.length > 5 ? '...' : ''}`);
+    } else {
+      setAlertMessage(`Импорт выполнен: ${movementItems.length} позиций.`);
+    }
+  };
+
+  const hasActiveFilters =
+    !!search.trim() ||
+    filterOnlyNonZero ||
+    !!filterCategory ||
+    !!selectedDepartmentId ||
+    !!selectedWarehouseId;
+  const downloadBalancesTemplate = () => {
+    const sample = 'sku;name;quantity\nSKU-001;Пример позиции;10\n';
+    const blob = new Blob([sample], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'inventory_balances_template.csv';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
   };
 
   return (
@@ -187,111 +315,158 @@ const InventoryView: React.FC<InventoryViewProps> = ({
             accent="emerald"
             icon={<Layers size={24} strokeWidth={2} />}
             title="Склад"
-            description="Остатки, номенклатура, движения и инвентаризация"
-            actions={
-              <ModuleCreateDropdown
-                accent="emerald"
-                items={[
-                  {
-                    id: 'nom',
-                    label: 'Новая номенклатура',
-                    icon: Package,
-                    onClick: () => setActiveTab('items'),
-                    iconClassName: 'text-emerald-600 dark:text-emerald-400',
-                  },
-                  {
-                    id: 'mov',
-                    label: 'Складская операция',
-                    icon: ArrowLeftRight,
-                    onClick: () => setActiveTab('movements'),
-                    iconClassName: 'text-emerald-600 dark:text-emerald-400',
-                  },
-                  {
-                    id: 'rev',
-                    label: 'Ревизия',
-                    icon: ClipboardCheck,
-                    onClick: () => setActiveTab('revisions'),
-                    iconClassName: 'text-emerald-600 dark:text-emerald-400',
-                  },
+            description="Рабочая зона склада: таблицы, фильтры, загрузка остатков"
+            tabs={
+              <ModuleSegmentedControl
+                variant="neutral"
+                value={activeTab}
+                onChange={(v) => setActiveTab(v as typeof activeTab)}
+                options={[
+                  { value: 'balances', label: 'Остатки' },
+                  { value: 'items', label: 'Номенклатура' },
+                  { value: 'movements', label: 'Журнал' },
+                  { value: 'revisions', label: 'Ревизии' },
                 ]}
               />
             }
-          />
-          <ModuleSegmentedControl
-            variant="accent"
-            accent="emerald"
-            value={activeTab}
-            onChange={(v) => setActiveTab(v as typeof activeTab)}
-            options={[
-              { value: 'balances', label: 'Остатки', icon: <BarChart3 size={16} strokeWidth={2} /> },
-              { value: 'items', label: 'Номенклатура', icon: <Package size={16} strokeWidth={2} /> },
-              { value: 'movements', label: 'Журнал', icon: <ArrowLeftRight size={16} strokeWidth={2} /> },
-              { value: 'revisions', label: 'Ревизии', icon: <ClipboardCheck size={16} strokeWidth={2} /> },
-            ]}
+            controls={
+              <>
+                <ModuleFilterIconButton
+                  accent="emerald"
+                  active={showFilters || hasActiveFilters}
+                  activeCount={
+                    Number(!!search.trim()) +
+                    Number(filterOnlyNonZero) +
+                    Number(!!filterCategory) +
+                    Number(!!selectedDepartmentId) +
+                    Number(!!selectedWarehouseId)
+                  }
+                  onClick={() => setShowFilters((prev) => !prev)}
+                />
+                <ModuleCreateDropdown
+                  accent="emerald"
+                  items={[
+                    {
+                      id: 'nom',
+                      label: 'Новая номенклатура',
+                      icon: Package,
+                      onClick: () => setIsCreateItemOpen(true),
+                      iconClassName: 'text-emerald-600 dark:text-emerald-400',
+                    },
+                    {
+                      id: 'mov',
+                      label: 'Складская операция',
+                      icon: ArrowLeftRight,
+                      onClick: () => setIsCreateMovementOpen(true),
+                      iconClassName: 'text-emerald-600 dark:text-emerald-400',
+                    },
+                    {
+                      id: 'rev',
+                      label: 'Ревизия',
+                      icon: ClipboardCheck,
+                      onClick: () => setIsCreateRevisionOpen(true),
+                      iconClassName: 'text-emerald-600 dark:text-emerald-400',
+                    },
+                    {
+                      id: 'import',
+                      label: 'Загрузить остатки (CSV)',
+                      icon: Upload,
+                      onClick: () => importInputRef.current?.click(),
+                      iconClassName: 'text-emerald-600 dark:text-emerald-400',
+                    },
+                    {
+                      id: 'import-template',
+                      label: 'Скачать шаблон импорта',
+                      icon: Upload,
+                      onClick: downloadBalancesTemplate,
+                      iconClassName: 'text-emerald-600 dark:text-emerald-400',
+                    },
+                  ]}
+                />
+              </>
+            }
           />
         </div>
       </div>
       <div className="flex-1 overflow-y-auto custom-scrollbar min-h-0">
         <div className={`${MODULE_PAGE_GUTTER} pb-20`}>
 
-          <div className="rounded-2xl border border-gray-200 dark:border-[#333] bg-white dark:bg-[#191919] p-4 sm:p-5 mb-4 shadow-sm">
-            <p className="text-[11px] font-bold uppercase tracking-wide text-gray-400 dark:text-gray-500 mb-2">Контекст</p>
-            <div className="flex flex-col sm:flex-row sm:items-end gap-4">
-              <label className="flex flex-col gap-1.5 flex-1 min-w-[200px]">
-                <span className="text-xs font-medium text-gray-600 dark:text-gray-300">Подразделение</span>
+          {showFilters && (
+            <div className="rounded-2xl border border-gray-200 dark:border-[#333] bg-white dark:bg-[#191919] p-4 sm:p-5 mb-4 shadow-sm">
+              <p className="text-[11px] font-bold uppercase tracking-wide text-gray-400 dark:text-gray-500 mb-2">Фильтры</p>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
+                <label className="flex flex-col gap-1.5 min-w-0">
+                  <span className="text-xs font-medium text-gray-600 dark:text-gray-300">Подразделение</span>
+                  <select
+                    value={selectedDepartmentId}
+                    onChange={(e) => setSelectedDepartmentId(e.target.value)}
+                    className="rounded-xl border border-gray-200 dark:border-[#333] bg-gray-50 dark:bg-[#252525] px-3 py-2.5 text-sm text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-emerald-500/30 outline-none"
+                  >
+                    <option value="">Все подразделения</option>
+                    {departments.map((d) => (
+                      <option key={d.id} value={d.id}>
+                        {d.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="flex flex-col gap-1.5 min-w-0">
+                  <span className="text-xs font-medium text-gray-600 dark:text-gray-300">Склад</span>
+                  <select
+                    value={selectedWarehouseId}
+                    onChange={(e) => setSelectedWarehouseId(e.target.value)}
+                    className="rounded-xl border border-gray-200 dark:border-[#333] bg-gray-50 dark:bg-[#252525] px-3 py-2.5 text-sm text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-emerald-500/30 outline-none"
+                  >
+                    <option value="">Все / авто (первый склад)</option>
+                    {filteredWarehouses.map((w) => (
+                      <option key={w.id} value={w.id}>
+                        {w.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <input
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  placeholder="Поиск по коду, названию, комментарию..."
+                  className="rounded-xl border border-gray-200 dark:border-[#333] bg-gray-50 dark:bg-[#252525] px-3 py-2.5 text-sm text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-emerald-500/30 outline-none"
+                />
                 <select
-                  value={selectedDepartmentId}
-                  onChange={e => setSelectedDepartmentId(e.target.value)}
+                  value={filterCategory}
+                  onChange={(e) => setFilterCategory(e.target.value)}
                   className="rounded-xl border border-gray-200 dark:border-[#333] bg-gray-50 dark:bg-[#252525] px-3 py-2.5 text-sm text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-emerald-500/30 outline-none"
                 >
-                  <option value="">Все подразделения</option>
-                  {departments.map(d => (
-                    <option key={d.id} value={d.id}>
-                      {d.name}
+                  <option value="">Все категории</option>
+                  {categories.map((c) => (
+                    <option key={c} value={c}>
+                      {c}
                     </option>
                   ))}
                 </select>
-              </label>
+                <label className="inline-flex items-center gap-2 px-3 py-2.5 rounded-xl border border-gray-200 dark:border-[#333] bg-gray-50 dark:bg-[#252525] text-sm text-gray-800 dark:text-gray-100">
+                  <input
+                    type="checkbox"
+                    checked={filterOnlyNonZero}
+                    onChange={(e) => setFilterOnlyNonZero(e.target.checked)}
+                    className="rounded border-gray-300 dark:border-gray-600"
+                  />
+                  Только ненулевые остатки
+                </label>
+              </div>
             </div>
-          </div>
+          )}
 
           <div className="flex-1 bg-white dark:bg-[#1a1a1a] border border-gray-200 dark:border-[#333] rounded-2xl shadow-sm overflow-hidden flex flex-col min-h-0">
         {activeTab === 'balances' && (
           <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
-            <div className="border-b border-gray-100 dark:border-[#2a2a2a] px-4 sm:px-5 py-4 flex flex-col lg:flex-row lg:items-end gap-4 shrink-0 bg-emerald-50/40 dark:bg-emerald-950/15">
-              <label className="flex flex-col gap-1.5 min-w-[200px]">
-                <span className="text-[11px] font-bold uppercase tracking-wide text-emerald-800/80 dark:text-emerald-300/90">Склад</span>
-                <select
-                  value={selectedWarehouseId}
-                  onChange={e => setSelectedWarehouseId(e.target.value)}
-                  className="rounded-xl border border-emerald-200 dark:border-emerald-900/50 px-3 py-2.5 text-sm bg-white dark:bg-[#252525] text-gray-900 dark:text-gray-100 min-w-[220px] focus:ring-2 focus:ring-emerald-500/30 outline-none"
-                >
-                  <option value="">Выберите склад</option>
-                  {filteredWarehouses.map(w => (
-                    <option key={w.id} value={w.id}>
-                      {w.name}
-                    </option>
-                  ))}
-                </select>
-              </label>
-
-              <div className="flex flex-col sm:flex-row flex-1 gap-2 lg:justify-end lg:ml-auto">
-                <input
-                  value={newWarehouseName}
-                  onChange={e => setNewWarehouseName(e.target.value)}
-                  placeholder={currentDepartment ? `Название склада (${currentDepartment.name})` : 'Название нового склада'}
-                  className="rounded-xl border border-gray-200 dark:border-[#333] px-3 py-2.5 text-sm bg-white dark:bg-[#252525] text-gray-800 dark:text-gray-100 flex-1 min-w-[180px] focus:ring-2 focus:ring-emerald-500/25 outline-none"
-                />
-                <ModuleCreateIconButton accent="emerald" label="Добавить склад" onClick={handleCreateWarehouse} className="shrink-0" />
-              </div>
-            </div>
-
             <div className="flex-1 overflow-auto custom-scrollbar min-h-0">
               {balancesForView.length === 0 ? (
                 <div className="h-full min-h-[200px] flex flex-col items-center justify-center text-center px-6 py-12">
                   <Package className="text-gray-300 dark:text-gray-600 mb-3" size={40} strokeWidth={1.25} />
                   <p className="text-gray-700 dark:text-gray-300 font-medium">Нет остатков для выбранного склада</p>
-                  <p className="text-sm text-gray-500 dark:text-gray-500 mt-1 max-w-md">Создайте склад выше, заведите номенклатуру и проведите оприходование на вкладке «Журнал».</p>
+                  <p className="text-sm text-gray-500 dark:text-gray-500 mt-1 max-w-md">Создайте склад в настройках, заведите номенклатуру и проведите оприходование на вкладке «Журнал». При необходимости укажите склад в фильтрах.</p>
                 </div>
               ) : (
                 <table className="w-full text-left text-sm border-collapse">
@@ -321,49 +496,12 @@ const InventoryView: React.FC<InventoryViewProps> = ({
 
         {activeTab === 'items' && (
           <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
-            <div className="border-b border-gray-100 dark:border-[#2a2a2a] px-4 sm:px-5 py-4 flex flex-col gap-3 shrink-0 bg-slate-50/80 dark:bg-[#141414]">
-              <span className="text-[11px] font-bold uppercase tracking-wide text-gray-500 dark:text-gray-400">Новая позиция справочника</span>
-              <div className="flex flex-wrap items-end gap-2">
-              <input
-                value={newItemSku}
-                onChange={e => setNewItemSku(e.target.value)}
-                placeholder="Код"
-                className="border border-gray-200 dark:border-[#333] rounded-lg px-2 py-1.5 text-xs bg-white dark:bg-[#252525] text-gray-800 dark:text-gray-100 w-24"
-              />
-              <input
-                value={newItemName}
-                onChange={e => setNewItemName(e.target.value)}
-                placeholder="Название"
-                className="border border-gray-200 dark:border-[#333] rounded-lg px-2 py-1.5 text-xs bg-white dark:bg-[#252525] text-gray-800 dark:text-gray-100 flex-1"
-              />
-              <input
-                value={newItemUnit}
-                onChange={e => setNewItemUnit(e.target.value)}
-                placeholder="Ед. изм."
-                className="border border-gray-200 dark:border-[#333] rounded-lg px-2 py-1.5 text-xs bg-white dark:bg-[#252525] text-gray-800 dark:text-gray-100 w-24"
-              />
-              <input
-                value={newItemCategory}
-                onChange={e => setNewItemCategory(e.target.value)}
-                placeholder="Категория"
-                className="border border-gray-200 dark:border-[#333] rounded-lg px-2 py-1.5 text-xs bg-white dark:bg-[#252525] text-gray-800 dark:text-gray-100 w-32"
-              />
-              <input
-                value={newItemNotes}
-                onChange={e => setNewItemNotes(e.target.value)}
-                placeholder="Комментарий"
-                className="border border-gray-200 dark:border-[#333] rounded-lg px-2 py-1.5 text-xs bg-white dark:bg-[#252525] text-gray-800 dark:text-gray-100 flex-1"
-              />
-              <ModuleCreateIconButton accent="emerald" label="Добавить номенклатуру" onClick={handleCreateItem} />
-              </div>
-            </div>
-
             <div className="flex-1 overflow-auto custom-scrollbar min-h-0">
-              {items.length === 0 ? (
+              {filteredItems.length === 0 ? (
                 <div className="h-full min-h-[180px] flex flex-col items-center justify-center text-center px-6 py-10">
                   <Package className="text-gray-300 dark:text-gray-600 mb-3" size={36} strokeWidth={1.25} />
-                  <p className="text-gray-700 dark:text-gray-300 font-medium">Справочник пуст</p>
-                  <p className="text-sm text-gray-500 mt-1">Заполните поля выше и нажмите «Добавить».</p>
+                  <p className="text-gray-700 dark:text-gray-300 font-medium">Нет данных по фильтрам</p>
+                  <p className="text-sm text-gray-500 mt-1">Добавьте номенклатуру через `+` или измените фильтры.</p>
                 </div>
               ) : (
                 <table className="w-full text-left text-sm border-collapse">
@@ -377,7 +515,7 @@ const InventoryView: React.FC<InventoryViewProps> = ({
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100 dark:divide-[#2a2a2a]">
-                    {items.filter(item => !item.isArchived).map(item => (
+                    {filteredItems.map(item => (
                       <tr key={item.id} className="hover:bg-slate-50/80 dark:hover:bg-[#222] transition-colors">
                         <td className="px-4 py-3 text-gray-500 dark:text-gray-400 font-mono text-xs">{item.sku}</td>
                         <td className="px-4 py-3 text-gray-900 dark:text-gray-100 font-medium">{item.name}</td>
@@ -395,108 +533,12 @@ const InventoryView: React.FC<InventoryViewProps> = ({
 
         {activeTab === 'movements' && (
           <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
-            <div className="border-b border-gray-100 dark:border-[#2a2a2a] px-4 sm:px-5 py-4 shrink-0 bg-slate-50/80 dark:bg-[#141414] space-y-4">
-              <div>
-                <span className="text-[11px] font-bold uppercase tracking-wide text-gray-500 dark:text-gray-400">Новая операция</span>
-                <div className="mt-2 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
-                  <label className="flex flex-col gap-1.5">
-                    <span className="text-xs text-gray-600 dark:text-gray-400">Тип</span>
-                    <select
-                      value={movementType}
-                      onChange={e => setMovementType(e.target.value as 'receipt' | 'transfer' | 'writeoff' | 'adjustment')}
-                      className="rounded-xl border border-gray-200 dark:border-[#333] px-3 py-2 text-sm bg-white dark:bg-[#252525] text-gray-800 dark:text-gray-100 focus:ring-2 focus:ring-emerald-500/25 outline-none"
-                    >
-                      <option value="receipt">Оприходование</option>
-                      <option value="transfer">Перемещение</option>
-                      <option value="writeoff">Списание</option>
-                      <option value="adjustment">Корректировка</option>
-                    </select>
-                  </label>
-                  {movementType !== 'receipt' && movementType !== 'adjustment' && (
-                    <label className="flex flex-col gap-1.5">
-                      <span className="text-xs text-gray-600 dark:text-gray-400">Со склада</span>
-                      <select
-                        value={fromWarehouseId}
-                        onChange={e => setFromWarehouseId(e.target.value)}
-                        className="rounded-xl border border-gray-200 dark:border-[#333] px-3 py-2 text-sm bg-white dark:bg-[#252525] text-gray-800 dark:text-gray-100 focus:ring-2 focus:ring-emerald-500/25 outline-none"
-                      >
-                        <option value="">Выберите</option>
-                        {warehouses.filter(w => !w.isArchived).map(w => (
-                          <option key={w.id} value={w.id}>
-                            {w.name}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                  )}
-                  {movementType !== 'writeoff' && (
-                    <label className="flex flex-col gap-1.5">
-                      <span className="text-xs text-gray-600 dark:text-gray-400">На склад</span>
-                      <select
-                        value={toWarehouseId}
-                        onChange={e => setToWarehouseId(e.target.value)}
-                        className="rounded-xl border border-gray-200 dark:border-[#333] px-3 py-2 text-sm bg-white dark:bg-[#252525] text-gray-800 dark:text-gray-100 focus:ring-2 focus:ring-emerald-500/25 outline-none"
-                      >
-                        <option value="">Выберите</option>
-                        {warehouses.filter(w => !w.isArchived).map(w => (
-                          <option key={w.id} value={w.id}>
-                            {w.name}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                  )}
-                  <label className="flex flex-col gap-1.5 md:col-span-2 lg:col-span-1">
-                    <span className="text-xs text-gray-600 dark:text-gray-400">Номенклатура</span>
-                    <select
-                      value={movementItemId}
-                      onChange={e => setMovementItemId(e.target.value)}
-                      className="rounded-xl border border-gray-200 dark:border-[#333] px-3 py-2 text-sm bg-white dark:bg-[#252525] text-gray-800 dark:text-gray-100 focus:ring-2 focus:ring-emerald-500/25 outline-none"
-                    >
-                      <option value="">Выберите позицию</option>
-                      {items.filter(i => !i.isArchived).map(i => (
-                        <option key={i.id} value={i.id}>
-                          {i.name}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                </div>
-                <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 items-end">
-                  <label className="flex flex-col gap-1.5">
-                    <span className="text-xs text-gray-600 dark:text-gray-400">Количество</span>
-                    <input
-                      value={movementQty}
-                      onChange={e => setMovementQty(e.target.value)}
-                      placeholder={movementType === 'adjustment' ? '± количество' : 'Количество'}
-                      className="rounded-xl border border-gray-200 dark:border-[#333] px-3 py-2 text-sm bg-white dark:bg-[#252525] text-gray-800 dark:text-gray-100 focus:ring-2 focus:ring-emerald-500/25 outline-none"
-                    />
-                  </label>
-                  <label className="flex flex-col gap-1.5 sm:col-span-2">
-                    <span className="text-xs text-gray-600 dark:text-gray-400">Комментарий</span>
-                    <input
-                      value={movementReason}
-                      onChange={e => setMovementReason(e.target.value)}
-                      placeholder="Необязательно"
-                      className="rounded-xl border border-gray-200 dark:border-[#333] px-3 py-2 text-sm bg-white dark:bg-[#252525] text-gray-800 dark:text-gray-100 focus:ring-2 focus:ring-emerald-500/25 outline-none"
-                    />
-                  </label>
-                  <ModuleCreateIconButton
-                    accent="emerald"
-                    label="Провести операцию"
-                    onClick={handleCreateMovement}
-                    className="w-full sm:w-auto"
-                  />
-                </div>
-              </div>
-            </div>
-
             <div className="flex-1 overflow-auto custom-scrollbar min-h-0">
-              {movements.length === 0 ? (
+              {filteredMovements.length === 0 ? (
                 <div className="h-full min-h-[200px] flex flex-col items-center justify-center text-center px-6 py-12">
                   <ArrowLeftRight className="text-gray-300 dark:text-gray-600 mb-3" size={40} strokeWidth={1.25} />
                   <p className="text-gray-700 dark:text-gray-300 font-medium">Журнал движений пуст</p>
-                  <p className="text-sm text-gray-500 mt-1">Проведите первую операцию с помощью формы выше.</p>
+                  <p className="text-sm text-gray-500 mt-1">Добавьте операцию через `+` в шапке.</p>
                 </div>
               ) : (
                 <table className="w-full text-left text-sm border-collapse">
@@ -510,10 +552,7 @@ const InventoryView: React.FC<InventoryViewProps> = ({
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100 dark:divide-[#2a2a2a]">
-                    {movements
-                      .slice()
-                      .reverse()
-                      .map(m => {
+                    {filteredMovements.map(m => {
                         const fromWh = m.fromWarehouseId ? warehouses.find(w => w.id === m.fromWarehouseId)?.name : '';
                         const toWh = m.toWarehouseId ? warehouses.find(w => w.id === m.toWarehouseId)?.name : '';
                         const typeLabel =
@@ -549,29 +588,12 @@ const InventoryView: React.FC<InventoryViewProps> = ({
 
         {activeTab === 'revisions' && (
           <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
-            <div className="border-b border-gray-100 dark:border-[#2a2a2a] px-4 sm:px-5 py-4 flex flex-wrap items-center justify-between gap-3 shrink-0 bg-emerald-50/30 dark:bg-emerald-950/20">
-              <div>
-                <span className="text-[11px] font-bold uppercase tracking-wide text-emerald-800/90 dark:text-emerald-300">Инвентаризация</span>
-                <p className="text-xs text-gray-600 dark:text-gray-400 mt-0.5">Сначала выберите склад на вкладке «Остатки», затем создайте ревизию</p>
-              </div>
-              {onCreateRevision && (
-                <ModuleCreateIconButton
-                  accent="emerald"
-                  label="Новая ревизия"
-                  onClick={() => {
-                    const whId = selectedWarehouseId || filteredWarehouses[0]?.id;
-                    if (!whId) { alert('Выберите склад на вкладке «Остатки» или создайте склад'); return; }
-                    onCreateRevision({ warehouseId: whId, date: new Date().toISOString().slice(0, 10), createdByUserId: currentUserId });
-                  }}
-                />
-              )}
-            </div>
             <div className="flex-1 overflow-auto custom-scrollbar min-h-0 p-4 sm:p-5">
               {revisions.length === 0 ? (
                 <div className="flex flex-col items-center justify-center text-center py-12 px-4 rounded-2xl border border-dashed border-gray-200 dark:border-[#333] bg-slate-50/50 dark:bg-[#141414]">
                   <ClipboardCheck className="text-gray-300 dark:text-gray-600 mb-3" size={40} strokeWidth={1.25} />
                   <p className="text-gray-700 dark:text-gray-300 font-medium">Ревизий пока нет</p>
-                  <p className="text-sm text-gray-500 dark:text-gray-500 mt-1 max-w-md">Укажите склад на вкладке «Остатки» и нажмите «Новая ревизия».</p>
+                  <p className="text-sm text-gray-500 dark:text-gray-500 mt-1 max-w-md">Выберите склад в фильтрах (иконка в шапке) и нажмите «Новая ревизия».</p>
                 </div>
               ) : (
                 <div className="space-y-4">
@@ -595,9 +617,9 @@ const InventoryView: React.FC<InventoryViewProps> = ({
                               >
                                 {isEditing ? 'Свернуть' : 'Редактировать'}
                               </button>
-                              <Button
-                                variant="secondary"
-                                size="sm"
+                              <button
+                                type="button"
+                                className="px-2.5 py-1.5 rounded-lg border border-gray-200 dark:border-[#444] text-xs text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-[#2e2e2e]"
                                 onClick={() => {
                                   const whBalances = balances.filter(b => b.warehouseId === rev.warehouseId);
                                   const lines = whBalances.map(b => ({ itemId: b.itemId, quantitySystem: b.quantity, quantityFact: b.quantity }));
@@ -605,15 +627,15 @@ const InventoryView: React.FC<InventoryViewProps> = ({
                                 }}
                               >
                                 Подтянуть остатки
-                              </Button>
+                              </button>
                               {onPostRevision && (
-                                <Button
-                                  variant="primary"
-                                  size="sm"
+                                <button
+                                  type="button"
+                                  className="px-2.5 py-1.5 rounded-lg text-xs text-white bg-emerald-600 hover:bg-emerald-700"
                                   onClick={() => onPostRevision(rev.id, currentUserId)}
                                 >
                                   Провести
-                                </Button>
+                                </button>
                               )}
                             </div>
                           )}
@@ -691,6 +713,133 @@ const InventoryView: React.FC<InventoryViewProps> = ({
           </div>
         )}
           </div>
+
+          <input
+            ref={importInputRef}
+            type="file"
+            accept=".csv,.txt"
+            className="hidden"
+            onChange={async (e) => {
+              const file = e.target.files?.[0];
+              if (!file) return;
+              await handleImportBalances(file);
+              e.currentTarget.value = '';
+            }}
+          />
+
+          {isCreateItemOpen && (
+            <div className="fixed inset-0 z-[220] bg-black/35 flex items-center justify-center p-4" onClick={() => setIsCreateItemOpen(false)}>
+              <div className="w-full max-w-2xl rounded-xl border border-gray-200 dark:border-[#444] bg-white dark:bg-[#252525] shadow-2xl" onClick={(e) => e.stopPropagation()}>
+                <div className="px-4 py-3 border-b border-gray-100 dark:border-[#333] flex items-center justify-between">
+                  <h4 className="text-sm font-semibold text-gray-900 dark:text-white">Новая номенклатура</h4>
+                  <button type="button" onClick={() => setIsCreateItemOpen(false)} className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-[#333] text-gray-500"><X size={16} /></button>
+                </div>
+                <div className="p-4 grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <input value={newItemSku} onChange={e => setNewItemSku(e.target.value)} placeholder="Код" className="rounded-xl border border-gray-200 dark:border-[#333] px-3 py-2.5 text-sm bg-white dark:bg-[#252525]" />
+                  <input value={newItemName} onChange={e => setNewItemName(e.target.value)} placeholder="Название *" className="rounded-xl border border-gray-200 dark:border-[#333] px-3 py-2.5 text-sm bg-white dark:bg-[#252525]" />
+                  <input value={newItemUnit} onChange={e => setNewItemUnit(e.target.value)} placeholder="Ед. изм. (шт, кг...)" className="rounded-xl border border-gray-200 dark:border-[#333] px-3 py-2.5 text-sm bg-white dark:bg-[#252525]" />
+                  <input value={newItemCategory} onChange={e => setNewItemCategory(e.target.value)} placeholder="Категория" className="rounded-xl border border-gray-200 dark:border-[#333] px-3 py-2.5 text-sm bg-white dark:bg-[#252525]" />
+                  <input value={newItemNotes} onChange={e => setNewItemNotes(e.target.value)} placeholder="Комментарий" className="rounded-xl border border-gray-200 dark:border-[#333] px-3 py-2.5 text-sm bg-white dark:bg-[#252525] md:col-span-2" />
+                </div>
+                <div className="px-4 pb-4 flex justify-end gap-2">
+                  <button type="button" onClick={() => setIsCreateItemOpen(false)} className="px-3 py-2 rounded-lg border border-gray-200 dark:border-[#444] text-sm">Отмена</button>
+                  <button type="button" onClick={handleCreateItem} className="px-3 py-2 rounded-lg text-sm text-white bg-emerald-600 hover:bg-emerald-700">Создать</button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {isCreateMovementOpen && (
+            <div className="fixed inset-0 z-[220] bg-black/35 flex items-center justify-center p-4" onClick={() => setIsCreateMovementOpen(false)}>
+              <div className="w-full max-w-3xl rounded-xl border border-gray-200 dark:border-[#444] bg-white dark:bg-[#252525] shadow-2xl" onClick={(e) => e.stopPropagation()}>
+                <div className="px-4 py-3 border-b border-gray-100 dark:border-[#333] flex items-center justify-between">
+                  <h4 className="text-sm font-semibold text-gray-900 dark:text-white">Новая складская операция</h4>
+                  <button type="button" onClick={() => setIsCreateMovementOpen(false)} className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-[#333] text-gray-500"><X size={16} /></button>
+                </div>
+                <div className="p-4 grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <select value={movementType} onChange={e => setMovementType(e.target.value as 'receipt' | 'transfer' | 'writeoff' | 'adjustment')} className="rounded-xl border border-gray-200 dark:border-[#333] px-3 py-2.5 text-sm bg-white dark:bg-[#252525]">
+                    <option value="receipt">Оприходование</option>
+                    <option value="transfer">Перемещение</option>
+                    <option value="writeoff">Списание</option>
+                    <option value="adjustment">Корректировка</option>
+                  </select>
+                  <select value={movementWarehouseId} onChange={e => setMovementWarehouseId(e.target.value)} className="rounded-xl border border-gray-200 dark:border-[#333] px-3 py-2.5 text-sm bg-white dark:bg-[#252525]">
+                    <option value="">Склад (быстрый выбор)</option>
+                    {warehouses.filter(w => !w.isArchived).map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
+                  </select>
+                  {movementType !== 'receipt' && movementType !== 'adjustment' && (
+                    <select value={fromWarehouseId} onChange={e => setFromWarehouseId(e.target.value)} className="rounded-xl border border-gray-200 dark:border-[#333] px-3 py-2.5 text-sm bg-white dark:bg-[#252525]">
+                      <option value="">Со склада</option>
+                      {warehouses.filter(w => !w.isArchived).map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
+                    </select>
+                  )}
+                  {movementType !== 'writeoff' && (
+                    <select value={toWarehouseId} onChange={e => setToWarehouseId(e.target.value)} className="rounded-xl border border-gray-200 dark:border-[#333] px-3 py-2.5 text-sm bg-white dark:bg-[#252525]">
+                      <option value="">На склад</option>
+                      {warehouses.filter(w => !w.isArchived).map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
+                    </select>
+                  )}
+                  <select value={movementItemId} onChange={e => setMovementItemId(e.target.value)} className="rounded-xl border border-gray-200 dark:border-[#333] px-3 py-2.5 text-sm bg-white dark:bg-[#252525] md:col-span-2">
+                    <option value="">Номенклатура</option>
+                    {items.filter(i => !i.isArchived).map(i => <option key={i.id} value={i.id}>{i.name}</option>)}
+                  </select>
+                  <input value={movementQty} onChange={e => setMovementQty(e.target.value)} placeholder={movementType === 'adjustment' ? '± количество' : 'Количество'} className="rounded-xl border border-gray-200 dark:border-[#333] px-3 py-2.5 text-sm bg-white dark:bg-[#252525]" />
+                  <input value={movementReason} onChange={e => setMovementReason(e.target.value)} placeholder="Комментарий" className="rounded-xl border border-gray-200 dark:border-[#333] px-3 py-2.5 text-sm bg-white dark:bg-[#252525]" />
+                </div>
+                <div className="px-4 pb-4 flex justify-end gap-2">
+                  <button type="button" onClick={() => setIsCreateMovementOpen(false)} className="px-3 py-2 rounded-lg border border-gray-200 dark:border-[#444] text-sm">Отмена</button>
+                  <button type="button" onClick={handleCreateMovement} className="px-3 py-2 rounded-lg text-sm text-white bg-emerald-600 hover:bg-emerald-700">Провести</button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {isCreateRevisionOpen && (
+            <div className="fixed inset-0 z-[220] bg-black/35 flex items-center justify-center p-4" onClick={() => setIsCreateRevisionOpen(false)}>
+              <div className="w-full max-w-lg rounded-xl border border-gray-200 dark:border-[#444] bg-white dark:bg-[#252525] shadow-2xl" onClick={(e) => e.stopPropagation()}>
+                <div className="px-4 py-3 border-b border-gray-100 dark:border-[#333] flex items-center justify-between">
+                  <h4 className="text-sm font-semibold text-gray-900 dark:text-white">Новая ревизия</h4>
+                  <button type="button" onClick={() => setIsCreateRevisionOpen(false)} className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-[#333] text-gray-500"><X size={16} /></button>
+                </div>
+                <div className="p-4">
+                  <p className="text-sm text-gray-600 dark:text-gray-300 mb-3">Выберите склад и создайте черновик ревизии.</p>
+                  <select value={selectedWarehouseId} onChange={(e) => setSelectedWarehouseId(e.target.value)} className="w-full rounded-xl border border-gray-200 dark:border-[#333] px-3 py-2.5 text-sm bg-white dark:bg-[#252525]">
+                    <option value="">Выберите склад</option>
+                    {filteredWarehouses.map((w) => (
+                      <option key={w.id} value={w.id}>{w.name}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="px-4 pb-4 flex justify-end gap-2">
+                  <button type="button" onClick={() => setIsCreateRevisionOpen(false)} className="px-3 py-2 rounded-lg border border-gray-200 dark:border-[#444] text-sm">Отмена</button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (!onCreateRevision) return;
+                      const whId = selectedWarehouseId || filteredWarehouses[0]?.id;
+                      if (!whId) {
+                        setAlertMessage('Выберите склад для ревизии.');
+                        return;
+                      }
+                      onCreateRevision({ warehouseId: whId, date: new Date().toISOString().slice(0, 10), createdByUserId: currentUserId });
+                      setIsCreateRevisionOpen(false);
+                      setActiveTab('revisions');
+                    }}
+                    className="px-3 py-2 rounded-lg text-sm text-white bg-emerald-600 hover:bg-emerald-700"
+                  >
+                    Создать
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          <SystemAlertDialog
+            open={!!alertMessage}
+            title="Склад"
+            message={alertMessage || ''}
+            onClose={() => setAlertMessage(null)}
+          />
         </div>
       </div>
     </ModulePageShell>

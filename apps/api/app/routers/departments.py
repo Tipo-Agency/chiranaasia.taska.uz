@@ -5,6 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
 from app.models.finance import Department
+from app.services.domain_events import log_entity_mutation
 
 router = APIRouter(prefix="/departments", tags=["departments"])
 
@@ -32,6 +33,7 @@ async def update_departments(departments: list[dict], db: AsyncSession = Depends
         if not did:
             continue
         existing = await db.get(Department, did)
+        is_new = existing is None
         if existing:
             existing.name = d.get("name", existing.name)
             existing.head_id = d.get("headId")
@@ -46,5 +48,15 @@ async def update_departments(departments: list[dict], db: AsyncSession = Depends
                 description=d.get("description"),
                 is_archived=bool(d.get("isArchived", False)),
             ))
+        await db.flush()
+        row = await db.get(Department, did)
+        await log_entity_mutation(
+            db,
+            event_type="department.created" if is_new else "department.updated",
+            entity_type="department",
+            entity_id=did,
+            source="departments-router",
+            payload={"name": row.name if row else d.get("name")},
+        )
     await db.commit()
     return {"ok": True}

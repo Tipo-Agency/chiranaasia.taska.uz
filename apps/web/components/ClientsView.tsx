@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useCallback } from 'react';
-import { Client, Deal, AccountsReceivable, SalesFunnel } from '../types';
+import { Client, Deal, Contract, OneTimeDeal, AccountsReceivable, SalesFunnel, User } from '../types';
 import { FilterConfig } from './FiltersPanel';
 import {
   ClientsHeader,
@@ -17,15 +17,16 @@ import { ModulePageShell, MODULE_PAGE_GUTTER } from './ui';
 
 interface ClientsViewProps {
   clients: Client[];
-  contracts: Deal[]; // Договоры (recurring: true)
-  oneTimeDeals?: Deal[]; // Продажи (recurring: false)
+  users?: User[];
+  contracts: Contract[];
+  oneTimeDeals?: OneTimeDeal[];
   accountsReceivable?: AccountsReceivable[];
   salesFunnels?: SalesFunnel[];
   onSaveClient: (client: Client) => void;
   onDeleteClient: (id: string) => void;
-  onSaveContract: (deal: Deal) => void;
+  onSaveContract: (deal: Contract) => void;
   onDeleteContract: (id: string) => void;
-  onSaveOneTimeDeal?: (deal: Deal) => void;
+  onSaveOneTimeDeal?: (deal: OneTimeDeal) => void;
   onDeleteOneTimeDeal?: (id: string) => void;
   onSaveAccountsReceivable?: (receivable: AccountsReceivable) => void;
   onDeleteAccountsReceivable?: (id: string) => void;
@@ -33,6 +34,7 @@ interface ClientsViewProps {
 
 const ClientsView: React.FC<ClientsViewProps> = ({ 
   clients,
+  users = [],
   contracts,
   oneTimeDeals = [],
   accountsReceivable = [],
@@ -47,7 +49,6 @@ const ClientsView: React.FC<ClientsViewProps> = ({
   onDeleteAccountsReceivable,
 }) => {
   const [activeTab, setActiveTab] = useState<'clients' | 'contracts' | 'finance' | 'receivables'>('clients');
-  const [searchQuery, setSearchQuery] = useState('');
   const [contractStatusFilter, setContractStatusFilter] = useState<string>('all');
   const [selectedFunnelId, setSelectedFunnelId] = useState<string>('');
   const [showFilters, setShowFilters] = useState(false);
@@ -77,40 +78,23 @@ const ClientsView: React.FC<ClientsViewProps> = ({
       filtered = filtered.filter(c => c.funnelId === selectedFunnelId);
     }
     
-    if (searchQuery) {
-    const query = searchQuery.toLowerCase();
-      filtered = filtered.filter(c => c.name.toLowerCase().includes(query));
-    }
-    
     return filtered;
-  }, [clients, searchQuery, selectedFunnelId]);
+  }, [clients, selectedFunnelId]);
 
   const filteredContracts = useMemo(() => {
     const activeContracts = contracts.filter(c => !c.isArchived);
     return activeContracts.filter(c => {
       if (selectedFunnelId && c.funnelId !== selectedFunnelId) return false;
-      
-      const matchesSearch = !searchQuery || 
-        c.number.includes(searchQuery) || 
-        clients.some(cl => cl.id === c.clientId && cl.name.toLowerCase().includes(searchQuery.toLowerCase()));
-      
       const matchesStatus = contractStatusFilter === 'all' || c.status === contractStatusFilter;
-      
-      return matchesSearch && matchesStatus;
+
+      return matchesStatus;
     });
-  }, [contracts, clients, searchQuery, contractStatusFilter, selectedFunnelId]);
+  }, [contracts, contractStatusFilter, selectedFunnelId]);
 
   const filteredReceivables = useMemo(() => {
     const activeReceivables = accountsReceivable.filter(r => !r.isArchived);
-    if (!searchQuery) return activeReceivables;
-    const query = searchQuery.toLowerCase();
-    return activeReceivables.filter(r => {
-      const client = clients.find(c => c.id === r.clientId);
-      return client?.name.toLowerCase().includes(query) || 
-             r.description?.toLowerCase().includes(query) ||
-             r.amount.toString().includes(query);
-    });
-  }, [accountsReceivable, clients, searchQuery]);
+    return activeReceivables;
+  }, [accountsReceivable]);
 
   // Filters for contracts tab
   const contractFilters: FilterConfig[] = useMemo(() => [
@@ -140,19 +124,6 @@ const ClientsView: React.FC<ClientsViewProps> = ({
     contractFilters.filter(f => f.value && f.value !== 'all' && f.value !== '').length,
     [contractFilters]
   );
-
-  // Handler for create button - depends on active tab
-  const handleCreateClick = () => {
-    if (activeTab === 'clients') {
-      handleOpenClientCreate();
-    } else if (activeTab === 'contracts') {
-      handleOpenContractCreate('');
-    } else if (activeTab === 'finance') {
-      // Finance tab doesn't have create functionality
-    } else if (activeTab === 'receivables') {
-      handleOpenReceivableCreate('');
-    }
-  };
 
   // Handlers
   const handleOpenClientCreate = () => {
@@ -213,28 +184,29 @@ const ClientsView: React.FC<ClientsViewProps> = ({
     <ModulePageShell>
       <div className={`${MODULE_PAGE_GUTTER} pt-6 md:pt-8 flex-shrink-0 space-y-5`}>
         <ClientsHeader
-          searchQuery={searchQuery}
-          onSearchChange={setSearchQuery}
           salesFunnels={salesFunnels}
           selectedFunnelId={selectedFunnelId}
           onFunnelChange={setSelectedFunnelId}
           showFunnelFilter={activeTab === 'clients' || activeTab === 'contracts'}
           activeTab={activeTab}
-          onCreateClick={handleCreateClick}
+          onCreateClient={handleOpenClientCreate}
+          onCreateContract={() => handleOpenContractCreate('')}
+          onCreateSale={() => handleOpenOneTimeDealCreate('')}
+          onCreateReceivable={() => handleOpenReceivableCreate('')}
           onFiltersClick={activeTab === 'contracts' ? () => setShowFilters(!showFilters) : undefined}
           showFilters={showFilters}
           hasActiveFilters={hasActiveContractFilters}
           activeFiltersCount={activeFiltersCount}
+          tabs={<ClientsTabs activeTab={activeTab} onTabChange={setActiveTab} />}
         />
-
-        <ClientsTabs activeTab={activeTab} onTabChange={setActiveTab} />
       </div>
 
       <div className="flex-1 min-h-0 overflow-hidden">
-        <div className={`${MODULE_PAGE_GUTTER} pb-24 md:pb-32 h-full overflow-y-auto overflow-x-hidden custom-scrollbar`}>
+        <div className={`${MODULE_PAGE_GUTTER} mt-3 pb-24 md:pb-32 h-full overflow-y-auto overflow-x-hidden custom-scrollbar`}>
           {activeTab === 'clients' && (
             <ClientsTab
               clients={filteredClients}
+              users={users}
               contracts={contracts}
               onEditClient={handleOpenClientEdit}
               onCreateContract={handleOpenContractCreate}
@@ -271,6 +243,7 @@ const ClientsView: React.FC<ClientsViewProps> = ({
       <ClientModal
         isOpen={isClientModalOpen}
         editingClient={editingClient}
+        users={users}
         salesFunnels={salesFunnels}
         contracts={contracts}
         oneTimeDeals={oneTimeDeals}

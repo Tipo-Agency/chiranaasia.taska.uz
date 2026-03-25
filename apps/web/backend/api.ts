@@ -32,11 +32,6 @@ import {
   bpmEndpoint,
   inventoryEndpoint,
   funnelsEndpoint,
-  partnerLogosEndpoint,
-  newsEndpoint,
-  casesEndpoint,
-  tagsEndpoint,
-  publicSitesEndpoint,
   publicContentPlanEndpoint,
 } from "../services/apiClient";
 
@@ -76,10 +71,5 @@ export const api = {
   inventory: inventoryEndpoint,
   funnels: funnelsEndpoint,
 
-  partnerLogos: partnerLogosEndpoint,
-  news: newsEndpoint,
-  cases: casesEndpoint,
-  tags: tagsEndpoint,
-  publicSites: publicSitesEndpoint,
   publicContentPlan: publicContentPlanEndpoint,
 };

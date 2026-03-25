@@ -2,7 +2,7 @@
  * MeetingCard - карточка встречи для отображения в списках
  * 
  * Зачем отдельно:
- * - Переиспользуется в MeetingsModule, HomeView
+ * - Переиспользуется в MeetingsModule, WorkdeskView
  * - Единый стиль отображения встреч
  */
 import React from 'react';

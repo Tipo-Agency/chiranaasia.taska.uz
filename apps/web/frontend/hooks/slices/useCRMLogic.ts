@@ -1,19 +1,17 @@
 
-import { useState, useMemo } from 'react';
-import { Client, Deal, EmployeeInfo, AccountsReceivable } from '../../../types';
+import { useState } from 'react';
+import { Client, Deal, Contract, OneTimeDeal, EmployeeInfo, AccountsReceivable } from '../../../types';
 import { api } from '../../../backend/api';
 import { createSaveHandler, createDeleteHandler } from '../../../utils/crudUtils';
 import { NOTIFICATION_MESSAGES } from '../../../constants/messages';
 
 export const useCRMLogic = (showNotification: (msg: string) => void) => {
   const [clients, setClients] = useState<Client[]>([]);
-  const [deals, setDeals] = useState<Deal[]>([]); // Объединенная сущность для договоров и продаж
+  const [deals, setDeals] = useState<Deal[]>([]); // CRM воронка
+  const [contracts, setContracts] = useState<Contract[]>([]);
+  const [oneTimeDeals, setOneTimeDeals] = useState<OneTimeDeal[]>([]);
   const [accountsReceivable, setAccountsReceivable] = useState<AccountsReceivable[]>([]);
   const [employeeInfos, setEmployeeInfos] = useState<EmployeeInfo[]>([]);
-  
-  // Алиасы для обратной совместимости (мемоизированы для правильного обновления)
-  const contracts = useMemo(() => deals.filter(d => d.recurring === true), [deals]);
-  const oneTimeDeals = useMemo(() => deals.filter(d => d.recurring === false), [deals]);
 
   // Clients
   const saveClient = createSaveHandler(
@@ -29,7 +27,7 @@ export const useCRMLogic = (showNotification: (msg: string) => void) => {
     NOTIFICATION_MESSAGES.CLIENT_DELETED
   );
 
-  // Deals (объединенные договоры и продажи)
+  // CRM deals
   const saveDeal = createSaveHandler(
     setDeals,
     api.deals.updateAll,
@@ -43,20 +41,45 @@ export const useCRMLogic = (showNotification: (msg: string) => void) => {
     'Сделка удалена'
   );
   
-  // Алиасы для обратной совместимости
+  // Contracts / one-time sales
+  const saveContractBase = createSaveHandler(
+    setContracts,
+    api.contracts.updateAll,
+    showNotification,
+    'Договор сохранен'
+  );
+  const deleteContractBase = createDeleteHandler(
+    setContracts,
+    api.contracts.updateAll,
+    showNotification,
+    'Договор удален'
+  );
+  const saveOneTimeDealBase = createSaveHandler(
+    setOneTimeDeals,
+    api.oneTimeDeals.updateAll,
+    showNotification,
+    'Продажа сохранена'
+  );
+  const deleteOneTimeDealBase = createDeleteHandler(
+    setOneTimeDeals,
+    api.oneTimeDeals.updateAll,
+    showNotification,
+    'Продажа удалена'
+  );
+
   const saveContract = (deal: Deal) => {
-    const contractDeal: Deal = { ...deal, recurring: true };
-    saveDeal(contractDeal);
+    const contractDeal: Contract = { ...deal, recurring: true, dealKind: 'contract' };
+    saveContractBase(contractDeal);
   };
   const deleteContract = (id: string) => {
-    deleteDeal(id);
+    deleteContractBase(id);
   };
   const saveOneTimeDeal = (deal: Deal) => {
-    const oneTimeDeal: Deal = { ...deal, recurring: false };
-    saveDeal(oneTimeDeal);
+    const oneTimeDeal: OneTimeDeal = { ...deal, recurring: false, dealKind: 'contract' };
+    saveOneTimeDealBase(oneTimeDeal);
   };
   const deleteOneTimeDeal = (id: string) => {
-    deleteDeal(id);
+    deleteOneTimeDealBase(id);
   };
 
   // Employees
@@ -100,6 +123,8 @@ export const useCRMLogic = (showNotification: (msg: string) => void) => {
     setters: { 
       setClients, 
       setDeals, // Основной setter
+      setContracts,
+      setOneTimeDeals,
       setAccountsReceivable, 
       setEmployeeInfos 
     },

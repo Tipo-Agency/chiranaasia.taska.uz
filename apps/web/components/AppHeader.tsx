@@ -1,13 +1,13 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { 
   Search, Moon, Sun, Settings, Bell, ChevronDown, LogOut, User as UserIcon, Home, Menu, X, MessageCircle,
-  BarChart3, Wallet, Network, PieChart, Briefcase, UserCheck, CheckSquare, Users, FileText, Instagram, Layers, Globe, Package, Cog
+  BarChart3, Wallet, Network, PieChart, Briefcase, UserCheck, CheckSquare, Users, FileText, Instagram, Layers, Package, Cog
 } from 'lucide-react';
 import { User, Role, TableCollection } from '../types';
 import { DynamicIcon } from './AppIcons';
 import { getDefaultAvatarForId } from '../constants/avatars';
 
-interface AppHeaderProps {
+export interface AppHeaderProps {
   darkMode: boolean;
   currentView: string;
   activeTable?: TableCollection;
@@ -19,6 +19,8 @@ interface AppHeaderProps {
   onSearchChange: (query: string) => void;
   onSearchFocus: () => void;
   onNavigateToInbox: () => void;
+  /** Открыть системную ленту в чате вместо раздела «Входящие» */
+  onOpenSystemChat?: () => void;
   onMarkAllRead: () => void;
   onOpenSettings: (tab: string) => void;
   onLogout: () => void;
@@ -38,6 +40,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
   onSearchChange,
   onSearchFocus,
   onNavigateToInbox,
+  onOpenSystemChat,
   onMarkAllRead,
   onOpenSettings,
   onLogout,
@@ -46,10 +49,38 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
 }) => {
   const [showUserDropdown, setShowUserDropdown] = useState(false);
   const [showNotificationDropdown, setShowNotificationDropdown] = useState(false);
+  const notificationRef = useRef<HTMLDivElement>(null);
+  const userRef = useRef<HTMLDivElement>(null);
   const getLogTitle = (log: any) => log?.title || log?.action || 'Уведомление';
   const getLogBody = (log: any) => log?.body || log?.details || '';
   const getLogTimestamp = (log: any) => log?.createdAt || log?.timestamp;
   const isLogRead = (log: any) => Boolean(log?.isRead ?? log?.read);
+
+  useEffect(() => {
+    const onDocumentClick = (event: MouseEvent) => {
+      const target = event.target as Node;
+      if (showNotificationDropdown && notificationRef.current && !notificationRef.current.contains(target)) {
+        setShowNotificationDropdown(false);
+      }
+      if (showUserDropdown && userRef.current && !userRef.current.contains(target)) {
+        setShowUserDropdown(false);
+      }
+    };
+
+    const onEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setShowNotificationDropdown(false);
+        setShowUserDropdown(false);
+      }
+    };
+
+    document.addEventListener('mousedown', onDocumentClick);
+    document.addEventListener('keydown', onEscape);
+    return () => {
+      document.removeEventListener('mousedown', onDocumentClick);
+      document.removeEventListener('keydown', onEscape);
+    };
+  }, [showNotificationDropdown, showUserDropdown]);
 
   /** Вкладка настроек, относящаяся к текущему экрану (для кнопки-шестерёнки в шапке). */
   const getModuleSettingsTab = (view: string): string | null => {
@@ -62,7 +93,6 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
       case 'employees': return 'departments';
       case 'spaces': return 'spaces';
       case 'meetings': return 'automation';
-      case 'sites': return 'integrations';
       case 'inbox': return 'automation';
       case 'analytics': return 'system';
       case 'home': return 'profile';
@@ -91,7 +121,6 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
       case 'meetings': return { title: 'Встречи', icon: <Users size={18} />, iconBox: 'bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-300' };
       case 'docs': return { title: 'Документы', icon: <FileText size={18} />, iconBox: 'bg-slate-100 text-slate-700 dark:bg-slate-900/30 dark:text-slate-300' };
       case 'doc-editor': return { title: 'Редактор документа', icon: <FileText size={18} />, iconBox: 'bg-slate-100 text-slate-700 dark:bg-slate-900/30 dark:text-slate-300' };
-      case 'sites': return { title: 'Сайты', icon: <Globe size={18} />, iconBox: 'bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-300' };
       case 'inventory': return { title: 'Склад', icon: <Package size={18} />, iconBox: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300' };
       default: return { title: view, icon: <Settings size={18} />, iconBox: 'bg-slate-100 text-slate-700 dark:bg-slate-900/30 dark:text-slate-300' };
     }
@@ -101,7 +130,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
   const moduleSettingsTab = getModuleSettingsTab(currentView);
 
   return (
-    <div className="h-14 md:h-14 border-b border-gray-200 dark:border-[#333] flex items-center justify-between px-3 md:px-4 bg-white/95 dark:bg-[#191919]/95 backdrop-blur shrink-0 z-20">
+    <div className="h-14 md:h-14 border-b border-gray-200 dark:border-[#333] flex items-center justify-between px-3 md:px-4 bg-white/95 dark:bg-[#191919]/95 backdrop-blur shrink-0 z-[40]">
       <div className="flex items-center gap-2 md:gap-3 overflow-hidden min-w-0 flex-1">
         <button 
           onClick={onMobileMenuToggle} 
@@ -153,10 +182,10 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
       {/* Глобальный поиск по системе — выразительное поле */}
       <div className="flex-1 max-w-2xl mx-2 md:mx-4 hidden sm:block">
         <div className="relative group">
-          <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-[#3337AD]"/>
+          <Search size={17} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-[#3337AD]"/>
           <input 
             type="text" 
-            placeholder="Поиск по задачам, сделкам, клиентам..." 
+            placeholder="Поиск"
             value={searchQuery}
             onChange={e => onSearchChange(e.target.value)}
             onKeyDown={e => {
@@ -164,7 +193,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
                 onSearchFocus();
               }
             }}
-            className="w-full bg-gray-100 dark:bg-[#252525] border-2 border-transparent dark:border-[#333] group-focus-within:border-[#3337AD] rounded-xl pl-10 pr-4 py-2 text-sm text-gray-900 dark:text-white outline-none transition-all placeholder-gray-500 font-medium"
+            className="w-full bg-white dark:bg-[#252525] border border-gray-300 dark:border-[#333] group-focus-within:border-[#3337AD] rounded-xl pl-10 pr-4 py-2 text-sm text-gray-900 dark:text-white outline-none transition-all placeholder-gray-400"
           />
         </div>
       </div>
@@ -178,9 +207,12 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
         </button>
         
         {/* Notification Bell */}
-        <div className="relative">
+        <div className="relative" ref={notificationRef}>
           <button 
-            onClick={() => setShowNotificationDropdown(!showNotificationDropdown)} 
+            onClick={() => {
+              setShowNotificationDropdown((prev) => !prev);
+              setShowUserDropdown(false);
+            }}
             className="p-2 text-gray-500 hover:bg-gray-100 dark:hover:bg-[#252525] rounded-lg transition-colors relative"
           >
             <Bell size={18} />
@@ -189,12 +221,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
             )}
           </button>
           {showNotificationDropdown && (
-            <>
-              <div 
-                className="fixed inset-0 z-30" 
-                onClick={() => setShowNotificationDropdown(false)}
-              ></div>
-              <div className="absolute right-0 top-full mt-2 w-[calc(100vw-2rem)] sm:w-72 md:w-80 max-w-sm bg-white dark:bg-[#252525] border border-gray-200 dark:border-[#333] rounded-xl shadow-xl z-40 overflow-hidden flex flex-col">
+              <div className="absolute right-0 top-full mt-2 w-[calc(100vw-2rem)] sm:w-72 md:w-80 max-w-sm bg-white dark:bg-[#252525] border border-gray-200 dark:border-[#333] rounded-xl shadow-xl z-[120] overflow-hidden flex flex-col">
                 <div className="p-3 border-b border-gray-100 dark:border-[#333] flex justify-between items-center bg-gray-50 dark:bg-[#202020]">
                   <span className="text-xs font-bold text-gray-500 uppercase">Уведомления</span>
                   {unreadNotificationsCount > 0 && (
@@ -210,7 +237,11 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
                   {activityLogs.slice(0, 5).map(log => (
                     <div 
                       key={log.id} 
-                      onClick={() => { setShowNotificationDropdown(false); onNavigateToInbox(); }}
+                      onClick={() => {
+                        setShowNotificationDropdown(false);
+                        if (onOpenSystemChat) onOpenSystemChat();
+                        else onNavigateToInbox();
+                      }}
                       className={`p-3 border-b border-gray-100 dark:border-[#333] last:border-0 text-sm cursor-pointer hover:bg-gray-50 dark:hover:bg-[#303030] transition-colors ${!isLogRead(log) ? 'bg-blue-50/50 dark:bg-blue-900/10' : ''}`}
                     >
                       <div className="font-medium text-gray-800 dark:text-gray-200">{getLogTitle(log)}</div>
@@ -227,21 +258,27 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
                   )}
                 </div>
                 <button 
-                  onClick={() => { setShowNotificationDropdown(false); onNavigateToInbox(); }} 
+                  onClick={() => {
+                    setShowNotificationDropdown(false);
+                    if (onOpenSystemChat) onOpenSystemChat();
+                    else onNavigateToInbox();
+                  }} 
                   className="p-2 text-center text-xs font-medium text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-[#333] border-t border-gray-100 dark:border-[#333]"
                 >
-                  Просмотреть все
+                  {onOpenSystemChat ? 'Открыть системный чат' : 'Просмотреть все'}
                 </button>
               </div>
-            </>
           )}
         </div>
 
         <div className="h-6 w-px bg-gray-200 dark:bg-[#333] mx-1 hidden md:block"></div>
 
-        <div className="relative">
+        <div className="relative" ref={userRef}>
           <button 
-            onClick={() => setShowUserDropdown(!showUserDropdown)} 
+            onClick={() => {
+              setShowUserDropdown((prev) => !prev);
+              setShowNotificationDropdown(false);
+            }}
             className="flex items-center gap-2 hover:bg-gray-100 dark:hover:bg-[#252525] p-1 pr-3 rounded-full transition-colors border border-transparent hover:border-gray-200 dark:hover:border-[#333]"
           >
             <img 
@@ -255,12 +292,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
             <ChevronDown size={14} className="text-gray-400 hidden md:block" />
           </button>
           {showUserDropdown && (
-            <>
-              <div 
-                className="fixed inset-0 z-30" 
-                onClick={() => setShowUserDropdown(false)}
-              ></div>
-              <div className="absolute right-0 top-full mt-2 w-56 bg-white dark:bg-[#252525] border border-gray-200 dark:border-[#333] rounded-xl shadow-xl z-40 overflow-hidden">
+              <div className="absolute right-0 top-full mt-2 w-56 bg-white dark:bg-[#252525] border border-gray-200 dark:border-[#333] rounded-xl shadow-xl z-[120] overflow-hidden">
                 <div className="p-3 border-b border-gray-100 dark:border-[#333] flex items-center gap-3">
                   <div className="w-10 h-10 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center text-blue-600 dark:text-blue-400 font-bold text-lg">
                     {currentUser.name.charAt(0)}
@@ -294,7 +326,6 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
                   </button>
                 </div>
               </div>
-            </>
           )}
         </div>
       </div>

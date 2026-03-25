@@ -47,7 +47,6 @@ MIGRATION_MAP = [
     ("departments", "/departments", "put_list"),
     ("financeCategories", "/finance/categories", "put_list"),
     ("salesFunnels", "/funnels", "put_list"),
-    ("tags", "/sites/tags", "put_list"),
     ("users", "/auth/users", "put_list"),
     ("clients", "/clients", "put_list"),
     ("deals", "/deals", "put_list"),
@@ -71,9 +70,6 @@ MIGRATION_MAP = [
     ("financialPlanDocuments", "/finance/financial-plan-documents", "put_list"),
     ("financialPlannings", "/finance/financial-plannings", "put_list"),
     ("funds", "/finance/funds", "put_list"),
-    ("partnerLogos", "/sites/partner-logos", "put_list"),
-    ("news", "/sites/news", "put_list"),
-    ("cases", "/sites/cases", "put_list"),
 ]
 
 

@@ -1,6 +1,7 @@
 
 import React, { useMemo, useState } from 'react';
 import { TableCollection, Task, User, Project, StatusOption, PriorityOption, Doc, Folder, Meeting, ContentPost, ViewMode, BusinessProcess, Client, Deal } from '../../types';
+import type { AppActions } from '../../frontend/hooks/useAppLogic';
 import TableView from '../TableView';
 import KanbanBoard from '../KanbanBoard';
 import GanttView from '../GanttView';
@@ -29,7 +30,7 @@ interface SpaceModuleProps {
   businessProcesses?: BusinessProcess[];
   clients?: Client[];
   deals?: Deal[];
-  actions: any;
+  actions: AppActions;
 }
 
 export const SpaceModule: React.FC<SpaceModuleProps> = ({
@@ -260,7 +261,7 @@ export const SpaceModule: React.FC<SpaceModuleProps> = ({
 
         return (
             <div className="h-full flex flex-col min-h-0">
-                <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden px-6 pb-24 md:pb-32">
+                <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden">
                 <BacklogView 
                     backlogTasks={backlogTasks}
                     users={users}
@@ -320,7 +321,7 @@ export const SpaceModule: React.FC<SpaceModuleProps> = ({
 
         return (
             <div className="h-full flex flex-col min-h-0">
-                <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden px-6 pb-24 md:pb-32">
+                <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden">
                 <FunctionalityView 
                     features={allFunctionalityTasks} 
                     users={users} 
@@ -379,7 +380,7 @@ export const SpaceModule: React.FC<SpaceModuleProps> = ({
     case 'content-plan':
         return (
             <div className="h-full flex flex-col min-h-0">
-                <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden px-6 pb-24 md:pb-32">
+                <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden">
                 <ContentPlanView 
                     posts={contentPosts} tableId={activeTable.id} tasks={tasks} 
                     activeTable={activeTable}

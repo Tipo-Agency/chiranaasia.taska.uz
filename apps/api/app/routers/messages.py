@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
 from app.models.settings import InboxMessage
+from app.services.domain_events import log_entity_mutation
 from app.utils import row_to_inbox_message
 
 router = APIRouter(prefix="/messages", tags=["messages"])
@@ -50,6 +51,21 @@ async def add_message(
         created_at=body.get("createdAt", now),
         read=False,
     ))
+    await db.flush()
+    text = body.get("text") or ""
+    await log_entity_mutation(
+        db,
+        event_type="chat.message.sent",
+        entity_type="inbox_message",
+        entity_id=mid,
+        source="messages-router",
+        actor_id=body.get("senderId") or None,
+        payload={
+            "recipientId": body.get("recipientId"),
+            "textLen": len(text),
+            "attachmentCount": len(body.get("attachments") or []),
+        },
+    )
     await db.commit()
     return {"ok": True, "id": mid}
 
@@ -64,5 +80,14 @@ async def mark_read(
     row = await db.get(InboxMessage, message_id)
     if row:
         row.read = body.get("read", True)
+        await db.flush()
+        await log_entity_mutation(
+            db,
+            event_type="chat.message.read",
+            entity_type="inbox_message",
+            entity_id=message_id,
+            source="messages-router",
+            payload={"read": row.read},
+        )
         await db.commit()
     return {"ok": True}

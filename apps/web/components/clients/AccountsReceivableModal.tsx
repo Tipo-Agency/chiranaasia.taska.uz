@@ -3,10 +3,12 @@ import { AccountsReceivable, Client, Deal } from '../../types';
 import { X, Plus, Trash2, FileText, Receipt } from 'lucide-react';
 import { TaskSelect } from '../TaskSelect';
 import { normalizeDateForInput } from '../../utils/dateUtils';
+import { DateInput } from '../ui/DateInput';
+import { SystemAlertDialog, SystemConfirmDialog } from '../ui';
 
 interface ReceivableItem {
   id: string;
-  dealId: string; // ID сделки (договора или продажи)
+  dealId: string; // ID финансовой сущности (договора или продажи)
   amount: string; // Сумма задолженности
 }
 
@@ -15,7 +17,7 @@ interface AccountsReceivableModalProps {
   editingReceivable: AccountsReceivable | null;
   clientId?: string;
   clients: Client[];
-  deals: Deal[]; // Объединенные договоры и продажи
+  deals: Deal[]; // Финансовые сущности: договоры и продажи
   onClose: () => void;
   onSave: (receivables: AccountsReceivable[]) => void; // Может создать несколько записей
   onDelete?: (id: string) => void;
@@ -37,6 +39,8 @@ export const AccountsReceivableModal: React.FC<AccountsReceivableModalProps> = (
   const [receivableDescription, setReceivableDescription] = useState('');
   const [receivablePaidAmount, setReceivablePaidAmount] = useState('');
   const [receivablePaidDate, setReceivablePaidDate] = useState('');
+  const [alertState, setAlertState] = useState({ open: false, title: '', message: '' });
+  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
   
   // Таблица для выбора продаж и договоров
   const [receivableItems, setReceivableItems] = useState<ReceivableItem[]>([]);
@@ -85,7 +89,7 @@ export const AccountsReceivableModal: React.FC<AccountsReceivableModalProps> = (
     setReceivableItems(receivableItems.map(item => {
       if (item.id === id) {
         const updated = { ...item, ...updates };
-        // Если выбрана новая сделка, устанавливаем сумму по умолчанию
+        // Если выбрана новая финансовая сущность, устанавливаем сумму по умолчанию
         if (updates.dealId && updates.dealId !== item.dealId) {
           const deal = availableDeals.find(d => d.id === updates.dealId);
           if (deal && !item.amount) {
@@ -106,7 +110,7 @@ export const AccountsReceivableModal: React.FC<AccountsReceivableModalProps> = (
   const handleSubmit = (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     if (!receivableClientId || receivableItems.length === 0) {
-      alert('Выберите клиента и добавьте хотя бы одну продажу или договор');
+      setAlertState({ open: true, title: 'Проверьте данные', message: 'Выберите клиента и добавьте хотя бы одну финансовую запись.' });
       return;
     }
 
@@ -117,7 +121,7 @@ export const AccountsReceivableModal: React.FC<AccountsReceivableModalProps> = (
       }
       const deal = deals.find(d => d.id === item.dealId);
       return {
-        id: editingReceivable && receivableItems.length === 1 ? editingReceivable.id : `ar-${Date.now()}-${Math.random()}`,
+        id: editingReceivable && receivableItems.length === 1 ? editingReceivable.id : crypto.randomUUID(),
         clientId: receivableClientId,
         dealId: item.dealId,
         amount: parseFloat(item.amount) || 0,
@@ -135,7 +139,7 @@ export const AccountsReceivableModal: React.FC<AccountsReceivableModalProps> = (
     }).filter((r): r is AccountsReceivable => r !== null);
 
     if (receivables.length === 0) {
-      alert('Заполните все строки таблицы');
+      setAlertState({ open: true, title: 'Проверьте данные', message: 'Заполните все строки таблицы.' });
       return;
     }
 
@@ -152,7 +156,7 @@ export const AccountsReceivableModal: React.FC<AccountsReceivableModalProps> = (
 
   return (
     <div 
-      className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-end md:items-center justify-center z-[80] animate-in fade-in duration-200" 
+      className="fixed inset-0 bg-black/35 backdrop-blur-sm flex items-end md:items-center justify-center z-[210] animate-in fade-in duration-200" 
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
     >
       <div 
@@ -205,7 +209,7 @@ export const AccountsReceivableModal: React.FC<AccountsReceivableModalProps> = (
                           value={item.dealId}
                           onChange={(val) => updateReceivableItem(item.id, { dealId: val })}
                           options={[
-                            { value: '', label: 'Выберите сделку...' },
+                            { value: '', label: 'Выберите продажу или договор...' },
                             ...availableDeals.map(d => ({ 
                               value: d.id, 
                               label: `${d.recurring === false ? '💰 Продажа' : '📄 Договор'}: ${d.number} - ${d.amount.toLocaleString()} UZS` 
@@ -267,12 +271,11 @@ export const AccountsReceivableModal: React.FC<AccountsReceivableModalProps> = (
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 mb-1">Срок погашения *</label>
-              <input 
-                type="date" 
-                value={normalizeDateForInput(receivableDueDate) || receivableDueDate} 
-                onChange={e => setReceivableDueDate(e.target.value)} 
-                className="w-full border border-gray-300 dark:border-gray-600 rounded px-3 py-2 text-sm bg-white dark:bg-[#333] text-gray-900 dark:text-gray-100" 
+              <DateInput
                 required
+                value={normalizeDateForInput(receivableDueDate) || receivableDueDate}
+                onChange={setReceivableDueDate}
+                className="w-full"
               />
             </div>
             <div>
@@ -301,11 +304,10 @@ export const AccountsReceivableModal: React.FC<AccountsReceivableModalProps> = (
             </div>
             <div>
               <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 mb-1">Дата оплаты</label>
-              <input 
-                type="date" 
-                value={normalizeDateForInput(receivablePaidDate) || receivablePaidDate} 
-                onChange={e => setReceivablePaidDate(e.target.value)} 
-                className="w-full border border-gray-300 dark:border-gray-600 rounded px-3 py-2 text-sm bg-white dark:bg-[#333] text-gray-900 dark:text-gray-100"
+              <DateInput
+                value={normalizeDateForInput(receivablePaidDate) || receivablePaidDate}
+                onChange={setReceivablePaidDate}
+                className="w-full"
               />
             </div>
           </div>
@@ -315,10 +317,7 @@ export const AccountsReceivableModal: React.FC<AccountsReceivableModalProps> = (
               <button 
                 type="button" 
                 onClick={() => { 
-                  if (confirm('Удалить задолженность?')) {
-                    onDelete(editingReceivable.id);
-                    onClose();
-                  }
+                  setConfirmDeleteOpen(true);
                 }} 
                 className="text-red-500 text-sm hover:underline"
               >
@@ -343,6 +342,28 @@ export const AccountsReceivableModal: React.FC<AccountsReceivableModalProps> = (
           </div>
         </form>
       </div>
+      <SystemAlertDialog
+        open={alertState.open}
+        title={alertState.title}
+        message={alertState.message}
+        onClose={() => setAlertState({ open: false, title: '', message: '' })}
+      />
+      <SystemConfirmDialog
+        open={confirmDeleteOpen}
+        title="Удалить задолженность"
+        message="Вы уверены, что хотите удалить задолженность?"
+        danger
+        confirmText="Удалить"
+        cancelText="Отмена"
+        onCancel={() => setConfirmDeleteOpen(false)}
+        onConfirm={() => {
+          if (editingReceivable && onDelete) {
+            onDelete(editingReceivable.id);
+            setConfirmDeleteOpen(false);
+            onClose();
+          }
+        }}
+      />
     </div>
   );
 };

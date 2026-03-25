@@ -1,10 +1,12 @@
 """Weekly plans and protocols router."""
+from __future__ import annotations
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy import select, delete
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
 from app.models.weekly_plan import WeeklyPlan, Protocol
+from app.services.domain_events import log_entity_mutation
 
 router = APIRouter(prefix="/weekly-plans", tags=["weekly-plans"])
 
@@ -26,7 +28,11 @@ def _row_to_protocol(row):
         "id": row.id,
         "title": row.title,
         "weekStart": row.week_start,
+        "weekEnd": row.week_end,
+        "departmentId": row.department_id,
         "participantIds": row.participant_ids or [],
+        "plannedIncome": float(row.planned_income) if row.planned_income is not None else None,
+        "actualIncome": float(row.actual_income) if row.actual_income is not None else None,
         "createdAt": row.created_at,
         "updatedAt": row.updated_at,
     }
@@ -56,6 +62,7 @@ async def update_weekly_plans(payload: list[dict], db: AsyncSession = Depends(ge
         if not pid:
             continue
         existing = await db.get(WeeklyPlan, pid)
+        is_new = existing is None
         if existing:
             existing.user_id = p.get("userId", existing.user_id)
             existing.week_start = p.get("weekStart", existing.week_start)
@@ -73,6 +80,16 @@ async def update_weekly_plans(payload: list[dict], db: AsyncSession = Depends(ge
                 created_at=p.get("createdAt", ""),
                 updated_at=p.get("updatedAt"),
             ))
+        await db.flush()
+        await log_entity_mutation(
+            db,
+            event_type="weekly_plan.created" if is_new else "weekly_plan.updated",
+            entity_type="weekly_plan",
+            entity_id=pid,
+            source="weekly-plans-router",
+            actor_id=p.get("userId"),
+            payload={"weekStart": p.get("weekStart"), "taskCount": len(p.get("taskIds") or [])},
+        )
     await db.commit()
     return {"ok": True}
 
@@ -110,7 +127,11 @@ async def update_protocols(payload: list[dict], db: AsyncSession = Depends(get_d
         if existing:
             existing.title = p.get("title", existing.title)
             existing.week_start = p.get("weekStart", existing.week_start)
+            existing.week_end = p.get("weekEnd", existing.week_end)
+            existing.department_id = p.get("departmentId", existing.department_id)
             existing.participant_ids = p.get("participantIds", existing.participant_ids or [])
+            existing.planned_income = p.get("plannedIncome", existing.planned_income)
+            existing.actual_income = p.get("actualIncome", existing.actual_income)
             existing.created_at = p.get("createdAt", existing.created_at)
             existing.updated_at = p.get("updatedAt")
         else:
@@ -118,7 +139,11 @@ async def update_protocols(payload: list[dict], db: AsyncSession = Depends(get_d
                 id=pid,
                 title=p.get("title", ""),
                 week_start=p.get("weekStart", ""),
+                week_end=p.get("weekEnd"),
+                department_id=p.get("departmentId"),
                 participant_ids=p.get("participantIds", []),
+                planned_income=p.get("plannedIncome"),
+                actual_income=p.get("actualIncome"),
                 created_at=p.get("createdAt", ""),
                 updated_at=p.get("updatedAt"),
             ))
@@ -137,9 +162,11 @@ async def get_protocol_aggregated(
         return {"protocol": None, "plans": [], "taskIdsByUser": {}}
     participant_ids = protocol.participant_ids or []
     week_start = protocol.week_start
+    week_end = protocol.week_end or protocol.week_start
     q = select(WeeklyPlan).where(
         WeeklyPlan.user_id.in_(participant_ids),
-        WeeklyPlan.week_start == week_start,
+        WeeklyPlan.week_start >= week_start,
+        WeeklyPlan.week_start <= week_end,
     )
     result = await db.execute(q)
     plans = result.scalars().all()
@@ -156,6 +183,15 @@ async def delete_weekly_plan(plan_id: str, db: AsyncSession = Depends(get_db)):
     plan = await db.get(WeeklyPlan, plan_id)
     if plan:
         await db.delete(plan)
+        await db.flush()
+        await log_entity_mutation(
+            db,
+            event_type="weekly_plan.deleted",
+            entity_type="weekly_plan",
+            entity_id=plan_id,
+            source="weekly-plans-router",
+            payload={},
+        )
     await db.commit()
     return {"ok": True}
 
@@ -165,5 +201,14 @@ async def delete_protocol(protocol_id: str, db: AsyncSession = Depends(get_db)):
     protocol = await db.get(Protocol, protocol_id)
     if protocol:
         await db.delete(protocol)
+        await db.flush()
+        await log_entity_mutation(
+            db,
+            event_type="protocol.deleted",
+            entity_type="protocol",
+            entity_id=protocol_id,
+            source="weekly-plans-router",
+            payload={},
+        )
     await db.commit()
     return {"ok": True}

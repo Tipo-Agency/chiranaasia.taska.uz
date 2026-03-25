@@ -17,9 +17,7 @@ import {
   BusinessProcess,
   ViewMode,
 } from '../../types';
-import { PageLayout } from '../ui/PageLayout';
-import { Container } from '../ui/Container';
-import { MODULE_PAGE_GUTTER } from '../ui';
+import { ModulePageShell, MODULE_PAGE_GUTTER } from '../ui';
 import {
   TasksHeader,
   ViewModeToggle,
@@ -202,18 +200,17 @@ export const TasksPage: React.FC<TasksPageProps> = ({
   }, []);
 
   return (
-    <PageLayout contentClassName="bg-gray-50/50 dark:bg-[#141414]">
-      <Container safeArea maxWidth="full" padding={false} className={`${MODULE_PAGE_GUTTER} py-6 pb-24 md:pb-32`}>
-        <TasksHeader
-          showFilters={showFilters}
-          hasActiveFilters={hasActiveFilters}
-          activeFiltersCount={activeFiltersCount}
-          onToggleFilters={() => setShowFilters(!showFilters)}
-          onCreateTask={onCreateTask}
-        />
-
-        <div className="mb-4">
-          <ViewModeToggle viewMode={viewMode} onViewModeChange={setViewMode} />
+    <ModulePageShell>
+      <div className={`${MODULE_PAGE_GUTTER} pt-6 md:pt-8 flex-shrink-0`}>
+        <div className="mb-5">
+          <TasksHeader
+            showFilters={showFilters}
+            hasActiveFilters={hasActiveFilters}
+            activeFiltersCount={activeFiltersCount}
+            onToggleFilters={() => setShowFilters(!showFilters)}
+            onCreateTask={onCreateTask}
+            tabs={<ViewModeToggle viewMode={viewMode} onViewModeChange={setViewMode} />}
+          />
         </div>
 
         {showFilters && (
@@ -222,8 +219,10 @@ export const TasksPage: React.FC<TasksPageProps> = ({
             onClear={clearFilters}
           />
         )}
+      </div>
 
-        <div className="flex-1 min-h-0">
+      <div className="flex-1 min-h-0 overflow-hidden">
+        <div className={`${MODULE_PAGE_GUTTER} mt-3 pb-24 md:pb-32 h-full overflow-y-auto overflow-x-hidden custom-scrollbar`}>
           {viewMode === ViewMode.TABLE && (
             <TableView
               tasks={filteredTasks}
@@ -264,7 +263,7 @@ export const TasksPage: React.FC<TasksPageProps> = ({
             />
           )}
         </div>
-      </Container>
-    </PageLayout>
+      </div>
+    </ModulePageShell>
   );
 };

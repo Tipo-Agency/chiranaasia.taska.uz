@@ -44,7 +44,6 @@ from app.routers import (
     bpm,
     inventory,
     funnels,
-    sites,
 )
 
 settings = get_settings()
@@ -153,7 +152,6 @@ app.include_router(finance.router, prefix=settings.API_PREFIX, tags=["finance"])
 app.include_router(bpm.router, prefix=settings.API_PREFIX, tags=["bpm"])
 app.include_router(inventory.router, prefix=settings.API_PREFIX, tags=["inventory"])
 app.include_router(funnels.router, prefix=settings.API_PREFIX, tags=["funnels"])
-app.include_router(sites.router, prefix=settings.API_PREFIX, tags=["sites"])
 app.include_router(weekly_plans.router, prefix=settings.API_PREFIX, tags=["weekly-plans"])
 
 

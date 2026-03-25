@@ -12,6 +12,7 @@ export const ClientsTabs: React.FC<ClientsTabsProps> = ({ activeTab, onTabChange
       variant="neutral"
       value={activeTab}
       onChange={(v) => onTabChange(v as 'clients' | 'contracts' | 'finance' | 'receivables')}
+      className="flex-nowrap whitespace-nowrap"
       options={[
         { value: 'clients', label: 'База клиентов' },
         { value: 'contracts', label: 'Договоры и продажи' },

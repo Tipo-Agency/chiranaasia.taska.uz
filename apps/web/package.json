@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
     "preview": "vite preview"
   },
   "dependencies": {
@@ -13,7 +14,8 @@
     "bcryptjs": "^3.0.3",
     "lucide-react": "^0.554.0",
     "react": "^19.2.1",
-    "react-dom": "^19.2.1"
+    "react-dom": "^19.2.1",
+    "xlsx": "^0.18.5"
   },
   "devDependencies": {
     "@types/node": "^22.14.0",

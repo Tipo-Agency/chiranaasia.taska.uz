@@ -3,6 +3,7 @@ import { Deal, Client } from '../../types';
 import { X } from 'lucide-react';
 import { TaskSelect } from '../TaskSelect';
 import { normalizeDateForInput } from '../../utils/dateUtils';
+import { DateInput } from '../ui/DateInput';
 
 interface ContractModalProps {
   isOpen: boolean;
@@ -27,7 +28,6 @@ export const ContractModal: React.FC<ContractModalProps> = ({
   const [contractPaymentDay, setContractPaymentDay] = useState('5');
   const [contractStatus, setContractStatus] = useState<'active' | 'pending' | 'completed'>('active');
   const [contractServices, setContractServices] = useState('');
-  const [isOneTime, setIsOneTime] = useState(false); // Разовый договор
 
   useEffect(() => {
     if (isOpen) {
@@ -38,7 +38,6 @@ export const ContractModal: React.FC<ContractModalProps> = ({
         setContractPaymentDay((editingContract.paymentDay || 5).toString());
         setContractStatus(editingContract.status as 'active' | 'pending' | 'completed');
         setContractServices(editingContract.description);
-        setIsOneTime(editingContract.recurring === false); // Разовый если recurring = false
       } else {
         setContractNumber('');
         setContractAmount('');
@@ -46,7 +45,6 @@ export const ContractModal: React.FC<ContractModalProps> = ({
         setContractPaymentDay('5');
         setContractStatus('active');
         setContractServices('');
-        setIsOneTime(false);
       }
     }
   }, [isOpen, editingContract]);
@@ -59,15 +57,15 @@ export const ContractModal: React.FC<ContractModalProps> = ({
     onSave({
       id: editingContract ? editingContract.id : `deal-${Date.now()}`,
       clientId: targetClientId,
-      recurring: !isOneTime, // false = разовый, true = ежемесячно
+      recurring: true, // Договор всегда регулярный
       number: contractNumber,
       amount: parseFloat(contractAmount) || 0,
       currency: 'UZS',
       status: contractStatus,
       description: contractServices,
-      startDate: isOneTime ? undefined : contractStartDate,
+      startDate: contractStartDate,
       date: contractStartDate, // Для отображения
-      paymentDay: isOneTime ? undefined : (parseInt(contractPaymentDay) || 1),
+      paymentDay: parseInt(contractPaymentDay) || 1,
       funnelId: client?.funnelId || undefined,
       createdAt: editingContract?.createdAt || now,
       updatedAt: now
@@ -77,8 +75,7 @@ export const ContractModal: React.FC<ContractModalProps> = ({
 
   const handleBackdrop = (e: React.MouseEvent) => {
     if (e.target === e.currentTarget) {
-      if (window.confirm("Сохранить изменения?")) handleSubmit();
-      else onClose();
+      onClose();
     }
   };
 
@@ -86,7 +83,7 @@ export const ContractModal: React.FC<ContractModalProps> = ({
 
   return (
     <div 
-      className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-end md:items-center justify-center z-[90] animate-in fade-in duration-200" 
+      className="fixed inset-0 bg-black/35 backdrop-blur-sm flex items-end md:items-center justify-center z-[210] animate-in fade-in duration-200" 
       onClick={handleBackdrop}
     >
       <div 
@@ -118,11 +115,10 @@ export const ContractModal: React.FC<ContractModalProps> = ({
             </div>
             <div>
               <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 mb-1">Дата подписания</label>
-              <input 
-                type="date" 
-                value={normalizeDateForInput(contractStartDate) || contractStartDate} 
-                onChange={e => setContractStartDate(e.target.value)} 
-                className="w-full border border-gray-300 dark:border-gray-600 rounded px-3 py-2 text-sm bg-white dark:bg-[#333] text-gray-900 dark:text-gray-100"
+              <DateInput
+                value={normalizeDateForInput(contractStartDate) || contractStartDate}
+                onChange={setContractStartDate}
+                className="w-full"
               />
             </div>
           </div>
@@ -158,35 +154,20 @@ export const ContractModal: React.FC<ContractModalProps> = ({
             </div>
           </div>
 
-          <div className="flex items-center gap-2 pb-2 border-b border-gray-100 dark:border-[#333]">
-            <input
-              type="checkbox"
-              id="isOneTime"
-              checked={isOneTime}
-              onChange={(e) => setIsOneTime(e.target.checked)}
-              className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 dark:bg-[#333] dark:border-gray-600"
-            />
-            <label htmlFor="isOneTime" className="text-sm font-medium text-gray-700 dark:text-gray-300 cursor-pointer">
-              Разовый (без повторения оплат)
-            </label>
-          </div>
-
           <div className="grid grid-cols-2 gap-4">
-            {!isOneTime && (
-              <div>
-                <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 mb-1">День оплаты</label>
-                <input 
-                  type="number" 
-                  min="1" 
-                  max="31" 
-                  value={contractPaymentDay} 
-                  onChange={e => setContractPaymentDay(e.target.value)} 
-                  className="w-full border border-gray-300 dark:border-gray-600 rounded px-3 py-2 text-sm bg-white dark:bg-[#333] text-gray-900 dark:text-gray-100" 
-                  placeholder="5"
-                />
-              </div>
-            )}
-            <div className={isOneTime ? 'col-span-2' : ''}>
+            <div>
+              <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 mb-1">День оплаты</label>
+              <input 
+                type="number" 
+                min="1" 
+                max="31" 
+                value={contractPaymentDay} 
+                onChange={e => setContractPaymentDay(e.target.value)} 
+                className="w-full border border-gray-300 dark:border-gray-600 rounded px-3 py-2 text-sm bg-white dark:bg-[#333] text-gray-900 dark:text-gray-100" 
+                placeholder="5"
+              />
+            </div>
+            <div>
               <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 mb-1">Статус</label>
               <TaskSelect
                 value={contractStatus}

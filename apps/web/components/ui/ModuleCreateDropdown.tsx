@@ -4,7 +4,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { type LucideIcon } from 'lucide-react';
 import { ModuleCreateIconButton } from './ModuleCreateIconButton';
-import type { ModuleAccentKey } from './moduleAccent';
+import { MODULE_ACCENTS, type ModuleAccentKey } from './moduleAccent';
 
 export interface ModuleCreateMenuItem {
   id: string;
@@ -37,6 +37,7 @@ export const ModuleCreateDropdown: React.FC<ModuleCreateDropdownProps> = ({
 }) => {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+  const defaultIconClass = MODULE_ACCENTS[accent].menuIcon;
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -86,7 +87,7 @@ export const ModuleCreateDropdown: React.FC<ModuleCreateDropdownProps> = ({
                   <Icon
                     size={16}
                     className={
-                      item.iconClassName ?? 'text-[#3337AD] dark:text-[#8b8ee0] shrink-0'
+                      item.iconClassName ?? defaultIconClass
                     }
                   />
                   <span>{item.label}</span>

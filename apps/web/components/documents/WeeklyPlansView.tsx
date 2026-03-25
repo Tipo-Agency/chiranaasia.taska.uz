@@ -1,12 +1,14 @@
 /**
  * Недельные планы сотрудника: список планов, редактирование, подтянуть задачи из задач/контент-плана.
  */
-import React, { useEffect, useState } from 'react';
-import { Calendar, Trash2, ChevronDown, ChevronRight, Loader2, ListTodo, Search, X } from 'lucide-react';
+import React, { useEffect, useState, useCallback, forwardRef, useImperativeHandle, useMemo } from 'react';
+import { Calendar, Trash2, FileText, Loader2, ListTodo, Search, X, Plus } from 'lucide-react';
 import { ModuleCreateIconButton } from '../ui/ModuleCreateIconButton';
+import { SystemConfirmDialog } from '../ui';
 import { weeklyPlansEndpoint, type WeeklyPlanApi } from '../../services/apiClient';
 import type { User } from '../../types';
 import type { Task } from '../../types';
+import { DateRangeInput } from '../ui/DateInput';
 
 const MONDAY = 1;
 
@@ -18,38 +20,69 @@ function getWeekStart(d: Date): string {
   return monday.toISOString().slice(0, 10);
 }
 
-function formatWeekLabel(weekStart: string): string {
+function formatWeekLabel(weekStart: string, weekEnd?: string): string {
   const d = new Date(weekStart + 'T12:00:00');
-  const end = new Date(d);
-  end.setDate(end.getDate() + 6);
+  const end = weekEnd ? new Date(weekEnd + 'T12:00:00') : new Date(d);
+  if (!weekEnd) end.setDate(end.getDate() + 6);
   return `${d.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' })} – ${end.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short', year: 'numeric' })}`;
 }
 
 interface WeeklyPlansViewProps {
   currentUser: User;
   tasks: Task[];
+  users?: User[];
+  scope?: 'mine' | 'all';
   onOpenTask?: (task: Task) => void;
+  onCreateTask?: (title: string) => Promise<{ id: string; label: string } | null> | { id: string; label: string } | null;
+  onUpdateTask?: (taskId: string, updates: Partial<Task>) => Promise<void> | void;
   /** В модалке — без дублирующего заголовка страницы */
   layout?: 'full' | 'embedded';
+  /** В модуле «Документы» кнопка создания в шапке — скрыть внутренний блок с плюсом */
+  hideEmbeddedToolbar?: boolean;
 }
 
-export const WeeklyPlansView: React.FC<WeeklyPlansViewProps> = ({
+export interface WeeklyPlansViewHandle {
+  createPlanForCurrentWeek: () => void;
+  openCreateModal: () => void;
+  toggleFilters: () => void;
+}
+
+export const WeeklyPlansView = forwardRef<WeeklyPlansViewHandle, WeeklyPlansViewProps>(function WeeklyPlansView(
+  {
   currentUser,
   tasks,
+  users = [],
+  scope = 'mine',
   onOpenTask,
+  onCreateTask,
+  onUpdateTask,
   layout = 'full',
-}) => {
+  hideEmbeddedToolbar = false,
+},
+  ref
+) {
   const embedded = layout === 'embedded';
   const [plans, setPlans] = useState<WeeklyPlanApi[]>([]);
   const [loading, setLoading] = useState(true);
-  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [openedPlanId, setOpenedPlanId] = useState<string | null>(null);
   const [editingPlan, setEditingPlan] = useState<WeeklyPlanApi | null>(null);
   const [showAddTaskModal, setShowAddTaskModal] = useState(false);
+  const [planToDelete, setPlanToDelete] = useState<WeeklyPlanApi | null>(null);
+  const [closeConfirmOpen, setCloseConfirmOpen] = useState(false);
+  const [createOpen, setCreateOpen] = useState(false);
+  const [newStartDate, setNewStartDate] = useState('');
+  const [newEndDate, setNewEndDate] = useState('');
+  const [newTaskTitle, setNewTaskTitle] = useState('');
+  const [userFilter, setUserFilter] = useState<'all' | string>('all');
+  const [showFilters, setShowFilters] = useState(false);
+  const [expandedUsers, setExpandedUsers] = useState<Record<string, boolean>>({});
 
   const load = async () => {
     setLoading(true);
     try {
-      const data = await weeklyPlansEndpoint.getPlans({ userId: currentUser.id });
+      const data = scope === 'all'
+        ? await weeklyPlansEndpoint.getPlans()
+        : await weeklyPlansEndpoint.getPlans({ userId: currentUser.id });
       setPlans(data);
     } catch {
       setPlans([]);
@@ -60,20 +93,67 @@ export const WeeklyPlansView: React.FC<WeeklyPlansViewProps> = ({
 
   useEffect(() => {
     load();
-  }, [currentUser.id]);
+  }, [currentUser.id, scope]);
 
-  const handleCreatePlan = async () => {
-    const weekStart = getWeekStart(new Date());
+  const sortedPlans = useMemo(
+    () => [...plans].sort((a, b) => (b.weekStart || '').localeCompare(a.weekStart || '')),
+    [plans]
+  );
+  const visiblePlans = useMemo(() => {
+    if (scope !== 'all' || userFilter === 'all') return sortedPlans;
+    return sortedPlans.filter((p) => p.userId === userFilter);
+  }, [scope, sortedPlans, userFilter]);
+  const plansByUser = useMemo(() => {
+    const map = new Map<string, WeeklyPlanApi[]>();
+    visiblePlans.forEach((p) => {
+      const arr = map.get(p.userId) || [];
+      arr.push(p);
+      map.set(p.userId, arr);
+    });
+    return map;
+  }, [visiblePlans]);
+  const userLabel = (uid: string) => users.find((u) => u.id === uid)?.name || (uid === currentUser.id ? 'Вы' : 'Сотрудник');
+  const taskById = useMemo(() => {
+    const map = new Map<string, Task>();
+    for (const t of tasks) map.set(t.id, t);
+    return map;
+  }, [tasks]);
+  const statusOptions = useMemo(() => {
+    const defaults = ['Не начато', 'В работе', 'На проверке', 'Выполнено'];
+    const fromTasks = tasks.map((t) => t.status).filter((s): s is string => Boolean(s && s.trim()));
+    return [...new Set([...defaults, ...fromTasks])];
+  }, [tasks]);
+
+  const openCreateModal = useCallback(() => {
+    setOpenedPlanId(null);
+    const basePool = scope === 'all' ? plans.filter((p) => p.userId === currentUser.id) : plans;
+    const latest = [...basePool].sort((a, b) => (b.weekStart || '').localeCompare(a.weekStart || ''))[0];
+    const base = latest
+      ? new Date(`${(latest.weekEnd || latest.weekStart)}T12:00:00`)
+      : new Date();
+    if (latest) base.setDate(base.getDate() + 1);
+    const start = base.toISOString().slice(0, 10);
+    const end = new Date(`${start}T12:00:00`);
+    end.setDate(end.getDate() + 6);
+    setNewStartDate(start);
+    setNewEndDate(end.toISOString().slice(0, 10));
+    setCreateOpen(true);
+  }, [plans, scope, currentUser.id]);
+
+  const handleCreatePlan = useCallback(async (forcedWeekStart?: string, forcedWeekEnd?: string) => {
+    const weekStart = forcedWeekStart || getWeekStart(new Date());
     const existing = plans.find((p) => p.weekStart === weekStart);
     if (existing) {
       setEditingPlan(existing);
-      setExpandedId(existing.id);
+      setOpenedPlanId(existing.id);
+      setCreateOpen(false);
       return;
     }
     const newPlan: WeeklyPlanApi = {
       id: crypto.randomUUID(),
       userId: currentUser.id,
       weekStart: weekStart,
+      weekEnd: forcedWeekEnd,
       taskIds: [],
       notes: '',
       createdAt: new Date().toISOString(),
@@ -83,18 +163,30 @@ export const WeeklyPlansView: React.FC<WeeklyPlansViewProps> = ({
       await weeklyPlansEndpoint.updatePlans([...plans, newPlan]);
       setPlans((prev) => [...prev, newPlan]);
       setEditingPlan(newPlan);
-      setExpandedId(newPlan.id);
+      setOpenedPlanId(newPlan.id);
+      setCreateOpen(false);
     } catch (e) {
       console.error(e);
     }
-  };
+  }, [plans, currentUser.id]);
 
-  const handleSavePlan = async (plan: WeeklyPlanApi) => {
+  useImperativeHandle(ref, () => ({
+    createPlanForCurrentWeek: () => {
+      openCreateModal();
+    },
+    openCreateModal,
+    toggleFilters: () => setShowFilters((v) => !v),
+  }), [openCreateModal]);
+
+  const handleSavePlan = async (plan: WeeklyPlanApi, opts?: { closeAfterSave?: boolean }) => {
     const list = plans.map((p) => (p.id === plan.id ? plan : p));
     try {
       await weeklyPlansEndpoint.updatePlans(list);
       setPlans(list);
       setEditingPlan(null);
+      if (opts?.closeAfterSave) {
+        setOpenedPlanId(null);
+      }
     } catch (e) {
       console.error(e);
     }
@@ -111,16 +203,64 @@ export const WeeklyPlansView: React.FC<WeeklyPlansViewProps> = ({
     setShowAddTaskModal(false);
   };
 
+  const handleCreateTaskFromPlan = async (plan: WeeklyPlanApi) => {
+    const title = newTaskTitle.trim();
+    if (!title || !onCreateTask) return;
+    const created = await onCreateTask(title);
+    if (!created?.id) return;
+    const currentIds = plan.taskIds || [];
+    if (!currentIds.includes(created.id)) {
+      await handleSavePlan({ ...plan, taskIds: [...currentIds, created.id] });
+    }
+    setNewTaskTitle('');
+  };
+
+  const handleTaskStatusChange = async (taskId: string, status: string) => {
+    if (!onUpdateTask) return;
+    try {
+      await onUpdateTask(taskId, { status });
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
   const handleDeletePlan = async (plan: WeeklyPlanApi) => {
-    if (!confirm('Удалить этот недельный план?')) return;
     try {
       await weeklyPlansEndpoint.deletePlan(plan.id);
       setPlans((prev) => prev.filter((p) => p.id !== plan.id));
       if (editingPlan?.id === plan.id) setEditingPlan(null);
-      if (expandedId === plan.id) setExpandedId(null);
+      if (openedPlanId === plan.id) setOpenedPlanId(null);
     } catch (e) {
       console.error(e);
     }
+  };
+
+  const planHasUnsavedChanges = (basePlan: WeeklyPlanApi, draftPlan: WeeklyPlanApi) => {
+    const baseTaskIds = [...(basePlan.taskIds || [])].sort();
+    const draftTaskIds = [...(draftPlan.taskIds || [])].sort();
+    return (
+      (basePlan.weekStart || '') !== (draftPlan.weekStart || '') ||
+      (basePlan.weekEnd || '') !== (draftPlan.weekEnd || '') ||
+      (basePlan.notes || '') !== (draftPlan.notes || '') ||
+      baseTaskIds.join(',') !== draftTaskIds.join(',')
+    );
+  };
+
+  const requestCloseOpenedPlan = () => {
+    if (!openedPlanId) return;
+    const basePlan = plans.find((p) => p.id === openedPlanId);
+    const draftPlan = editingPlan?.id === openedPlanId ? editingPlan : basePlan;
+    if (!basePlan || !draftPlan) {
+      setOpenedPlanId(null);
+      setEditingPlan(null);
+      return;
+    }
+    if (planHasUnsavedChanges(basePlan, draftPlan)) {
+      setCloseConfirmOpen(true);
+      return;
+    }
+    setOpenedPlanId(null);
+    setEditingPlan(null);
   };
 
   if (loading) {
@@ -141,13 +281,13 @@ export const WeeklyPlansView: React.FC<WeeklyPlansViewProps> = ({
               <Calendar size={22} className="text-[#3337AD]" />
               Недельные планы
             </h2>
-            <ModuleCreateIconButton accent="indigo" label="План на эту неделю" onClick={handleCreatePlan} />
+            <ModuleCreateIconButton accent="indigo" label="Новый недельный план" onClick={openCreateModal} />
           </div>
           <p className="text-sm text-gray-500 dark:text-gray-400 leading-relaxed">
             Составляйте план недели: добавляйте задачи из раздела «Задачи» и контент-плана, убирайте лишнее.
           </p>
         </>
-      ) : (
+      ) : hideEmbeddedToolbar ? null : (
         <div className="rounded-2xl border border-gray-200 dark:border-[#333] bg-gradient-to-br from-[#3337AD]/8 via-white to-violet-50/40 dark:from-[#3337AD]/20 dark:via-[#1e1e1e] dark:to-[#252525] p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <p className="text-sm text-gray-600 dark:text-gray-300 leading-snug">
             Добавьте задачи в план и ведите заметки по неделе. Всё сохраняется автоматически.
@@ -155,8 +295,7 @@ export const WeeklyPlansView: React.FC<WeeklyPlansViewProps> = ({
           <ModuleCreateIconButton accent="indigo" label="План на эту неделю" onClick={handleCreatePlan} className="shrink-0" />
         </div>
       )}
-
-      {plans.length === 0 ? (
+      {visiblePlans.length === 0 ? (
         <div className="rounded-2xl border-2 border-dashed border-gray-200 dark:border-[#333] bg-gray-50/50 dark:bg-[#1a1a1a] p-10 text-center">
           <Calendar size={44} className="mx-auto mb-3 text-gray-300 dark:text-gray-600" strokeWidth={1.25} />
           <p className="text-gray-700 dark:text-gray-300 font-medium">Пока нет планов</p>
@@ -164,117 +303,79 @@ export const WeeklyPlansView: React.FC<WeeklyPlansViewProps> = ({
         </div>
       ) : (
         <div className="space-y-3">
-          {plans.map((plan) => (
-            <div
-              key={plan.id}
-              className="rounded-2xl border border-gray-200 dark:border-[#333] overflow-hidden bg-white dark:bg-[#252525] shadow-sm hover:shadow-md transition-shadow"
-            >
-              <button
-                type="button"
-                className="w-full flex items-center justify-between gap-2 px-4 py-3.5 text-left hover:bg-gray-50/80 dark:hover:bg-[#2a2a2a]/80 transition-colors"
-                onClick={() => setExpandedId(expandedId === plan.id ? null : plan.id)}
+          {scope === 'all' && showFilters && (
+            <div className="rounded-2xl border border-gray-200 dark:border-[#333] bg-white dark:bg-[#252525] p-3">
+              <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1.5">Сотрудник</label>
+              <select
+                value={userFilter}
+                onChange={(e) => setUserFilter(e.target.value)}
+                className="w-full sm:w-72 px-3 py-2 rounded-xl border border-gray-200 dark:border-[#444] bg-white dark:bg-[#1f1f1f] text-sm"
               >
-                <span className="flex items-center gap-3 min-w-0">
-                  <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#3337AD]/10 text-[#3337AD] dark:bg-[#3337AD]/25 dark:text-[#a8abf0] shrink-0">
-                    {expandedId === plan.id ? <ChevronDown size={18} /> : <ChevronRight size={18} />}
-                  </span>
-                  <span className="font-semibold text-gray-900 dark:text-white truncate">
-                    {formatWeekLabel(plan.weekStart)}
-                  </span>
-                </span>
-                <div className="flex items-center gap-2 shrink-0">
-                  {(plan.taskIds || []).length > 0 && (
-                    <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-gray-100 dark:bg-[#333] text-gray-600 dark:text-gray-300">
-                      {(plan.taskIds || []).length} задач
-                    </span>
-                  )}
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleDeletePlan(plan);
-                    }}
-                    className="p-2 rounded-xl text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20"
-                    title="Удалить план"
-                  >
-                    <Trash2 size={16} />
-                  </button>
-                </div>
-              </button>
-
-              {expandedId === plan.id && (
-                <div className="border-t border-gray-100 dark:border-[#333] p-4 sm:p-5 bg-slate-50/60 dark:bg-[#1a1a1a]/80">
-                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
-                    <span className="text-sm font-semibold text-gray-800 dark:text-gray-200">
-                      Задачи в плане
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setEditingPlan(plan);
-                        setShowAddTaskModal(true);
-                      }}
-                      className="inline-flex items-center justify-center gap-2 px-3 py-2 rounded-xl bg-white dark:bg-[#252525] border border-gray-200 dark:border-[#444] text-gray-800 dark:text-gray-100 text-sm font-medium hover:border-[#3337AD]/50 hover:bg-[#3337AD]/5 dark:hover:bg-[#3337AD]/10"
-                    >
-                      <ListTodo size={16} className="text-[#3337AD]" />
-                      Подтянуть задачи
-                    </button>
-                  </div>
-
-                  {(plan.taskIds || []).length === 0 ? (
-                    <p className="text-sm text-gray-500 dark:text-gray-400 rounded-xl bg-white/60 dark:bg-[#252525]/60 border border-dashed border-gray-200 dark:border-[#333] px-4 py-6 text-center">
-                      Нет задач. Нажмите «Подтянуть задачи», чтобы выбрать из списка задач.
-                    </p>
-                  ) : (
-                    <ul className="space-y-2">
-                      {(plan.taskIds || []).map((taskId) => {
-                        const task = tasks.find((t) => t.id === taskId);
-                        return (
-                          <li
-                            key={taskId}
-                            className="flex items-center justify-between gap-2 py-2.5 px-3 rounded-xl bg-white dark:bg-[#252525] border border-gray-100 dark:border-[#333] shadow-sm"
-                          >
+                <option value="all">Все сотрудники</option>
+                {users.map((u) => (
+                  <option key={u.id} value={u.id}>{u.name}</option>
+                ))}
+              </select>
+            </div>
+          )}
+          {[...plansByUser.entries()].map(([uid, userPlans]) => {
+            const isOpen = expandedUsers[uid] ?? true;
+            return (
+              <div key={uid} className="rounded-2xl border border-gray-200 dark:border-[#333] overflow-hidden bg-white dark:bg-[#252525] shadow-sm">
+                <button
+                  type="button"
+                  onClick={() => setExpandedUsers((prev) => ({ ...prev, [uid]: !isOpen }))}
+                  className="w-full px-4 py-3 flex items-center justify-between text-left hover:bg-gray-50/80 dark:hover:bg-[#2a2a2a]/80"
+                >
+                  <span className="font-semibold text-gray-900 dark:text-white">{userLabel(uid)}</span>
+                  <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 dark:bg-[#333] text-gray-600 dark:text-gray-300">{userPlans.length} планов</span>
+                </button>
+                {isOpen && (
+                  <div className="border-t border-gray-100 dark:border-[#333] p-2 space-y-2">
+                    {userPlans.map((plan) => (
+                      <div
+                        key={plan.id}
+                        className="rounded-xl border border-gray-200 dark:border-[#333] overflow-hidden bg-white dark:bg-[#252525] hover:shadow-md transition-shadow"
+                      >
+                        <button
+                          type="button"
+                          className="w-full flex items-center justify-between gap-2 px-4 py-3 text-left hover:bg-gray-50/80 dark:hover:bg-[#2a2a2a]/80 transition-colors"
+                          onClick={() => setOpenedPlanId(plan.id)}
+                        >
+                          <span className="flex items-center gap-3 min-w-0">
+                            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#3337AD]/10 text-[#3337AD] dark:bg-[#3337AD]/25 dark:text-[#a8abf0] shrink-0">
+                              <FileText size={16} />
+                            </span>
+                            <span className="font-medium text-gray-900 dark:text-white truncate">
+                              {formatWeekLabel(plan.weekStart, plan.weekEnd)}
+                            </span>
+                          </span>
+                          <div className="flex items-center gap-2 shrink-0">
+                            {(plan.taskIds || []).length > 0 && (
+                              <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-gray-100 dark:bg-[#333] text-gray-600 dark:text-gray-300">
+                                {(plan.taskIds || []).length} задач
+                              </span>
+                            )}
                             <button
                               type="button"
-                              onClick={() => task && onOpenTask?.(task)}
-                              className="text-left flex-1 min-w-0 truncate text-sm font-medium text-gray-800 dark:text-gray-100 hover:text-[#3337AD] dark:hover:text-[#8b8ee0]"
-                            >
-                              {task ? task.title : `Задача ${taskId}`}
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => handleRemoveTask(plan, taskId)}
-                              className="p-2 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20"
-                              title="Убрать из плана"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setPlanToDelete(plan);
+                              }}
+                              className="p-2 rounded-xl text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20"
+                              title="Удалить план"
                             >
                               <Trash2 size={14} />
                             </button>
-                          </li>
-                        );
-                      })}
-                    </ul>
-                  )}
-
-                  <div className="mt-4 pt-4 border-t border-gray-200 dark:border-[#333]">
-                    <label className="block text-[11px] font-bold uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-1.5">
-                      Заметки к плану
-                    </label>
-                    <textarea
-                      key={`${plan.id}-${plan.updatedAt ?? ''}`}
-                      defaultValue={plan.notes ?? ''}
-                      onBlur={(e) => {
-                        const v = e.target.value;
-                        if (v !== (plan.notes ?? '')) handleSavePlan({ ...plan, notes: v });
-                      }}
-                      className="w-full px-3 py-2.5 border border-gray-200 dark:border-[#333] rounded-xl bg-white dark:bg-[#252525] text-sm text-gray-800 dark:text-gray-200 focus:ring-2 focus:ring-[#3337AD]/25 outline-none"
-                      rows={3}
-                      placeholder="Договорённости, фокус недели, напоминания…"
-                    />
+                          </div>
+                        </button>
+                      </div>
+                    ))}
                   </div>
-                </div>
-              )}
-            </div>
-          ))}
+                )}
+              </div>
+            );
+          })}
         </div>
       )}
 
@@ -289,9 +390,219 @@ export const WeeklyPlansView: React.FC<WeeklyPlansViewProps> = ({
           }}
         />
       )}
+      <SystemConfirmDialog
+        open={Boolean(planToDelete)}
+        title="Удалить недельный план"
+        message="Вы уверены, что хотите удалить этот недельный план?"
+        danger
+        confirmText="Удалить"
+        cancelText="Отмена"
+        onCancel={() => setPlanToDelete(null)}
+        onConfirm={() => {
+          if (planToDelete) {
+            handleDeletePlan(planToDelete);
+          }
+          setPlanToDelete(null);
+        }}
+      />
+      <SystemConfirmDialog
+        open={closeConfirmOpen}
+        title="Сохранить изменения?"
+        message="В недельном плане есть несохраненные изменения. Сохранить перед закрытием?"
+        confirmText="Сохранить"
+        cancelText="Не сохранять"
+        onCancel={() => {
+          setCloseConfirmOpen(false);
+          setOpenedPlanId(null);
+          setEditingPlan(null);
+        }}
+        onConfirm={() => {
+          const opened = openedPlanId ? plans.find((p) => p.id === openedPlanId) : null;
+          const toSave = opened && editingPlan?.id === opened.id ? editingPlan : opened;
+          if (toSave) {
+            void handleSavePlan(toSave, { closeAfterSave: true });
+          } else {
+            setOpenedPlanId(null);
+            setEditingPlan(null);
+          }
+          setCloseConfirmOpen(false);
+        }}
+      />
+      {createOpen && (
+        <div className="fixed inset-0 z-[130] flex items-center justify-center bg-black/50 dark:bg-black/70 backdrop-blur-sm p-4">
+          <div className="w-full max-w-md rounded-2xl bg-white dark:bg-[#191919] border border-gray-200 dark:border-[#333] shadow-2xl">
+            <div className="p-4 border-b border-gray-200 dark:border-[#333] flex items-center justify-between">
+              <h3 className="text-base font-semibold text-gray-900 dark:text-white">Новый недельный план</h3>
+              <button type="button" onClick={() => setCreateOpen(false)} className="p-1 rounded hover:bg-gray-100 dark:hover:bg-[#333]">
+                <X size={18} />
+              </button>
+            </div>
+            <div className="p-4 space-y-3">
+              <div>
+                <label className="block text-xs font-semibold text-gray-600 dark:text-gray-300 mb-1">Период</label>
+                <DateRangeInput
+                  startDate={newStartDate}
+                  endDate={newEndDate}
+                  autoRangeDays={7}
+                  onChange={(start, end) => {
+                    setNewStartDate(start);
+                    setNewEndDate(end);
+                  }}
+                />
+              </div>
+            </div>
+            <div className="p-4 border-t border-gray-200 dark:border-[#333] flex justify-end gap-2">
+              <button type="button" onClick={() => setCreateOpen(false)} className="px-4 py-2 rounded-xl border border-gray-200 dark:border-[#333] text-sm">
+                Отмена
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  if (!newStartDate) return;
+                  const safeEnd = newEndDate || newStartDate;
+                  void handleCreatePlan(newStartDate, safeEnd);
+                }}
+                className="px-4 py-2 rounded-xl bg-[#3337AD] text-white text-sm font-semibold"
+              >
+                Создать
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {openedPlanId && (() => {
+        const plan = plans.find((p) => p.id === openedPlanId);
+        if (!plan) return null;
+        const activePlan = editingPlan?.id === plan.id ? editingPlan : plan;
+        return (
+          <div
+            className="fixed inset-0 z-[125] flex items-center justify-center bg-black/50 dark:bg-black/70 backdrop-blur-sm p-4"
+            onClick={requestCloseOpenedPlan}
+          >
+          <div
+            className="w-full max-w-2xl max-h-[85vh] overflow-hidden rounded-2xl bg-white dark:bg-[#191919] border border-gray-200 dark:border-[#333] ring-1 ring-black/5 dark:ring-white/10 shadow-[0_20px_60px_rgba(0,0,0,0.35)] flex flex-col"
+            onClick={(e) => e.stopPropagation()}
+          >
+              <div className="p-4 border-b border-gray-200 dark:border-[#333] flex items-center justify-between">
+                <h3 className="text-base font-semibold text-gray-900 dark:text-white">{formatWeekLabel(plan.weekStart, plan.weekEnd)}</h3>
+                <button type="button" onClick={requestCloseOpenedPlan} className="p-1 rounded hover:bg-gray-100 dark:hover:bg-[#333]"><X size={18} /></button>
+              </div>
+              <div className="p-4 overflow-y-auto custom-scrollbar space-y-4">
+                <div>
+                  <label className="block text-[11px] font-bold uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-1.5">Период</label>
+                  <DateRangeInput
+                    startDate={activePlan.weekStart || ''}
+                    endDate={activePlan.weekEnd || ''}
+                    onChange={(start, end) => setEditingPlan({ ...activePlan, weekStart: start, weekEnd: end })}
+                  />
+                </div>
+                <div className="flex justify-between items-center gap-3">
+                  <span className="text-sm font-semibold text-gray-800 dark:text-gray-200">Задачи в плане</span>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setEditingPlan(plan);
+                        setShowAddTaskModal(true);
+                      }}
+                      className="inline-flex items-center justify-center gap-2 px-3 py-2 rounded-xl bg-white dark:bg-[#252525] border border-gray-200 dark:border-[#444] text-gray-800 dark:text-gray-100 text-sm font-medium hover:border-[#3337AD]/50 hover:bg-[#3337AD]/5 dark:hover:bg-[#3337AD]/10"
+                    >
+                      <ListTodo size={16} className="text-[#3337AD]" />
+                      Подтянуть задачи
+                    </button>
+                  </div>
+                </div>
+                {onCreateTask && (
+                  <div className="flex items-center gap-2">
+                    <input
+                      value={newTaskTitle}
+                      onChange={(e) => setNewTaskTitle(e.target.value)}
+                      placeholder="Новая задача для этого плана"
+                      className="flex-1 px-3 py-2 rounded-xl border border-gray-200 dark:border-[#333] bg-white dark:bg-[#252525] text-sm"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => void handleCreateTaskFromPlan(plan)}
+                      className="inline-flex items-center gap-1 px-3 py-2 rounded-xl bg-[#3337AD] text-white text-sm font-semibold"
+                    >
+                      <Plus size={14} /> Создать
+                    </button>
+                  </div>
+                )}
+                {(plan.taskIds || []).length === 0 ? (
+                  <p className="text-sm text-gray-500 dark:text-gray-400 rounded-xl bg-white/60 dark:bg-[#252525]/60 border border-dashed border-gray-200 dark:border-[#333] px-4 py-6 text-center">
+                    Нет задач. Нажмите «Подтянуть задачи», чтобы выбрать из списка задач.
+                  </p>
+                ) : (
+                  <ul className="space-y-2">
+                    {(plan.taskIds || []).map((taskId) => {
+                      const task = taskById.get(taskId);
+                      return (
+                        <li key={taskId} className="py-2.5 px-3 rounded-xl bg-white dark:bg-[#252525] border border-gray-100 dark:border-[#333] shadow-sm">
+                          <div className="flex items-start gap-2">
+                            <button type="button" onClick={() => task && onOpenTask?.(task)} className="text-left flex-1 min-w-0 truncate text-sm font-medium text-gray-800 dark:text-gray-100 hover:text-[#3337AD] dark:hover:text-[#8b8ee0]">
+                              {task ? task.title : `Задача ${taskId}`}
+                            </button>
+                            <button type="button" onClick={() => handleRemoveTask(plan, taskId)} className="p-2 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20" title="Убрать из плана">
+                              <Trash2 size={14} />
+                            </button>
+                          </div>
+                          <div className="mt-2 flex items-center justify-between gap-2">
+                            <span className="text-[11px] uppercase tracking-wide text-gray-500 dark:text-gray-400">Статус</span>
+                            <select
+                              value={task?.status || 'Не начато'}
+                              onChange={(e) => void handleTaskStatusChange(taskId, e.target.value)}
+                              disabled={!task || !onUpdateTask}
+                              className="min-w-[170px] max-w-[220px] px-2.5 py-1.5 rounded-lg border border-gray-200 dark:border-[#444] bg-white dark:bg-[#1f1f1f] text-xs text-gray-800 dark:text-gray-200 disabled:opacity-60"
+                            >
+                              {statusOptions.map((status) => (
+                                <option key={status} value={status}>
+                                  {status}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                )}
+                <div className="pt-2">
+                  <label className="block text-[11px] font-bold uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-1.5">Заметки к плану</label>
+                  <textarea
+                    value={activePlan.notes ?? ''}
+                    onChange={(e) => setEditingPlan({ ...(editingPlan?.id === plan.id ? editingPlan : plan), notes: e.target.value })}
+                    className="w-full px-3 py-2.5 border border-gray-200 dark:border-[#333] rounded-xl bg-white dark:bg-[#252525] text-sm text-gray-800 dark:text-gray-200 focus:ring-2 focus:ring-[#3337AD]/25 outline-none"
+                    rows={4}
+                    placeholder="Договорённости, фокус недели, напоминания…"
+                  />
+                </div>
+                <div className="flex justify-end pt-1">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const toSave = editingPlan?.id === plan.id ? editingPlan : plan;
+                      void handleSavePlan({
+                        ...plan,
+                        weekStart: toSave?.weekStart || plan.weekStart,
+                        weekEnd: toSave?.weekEnd || plan.weekEnd,
+                        notes: toSave?.notes ?? '',
+                        taskIds: toSave?.taskIds || plan.taskIds || [],
+                      }, { closeAfterSave: true });
+                    }}
+                    className="px-4 py-2 rounded-xl bg-[#3337AD] text-white text-sm font-semibold hover:bg-[#292b8a]"
+                  >
+                    Сохранить
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
-};
+});
 
 function AddTasksModal({
   tasks,
@@ -331,7 +642,7 @@ function AddTasksModal({
 
   return (
     <div
-      className="fixed inset-0 z-[100] flex items-end md:items-center justify-center bg-black/50 dark:bg-black/70 backdrop-blur-sm p-4"
+      className="fixed inset-0 z-[140] flex items-end md:items-center justify-center bg-black/50 dark:bg-black/70 backdrop-blur-sm p-4"
       onClick={onClose}
       role="presentation"
     >

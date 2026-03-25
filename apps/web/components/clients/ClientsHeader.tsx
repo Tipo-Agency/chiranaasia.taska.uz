@@ -1,51 +1,59 @@
 import React from 'react';
-import { Search, Filter, Users } from 'lucide-react';
+import { AlertCircle, Briefcase, Building2, FileText, Filter, Users } from 'lucide-react';
 import { Button } from '../ui/Button';
-import { ModuleCreateIconButton } from '../ui/ModuleCreateIconButton';
+import { ModuleCreateDropdown } from '../ui/ModuleCreateDropdown';
 import { TaskSelect } from '../TaskSelect';
 import { SalesFunnel } from '../../types';
 import { ModulePageHeader } from '../ui/ModulePageHeader';
+import { MODULE_ACCENTS } from '../ui/moduleAccent';
 
 interface ClientsHeaderProps {
-  searchQuery: string;
-  onSearchChange: (query: string) => void;
   salesFunnels?: SalesFunnel[];
   selectedFunnelId: string;
   onFunnelChange: (funnelId: string) => void;
   showFunnelFilter?: boolean;
   activeTab: 'clients' | 'contracts' | 'finance' | 'receivables';
-  onCreateClick: () => void;
+  onCreateClient: () => void;
+  onCreateContract: () => void;
+  onCreateSale: () => void;
+  onCreateReceivable: () => void;
   onFiltersClick?: () => void;
   showFilters?: boolean;
   hasActiveFilters?: boolean;
   activeFiltersCount?: number;
+  tabs?: React.ReactNode;
 }
 
 export const ClientsHeader: React.FC<ClientsHeaderProps> = ({
-  searchQuery,
-  onSearchChange,
   salesFunnels = [],
   selectedFunnelId,
   onFunnelChange,
   showFunnelFilter = false,
   activeTab,
-  onCreateClick,
+  onCreateClient,
+  onCreateContract,
+  onCreateSale,
+  onCreateReceivable,
   onFiltersClick,
   showFilters = false,
   hasActiveFilters = false,
   activeFiltersCount = 0,
+  tabs,
 }) => {
+  const filterActiveClass = MODULE_ACCENTS.violet.filterActive;
+
   return (
-    <div className="mb-6 space-y-5">
+    <div className="mb-3">
       <ModulePageHeader
         accent="violet"
         icon={<Users size={24} strokeWidth={2} />}
         title="Клиенты и договора"
         description="Управление клиентами и контрактами"
-        actions={
-          <>
+        tabs={tabs}
+        controls={
+          <div className="flex items-center gap-2">
             {showFunnelFilter && salesFunnels.length > 0 && (
-              <div className="min-w-[180px]">
+              <div className="min-w-[180px] max-w-[220px]">
                 <TaskSelect
                   value={selectedFunnelId}
                   onChange={onFunnelChange}
@@ -59,10 +67,11 @@ export const ClientsHeader: React.FC<ClientsHeaderProps> = ({
             )}
             {activeTab === 'contracts' && onFiltersClick && (
               <Button
-                variant={showFilters || hasActiveFilters ? 'primary' : 'secondary'}
+                variant="secondary"
                 size="sm"
                 icon={Filter}
                 onClick={onFiltersClick}
+                className={showFilters || hasActiveFilters ? filterActiveClass : ''}
               >
                 <span className="hidden sm:inline">Фильтры</span>
                 {hasActiveFilters && (
@@ -72,24 +81,19 @@ export const ClientsHeader: React.FC<ClientsHeaderProps> = ({
                 )}
               </Button>
             )}
-            <ModuleCreateIconButton accent="violet" label="Создать" onClick={onCreateClick} />
-          </>
+            <ModuleCreateDropdown
+              accent="violet"
+              label="Создать"
+              items={[
+                { id: 'create-client', label: 'Клиент', icon: Building2, onClick: onCreateClient },
+                { id: 'create-contract', label: 'Договор', icon: FileText, onClick: onCreateContract },
+                { id: 'create-sale', label: 'Продажа', icon: Briefcase, onClick: onCreateSale },
+                { id: 'create-receivable', label: 'Задолженность', icon: AlertCircle, onClick: onCreateReceivable },
+              ]}
+            />
+          </div>
         }
       />
-
-      <div className="relative">
-        <Search
-          className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"
-          size={18}
-        />
-        <input
-          type="text"
-          value={searchQuery}
-          onChange={(e) => onSearchChange(e.target.value)}
-          placeholder="Поиск клиентов, договоров..."
-          className="w-full pl-10 pr-4 py-2.5 border border-gray-200 dark:border-[#333] rounded-xl bg-white dark:bg-[#252525] text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:ring-2 focus:ring-violet-500/30 focus:border-violet-500/50 outline-none text-sm"
-        />
-      </div>
     </div>
   );
 };

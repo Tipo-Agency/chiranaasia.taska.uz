@@ -5,7 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
 from app.models.content import Meeting
-from app.services.domain_events import emit_domain_event
+from app.services.domain_events import emit_domain_event, log_entity_mutation
 
 router = APIRouter(prefix="/meetings", tags=["meetings"])
 
@@ -52,6 +52,22 @@ async def update_meetings(meetings: list[dict], db: AsyncSession = Depends(get_d
             existing.client_id = m.get("clientId")
             existing.recurrence = m.get("recurrence", "none")
             existing.is_archived = m.get("isArchived", False)
+            await db.flush()
+            await log_entity_mutation(
+                db,
+                event_type="meeting.updated",
+                entity_type="meeting",
+                entity_id=mid,
+                source="meetings-router",
+                actor_id=m.get("updatedByUserId"),
+                payload={
+                    "meetingId": mid,
+                    "title": existing.title,
+                    "date": existing.date,
+                    "time": existing.time,
+                    "participantIds": existing.participant_ids or [],
+                },
+            )
         else:
             db.add(Meeting(
                 id=mid,

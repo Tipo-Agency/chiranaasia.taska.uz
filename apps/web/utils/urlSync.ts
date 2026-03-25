@@ -20,7 +20,6 @@ export const VIEW_PATHS: Record<string, string> = {
   analytics: '/analytics',
   spaces: '/spaces',
   settings: '/settings',
-  sites: '/sites',
   admin: '/admin',
   table: '/table',
   'doc-editor': '/doc',
@@ -43,7 +42,6 @@ const PATH_TO_VIEW: Record<string, string> = {
   '/analytics': 'analytics',
   '/spaces': 'spaces',
   '/settings': 'settings',
-  '/sites': 'sites',
   '/admin': 'admin',
 };
 

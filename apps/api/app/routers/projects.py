@@ -6,6 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_db
 from app.models.task import Project
 from app.utils import row_to_project
+from app.services.domain_events import log_entity_mutation
 
 router = APIRouter(prefix="/projects", tags=["projects"])
 
@@ -23,6 +24,7 @@ async def update_projects(projects: list[dict], db: AsyncSession = Depends(get_d
         if not pid:
             continue
         existing = await db.get(Project, pid)
+        is_new = existing is None
         if existing:
             existing.name = p.get("name", existing.name)
             existing.icon = p.get("icon")
@@ -36,5 +38,15 @@ async def update_projects(projects: list[dict], db: AsyncSession = Depends(get_d
                 color=p.get("color"),
                 is_archived=p.get("isArchived", False),
             ))
+        await db.flush()
+        row = await db.get(Project, pid)
+        await log_entity_mutation(
+            db,
+            event_type="project.created" if is_new else "project.updated",
+            entity_type="project",
+            entity_id=pid,
+            source="projects-router",
+            payload={"name": row.name if row else p.get("name")},
+        )
     await db.commit()
     return {"ok": True}

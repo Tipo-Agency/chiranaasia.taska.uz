@@ -11,7 +11,7 @@
 - `Phase 1` сделан: `notification_events`, Redis publish, API publish/recent.
 - `Phase 2` сделан: `notifications`, `notification_deliveries`, notification hub.
 - `Realtime` сделан: websocket endpoint `/api/notifications/ws/{user_id}`.
-- Базовая интеграция доменных событий включена в роутеры: `tasks`, `deals`, `meetings`, `docs`.
+- **Доменные события (`log_entity_mutation` / `emit_domain_event`)** подключены ко всем основным продуктовым роутерам с мутациями — см. раздел **«19) Покрытие producers»** ниже. Неизвестные типы событий всё равно попадают в `notification_events` и (при доступном Redis) в Stream; пользовательские уведомления создаются только для типов, обработанных в `notification_hub`.
 - Каналы `telegram/email` на этапе placeholder delivery (pending/runner), без внешнего провайдера.
 - `Unread count` endpoint сделан: `GET /api/notifications/unread-count?user_id=...`.
 - `Retention` реализован:
@@ -295,3 +295,43 @@
 3. Email provider в MVP: SMTP/Sendgrid/другой?
 4. Telegram в MVP: personal chat, group, или оба?
 5. Нужно ли в MVP UI для DLQ requeue (или только админ endpoint)?
+
+---
+
+## 19) Покрытие producers (актуальный бэклог / факт)
+
+**Паттерн в коде:** хелпер `log_entity_mutation` в `apps/api/app/services/domain_events.py` (обёртка над `emit_domain_event`: запись в БД → Redis Stream → `process_domain_event`).
+
+### Роутеры, где мутации логируются в шину
+
+| Роутер | Примечание |
+|--------|------------|
+| `tasks` | `emit_domain_event` |
+| `deals`, `meetings`, `docs` | `emit` / `log_entity_mutation` |
+| `clients`, `projects`, `employees`, `departments`, `tables`, `folders` | CRUD-события |
+| `content_posts`, `statuses`, `priorities`, `automation`, `bpm`, `inventory` | |
+| `accounts_receivable`, `funnels`, `finance` | включая финплан, выписки, БДР, заявки |
+| `weekly_plans` | планы и протоколы + delete |
+| `messages` | отправка и прочтение |
+| `auth` | `user.created` / `updated` / `archived` |
+| `notification_prefs` | компактный payload |
+| `activity` | `POST` — построчно; `PUT` — одно событие **`activity_log.bulk_synced`** на весь запрос |
+| `notifications` | смена прочитанности in-app уведомления |
+| `notification_events` | ручной `POST /publish` |
+
+### Намеренно без доменного события
+
+| Что | Почему |
+|-----|--------|
+| `POST /auth/login` | не бизнес-мутация; при необходимости аудит сессий — отдельный канал |
+| Роуты **`/admin/*`** | обслуживание (requeue, retention, тесты, тестовые сообщения в Telegram) |
+| `POST /notifications/deliveries/run`, `POST /notifications/retention/run` | операционные джобы |
+| Чтение (`GET`) | не пишет событий |
+
+### Бэклог (продукт / техдолг, не «дыра в emit»)
+
+- Потребители **Redis Streams** (кроме записи при publish): отдельные воркеры `analytics`, `audit-export`, `webhooks` — по мере необходимости.
+- **Идемпотентность доставок** и **DLQ UI** — см. фазы 4–5 в этом документе.
+- **Фоновые задачи** вне HTTP (если появятся) должны вызывать тот же `emit_domain_event` / `log_entity_mutation`, иначе события не появятся.
+
+Подробнее про ожидания для Telegram-бота и честные ограничения — `docs/development/BOT.md`.

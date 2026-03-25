@@ -3,6 +3,8 @@ import { Deal, Client } from '../../types';
 import { X } from 'lucide-react';
 import { TaskSelect } from '../TaskSelect';
 import { normalizeDateForInput } from '../../utils/dateUtils';
+import { DateInput } from '../ui/DateInput';
+import { SystemAlertDialog, SystemConfirmDialog } from '../ui';
 
 interface OneTimeDealModalProps {
   isOpen: boolean;
@@ -33,6 +35,8 @@ export const OneTimeDealModal: React.FC<OneTimeDealModalProps> = ({
   const [oneTimeDealPaidAmount, setOneTimeDealPaidAmount] = useState('');
   const [oneTimeDealPaidDate, setOneTimeDealPaidDate] = useState('');
   const [oneTimeDealNotes, setOneTimeDealNotes] = useState('');
+  const [alertState, setAlertState] = useState({ open: false, title: '', message: '' });
+  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
 
   useEffect(() => {
     if (isOpen) {
@@ -67,15 +71,15 @@ export const OneTimeDealModal: React.FC<OneTimeDealModalProps> = ({
     
     // Проверяем обязательные поля
     if (!oneTimeDealClientId) {
-      alert('Выберите клиента');
+      setAlertState({ open: true, title: 'Проверьте данные', message: 'Выберите клиента.' });
       return;
     }
     if (!oneTimeDealDescription.trim()) {
-      alert('Заполните описание');
+      setAlertState({ open: true, title: 'Проверьте данные', message: 'Заполните описание.' });
       return;
     }
     if (!oneTimeDealAmount || parseFloat(oneTimeDealAmount) <= 0) {
-      alert('Укажите сумму');
+      setAlertState({ open: true, title: 'Проверьте данные', message: 'Укажите сумму.' });
       return;
     }
     
@@ -109,7 +113,7 @@ export const OneTimeDealModal: React.FC<OneTimeDealModalProps> = ({
 
   return (
     <div 
-      className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-end md:items-center justify-center z-[80] animate-in fade-in duration-200" 
+      className="fixed inset-0 bg-black/35 backdrop-blur-sm flex items-end md:items-center justify-center z-[210] animate-in fade-in duration-200" 
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
     >
       <div 
@@ -138,7 +142,7 @@ export const OneTimeDealModal: React.FC<OneTimeDealModalProps> = ({
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 mb-1">Номер сделки</label>
+              <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 mb-1">Номер продажи</label>
               <input 
                 type="text" 
                 value={oneTimeDealNumber} 
@@ -148,13 +152,12 @@ export const OneTimeDealModal: React.FC<OneTimeDealModalProps> = ({
               />
             </div>
             <div>
-              <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 mb-1">Дата сделки *</label>
-              <input 
-                type="date" 
-                value={normalizeDateForInput(oneTimeDealDate) || oneTimeDealDate} 
-                onChange={e => setOneTimeDealDate(e.target.value)} 
-                className="w-full border border-gray-300 dark:border-gray-600 rounded px-3 py-2 text-sm bg-white dark:bg-[#333] text-gray-900 dark:text-gray-100" 
+              <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 mb-1">Дата продажи *</label>
+              <DateInput
                 required
+                value={normalizeDateForInput(oneTimeDealDate) || oneTimeDealDate}
+                onChange={setOneTimeDealDate}
+                className="w-full"
               />
             </div>
           </div>
@@ -195,11 +198,10 @@ export const OneTimeDealModal: React.FC<OneTimeDealModalProps> = ({
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 mb-1">Срок оплаты</label>
-              <input 
-                type="date" 
-                value={normalizeDateForInput(oneTimeDealDueDate) || oneTimeDealDueDate} 
-                onChange={e => setOneTimeDealDueDate(e.target.value)} 
-                className="w-full border border-gray-300 dark:border-gray-600 rounded px-3 py-2 text-sm bg-white dark:bg-[#333] text-gray-900 dark:text-gray-100"
+              <DateInput
+                value={normalizeDateForInput(oneTimeDealDueDate) || oneTimeDealDueDate}
+                onChange={setOneTimeDealDueDate}
+                className="w-full"
               />
             </div>
             <div>
@@ -214,11 +216,10 @@ export const OneTimeDealModal: React.FC<OneTimeDealModalProps> = ({
           </div>
           <div>
             <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 mb-1">Дата оплаты</label>
-            <input 
-              type="date" 
-              value={normalizeDateForInput(oneTimeDealPaidDate) || oneTimeDealPaidDate} 
-              onChange={e => setOneTimeDealPaidDate(e.target.value)} 
-              className="w-full border border-gray-300 dark:border-gray-600 rounded px-3 py-2 text-sm bg-white dark:bg-[#333] text-gray-900 dark:text-gray-100"
+            <DateInput
+              value={normalizeDateForInput(oneTimeDealPaidDate) || oneTimeDealPaidDate}
+              onChange={setOneTimeDealPaidDate}
+              className="w-full"
             />
           </div>
           <div>
@@ -235,10 +236,7 @@ export const OneTimeDealModal: React.FC<OneTimeDealModalProps> = ({
               <button 
                 type="button" 
                 onClick={() => { 
-                  if (confirm('Удалить сделку?')) {
-                    onDelete(editingDeal.id);
-                    onClose();
-                  }
+                  setConfirmDeleteOpen(true);
                 }} 
                 className="text-red-500 text-sm hover:underline"
               >
@@ -263,6 +261,28 @@ export const OneTimeDealModal: React.FC<OneTimeDealModalProps> = ({
           </div>
         </form>
       </div>
+      <SystemAlertDialog
+        open={alertState.open}
+        title={alertState.title}
+        message={alertState.message}
+        onClose={() => setAlertState({ open: false, title: '', message: '' })}
+      />
+      <SystemConfirmDialog
+        open={confirmDeleteOpen}
+        title="Удалить продажу"
+        message="Вы уверены, что хотите удалить продажу?"
+        danger
+        confirmText="Удалить"
+        cancelText="Отмена"
+        onCancel={() => setConfirmDeleteOpen(false)}
+        onConfirm={() => {
+          if (editingDeal && onDelete) {
+            onDelete(editingDeal.id);
+            setConfirmDeleteOpen(false);
+            onClose();
+          }
+        }}
+      />
     </div>
   );
 };

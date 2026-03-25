@@ -1,10 +1,11 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { BusinessProcess, ProcessStep, ProcessStepBranch, OrgPosition, User, Task, ProcessInstance, TableCollection } from '../types';
-import { Network, Plus, Edit2, Trash2, ChevronRight, User as UserIcon, Building2, Save, X, ArrowDown, Play, CheckCircle2, Clock, FileText, ArrowLeft, Calendar, Users, Layers3, PauseCircle } from 'lucide-react';
+import { getStepsForInstance } from '../utils/bpmDealFunnel';
+import { Network, Plus, Edit2, Trash2, ChevronRight, User as UserIcon, Building2, Save, X, ArrowDown, Play, CheckCircle2, Clock, FileText, ArrowLeft, Calendar, Users, Layers3 } from 'lucide-react';
 import { TaskSelect } from './TaskSelect';
 import { ProcessCard } from './features/processes/ProcessCard';
-import { ModuleCreateDropdown, ModulePageShell, ModulePageHeader, ModuleSegmentedControl, MODULE_PAGE_GUTTER } from './ui';
+import { Button, ModuleCreateDropdown, ModulePageShell, ModulePageHeader, ModuleSegmentedControl, MODULE_PAGE_GUTTER, SystemAlertDialog } from './ui';
 
 interface BusinessProcessesViewProps {
   processes: BusinessProcess[];
@@ -17,18 +18,17 @@ interface BusinessProcessesViewProps {
   onDeleteProcess: (id: string) => void;
   onSaveTask: (task: Partial<Task>) => void;
   onOpenTask: (task: Task) => void;
-  /** Быстрое создание задачи из меню «Создать» (как на главной) */
-  onQuickCreateTask?: () => void;
   onCompleteProcessStepWithBranch?: (instanceId: string, nextStepId: string) => void;
   autoOpenCreateModal?: boolean;
 }
 
 const BusinessProcessesView: React.FC<BusinessProcessesViewProps> = ({ 
-    processes, orgPositions, users, tasks, tables, currentUser, onSaveProcess, onDeleteProcess, onSaveTask, onOpenTask, onQuickCreateTask, onCompleteProcessStepWithBranch, autoOpenCreateModal = false
+    processes, orgPositions, users, tasks, tables, currentUser, onSaveProcess, onDeleteProcess, onSaveTask, onOpenTask, onCompleteProcessStepWithBranch, autoOpenCreateModal = false
 }) => {
   const [selectedProcessId, setSelectedProcessId] = useState<string | null>(null);
   /** Шаблоны = описания процессов; В работе = active + paused; Завершённые = completed */
   const [activeTab, setActiveTab] = useState<'templates' | 'running' | 'completed'>('templates');
+  const [startPickerOpen, setStartPickerOpen] = useState(false);
   const [selectedInstanceId, setSelectedInstanceId] = useState<string | null>(null);
   
   // Modal State
@@ -40,6 +40,9 @@ const BusinessProcessesView: React.FC<BusinessProcessesViewProps> = ({
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [steps, setSteps] = useState<ProcessStep[]>([]);
+  const [alertText, setAlertText] = useState<string | null>(null);
+
+  const tasksTableId = useMemo(() => tables.find((t) => t.type === 'tasks')?.id || '', [tables]);
 
   // Получаем только последние версии процессов для отображения в списке, исключаем архивные
   const uniqueProcesses = useMemo(() => {
@@ -53,6 +56,11 @@ const BusinessProcessesView: React.FC<BusinessProcessesViewProps> = ({
     return Array.from(processMap.values());
   }, [processes]);
 
+  const userTemplates = useMemo(
+    () => uniqueProcesses.filter((p) => !p.systemKey),
+    [uniqueProcesses]
+  );
+
   const selectedProcess = uniqueProcesses.find(p => p.id === selectedProcessId);
 
   // Автоматически открываем модалку создания при монтировании, если autoOpenCreateModal = true
@@ -62,7 +70,7 @@ const BusinessProcessesView: React.FC<BusinessProcessesViewProps> = ({
     }
   }, [autoOpenCreateModal]);
 
-  // Слушаем событие для открытия модалки из HomeView
+  // Слушаем событие для открытия модалки с рабочего стола (WorkdeskView)
   useEffect(() => {
     const handleOpenModal = () => {
       handleOpenCreate();
@@ -138,13 +146,13 @@ const BusinessProcessesView: React.FC<BusinessProcessesViewProps> = ({
       if (e) e.preventDefault();
 
       if (!String(title || '').trim()) {
-          alert('Укажите название процесса.');
+          setAlertText('Укажите название процесса.');
           return;
       }
 
       const emptyStep = steps.find(s => !String(s.title || '').trim());
       if (steps.length > 0 && emptyStep) {
-          alert('Укажите название у каждого шага процесса.');
+          setAlertText('Укажите название у каждого шага процесса.');
           return;
       }
       
@@ -214,22 +222,26 @@ const BusinessProcessesView: React.FC<BusinessProcessesViewProps> = ({
       }
   };
 
-  const handleStartProcess = () => {
-      if (!selectedProcess || selectedProcess.steps.length === 0) return;
-      
-      const firstStep = selectedProcess.steps[0];
+  const startProcessFor = (proc: BusinessProcess, opts?: { fromPicker?: boolean }) => {
+      const fromPicker = opts?.fromPicker === true;
+      if (proc.steps.length === 0) {
+          setAlertText('Добавьте шаги в шаблон процесса.');
+          return;
+      }
+
+      const firstStep = proc.steps[0];
       const assigneeId = getAssigneeId(firstStep);
       
       if (!assigneeId) {
-          alert('Не назначен исполнитель для первого шага');
+          setAlertText('Не назначен исполнитель для первого шага');
           return;
       }
 
       const instanceId = `inst-${Date.now()}`;
       const instance: ProcessInstance = {
           id: instanceId,
-          processId: selectedProcess.id,
-          processVersion: selectedProcess.version || 1,
+          processId: proc.id,
+          processVersion: proc.version || 1,
           currentStepId: firstStep.id,
           status: 'active',
           startedAt: new Date().toISOString(),
@@ -240,8 +252,8 @@ const BusinessProcessesView: React.FC<BusinessProcessesViewProps> = ({
       const newTask: Partial<Task> = {
           id: taskId,
           entityType: 'task',
-          tableId: '', // Задачи из бизнес-процессов не привязаны к конкретной таблице
-          title: `${selectedProcess.title}: ${firstStep.title}`,
+          tableId: tasksTableId || '',
+          title: `${proc.title}: ${firstStep.title}`,
           description: firstStep.description || '',
           status: 'Не начато',
           priority: 'Средний',
@@ -249,7 +261,7 @@ const BusinessProcessesView: React.FC<BusinessProcessesViewProps> = ({
           source: 'Процесс',
           startDate: new Date().toISOString().split('T')[0],
           endDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-          processId: selectedProcess.id,
+          processId: proc.id,
           processInstanceId: instanceId,
           stepId: firstStep.id,
           createdAt: new Date().toISOString(),
@@ -260,8 +272,8 @@ const BusinessProcessesView: React.FC<BusinessProcessesViewProps> = ({
       
       // Находим последнюю версию процесса для обновления экземпляров
       const latestVersion = processes
-        .filter(p => p.id === selectedProcess.id)
-        .sort((a, b) => (b.version || 1) - (a.version || 1))[0] || selectedProcess;
+        .filter(p => p.id === proc.id)
+        .sort((a, b) => (b.version || 1) - (a.version || 1))[0] || proc;
       
       const updatedProcess: BusinessProcess = {
           ...latestVersion,
@@ -269,8 +281,17 @@ const BusinessProcessesView: React.FC<BusinessProcessesViewProps> = ({
       };
 
       onSaveProcess(updatedProcess);
-      // Сохраняем задачу без tableId - она будет видна в модуле задач
       onSaveTask(newTask);
+      if (fromPicker) {
+          setStartPickerOpen(false);
+          setActiveTab('running');
+          setSelectedProcessId(null);
+      }
+  };
+
+  const handleStartProcess = () => {
+      if (!selectedProcess) return;
+      startProcessFor(selectedProcess);
   };
 
   const getProcessInstances = (processId: string): ProcessInstance[] => {
@@ -545,6 +566,7 @@ const BusinessProcessesView: React.FC<BusinessProcessesViewProps> = ({
                           </button>
                           {selectedProcess.steps.length > 0 && (
                               <button
+                                  type="button"
                                   onClick={handleStartProcess}
                                   className="px-4 py-1.5 bg-indigo-600 text-white text-sm font-medium hover:bg-indigo-700 rounded-lg flex items-center gap-2 shadow-sm"
                               >
@@ -637,7 +659,7 @@ const BusinessProcessesView: React.FC<BusinessProcessesViewProps> = ({
                                   <div className="space-y-3">
                                       {activeInstances.map(instance => {
                                           const instanceTasks = getInstanceTasks(instance.id);
-                                          const currentStep = selectedProcess.steps.find(s => s.id === instance.currentStepId);
+                                          const currentStep = getStepsForInstance(selectedProcess, instance).find((s) => s.id === instance.currentStepId);
                                           
                                           return (
                                               <div key={instance.id} className="bg-white dark:bg-[#252525] border border-gray-200 dark:border-[#333] rounded-xl p-5 shadow-sm cursor-pointer hover:shadow-md transition-shadow" onClick={() => setSelectedInstanceId(instance.id)}>
@@ -743,48 +765,56 @@ const BusinessProcessesView: React.FC<BusinessProcessesViewProps> = ({
 
               {/* Edit Modal */}
               {isModalOpen && (
-                  <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-[90] animate-in fade-in duration-200" onClick={handleBackdropClick}>
-                      <div className="bg-white dark:bg-[#252525] rounded-xl shadow-2xl w-full max-w-2xl overflow-hidden border border-gray-200 dark:border-[#333] flex flex-col max-h-[90vh]" onClick={e => e.stopPropagation()}>
-                          <div className="p-4 border-b border-gray-100 dark:border-[#333] flex justify-between items-center gap-2 bg-white dark:bg-[#252525] shrink-0">
-                              <h3 className="font-bold text-gray-800 dark:text-white truncate">{editingProcess ? 'Редактировать процесс' : 'Новый процесс'}</h3>
+                  <div
+                    className="fixed inset-0 z-[100] flex items-end md:items-center justify-center bg-black/50 dark:bg-black/70 backdrop-blur-sm p-0 md:p-4 animate-in fade-in duration-200"
+                    onClick={handleBackdropClick}
+                  >
+                      <div
+                        className="w-full max-w-2xl overflow-hidden rounded-t-2xl md:rounded-2xl border border-gray-200 dark:border-[#333] bg-white dark:bg-[#191919] shadow-2xl flex flex-col max-h-[95vh] md:max-h-[90vh] animate-in slide-in-from-bottom md:zoom-in-95 duration-200"
+                        onClick={e => e.stopPropagation()}
+                      >
+                          <div className="p-4 md:p-5 border-b border-gray-200 dark:border-[#333] flex justify-between items-center gap-2 bg-white dark:bg-[#191919] shrink-0">
+                              <h3 className="font-bold text-base md:text-lg text-gray-900 dark:text-white truncate">{editingProcess ? 'Редактировать процесс' : 'Новый процесс'}</h3>
                               <div className="flex items-center gap-1 shrink-0">
                                 {editingProcess && (
                                   <button
                                     type="button"
                                     onClick={(e) => { e.stopPropagation(); handleDelete(); }}
-                                    className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-sm font-medium text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40"
+                                    className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-sm font-medium text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40"
                                   >
                                     <Trash2 size={16} />
                                     <span className="hidden sm:inline">Удалить</span>
                                   </button>
                                 )}
-                                <button type="button" onClick={() => setIsModalOpen(false)} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 p-1.5 rounded-full hover:bg-gray-100 dark:hover:bg-[#333]"><X size={18} /></button>
+                                <button type="button" onClick={() => setIsModalOpen(false)} className="p-2 rounded-xl hover:bg-gray-100 dark:hover:bg-[#252525] text-gray-500 dark:text-gray-400" aria-label="Закрыть"><X size={20} /></button>
                               </div>
                           </div>
-                          <div className="flex border-b border-gray-100 dark:border-[#333] px-4">
-                              <button type="button" onClick={() => setEditModalTab('steps')} className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${editModalTab === 'steps' ? 'border-indigo-600 text-indigo-600 dark:text-indigo-400' : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'}`}>
+                          <div className="px-4 py-3 border-b border-gray-200 dark:border-[#333] bg-white dark:bg-[#191919]">
+                              <div className="inline-flex w-full sm:w-auto gap-1 p-1 rounded-xl bg-gray-100 dark:bg-[#252525] border border-gray-200/80 dark:border-[#333]">
+                              <button type="button" onClick={() => setEditModalTab('steps')} className={`flex-1 sm:flex-none px-3 py-2 text-sm font-medium rounded-lg transition-colors ${editModalTab === 'steps' ? 'bg-white dark:bg-[#2a2a2a] text-indigo-600 dark:text-indigo-400 shadow-sm' : 'text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200'}`}>
                                   Шаги
                               </button>
-                              <button type="button" onClick={() => setEditModalTab('schema')} className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${editModalTab === 'schema' ? 'border-indigo-600 text-indigo-600 dark:text-indigo-400' : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'}`}>
+                              <button type="button" onClick={() => setEditModalTab('schema')} className={`flex-1 sm:flex-none px-3 py-2 text-sm font-medium rounded-lg transition-colors ${editModalTab === 'schema' ? 'bg-white dark:bg-[#2a2a2a] text-indigo-600 dark:text-indigo-400 shadow-sm' : 'text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200'}`}>
                                   Схема
                               </button>
+                              </div>
                           </div>
                           
-                          <form onSubmit={handleSubmit} className="flex-1 overflow-hidden flex flex-col">
-                              <div className="p-6 overflow-y-auto custom-scrollbar space-y-6">
+                          <form onSubmit={handleSubmit} className="flex-1 overflow-hidden flex flex-col min-h-0">
+                              <div className="p-4 md:p-6 overflow-y-auto custom-scrollbar space-y-6">
                                   <div className="space-y-4">
                                       <div>
-                                          <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 mb-1">Название процесса</label>
-                                          <input value={title} onChange={e => setTitle(e.target.value)} className="w-full border border-gray-300 dark:border-gray-600 rounded px-3 py-2 text-sm bg-white dark:bg-[#333] text-gray-900 dark:text-gray-100" placeholder="Например: Согласование договора"/>
+                                          <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 mb-1.5 uppercase tracking-wide">Название процесса</label>
+                                          <input value={title} onChange={e => setTitle(e.target.value)} className="w-full rounded-xl border border-gray-200 dark:border-[#333] bg-gray-50 dark:bg-[#252525] px-3 py-2.5 text-sm text-gray-900 dark:text-gray-100 placeholder-gray-400 focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500/50 outline-none" placeholder="Например: Согласование договора"/>
                                       </div>
                                       <div>
-                                          <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 mb-1">Описание</label>
-                                          <textarea value={description} onChange={e => setDescription(e.target.value)} className="w-full h-20 border border-gray-300 dark:border-gray-600 rounded px-3 py-2 text-sm bg-white dark:bg-[#333] text-gray-900 dark:text-gray-100 resize-none"/>
+                                          <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 mb-1.5 uppercase tracking-wide">Описание</label>
+                                          <textarea value={description} onChange={e => setDescription(e.target.value)} className="w-full h-24 rounded-xl border border-gray-200 dark:border-[#333] bg-gray-50 dark:bg-[#252525] px-3 py-2.5 text-sm text-gray-900 dark:text-gray-100 resize-none focus:ring-2 focus:ring-indigo-500/30 outline-none"/>
                                       </div>
                                   </div>
 
                                   {editModalTab === 'schema' && (
-                                      <div className="border border-gray-200 dark:border-[#333] rounded-lg p-4 bg-gray-50 dark:bg-[#202020]">
+                                      <div className="border border-gray-200 dark:border-[#333] rounded-2xl p-4 bg-gray-50 dark:bg-[#202020]">
                                           {steps.length > 0 ? (
                                           <>
                                           <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">Визуализация процесса. Редактируйте шаги и связи во вкладке «Шаги».</p>
@@ -822,29 +852,29 @@ const BusinessProcessesView: React.FC<BusinessProcessesViewProps> = ({
                                   )}
 
                                   {editModalTab === 'steps' && <div className="border-t border-gray-200 dark:border-[#333] pt-4">
-                                      <div className="flex justify-between items-center mb-4">
-                                          <h4 className="font-bold text-gray-700 dark:text-gray-200 text-sm">Шаги процесса</h4>
-                                          <button type="button" onClick={handleAddStep} className="text-indigo-600 hover:text-indigo-700 text-xs font-medium flex items-center gap-1"><Plus size={14}/> Добавить шаг</button>
+                                      <div className="flex justify-between items-center mb-4 gap-2">
+                                          <h4 className="font-bold text-gray-900 dark:text-gray-100 text-sm">Шаги процесса</h4>
+                                          <button type="button" onClick={handleAddStep} className="text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 text-xs font-semibold flex items-center gap-1 px-2.5 py-1.5 rounded-xl border border-indigo-200 dark:border-indigo-800 bg-indigo-50/80 dark:bg-indigo-950/30 shrink-0"><Plus size={14}/> Добавить шаг</button>
                                       </div>
-                                      
+
                                       <div className="space-y-4">
                                           {steps.map((step, index) => (
-                                              <div key={step.id} className="bg-gray-50 dark:bg-[#303030] p-4 rounded-lg border border-gray-200 dark:border-[#444] relative group">
-                                                  <button type="button" onClick={() => handleRemoveStep(step.id)} className="absolute top-2 right-2 text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"><Trash2 size={14}/></button>
-                                                  <div className="flex items-center gap-2 mb-3">
-                                                      <span className="text-xs font-bold text-gray-400 w-6 h-6 rounded-full bg-white dark:bg-[#252525] flex items-center justify-center border border-gray-200 dark:border-[#444] shrink-0">{index + 1}</span>
-                                                      <input 
-                                                          value={step.title} 
+                                              <div key={step.id} className="bg-gray-50 dark:bg-[#252525] p-4 rounded-2xl border border-gray-200 dark:border-[#333] relative group">
+                                                  <button type="button" onClick={() => handleRemoveStep(step.id)} className="absolute top-2 right-2 text-gray-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded-lg hover:bg-white/80 dark:hover:bg-[#333]"><Trash2 size={14}/></button>
+                                                  <div className="flex items-center gap-2 mb-3 pr-8">
+                                                      <span className="text-xs font-bold text-white w-7 h-7 rounded-full bg-indigo-600 dark:bg-indigo-500 flex items-center justify-center shrink-0 shadow-sm">{index + 1}</span>
+                                                      <input
+                                                          value={step.title}
                                                           onChange={e => handleUpdateStep(step.id, { title: e.target.value })}
-                                                          className="flex-1 bg-white dark:bg-[#252525] border border-gray-300 dark:border-[#555] rounded px-3 py-2 text-sm font-medium text-gray-800 dark:text-gray-100 placeholder-gray-400 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                                                          className="flex-1 bg-white dark:bg-[#1a1a1a] border border-gray-200 dark:border-[#444] rounded-xl px-3 py-2 text-sm font-medium text-gray-800 dark:text-gray-100 placeholder-gray-400 focus:ring-2 focus:ring-indigo-500/30 outline-none"
                                                           placeholder="Название шага *"
                                                       />
                                                   </div>
-                                                  <textarea 
+                                                  <textarea
                                                       value={step.description || ''}
                                                       onChange={e => handleUpdateStep(step.id, { description: e.target.value })}
                                                       rows={2}
-                                                      className="w-full bg-white dark:bg-[#252525] border border-gray-300 dark:border-[#555] rounded px-3 py-2 text-xs text-gray-600 dark:text-gray-400 placeholder-gray-400 mb-3 resize-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                                                      className="w-full bg-white dark:bg-[#1a1a1a] border border-gray-200 dark:border-[#444] rounded-xl px-3 py-2 text-xs text-gray-600 dark:text-gray-400 placeholder-gray-400 mb-3 resize-none focus:ring-2 focus:ring-indigo-500/30 outline-none"
                                                       placeholder="Описание действий..."
                                                   />
                                                   <div className="flex gap-2">
@@ -918,14 +948,20 @@ const BusinessProcessesView: React.FC<BusinessProcessesViewProps> = ({
                                   </div>}
                               </div>
 
-                              <div className="p-4 border-t border-gray-100 dark:border-[#333] bg-white dark:bg-[#252525] flex justify-end items-center gap-2 shrink-0">
-                                   <button type="button" onClick={() => setIsModalOpen(false)} className="px-4 py-2 text-sm font-medium text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-[#303030] rounded-lg">Отмена</button>
-                                   <button type="submit" className="px-4 py-2 text-sm font-medium bg-indigo-600 text-white hover:bg-indigo-700 rounded-lg shadow-sm flex items-center gap-2"><Save size={16}/> Сохранить</button>
+                              <div className="p-4 md:p-6 border-t border-gray-200 dark:border-[#333] bg-white dark:bg-[#191919] flex justify-end items-center gap-2 shrink-0">
+                                   <Button type="button" variant="secondary" onClick={() => setIsModalOpen(false)} size="md">Отмена</Button>
+                                   <Button type="submit" size="md" icon={Save} className="!bg-indigo-600 hover:!bg-indigo-700 !text-white focus:!ring-indigo-500">Сохранить</Button>
                               </div>
                           </form>
                       </div>
                   </div>
               )}
+              <SystemAlertDialog
+                open={!!alertText}
+                title="Бизнес-процессы"
+                message={alertText || ''}
+                onClose={() => setAlertText(null)}
+              />
           </div>
       );
   }
@@ -1116,13 +1152,25 @@ const BusinessProcessesView: React.FC<BusinessProcessesViewProps> = ({
   return (
     <ModulePageShell>
       <div className={`${MODULE_PAGE_GUTTER} pt-6 md:pt-8 flex-shrink-0`}>
-        <div className="mb-6 space-y-5">
+        <div className="mb-6">
           <ModulePageHeader
             accent="indigo"
             icon={<Network size={24} strokeWidth={2} />}
             title="Бизнес-процессы"
-            description="Шаблоны, запуски в работе и завершённые экземпляры — на отдельных вкладках"
-            actions={
+            description="Шаблоны, запуски и история процессов"
+            tabs={
+              <ModuleSegmentedControl
+                variant="neutral"
+                value={activeTab}
+                onChange={(v) => setActiveTab(v as 'templates' | 'running' | 'completed')}
+                options={[
+                  { value: 'templates', label: 'Шаблоны', icon: <Layers3 size={14} /> },
+                  { value: 'running', label: 'В работе', icon: <Play size={14} /> },
+                  { value: 'completed', label: 'Завершённые', icon: <CheckCircle2 size={14} /> },
+                ]}
+              />
+            }
+            controls={
               <ModuleCreateDropdown
                 accent="indigo"
                 items={[
@@ -1133,80 +1181,28 @@ const BusinessProcessesView: React.FC<BusinessProcessesViewProps> = ({
                     onClick: handleOpenCreate,
                     iconClassName: 'text-indigo-600 dark:text-indigo-400',
                   },
-                  ...(onQuickCreateTask
-                    ? [
-                        {
-                          id: 'task',
-                          label: 'Задача',
-                          icon: CheckCircle2,
-                          onClick: onQuickCreateTask,
-                          iconClassName: 'text-indigo-600 dark:text-indigo-400',
-                        },
-                      ]
-                    : []),
+                  {
+                    id: 'start-process',
+                    label: 'Запустить процесс…',
+                    icon: Play,
+                    onClick: () => setStartPickerOpen(true),
+                    iconClassName: 'text-emerald-600 dark:text-emerald-400',
+                  },
                 ]}
               />
             }
           />
-
-          <ModuleSegmentedControl
-            variant="neutral"
-            value={activeTab}
-            onChange={(v) => setActiveTab(v as 'templates' | 'running' | 'completed')}
-            options={[
-              { value: 'templates', label: 'Шаблоны', icon: <Layers3 size={14} /> },
-              { value: 'running', label: 'В работе', icon: <Play size={14} /> },
-              { value: 'completed', label: 'Завершённые', icon: <CheckCircle2 size={14} /> },
-            ]}
-          />
-
-            <div className="flex flex-wrap items-center gap-2 text-[11px] sm:text-xs text-gray-600 dark:text-gray-400">
-              {activeTab === 'templates' && (
-                <>
-                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-gray-100 dark:bg-[#2a2a2a] border border-gray-200/80 dark:border-[#444]">
-                    <Network size={13} className="text-indigo-500 shrink-0" />
-                    Шаблонов: <strong className="text-gray-900 dark:text-white">{uniqueProcesses.filter(p => !p.isArchived).length}</strong>
-                  </span>
-                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-blue-50 dark:bg-blue-950/40 border border-blue-100 dark:border-blue-900/50 text-blue-800 dark:text-blue-200">
-                    <Play size={13} className="shrink-0" />
-                    Активных запусков: <strong>{runningInstances.length}</strong>
-                  </span>
-                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-100 dark:border-emerald-900/40 text-emerald-800 dark:text-emerald-200">
-                    <CheckCircle2 size={13} className="shrink-0" />
-                    Завершено: <strong>{completedInstancesList.length}</strong>
-                  </span>
-                </>
-              )}
-              {activeTab === 'running' && (
-                <>
-                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-blue-50 dark:bg-blue-950/40 border border-blue-100 dark:border-blue-900/50 text-blue-800 dark:text-blue-200">
-                    <Play size={13} />
-                    Активны: <strong>{allInstances.filter(({ instance: i }) => i.status === 'active').length}</strong>
-                  </span>
-                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-amber-50 dark:bg-amber-950/30 border border-amber-100 dark:border-amber-900/40 text-amber-900 dark:text-amber-200">
-                    <PauseCircle size={13} />
-                    На паузе: <strong>{allInstances.filter(({ instance: i }) => i.status === 'paused').length}</strong>
-                  </span>
-                </>
-              )}
-              {activeTab === 'completed' && (
-                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-100 dark:border-emerald-900/40 text-emerald-800 dark:text-emerald-200">
-                  <CheckCircle2 size={13} />
-                  Всего завершённых экземпляров: <strong>{completedInstancesList.length}</strong>
-                </span>
-              )}
-            </div>
         </div>
       </div>
       
       <div className="flex-1 min-h-0 overflow-hidden">
         <div className={`${MODULE_PAGE_GUTTER} pb-20 h-full overflow-y-auto custom-scrollbar`}>
           {activeTab === 'templates' ? (
-            processes.length === 0 ? (
+            userTemplates.length === 0 ? (
             <div className="bg-white dark:bg-[#252525] border border-gray-200 dark:border-[#333] rounded-xl p-12 text-center">
               <Network size={48} className="mx-auto text-gray-300 dark:text-gray-600 mb-4" />
-              <p className="text-gray-500 dark:text-gray-400 text-sm mb-2">Нет бизнес-процессов</p>
-              <p className="text-xs text-gray-400 dark:text-gray-500 mb-4">Выберите действие в меню «Создать» выше или создайте шаблон здесь</p>
+              <p className="text-gray-500 dark:text-gray-400 text-sm mb-2">Нет своих шаблонов</p>
+              <p className="text-xs text-gray-400 dark:text-gray-500 mb-4">Создайте первый шаблон процесса</p>
               <ModuleCreateDropdown
                 accent="indigo"
                 align="left"
@@ -1218,23 +1214,19 @@ const BusinessProcessesView: React.FC<BusinessProcessesViewProps> = ({
                     onClick: handleOpenCreate,
                     iconClassName: 'text-indigo-600 dark:text-indigo-400',
                   },
-                  ...(onQuickCreateTask
-                    ? [
-                        {
-                          id: 'task',
-                          label: 'Задача',
-                          icon: CheckCircle2,
-                          onClick: onQuickCreateTask,
-                          iconClassName: 'text-indigo-600 dark:text-indigo-400',
-                        },
-                      ]
-                    : []),
+                  {
+                    id: 'start-process',
+                    label: 'Запустить процесс…',
+                    icon: Play,
+                    onClick: () => setStartPickerOpen(true),
+                    iconClassName: 'text-emerald-600 dark:text-emerald-400',
+                  },
                 ]}
               />
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {uniqueProcesses.filter(p => !p.isArchived).map(process => {
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-2 gap-4">
+              {userTemplates.map(process => {
                 const instances = getProcessInstances(process.id);
                 
                 return (
@@ -1286,7 +1278,7 @@ const BusinessProcessesView: React.FC<BusinessProcessesViewProps> = ({
               ) : (
                 <div className="space-y-3">
                   {tabInstanceList.map(({ process, instance, tasks }) => {
-                    const currentStep = process.steps.find(s => s.id === instance.currentStepId);
+                    const currentStep = getStepsForInstance(process, instance).find((s) => s.id === instance.currentStepId);
                     const completedTasks = tasks.filter(t => t.status === 'Выполнено' || t.status === 'Done').length;
                     const totalTasks = tasks.length;
                     
@@ -1388,70 +1380,76 @@ const BusinessProcessesView: React.FC<BusinessProcessesViewProps> = ({
 
       {/* Create/Edit Modal (список процессов — без вкладки «Схема», упрощённый конструктор) */}
       {isModalOpen && (
-        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-[90] animate-in fade-in duration-200" onClick={handleBackdropClick}>
-          <div className="bg-white dark:bg-[#252525] rounded-xl shadow-2xl w-full max-w-2xl overflow-hidden border border-gray-200 dark:border-[#333] flex flex-col max-h-[90vh]" onClick={e => e.stopPropagation()}>
-            <div className="p-4 border-b border-gray-100 dark:border-[#333] flex justify-between items-center gap-2 bg-white dark:bg-[#252525] shrink-0">
-              <h3 className="font-bold text-gray-800 dark:text-white truncate">{editingProcess ? 'Редактировать процесс' : 'Новый процесс'}</h3>
+        <div
+          className="fixed inset-0 z-[100] flex items-end md:items-center justify-center bg-black/50 dark:bg-black/70 backdrop-blur-sm p-0 md:p-4 animate-in fade-in duration-200"
+          onClick={handleBackdropClick}
+        >
+          <div
+            className="w-full max-w-2xl overflow-hidden rounded-t-2xl md:rounded-2xl border border-gray-200 dark:border-[#333] bg-white dark:bg-[#191919] shadow-2xl flex flex-col max-h-[95vh] md:max-h-[90vh] animate-in slide-in-from-bottom md:zoom-in-95 duration-200"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="p-4 md:p-5 border-b border-gray-200 dark:border-[#333] flex justify-between items-center gap-2 bg-white dark:bg-[#191919] shrink-0">
+              <h3 className="font-bold text-base md:text-lg text-gray-900 dark:text-white truncate">{editingProcess ? 'Редактировать процесс' : 'Новый процесс'}</h3>
               <div className="flex items-center gap-1 shrink-0">
                 {editingProcess && (
                   <button
                     type="button"
                     onClick={(e) => { e.stopPropagation(); handleDelete(); }}
-                    className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-sm font-medium text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40"
+                    className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-sm font-medium text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40"
                   >
                     <Trash2 size={16} />
                     <span className="hidden sm:inline">Удалить</span>
                   </button>
                 )}
-                <button type="button" onClick={() => setIsModalOpen(false)} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 p-1.5 rounded-full hover:bg-gray-100 dark:hover:bg-[#333]"><X size={18} /></button>
+                <button type="button" onClick={() => setIsModalOpen(false)} className="p-2 rounded-xl hover:bg-gray-100 dark:hover:bg-[#252525] text-gray-500 dark:text-gray-400" aria-label="Закрыть"><X size={20} /></button>
               </div>
             </div>
-            
-            <form onSubmit={handleSubmit} className="flex-1 overflow-hidden flex flex-col">
-              <div className="p-6 overflow-y-auto custom-scrollbar space-y-6">
+
+            <form onSubmit={handleSubmit} className="flex-1 overflow-hidden flex flex-col min-h-0">
+              <div className="p-4 md:p-6 overflow-y-auto custom-scrollbar space-y-6">
                 <div className="space-y-4">
                   <div>
-                    <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 mb-1">Название процесса</label>
-                    <input value={title} onChange={e => setTitle(e.target.value)} className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2.5 text-sm bg-white dark:bg-[#333] text-gray-900 dark:text-gray-100" placeholder="Например: Согласование договора"/>
+                    <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 mb-1.5 uppercase tracking-wide">Название процесса</label>
+                    <input value={title} onChange={e => setTitle(e.target.value)} className="w-full rounded-xl border border-gray-200 dark:border-[#333] bg-gray-50 dark:bg-[#252525] px-3 py-2.5 text-sm text-gray-900 dark:text-gray-100 placeholder-gray-400 focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500/50 outline-none" placeholder="Например: Согласование договора"/>
                   </div>
                   <div>
-                    <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 mb-1">Описание</label>
-                    <textarea value={description} onChange={e => setDescription(e.target.value)} className="w-full h-24 border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-[#333] text-gray-900 dark:text-gray-100 resize-none"/>
+                    <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 mb-1.5 uppercase tracking-wide">Описание</label>
+                    <textarea value={description} onChange={e => setDescription(e.target.value)} className="w-full h-24 rounded-xl border border-gray-200 dark:border-[#333] bg-gray-50 dark:bg-[#252525] px-3 py-2.5 text-sm text-gray-900 dark:text-gray-100 resize-none focus:ring-2 focus:ring-indigo-500/30 outline-none"/>
                   </div>
                 </div>
 
                 <div className="border-t border-gray-200 dark:border-[#333] pt-5">
-                  <div className="flex justify-between items-center mb-4">
+                  <div className="flex justify-between items-center mb-4 gap-2">
                     <div>
-                      <h4 className="font-bold text-gray-800 dark:text-gray-100 text-sm">Шаги процесса</h4>
+                      <h4 className="font-bold text-gray-900 dark:text-gray-100 text-sm">Шаги процесса</h4>
                       <p className="text-[11px] text-gray-500 dark:text-gray-400 mt-0.5">Порядок сверху вниз. Кому назначается шаг — справа.</p>
                     </div>
-                    <button type="button" onClick={handleAddStep} className="text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 text-xs font-semibold flex items-center gap-1 px-2 py-1 rounded-lg border border-indigo-200 dark:border-indigo-800 bg-indigo-50/50 dark:bg-indigo-950/30"><Plus size={14}/> Добавить шаг</button>
+                    <button type="button" onClick={handleAddStep} className="text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 text-xs font-semibold flex items-center gap-1 px-2.5 py-1.5 rounded-xl border border-indigo-200 dark:border-indigo-800 bg-indigo-50/80 dark:bg-indigo-950/30 shrink-0"><Plus size={14}/> Добавить шаг</button>
                   </div>
-                  
+
                   <div className="space-y-4">
                     {steps.length === 0 && (
-                      <p className="text-sm text-gray-500 dark:text-gray-400 py-6 text-center border border-dashed border-gray-200 dark:border-[#444] rounded-xl">
+                      <p className="text-sm text-gray-500 dark:text-gray-400 py-6 text-center border border-dashed border-gray-200 dark:border-[#444] rounded-2xl bg-gray-50/50 dark:bg-[#141414]">
                         Нажмите «Добавить шаг», чтобы собрать цепочку согласований или действий.
                       </p>
                     )}
                     {steps.map((step, index) => (
-                      <div key={step.id} className="relative pl-3 border-l-2 border-indigo-200 dark:border-indigo-800 bg-gray-50/80 dark:bg-[#2a2a2a] p-4 rounded-r-xl border border-gray-200/80 dark:border-[#444] group">
-                        <button type="button" onClick={() => handleRemoveStep(step.id)} className="absolute top-3 right-3 text-gray-400 hover:text-red-500 p-1 rounded-md hover:bg-white/80 dark:hover:bg-[#333] opacity-80 group-hover:opacity-100 transition-opacity" title="Убрать шаг"><Trash2 size={16}/></button>
+                      <div key={step.id} className="relative pl-3 border-l-2 border-indigo-300 dark:border-indigo-700 bg-gray-50 dark:bg-[#252525] p-4 rounded-r-2xl border border-gray-200 dark:border-[#333] group">
+                        <button type="button" onClick={() => handleRemoveStep(step.id)} className="absolute top-3 right-3 text-gray-400 hover:text-red-500 p-1 rounded-lg hover:bg-white/80 dark:hover:bg-[#333] opacity-80 group-hover:opacity-100 transition-opacity" title="Убрать шаг"><Trash2 size={16}/></button>
                         <div className="flex items-start gap-3 mb-3 pr-10">
                           <span className="text-xs font-bold text-white w-7 h-7 rounded-full bg-indigo-600 dark:bg-indigo-500 flex items-center justify-center shrink-0 shadow-sm">{index + 1}</span>
-                          <input 
-                            value={step.title} 
+                          <input
+                            value={step.title}
                             onChange={e => handleUpdateStep(step.id, { title: e.target.value })}
-                            className="flex-1 min-w-0 bg-white dark:bg-[#252525] border border-gray-300 dark:border-[#555] rounded-lg px-3 py-2 text-sm font-medium text-gray-800 dark:text-gray-100 placeholder-gray-400 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                            className="flex-1 min-w-0 bg-white dark:bg-[#1a1a1a] border border-gray-200 dark:border-[#444] rounded-xl px-3 py-2 text-sm font-medium text-gray-800 dark:text-gray-100 placeholder-gray-400 focus:ring-2 focus:ring-indigo-500/30 outline-none"
                             placeholder="Название шага *"
                           />
                         </div>
-                        <textarea 
+                        <textarea
                           value={step.description || ''}
                           onChange={e => handleUpdateStep(step.id, { description: e.target.value })}
                           rows={2}
-                          className="w-full bg-white dark:bg-[#252525] border border-gray-200 dark:border-[#555] rounded-lg px-3 py-2 text-xs text-gray-600 dark:text-gray-400 placeholder-gray-400 mb-3 resize-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                          className="w-full bg-white dark:bg-[#1a1a1a] border border-gray-200 dark:border-[#444] rounded-xl px-3 py-2 text-xs text-gray-600 dark:text-gray-400 placeholder-gray-400 mb-3 resize-none focus:ring-2 focus:ring-indigo-500/30 outline-none"
                           placeholder="Описание действий (необязательно)..."
                         />
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
@@ -1474,7 +1472,7 @@ const BusinessProcessesView: React.FC<BusinessProcessesViewProps> = ({
                               onChange={(val) => handleUpdateStep(step.id, { assigneeId: val })}
                               options={[
                                 { value: '', label: 'Выберите...' },
-                                ...(step.assigneeType === 'position' 
+                                ...(step.assigneeType === 'position'
                                   ? orgPositions.map(p => ({ value: p.id, label: p.title }))
                                   : users.map(u => ({ value: u.id, label: u.name }))
                                 )
@@ -1489,14 +1487,73 @@ const BusinessProcessesView: React.FC<BusinessProcessesViewProps> = ({
                 </div>
               </div>
 
-              <div className="p-4 border-t border-gray-100 dark:border-[#333] bg-white dark:bg-[#252525] flex justify-end items-center gap-2 shrink-0">
-                <button type="button" onClick={() => setIsModalOpen(false)} className="px-4 py-2 text-sm font-medium text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-[#303030] rounded-lg">Отмена</button>
-                <button type="submit" className="px-4 py-2 text-sm font-medium bg-indigo-600 text-white hover:bg-indigo-700 rounded-lg shadow-sm flex items-center gap-2"><Save size={16}/> Сохранить</button>
+              <div className="p-4 md:p-6 border-t border-gray-200 dark:border-[#333] bg-white dark:bg-[#191919] flex justify-end items-center gap-2 shrink-0">
+                <Button type="button" variant="secondary" onClick={() => setIsModalOpen(false)} size="md">Отмена</Button>
+                <Button type="submit" size="md" icon={Save} className="!bg-indigo-600 hover:!bg-indigo-700 !text-white focus:!ring-indigo-500">Сохранить</Button>
               </div>
             </form>
           </div>
         </div>
       )}
+
+      {startPickerOpen && (
+        <div
+          className="fixed inset-0 z-[190] flex items-center justify-center bg-black/50 dark:bg-black/70 backdrop-blur-sm p-4"
+          role="presentation"
+          onClick={() => setStartPickerOpen(false)}
+        >
+          <div
+            className="bg-white dark:bg-[#252525] rounded-xl shadow-2xl border border-gray-200 dark:border-[#333] w-full max-w-lg max-h-[80vh] flex flex-col overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="start-process-picker-title"
+          >
+            <div className="px-5 py-4 border-b border-gray-100 dark:border-[#333] flex items-center justify-between gap-3">
+              <h2 id="start-process-picker-title" className="text-lg font-bold text-gray-900 dark:text-white">
+                Запустить процесс
+              </h2>
+              <button
+                type="button"
+                onClick={() => setStartPickerOpen(false)}
+                className="p-2 rounded-lg text-gray-500 hover:bg-gray-100 dark:hover:bg-[#333]"
+                aria-label="Закрыть"
+              >
+                <X size={20} />
+              </button>
+            </div>
+            <p className="px-5 pt-2 text-xs text-gray-500 dark:text-gray-400">
+              Выберите шаблон. Для воронки продаж далее выберите сделку.
+            </p>
+            <div className="p-3 overflow-y-auto custom-scrollbar flex-1 min-h-0 space-y-1">
+              {uniqueProcesses.length === 0 ? (
+                <p className="text-sm text-gray-500 dark:text-gray-400 text-center py-8">Нет доступных шаблонов</p>
+              ) : (
+                userTemplates.map((proc) => (
+                  <button
+                    key={proc.id}
+                    type="button"
+                    onClick={() => startProcessFor(proc, { fromPicker: true })}
+                    className="w-full text-left px-4 py-3 rounded-xl border border-gray-100 dark:border-[#333] hover:bg-indigo-50 dark:hover:bg-indigo-950/30 hover:border-indigo-200 dark:hover:border-indigo-800 transition-colors"
+                  >
+                    <div className="font-medium text-gray-900 dark:text-white">{proc.title}</div>
+                    {proc.description ? (
+                      <div className="text-xs text-gray-500 dark:text-gray-400 line-clamp-2 mt-0.5">{proc.description}</div>
+                    ) : null}
+                  </button>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      <SystemAlertDialog
+        open={!!alertText}
+        title="Бизнес-процессы"
+        message={alertText || ''}
+        onClose={() => setAlertText(null)}
+      />
     </ModulePageShell>
   );
 };

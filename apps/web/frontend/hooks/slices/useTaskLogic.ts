@@ -1,10 +1,13 @@
 
 import { useState, useEffect } from 'react';
-import { Task, Project, StatusOption, PriorityOption, User, TaskComment, TaskAttachment, AutomationRule, Doc } from '../../../types';
+import { Task, Project, StatusOption, PriorityOption, User, TaskComment, TaskAttachment, AutomationRule, Doc, NotificationPreferences } from '../../../types';
+import { DEFAULT_NOTIFICATION_PREFS } from '../../../constants';
 import { api } from '../../../backend/api';
 import { uploadTaskAttachment } from '../../../services/localStorageService';
 import { getTodayLocalDate, getDateDaysFromNow } from '../../../utils/dateUtils';
 import { notifyTaskCreated, notifyTaskStatusChanged, NotificationContext } from '../../../services/notificationService';
+import { shouldSyncEditingTaskFromFresh } from '../../../utils/taskSyncUtils';
+import { sendTelegramNotification } from '../../../services/telegramService';
 
 export const useTaskLogic = (showNotification: (msg: string) => void, currentUser: User | null, users: User[], automationRules: AutomationRule[] = [], docs: Doc[] = [], onSaveDoc?: (docData: any, tableId?: string) => Doc | void, notificationPrefs?: NotificationPreferences) => {
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -15,21 +18,12 @@ export const useTaskLogic = (showNotification: (msg: string) => void, currentUse
   const [isTaskModalOpen, setIsTaskModalOpen] = useState(false);
   const [editingTask, setEditingTask] = useState<Partial<Task> | null>(null); // Changed to Partial
 
-  // Sync editingTask with latest data from tasks array (for realtime comments)
+  // Синхронизация карточки с массивом задач без JSON.stringify (O(n) по полям комментария)
   useEffect(() => {
       if (editingTask && isTaskModalOpen && editingTask.id) {
           const freshTask = tasks.find(t => t.id === editingTask.id);
-          if (freshTask) {
-              // Проверяем изменения в комментариях, вложениях и других полях
-              const commentsChanged = JSON.stringify(freshTask.comments || []) !== JSON.stringify(editingTask.comments || []);
-              const attachmentsChanged = JSON.stringify(freshTask.attachments || []) !== JSON.stringify(editingTask.attachments || []);
-              const statusChanged = freshTask.status !== editingTask.status;
-              const priorityChanged = freshTask.priority !== editingTask.priority;
-              
-              // Обновляем editingTask при любых изменениях
-              if (commentsChanged || attachmentsChanged || statusChanged || priorityChanged) {
-                  setEditingTask(freshTask);
-              }
+          if (freshTask && shouldSyncEditingTaskFromFresh(freshTask, editingTask)) {
+              setEditingTask(freshTask);
           }
       }
   }, [tasks, isTaskModalOpen, editingTask?.id]);
@@ -45,12 +39,12 @@ export const useTaskLogic = (showNotification: (msg: string) => void, currentUse
       showNotification('Модуль создан');
   };
 
-  const processAutomation = async (task: Task, trigger: 'status_change' | 'new_task') => {
+  const processAutomation = async (task: Task, trigger: 'task_status_changed' | 'task_created') => {
       const activeRules = automationRules.filter(r => r.isActive && r.trigger === trigger);
       
       for (const rule of activeRules) {
           if (rule.conditions.moduleId && task.projectId !== rule.conditions.moduleId) continue;
-          if (trigger === 'status_change' && rule.conditions.statusTo && task.status !== rule.conditions.statusTo) continue;
+          if (trigger === 'task_status_changed' && rule.conditions.statusTo && task.status !== rule.conditions.statusTo) continue;
 
           if (rule.action.type === 'telegram_message') {
               let msg = rule.action.template
@@ -75,7 +69,7 @@ export const useTaskLogic = (showNotification: (msg: string) => void, currentUse
   const saveTask = (taskData: Partial<Task>, activeTableId: string) => {
     let updatedTasks: Task[];
     // Используем переданные notificationPrefs или получаем из API (для обратной совместимости)
-    const currentNotificationPrefs = notificationPrefs || api.notificationPrefs.get();
+    const currentNotificationPrefs: NotificationPreferences = notificationPrefs ?? DEFAULT_NOTIFICATION_PREFS;
 
     if (taskData.id) {
         const oldTask = tasks.find(t => t.id === taskData.id);
@@ -112,7 +106,7 @@ export const useTaskLogic = (showNotification: (msg: string) => void, currentUse
                     notificationPrefs: currentNotificationPrefs
                 };
                 notifyTaskStatusChanged(newTask, oldStatus || '?', taskData.status, assigneeUser, { context }).catch(() => {});
-                processAutomation(newTask, 'status_change');
+                processAutomation(newTask, 'task_status_changed');
             }
         } else {
             // Задача с таким id не существует - создаем новую
@@ -157,7 +151,7 @@ export const useTaskLogic = (showNotification: (msg: string) => void, currentUse
                     notificationPrefs: currentNotificationPrefs
                 };
                 notifyTaskCreated(newTask, assigneeUser, { context }).catch(() => {});
-                processAutomation(newTask, 'new_task');
+                processAutomation(newTask, 'task_created');
             }
         }
     } else {
@@ -220,7 +214,7 @@ export const useTaskLogic = (showNotification: (msg: string) => void, currentUse
                 notificationPrefs: currentNotificationPrefs
             };
             notifyTaskCreated(newTask, assigneeUser, { context }).catch(() => {});
-            processAutomation(newTask, 'new_task');
+            processAutomation(newTask, 'task_created');
         }
     }
     setTasks(updatedTasks);
@@ -260,7 +254,7 @@ export const useTaskLogic = (showNotification: (msg: string) => void, currentUse
           
           const attachmentId = `att-${Date.now()}`;
           
-          const attachment: TaskAttachment = {
+          let attachment: TaskAttachment = {
               id: attachmentId,
               taskId,
               name: file.name,
@@ -268,73 +262,27 @@ export const useTaskLogic = (showNotification: (msg: string) => void, currentUse
               type: file.type.split('/')[0] || 'file',
               uploadedAt: new Date().toISOString(),
               attachmentType: 'file',
-              storagePath: uploadResult.path // Сохраняем путь в Storage для возможного удаления
+              storagePath: uploadResult.path
           };
 
-          // Обновляем задачу с вложением
-          const updatedTasks = tasks.map(t => {
-              if (t.id === taskId) {
-                  return { ...t, attachments: [...(t.attachments || []), attachment] };
-              }
-              return t;
-          });
-          setTasks(updatedTasks);
-          api.tasks.updateAll(updatedTasks).catch(() => showNotification('Ошибка сохранения задачи'));
-          
-          if (editingTask && editingTask.id === taskId) {
-              setEditingTask({ ...editingTask, attachments: [...(editingTask.attachments || []), attachment] });
-          }
-          
-          let finalTasks = updatedTasks;
-          
-          // Создаем документ в модуле документов
           if (onSaveDoc) {
               try {
-                  const task = updatedTasks.find(t => t.id === taskId);
+                  const task = tasks.find(t => t.id === taskId);
                   const docTitle = `${file.name} (из задачи: ${task?.title || 'Без названия'})`;
-                  
                   const newDoc = onSaveDoc({
                       title: docTitle,
                       url: uploadResult.url,
                       type: 'link',
                       tags: ['задача', taskId]
                   });
-                  
                   if (newDoc) {
-                      // Связываем вложение с документом
-                      const attachmentWithDoc: TaskAttachment = {
-                          ...attachment,
-                          docId: newDoc.id
-                      };
-                      
-                      finalTasks = updatedTasks.map(t => {
-                          if (t.id === taskId) {
-                              const updatedAttachments = t.attachments?.map(a => 
-                                  a.id === attachmentId ? attachmentWithDoc : a
-                              ) || [attachmentWithDoc];
-                              return { ...t, attachments: updatedAttachments };
-                          }
-                          return t;
-                      });
-                      setTasks(finalTasks);
-                      api.tasks.updateAll(finalTasks).catch(() => showNotification('Ошибка сохранения задачи'));
-                      
-                      if (editingTask && editingTask.id === taskId) {
-                          setEditingTask({ 
-                              ...editingTask, 
-                              attachments: editingTask.attachments?.map(a => 
-                                  a.id === attachmentId ? attachmentWithDoc : a
-                              ) || [attachmentWithDoc]
-                          });
-                      }
+                      attachment = { ...attachment, docId: newDoc.id };
                   }
               } catch (docError) {
                   console.error('Ошибка при создании документа:', docError);
-                  // Продолжаем работу даже если документ не создан
               }
           }
-          
-          // Создаем комментарий с ссылкой на вложение
+
           const comment: TaskComment = {
               id: `tc-${Date.now()}`,
               taskId,
@@ -344,20 +292,26 @@ export const useTaskLogic = (showNotification: (msg: string) => void, currentUse
               isSystem: true,
               attachmentId: attachmentId
           };
-          
-          const tasksWithComment = finalTasks.map(t => {
-              if (t.id === taskId) {
-                  return { ...t, comments: [...(t.comments || []), comment] };
-              }
-              return t;
+
+          const tasksFinal = tasks.map(t => {
+              if (t.id !== taskId) return t;
+              return {
+                  ...t,
+                  attachments: [...(t.attachments || []), attachment],
+                  comments: [...(t.comments || []), comment],
+              };
           });
-          setTasks(tasksWithComment);
-          api.tasks.updateAll(tasksWithComment).catch(() => showNotification('Ошибка сохранения задачи'));
-          
+          setTasks(tasksFinal);
+          api.tasks.updateAll(tasksFinal).catch(() => showNotification('Ошибка сохранения задачи'));
+
           if (editingTask && editingTask.id === taskId) {
-              setEditingTask({ ...editingTask, comments: [...(editingTask.comments || []), comment] });
+              setEditingTask({
+                  ...editingTask,
+                  attachments: [...(editingTask.attachments || []), attachment],
+                  comments: [...(editingTask.comments || []), comment],
+              });
           }
-          
+
           showNotification('Файл загружен и добавлен в документы');
       } catch (error) {
           console.error('Ошибка при загрузке файла:', error);
@@ -380,20 +334,6 @@ export const useTaskLogic = (showNotification: (msg: string) => void, currentUse
           docId: doc.id
       };
 
-      const updatedTasks = tasks.map(t => {
-          if (t.id === taskId) {
-              return { ...t, attachments: [...(t.attachments || []), attachment] };
-          }
-          return t;
-      });
-      setTasks(updatedTasks);
-      api.tasks.updateAll(updatedTasks).catch(() => showNotification('Ошибка сохранения задачи'));
-      
-      if (editingTask && editingTask.id === taskId) {
-          setEditingTask({ ...editingTask, attachments: [...(editingTask.attachments || []), attachment] });
-      }
-      
-      // Создаем комментарий с ссылкой на документ
       const comment: TaskComment = {
           id: `tc-${Date.now()}`,
           taskId,
@@ -403,18 +343,24 @@ export const useTaskLogic = (showNotification: (msg: string) => void, currentUse
           isSystem: true,
           attachmentId: attachment.id
       };
-      
-      const tasksWithComment = updatedTasks.map(t => {
-          if (t.id === taskId) {
-              return { ...t, comments: [...(t.comments || []), comment] };
-          }
-          return t;
+
+      const tasksFinal = tasks.map(t => {
+          if (t.id !== taskId) return t;
+          return {
+              ...t,
+              attachments: [...(t.attachments || []), attachment],
+              comments: [...(t.comments || []), comment],
+          };
       });
-      setTasks(tasksWithComment);
-      api.tasks.updateAll(tasksWithComment).catch(() => showNotification('Ошибка сохранения задачи'));
-      
+      setTasks(tasksFinal);
+      api.tasks.updateAll(tasksFinal).catch(() => showNotification('Ошибка сохранения задачи'));
+
       if (editingTask && editingTask.id === taskId) {
-          setEditingTask({ ...editingTask, comments: [...(editingTask.comments || []), comment] });
+          setEditingTask({
+              ...editingTask,
+              attachments: [...(editingTask.attachments || []), attachment],
+              comments: [...(editingTask.comments || []), comment],
+          });
       }
   };
 

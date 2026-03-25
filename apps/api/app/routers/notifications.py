@@ -5,6 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
 from app.models.notification import Notification
+from app.services.domain_events import log_entity_mutation
 from app.services.notifications_realtime import realtime_hub
 from app.services.notification_delivery import run_pending_deliveries
 from app.services.notification_retention import run_notification_retention
@@ -79,6 +80,15 @@ async def mark_notification_read(
     else:
         row.read_at = None
     await db.flush()
+    await log_entity_mutation(
+        db,
+        event_type="notification.read_state.updated",
+        entity_type="notification",
+        entity_id=notification_id,
+        source="notifications-router",
+        actor_id=row.recipient_id,
+        payload={"isRead": is_read},
+    )
     return {"ok": True}
 
 

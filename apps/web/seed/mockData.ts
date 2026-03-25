@@ -511,26 +511,5 @@ export function runSeed(): void {
     },
   ]);
 
-  // Сайты: мок для вкладок Логотипы, Новости, Кейсы, Теги
-  localStoreService.setAll('partnerLogos', [
-    { id: 'logo1', name: 'Партнёр 1', logoUrl: '', websiteUrl: 'https://example.com', order: 1, createdAt: now() },
-    { id: 'logo2', name: 'Партнёр 2', logoUrl: '', websiteUrl: 'https://example.com', order: 2, createdAt: now() },
-    { id: 'logo3', name: 'Партнёр 3', logoUrl: '', websiteUrl: 'https://example.com', order: 3, createdAt: now() },
-  ]);
-  localStoreService.setAll('news', [
-    { id: 'news1', title: 'Запустили новый сайт для ООО Ромашка', content: '<p>Кейс по разработке корпоративного сайта.</p>', excerpt: 'Успешный запуск проекта', tags: [], published: true, publishedAt: now(), createdAt: now() },
-    { id: 'news2', title: 'Расширяем команду', content: '<p>Приглашаем маркетологов и разработчиков.</p>', excerpt: 'Вакансии', tags: [], published: true, publishedAt: now(), createdAt: now() },
-    { id: 'news3', title: 'Вебинар по SMM 25 февраля', content: '<p>Регистрируйтесь на бесплатный вебинар.</p>', excerpt: 'Мероприятие', tags: [], published: false, createdAt: now() },
-  ]);
-  localStoreService.setAll('cases', [
-    { id: 'case1', title: 'Сайт для ООО Ромашка', description: '<p>Корпоративный сайт с каталогом и формой заявки.</p>', clientName: 'ООО Ромашка', tags: [], order: 1, published: true, createdAt: now() },
-    { id: 'case2', title: 'Реклама в Instagram для ИП Васильев', description: '<p>Настройка таргета и ведение профиля.</p>', clientName: 'ИП Васильев', tags: [], order: 2, published: true, createdAt: now() },
-  ]);
-  localStoreService.setAll('tags', [
-    { id: 'tag1', name: 'Разработка', color: '#267022', createdAt: now() },
-    { id: 'tag2', name: 'Реклама', color: '#3b82f6', createdAt: now() },
-    { id: 'tag3', name: 'Кейс', color: '#8b5cf6', createdAt: now() },
-  ]);
-
   localStorage.setItem(SEED_FLAG, '1');
 }

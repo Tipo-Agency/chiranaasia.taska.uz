@@ -1,11 +1,13 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Client, SalesFunnel, Deal } from '../../types';
+import { Client, SalesFunnel, Deal, User } from '../../types';
 import { X, Edit2, Receipt, FileText } from 'lucide-react';
 import { TaskSelect } from '../TaskSelect';
+import { SystemConfirmDialog } from '../ui';
 
 interface ClientModalProps {
   isOpen: boolean;
   editingClient: Client | null;
+  users?: User[];
   salesFunnels?: SalesFunnel[];
   contracts?: Deal[];
   oneTimeDeals?: Deal[];
@@ -19,6 +21,7 @@ interface ClientModalProps {
 export const ClientModal: React.FC<ClientModalProps> = ({
   isOpen,
   editingClient,
+  users = [],
   salesFunnels = [],
   contracts = [],
   oneTimeDeals = [],
@@ -39,6 +42,8 @@ export const ClientModal: React.FC<ClientModalProps> = ({
   const [companyInfo, setCompanyInfo] = useState('');
   const [clientNotes, setClientNotes] = useState('');
   const [clientFunnelId, setClientFunnelId] = useState<string>('');
+  const [responsibleUserId, setResponsibleUserId] = useState<string>('');
+  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
 
   useEffect(() => {
     if (isOpen) {
@@ -53,6 +58,7 @@ export const ClientModal: React.FC<ClientModalProps> = ({
         setCompanyInfo(editingClient.companyInfo || '');
         setClientNotes(editingClient.notes || '');
         setClientFunnelId(editingClient.funnelId || '');
+        setResponsibleUserId(editingClient.responsibleUserId || '');
       } else {
         setClientName('');
         setContactPerson('');
@@ -64,6 +70,7 @@ export const ClientModal: React.FC<ClientModalProps> = ({
         setCompanyInfo('');
         setClientNotes('');
         setClientFunnelId('');
+        setResponsibleUserId('');
       }
       setClientModalTab('company');
     }
@@ -82,15 +89,15 @@ export const ClientModal: React.FC<ClientModalProps> = ({
       companyName: companyName || undefined,
       companyInfo: companyInfo || undefined,
       notes: clientNotes || undefined,
-      funnelId: clientFunnelId || undefined
+      funnelId: clientFunnelId || undefined,
+      responsibleUserId: responsibleUserId || undefined,
     });
     onClose();
   };
 
   const handleBackdrop = (e: React.MouseEvent) => {
     if (e.target === e.currentTarget) {
-      if (window.confirm("Сохранить изменения?")) handleSubmit();
-      else onClose();
+      onClose();
     }
   };
 
@@ -98,7 +105,7 @@ export const ClientModal: React.FC<ClientModalProps> = ({
 
   return (
     <div 
-      className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-end md:items-center justify-center z-[80] animate-in fade-in duration-200" 
+      className="fixed inset-0 bg-black/35 backdrop-blur-sm flex items-end md:items-center justify-center z-[210] animate-in fade-in duration-200" 
       onClick={handleBackdrop}
     >
       <div 
@@ -239,6 +246,18 @@ export const ClientModal: React.FC<ClientModalProps> = ({
                     />
                   </div>
                 )}
+                <div>
+                  <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 mb-1">Ответственный сотрудник</label>
+                  <TaskSelect
+                    value={responsibleUserId}
+                    onChange={setResponsibleUserId}
+                    options={[
+                      { value: '', label: 'Не назначен' },
+                      ...users.filter((u) => !u.isArchived).map((u) => ({ value: u.id, label: u.name })),
+                    ]}
+                    className="bg-white dark:bg-[#333] border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100"
+                  />
+                </div>
               </>
             ) : clientModalTab === 'notes' ? (
               <div>
@@ -331,10 +350,7 @@ export const ClientModal: React.FC<ClientModalProps> = ({
               <button 
                 type="button" 
                 onClick={() => { 
-                  if (confirm('Удалить?')) {
-                    onDelete(editingClient.id);
-                    onClose();
-                  }
+                  setConfirmDeleteOpen(true);
                 }} 
                 className="text-red-500 text-sm hover:underline"
               >
@@ -359,6 +375,22 @@ export const ClientModal: React.FC<ClientModalProps> = ({
           </div>
         </form>
       </div>
+      <SystemConfirmDialog
+        open={confirmDeleteOpen}
+        title="Удалить клиента"
+        message="Вы уверены, что хотите удалить клиента?"
+        danger
+        confirmText="Удалить"
+        cancelText="Отмена"
+        onCancel={() => setConfirmDeleteOpen(false)}
+        onConfirm={() => {
+          if (editingClient && onDelete) {
+            onDelete(editingClient.id);
+            setConfirmDeleteOpen(false);
+            onClose();
+          }
+        }}
+      />
     </div>
   );
 };

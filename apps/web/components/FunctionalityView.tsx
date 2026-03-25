@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { Task, User, StatusOption, Project } from '../types';
-import { CheckCircle2, Trash2, Edit2, Search, Play, Layers, Folder, ChevronDown } from 'lucide-react';
-import { ModulePageShell, ModulePageHeader, MODULE_PAGE_GUTTER, ModuleCreateIconButton } from './ui';
+import { CheckCircle2, Trash2, Edit2, Play, Layers, Folder, ChevronDown } from 'lucide-react';
+import { ModulePageShell, ModulePageHeader, ModuleSegmentedControl, MODULE_PAGE_GUTTER, ModuleCreateIconButton, ModuleFilterIconButton } from './ui';
 
 interface FunctionalityViewProps {
   features: Task[]; // Все функции из всех functionality таблиц
@@ -54,9 +54,10 @@ const FunctionalityView: React.FC<FunctionalityViewProps> = ({
     onCreateFeature,
     onTakeToWork
 }) => {
-  const [searchQuery, setSearchQuery] = useState('');
   const [selectedProjectId, setSelectedProjectId] = useState<string>('all'); // 'all' или конкретный projectId
   const [selectedCategory, setSelectedCategory] = useState<string>('all'); // 'all' или конкретная категория
+  const [scope, setScope] = useState<'all' | 'assigned' | 'unassigned'>('all');
+  const [showFilters, setShowFilters] = useState(false);
 
   // Получаем все проекты, у которых есть функции
   const projectsWithFeatures = useMemo(() => {
@@ -68,14 +69,6 @@ const FunctionalityView: React.FC<FunctionalityViewProps> = ({
   const filteredFeatures = useMemo(() => {
     let result = features.filter(f => f.entityType === 'feature' && !f.isArchived);
 
-    // Фильтр по поиску
-    if (searchQuery) {
-      result = result.filter(f => 
-        f.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (f.description && f.description.toLowerCase().includes(searchQuery.toLowerCase()))
-      );
-    }
-
     // Фильтр по проекту
     if (selectedProjectId !== 'all') {
       result = result.filter(f => f.projectId === selectedProjectId);
@@ -86,8 +79,15 @@ const FunctionalityView: React.FC<FunctionalityViewProps> = ({
       result = result.filter(f => f.category === selectedCategory);
     }
 
+    if (scope === 'assigned') {
+      result = result.filter((f) => !!f.assigneeId || !!(f.assigneeIds && f.assigneeIds.length));
+    }
+    if (scope === 'unassigned') {
+      result = result.filter((f) => !f.assigneeId && !(f.assigneeIds && f.assigneeIds.length));
+    }
+
     return result;
-  }, [features, searchQuery, selectedProjectId, selectedCategory]);
+  }, [features, selectedProjectId, selectedCategory, scope]);
 
   // Группируем функции по проектам и категориям
   const groupedFeatures = useMemo(() => {
@@ -143,23 +143,75 @@ const FunctionalityView: React.FC<FunctionalityViewProps> = ({
 
   return (
     <ModulePageShell>
-    <div className={`${MODULE_PAGE_GUTTER} pt-8 pb-20 h-full flex flex-col`}>
-        {/* Header Stats */}
-        <div className="mb-8 bg-white dark:bg-[#1a1a1a] p-6 rounded-2xl border border-gray-200 dark:border-[#333] shadow-sm">
-            <ModulePageHeader
-              icon={<Layers size={24} strokeWidth={2} />}
-              title="Функционал"
-              description="Функции проектов"
-              accent="sky"
-              actions={
-                <div className="text-right">
-                    <div className="text-3xl font-bold text-sky-600 dark:text-sky-400 tabular-nums">{progress}%</div>
-                    <div className="text-xs text-gray-500 dark:text-gray-400 uppercase font-semibold">Готовность системы</div>
+      <div className={`${MODULE_PAGE_GUTTER} pt-6 md:pt-8 flex-shrink-0`}>
+        <div className="mb-6">
+          <ModulePageHeader
+            icon={<Layers size={24} strokeWidth={2} />}
+            title="Функционал"
+            description="Функции проектов"
+            accent="sky"
+            tabs={
+              <ModuleSegmentedControl
+                variant="neutral"
+                value={scope}
+                onChange={(v) => setScope(v as 'all' | 'assigned' | 'unassigned')}
+                options={[
+                  { value: 'all', label: 'Все' },
+                  { value: 'assigned', label: 'С исполнителем' },
+                  { value: 'unassigned', label: 'Без исполнителя' },
+                ]}
+              />
+            }
+            controls={
+              <div className="flex items-center gap-2">
+                  <ModuleFilterIconButton
+                    accent="sky"
+                    active={showFilters || selectedProjectId !== 'all' || selectedCategory !== 'all'}
+                    activeCount={(selectedProjectId !== 'all' ? 1 : 0) + (selectedCategory !== 'all' ? 1 : 0)}
+                    onClick={() => setShowFilters((v) => !v)}
+                  />
+                  <ModuleCreateIconButton
+                    accent="sky"
+                    label="Добавить функцию"
+                    onClick={() => onCreateFeature(selectedProjectId !== 'all' ? selectedProjectId : undefined, selectedCategory !== 'all' ? selectedCategory : undefined)}
+                  />
                 </div>
-              }
-              className="mb-4"
-            />
-            <div className="w-full bg-gray-100 dark:bg-[#333] rounded-full h-3 overflow-hidden">
+            }
+            className="mb-4"
+          />
+          {showFilters && (
+            <div className="mt-4 p-4 bg-gray-50 dark:bg-[#252525] rounded-lg border border-gray-200 dark:border-[#333]">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div className="relative">
+                  <select
+                    value={selectedProjectId}
+                    onChange={e => setSelectedProjectId(e.target.value)}
+                    className="w-full px-3 pr-8 py-2 bg-white dark:bg-[#252525] border border-gray-200 dark:border-[#333] rounded-lg text-sm text-gray-800 dark:text-gray-200 focus:ring-2 focus:ring-blue-500 outline-none appearance-none"
+                  >
+                    <option value="all">Все проекты</option>
+                    {projectsWithFeatures.map(p => (
+                      <option key={p.id} value={p.id}>{p.name}</option>
+                    ))}
+                  </select>
+                  <ChevronDown size={16} className="absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400" />
+                </div>
+                <div className="relative">
+                  <select
+                    value={selectedCategory}
+                    onChange={e => setSelectedCategory(e.target.value)}
+                    className="w-full px-3 pr-8 py-2 bg-white dark:bg-[#252525] border border-gray-200 dark:border-[#333] rounded-lg text-sm text-gray-800 dark:text-gray-200 focus:ring-2 focus:ring-blue-500 outline-none appearance-none"
+                  >
+                    <option value="all">Все категории</option>
+                    {STANDARD_CATEGORIES.map(c => (
+                      <option key={c.id} value={c.id}>{c.name}</option>
+                    ))}
+                  </select>
+                  <ChevronDown size={16} className="absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400" />
+                </div>
+              </div>
+            </div>
+          )}
+          <div className="w-full bg-gray-100 dark:bg-[#333] rounded-full h-3 overflow-hidden">
                 <div 
                     className="bg-blue-600 h-full rounded-full transition-all duration-500 ease-out relative"
                     style={{ width: `${progress}%` }}
@@ -173,61 +225,12 @@ const FunctionalityView: React.FC<FunctionalityViewProps> = ({
                 <span>100%</span>
             </div>
         </div>
+      </div>
 
-        {/* Toolbar */}
-        <div className="flex flex-wrap items-center justify-between gap-4 mb-4">
-            <div className="relative max-w-xs w-full">
-                <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"/>
-                <input 
-                    type="text" 
-                    placeholder="Найти функцию..." 
-                    value={searchQuery}
-                    onChange={e => setSearchQuery(e.target.value)}
-                    className="w-full pl-9 pr-4 py-2 bg-white dark:bg-[#252525] border border-gray-200 dark:border-[#333] rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none text-gray-800 dark:text-gray-200"
-                />
-            </div>
-            
-            <div className="flex items-center gap-2">
-                {/* Фильтр по проекту */}
-                <div className="relative">
-                    <select
-                        value={selectedProjectId}
-                        onChange={e => setSelectedProjectId(e.target.value)}
-                        className="px-3 pr-8 py-2 bg-white dark:bg-[#252525] border border-gray-200 dark:border-[#333] rounded-lg text-sm text-gray-800 dark:text-gray-200 focus:ring-2 focus:ring-blue-500 outline-none appearance-none"
-                    >
-                        <option value="all">Все проекты</option>
-                        {projectsWithFeatures.map(p => (
-                            <option key={p.id} value={p.id}>{p.name}</option>
-                        ))}
-                    </select>
-                    <ChevronDown size={16} className="absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400" />
-                </div>
 
-                {/* Фильтр по категории */}
-                <div className="relative">
-                    <select
-                        value={selectedCategory}
-                        onChange={e => setSelectedCategory(e.target.value)}
-                        className="px-3 pr-8 py-2 bg-white dark:bg-[#252525] border border-gray-200 dark:border-[#333] rounded-lg text-sm text-gray-800 dark:text-gray-200 focus:ring-2 focus:ring-blue-500 outline-none appearance-none"
-                    >
-                        <option value="all">Все категории</option>
-                        {STANDARD_CATEGORIES.map(c => (
-                            <option key={c.id} value={c.id}>{c.name}</option>
-                        ))}
-                    </select>
-                    <ChevronDown size={16} className="absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400" />
-                </div>
-
-                <ModuleCreateIconButton
-                    accent="sky"
-                    label="Добавить функцию"
-                    onClick={() => onCreateFeature(selectedProjectId !== 'all' ? selectedProjectId : undefined, selectedCategory !== 'all' ? selectedCategory : undefined)}
-                />
-            </div>
-        </div>
-
-        {/* Features List - Grouped by Project and Category */}
-        <div className="flex-1 overflow-y-auto custom-scrollbar space-y-6">
+      {/* Features List - Grouped by Project and Category */}
+      <div className="flex-1 min-h-0 overflow-hidden">
+        <div className={`${MODULE_PAGE_GUTTER} pb-24 md:pb-32 h-full overflow-y-auto custom-scrollbar space-y-6`}>
             {Object.keys(groupedFeatures).length === 0 ? (
                 <div className="bg-white dark:bg-[#252525] border border-gray-200 dark:border-[#333] rounded-xl p-12 text-center">
                     <Layers size={48} className="mx-auto text-gray-300 dark:text-gray-600 mb-4" />
@@ -354,7 +357,7 @@ const FunctionalityView: React.FC<FunctionalityViewProps> = ({
                 ))
             )}
         </div>
-    </div>
+      </div>
     </ModulePageShell>
   );
 };

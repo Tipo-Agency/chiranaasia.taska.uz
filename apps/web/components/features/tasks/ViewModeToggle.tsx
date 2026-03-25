@@ -17,8 +17,7 @@ export const ViewModeToggle: React.FC<ViewModeToggleProps> = ({
 }) => {
   return (
     <ModuleSegmentedControl
-      variant="accent"
-      accent="indigo"
+      variant="neutral"
       value={viewMode}
       onChange={(v) => onViewModeChange(v as ViewMode)}
       options={[

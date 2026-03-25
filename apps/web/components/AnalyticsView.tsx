@@ -14,6 +14,15 @@ interface AnalyticsViewProps {
   contracts: Contract[];
 }
 
+type EmployeeLeaderboardRow = {
+  id: string;
+  name: string;
+  avatar?: string;
+  completedTasks: number;
+  totalTasks: number;
+  revenue: number;
+};
+
 const AnalyticsView: React.FC<AnalyticsViewProps> = ({ tasks, deals, users, financePlan, contracts }) => {
   const [period, setPeriod] = useState<'month' | 'quarter' | 'year'>('month');
   const [activeTab, setActiveTab] = useState<'dashboard' | 'statistics' | 'reports'>('dashboard');
@@ -37,7 +46,7 @@ const AnalyticsView: React.FC<AnalyticsViewProps> = ({ tasks, deals, users, fina
   const pipelineValue = activeDeals.reduce((sum, d) => sum + d.amount, 0);
   
   // Employees Leaderboard
-  const employeeStats = users.map(user => {
+  const employeeStats: EmployeeLeaderboardRow[] = users.map(user => {
       const userTasks = activeTasks.filter(t => t.assigneeId === user.id || (t.assigneeIds && t.assigneeIds.includes(user.id)));
       const userCompleted = userTasks.filter(t => t.status === 'Выполнено' || t.status === 'Done').length;
       const userDeals = activeDeals.filter(d => d.assigneeId === user.id && d.stage === 'won');
@@ -203,7 +212,7 @@ const AnalyticsView: React.FC<AnalyticsViewProps> = ({ tasks, deals, users, fina
                <div className="p-6 border-b border-gray-200 dark:border-[#333]">
                    <h3 className="font-bold text-gray-800 dark:text-white">Рейтинг сотрудников</h3>
                </div>
-               <ResponsiveTable
+               <ResponsiveTable<EmployeeLeaderboardRow>
                    data={employeeStats}
                    columns={[
                        {
@@ -445,9 +454,22 @@ const AnalyticsView: React.FC<AnalyticsViewProps> = ({ tasks, deals, users, fina
             icon={<BarChart3 size={24} strokeWidth={2} />}
             title="Аналитика и отчёты"
             description="Аналитика и отчётность"
-            actions={
+            tabs={
               <ModuleSegmentedControl
                 variant="neutral"
+                value={activeTab}
+                onChange={(v) => setActiveTab(v as 'dashboard' | 'statistics' | 'reports')}
+                options={[
+                  { value: 'dashboard', label: 'Дашборд' },
+                  { value: 'statistics', label: 'Статистика' },
+                  { value: 'reports', label: 'Отчёты' },
+                ]}
+              />
+            }
+            controls={
+              <ModuleSegmentedControl
+                variant="accent"
+                accent="sky"
                 value={period}
                 onChange={(v) => setPeriod(v as 'month' | 'quarter' | 'year')}
                 options={[
@@ -457,17 +479,6 @@ const AnalyticsView: React.FC<AnalyticsViewProps> = ({ tasks, deals, users, fina
                 ]}
               />
             }
-          />
-          <ModuleSegmentedControl
-            variant="accent"
-            accent="sky"
-            value={activeTab}
-            onChange={(v) => setActiveTab(v as 'dashboard' | 'statistics' | 'reports')}
-            options={[
-              { value: 'dashboard', label: 'Дашборд' },
-              { value: 'statistics', label: 'Статистика' },
-              { value: 'reports', label: 'Отчёты' },
-            ]}
           />
         </div>
       </div>

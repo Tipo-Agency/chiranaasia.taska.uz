@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Task, User, StatusOption, TableCollection } from '../types';
-import { Archive, Trash2, Edit2, Search, Play } from 'lucide-react';
-import { ModulePageShell, ModulePageHeader, MODULE_PAGE_GUTTER, ModuleCreateIconButton } from './ui';
+import { Archive, Trash2, Edit2, Play } from 'lucide-react';
+import { ModulePageShell, ModulePageHeader, ModuleSegmentedControl, MODULE_PAGE_GUTTER, ModuleCreateIconButton } from './ui';
 
 interface BacklogViewProps {
   backlogTasks: Task[]; // Задачи из беклога
@@ -25,9 +25,15 @@ const BacklogView: React.FC<BacklogViewProps> = ({
     onCreateTask,
     onTakeToWork
 }) => {
-  const [searchQuery, setSearchQuery] = useState('');
+  const [scope, setScope] = useState<'all' | 'assigned' | 'unassigned'>('all');
 
-  const filteredTasks = backlogTasks.filter(t => t.title.toLowerCase().includes(searchQuery.toLowerCase()));
+  const filteredTasks = useMemo(() => {
+    return backlogTasks.filter((t) => {
+      if (scope === 'assigned' && !t.assigneeId && !(t.assigneeIds && t.assigneeIds.length)) return false;
+      if (scope === 'unassigned' && (t.assigneeId || (t.assigneeIds && t.assigneeIds.length))) return false;
+      return true;
+    });
+  }, [backlogTasks, scope]);
 
   const getStatusBadge = (statusName: string) => {
       const s = statuses.find(st => st.name === statusName);
@@ -42,40 +48,36 @@ const BacklogView: React.FC<BacklogViewProps> = ({
 
   return (
     <ModulePageShell>
-    <div className={`${MODULE_PAGE_GUTTER} pt-8 pb-20 h-full flex flex-col`}>
-        {/* Header */}
-        <div className="mb-8 bg-white dark:bg-[#1a1a1a] p-6 rounded-2xl border border-gray-200 dark:border-[#333] shadow-sm">
-            <ModulePageHeader
-              icon={<Archive size={24} strokeWidth={2} />}
-              title="Бэклог"
-              description="Идеи для реализации"
-              accent="orange"
-              actions={
-                <div className="text-right">
-                    <div className="text-3xl font-bold text-orange-600 dark:text-orange-400 tabular-nums">{filteredTasks.length}</div>
-                    <div className="text-xs text-gray-500 dark:text-gray-400 uppercase font-semibold">Идей в беклоге</div>
-                </div>
-              }
-            />
+      <div className={`${MODULE_PAGE_GUTTER} pt-6 md:pt-8 flex-shrink-0`}>
+        <div className="mb-6">
+          <ModulePageHeader
+            icon={<Archive size={24} strokeWidth={2} />}
+            title="Бэклог"
+            description="Идеи для реализации"
+            accent="orange"
+            tabs={
+              <ModuleSegmentedControl
+                variant="neutral"
+                value={scope}
+                onChange={(v) => setScope(v as 'all' | 'assigned' | 'unassigned')}
+                options={[
+                  { value: 'all', label: 'Все' },
+                  { value: 'assigned', label: 'С исполнителем' },
+                  { value: 'unassigned', label: 'Без исполнителя' },
+                ]}
+              />
+            }
+            controls={
+              <>
+                <ModuleCreateIconButton accent="orange" label="Новая идея" onClick={onCreateTask} />
+              </>
+            }
+          />
         </div>
+      </div>
 
-        {/* Toolbar */}
-        <div className="flex justify-between items-center mb-4">
-            <div className="relative max-w-xs w-full">
-                <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"/>
-                <input 
-                    type="text" 
-                    placeholder="Найти идею..." 
-                    value={searchQuery}
-                    onChange={e => setSearchQuery(e.target.value)}
-                    className="w-full pl-9 pr-4 py-2 bg-white dark:bg-[#252525] border border-gray-200 dark:border-[#333] rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none text-gray-800 dark:text-gray-200"
-                />
-            </div>
-            <ModuleCreateIconButton accent="orange" label="Новая идея" onClick={onCreateTask} />
-        </div>
-
-        {/* Ideas List - Card View */}
-        <div className="flex-1 overflow-y-auto custom-scrollbar">
+      <div className="flex-1 min-h-0 overflow-hidden">
+        <div className={`${MODULE_PAGE_GUTTER} pb-24 md:pb-32 h-full overflow-y-auto custom-scrollbar`}>
             {filteredTasks.length > 0 ? (
                 <div className="grid grid-cols-1 gap-4">
                     {filteredTasks.map(task => {
@@ -163,7 +165,7 @@ const BacklogView: React.FC<BacklogViewProps> = ({
                 </div>
             )}
         </div>
-    </div>
+      </div>
     </ModulePageShell>
   );
 };

@@ -5,6 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
 from app.models.bpm import OrgPosition, BusinessProcess
+from app.services.domain_events import log_entity_mutation
 
 router = APIRouter(prefix="/bpm", tags=["bpm"])
 
@@ -47,6 +48,7 @@ async def update_positions(positions: list[dict], db: AsyncSession = Depends(get
         if not pid:
             continue
         existing = await db.get(OrgPosition, pid)
+        is_new = existing is None
         if existing:
             existing.title = p.get("title", existing.title)
             existing.department_id = p.get("departmentId")
@@ -62,6 +64,15 @@ async def update_positions(positions: list[dict], db: AsyncSession = Depends(get
                 holder_user_id=p.get("holderUserId"),
                 order_val=str(p.get("order", 0)),
             ))
+        await db.flush()
+        await log_entity_mutation(
+            db,
+            event_type="bpm.position.created" if is_new else "bpm.position.updated",
+            entity_type="org_position",
+            entity_id=pid,
+            source="bpm-router",
+            payload={"title": p.get("title")},
+        )
     await db.commit()
     return {"ok": True}
 
@@ -79,6 +90,7 @@ async def update_processes(processes: list[dict], db: AsyncSession = Depends(get
         if not pid:
             continue
         existing = await db.get(BusinessProcess, pid)
+        is_new = existing is None
         if existing:
             existing.version = str(p.get("version", existing.version))
             existing.title = p.get("title", existing.title)
@@ -100,5 +112,14 @@ async def update_processes(processes: list[dict], db: AsyncSession = Depends(get
                 created_at=p.get("createdAt"),
                 updated_at=p.get("updatedAt"),
             ))
+        await db.flush()
+        await log_entity_mutation(
+            db,
+            event_type="bpm.process.created" if is_new else "bpm.process.updated",
+            entity_type="business_process",
+            entity_id=pid,
+            source="bpm-router",
+            payload={"title": p.get("title"), "version": p.get("version")},
+        )
     await db.commit()
     return {"ok": True}

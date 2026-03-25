@@ -7,6 +7,7 @@ import { storageService } from '../services/storageService';
 import { getDefaultAvatarForId, getRandomDefaultAvatar } from '../constants/avatars';
 import { LABEL_COLORS, PRIORITY_COLORS, ICON_OPTIONS, COLOR_OPTIONS, DEFAULT_NOTIFICATION_PREFS } from '../constants';
 import { DynamicIcon } from './AppIcons';
+import { SystemAlertDialog, SystemConfirmDialog } from './ui';
 
 interface SettingsModalProps {
   users: User[];
@@ -85,21 +86,31 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
 
   // Automation
   const [autoName, setAutoName] = useState('');
-  const [autoTrigger, setAutoTrigger] = useState<'status_change' | 'new_task'>('status_change');
+  const [autoTrigger, setAutoTrigger] = useState<'task_status_changed' | 'task_created'>('task_status_changed');
   const [autoStatus, setAutoStatus] = useState(statuses[0]?.name || '');
   const [autoModule, setAutoModule] = useState('');
   const [autoTemplate, setAutoTemplate] = useState('Задача "{task_title}" перешла в статус "{status}".');
   const [autoTarget, setAutoTarget] = useState<'assignee' | 'admin'>('assignee');
 
   // Integrations
+  const [employeeBotToken, setEmployeeBotToken] = useState('');
   const [clientBotToken, setClientBotToken] = useState('');
   const [chatId, setChatId] = useState('');
   const [enableTelegramImport, setEnableTelegramImport] = useState(false);
 
   // Notifications
   const [prefs, setPrefs] = useState<NotificationPreferences>(DEFAULT_NOTIFICATION_PREFS);
+  const [alertState, setAlertState] = useState({ open: false, title: '', message: '' });
+  const [confirmState, setConfirmState] = useState<{ open: boolean; title: string; message: string; onConfirm?: () => void }>({
+    open: false,
+    title: '',
+    message: '',
+  });
+  const [avatarPromptOpen, setAvatarPromptOpen] = useState(false);
+  const [avatarDraft, setAvatarDraft] = useState('');
 
   useEffect(() => {
+      setEmployeeBotToken(storageService.getEmployeeBotToken());
       setClientBotToken(storageService.getClientBotToken());
       setChatId(storageService.getTelegramChatId());
       setEnableTelegramImport(storageService.getEnableTelegramImport());
@@ -135,11 +146,8 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
   };
 
   const handleChangeAvatar = () => {
-      const url = prompt('Введите URL картинки или оставьте пустым для стандартного аватара:', profileAvatar);
-      if (url !== null) {
-          if (url === '') setProfileAvatar(getRandomDefaultAvatar());
-          else setProfileAvatar(url);
-      }
+      setAvatarDraft(profileAvatar || '');
+      setAvatarPromptOpen(true);
   };
 
   // --- Pages ---
@@ -164,7 +172,10 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
   // --- Users ---
   const handleAddUser = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newUserName.trim() || !newUserLogin.trim()) return alert('Имя и Логин обязательны');
+    if (!newUserName.trim() || !newUserLogin.trim()) {
+      setAlertState({ open: true, title: 'Проверьте данные', message: 'Имя и логин обязательны.' });
+      return;
+    }
 
     const passwordToSet = (newUserPassword || '123456').trim();
     
@@ -181,36 +192,42 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
     };
     onUpdateUsers([...users, newUser]);
     setNewUserName(''); setNewUserEmail(''); setNewUserLogin(''); setNewUserPassword('123456');
-    alert(`Пользователь создан. Пароль: ${newUserPassword || '123456'}`);
+    setAlertState({ open: true, title: 'Пользователь создан', message: `Пароль: ${newUserPassword || '123456'}` });
   };
 
   const handleDeleteUser = async (id: string) => {
     if (id === currentUser?.id) {
-      alert('Нельзя удалить текущего пользователя');
+      setAlertState({ open: true, title: 'Действие недоступно', message: 'Нельзя удалить текущего пользователя.' });
       return;
     }
-    if (confirm('Удалить пользователя? Это действие нельзя отменить.')) {
-      const now = new Date().toISOString();
-      // Мягкое удаление: помечаем пользователя как архивного
-      const updatedUsers = users.map(u => {
-        if (u.id === id) {
-          return { ...u, isArchived: true, updatedAt: now };
-        }
-        return { ...u, updatedAt: u.updatedAt || now };
-      });
-      
-      onUpdateUsers(updatedUsers);
-      // onUpdateUsers уже вызывает api.users.updateAll, который сохраняет в облако через setUsers
-      // Но для надежности ждем еще одно сохранение
-      const { storageService } = await import('../services/storageService');
-      await storageService.saveToCloud();
-    }
+    setConfirmState({
+      open: true,
+      title: 'Удалить пользователя',
+      message: 'Это действие нельзя отменить.',
+      onConfirm: async () => {
+        const now = new Date().toISOString();
+        const updatedUsers = users.map(u => {
+          if (u.id === id) return { ...u, isArchived: true, updatedAt: now };
+          return { ...u, updatedAt: u.updatedAt || now };
+        });
+        onUpdateUsers(updatedUsers);
+        const { storageService } = await import('../services/storageService');
+        await storageService.saveToCloud();
+        setConfirmState({ open: false, title: '', message: '' });
+      },
+    });
   };
   const handleResetPassword = async (id: string) => {
-      if(confirm('Сбросить пароль на "123456"?')) {
+      setConfirmState({
+        open: true,
+        title: 'Сброс пароля',
+        message: 'Сбросить пароль на "123456"?',
+        onConfirm: () => {
           onUpdateUsers(users.map(u => u.id === id ? { ...u, password: '123456', mustChangePassword: true } : u));
-          alert('Пароль сброшен на 123456');
-      }
+          setConfirmState({ open: false, title: '', message: '' });
+          setAlertState({ open: true, title: 'Готово', message: 'Пароль сброшен на 123456.' });
+        },
+      });
   };
 
   // --- Projects (Modules) ---
@@ -259,7 +276,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
 
   // --- Automation ---
   const handleOpenAutomationCreate = () => {
-      setEditingId(null); setAutoName(''); setAutoTrigger('status_change'); setAutoStatus(statuses[0]?.name || '');
+      setEditingId(null); setAutoName(''); setAutoTrigger('task_status_changed'); setAutoStatus(statuses[0]?.name || '');
       setAutoModule(''); setAutoTemplate('Задача "{task_title}" перешла в статус "{status}".'); setAutoTarget('assignee');
   };
   const handleAutomationSubmit = (e: React.FormEvent) => {
@@ -269,8 +286,9 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
           id: editingId || `rule-${Date.now()}`,
           name: autoName,
           isActive: true,
+          module: 'tasks',
           trigger: autoTrigger,
-          conditions: { statusTo: autoTrigger === 'status_change' ? autoStatus : undefined, moduleId: autoModule || undefined },
+          conditions: { statusTo: autoTrigger === 'task_status_changed' ? autoStatus : undefined, moduleId: autoModule || undefined },
           action: { type: 'telegram_message', targetUser: autoTarget, template: autoTemplate, buttons: [] }
       };
       onSaveAutomationRule(rule);
@@ -278,7 +296,10 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
   };
 
   // --- Integrations ---
-  const handleSaveEmployeeBot = () => {};
+  const handleSaveEmployeeBot = () => {
+    storageService.setEmployeeBotToken(employeeBotToken);
+    setAlertState({ open: true, title: 'Сохранено', message: 'Токен бота для сотрудников сохранён (локально).' });
+  };
   const handleSaveClientBot = () => {};
   const handleSaveChatId = () => {};
   const handleToggleTelegramImport = () => {};
@@ -290,7 +311,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
           title: source === 'instagram' ? '@username: Цена?' : 'Заявка',
           amount: 0, currency: 'UZS', stage: 'new', source: source, assigneeId: currentUser.id, createdAt: new Date().toISOString()
       });
-      alert('Лид создан!');
+      setAlertState({ open: true, title: 'Готово', message: 'Лид создан.' });
   };
 
   const TabButton = ({ id, label, icon }: { id: any, label: string, icon: React.ReactNode }) => (
@@ -537,7 +558,22 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                                     <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                                         <button onClick={() => handleEditPage(table)} className="p-2 text-gray-400 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg"><Pencil size={16}/></button>
                                         {!table.isSystem && onDeleteTable && (
-                                            <button onClick={() => { if(confirm('Удалить страницу?')) onDeleteTable(table.id) }} className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg"><Trash2 size={16}/></button>
+                                            <button
+                                              onClick={() =>
+                                                setConfirmState({
+                                                  open: true,
+                                                  title: 'Удалить страницу',
+                                                  message: 'Вы уверены, что хотите удалить страницу?',
+                                                  onConfirm: () => {
+                                                    onDeleteTable(table.id);
+                                                    setConfirmState({ open: false, title: '', message: '' });
+                                                  },
+                                                })
+                                              }
+                                              className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg"
+                                            >
+                                              <Trash2 size={16}/>
+                                            </button>
                                         )}
                                     </div>
                                 </div>
@@ -565,7 +601,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                                         )}
                                     </div>
                                     <div className="text-sm text-gray-600 dark:text-gray-400 space-y-1.5">
-                                        <div className="flex items-center gap-2"><Zap size={14} className="text-blue-500"/> <span className="font-semibold text-gray-900 dark:text-gray-300">Если:</span> {rule.trigger === 'status_change' ? `Статус изменен на "${rule.conditions.statusTo}"` : 'Создана новая задача'}</div>
+                                        <div className="flex items-center gap-2"><Zap size={14} className="text-blue-500"/> <span className="font-semibold text-gray-900 dark:text-gray-300">Если:</span> {rule.trigger === 'task_status_changed' ? `Статус изменен на "${rule.conditions.statusTo}"` : 'Создана новая задача'}</div>
                                         <div className="flex items-center gap-2"><MessageSquare size={14} className="text-green-500"/> <span className="font-semibold text-gray-900 dark:text-gray-300">То:</span> Отправить сообщение</div>
                                     </div>
                                 </div>
@@ -657,6 +693,66 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                 )}
                 </div>
             </div>
+            {avatarPromptOpen && (
+              <div
+                className="fixed inset-0 z-[230] bg-black/35 flex items-center justify-center p-4"
+                onClick={() => setAvatarPromptOpen(false)}
+              >
+                <div
+                  className="w-full max-w-md rounded-xl border border-gray-200 dark:border-[#444] bg-white dark:bg-[#252525] shadow-2xl overflow-hidden"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <div className="px-4 py-3 border-b border-gray-100 dark:border-[#333]">
+                    <h4 className="text-sm font-semibold text-gray-900 dark:text-white">URL аватара</h4>
+                  </div>
+                  <div className="p-4">
+                    <input
+                      value={avatarDraft}
+                      onChange={(e) => setAvatarDraft(e.target.value)}
+                      placeholder="https://..."
+                      className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-[#1f1f1f] text-gray-900 dark:text-gray-100"
+                    />
+                    <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">Оставьте пустым, чтобы выбрать стандартный аватар.</p>
+                  </div>
+                  <div className="px-4 pb-4 flex justify-end gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setAvatarPromptOpen(false)}
+                      className="px-3 py-2 rounded-lg border border-gray-200 dark:border-[#444] text-sm text-gray-700 dark:text-gray-300"
+                    >
+                      Отмена
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const next = avatarDraft.trim();
+                        setProfileAvatar(next ? next : getRandomDefaultAvatar());
+                        setAvatarPromptOpen(false);
+                      }}
+                      className="px-3 py-2 rounded-lg text-sm text-white bg-[#3337AD] hover:bg-[#2d3199]"
+                    >
+                      Сохранить
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+            <SystemAlertDialog
+              open={alertState.open}
+              title={alertState.title}
+              message={alertState.message}
+              onClose={() => setAlertState({ open: false, title: '', message: '' })}
+            />
+            <SystemConfirmDialog
+              open={confirmState.open}
+              title={confirmState.title}
+              message={confirmState.message}
+              danger
+              confirmText="Подтвердить"
+              cancelText="Отмена"
+              onCancel={() => setConfirmState({ open: false, title: '', message: '' })}
+              onConfirm={() => confirmState.onConfirm?.()}
+            />
         </div>
     </div>
   );

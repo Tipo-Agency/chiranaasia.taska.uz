@@ -1,6 +1,6 @@
 
-import React, { useState, useMemo } from 'react';
-import { Doc, Folder, TableCollection, Task, TaskAttachment, User } from '../types';
+import React, { useState, useMemo, useRef } from 'react';
+import { Doc, Folder, TableCollection, Task, TaskAttachment, User, Department, EmployeeInfo } from '../types';
 import { FileText, Folder as FolderIcon, Plus, LayoutGrid, List as ListIcon, Trash2, ExternalLink, ChevronRight, FolderPlus, X, Save, Box, FileText as FileTextIcon, Paperclip, Image as ImageIcon, Download, File as FileIcon, Edit2, Calendar, Users } from 'lucide-react';
 import {
   Tabs,
@@ -13,7 +13,9 @@ import {
 } from './ui';
 import { FilePreviewModal } from './FilePreviewModal';
 import { isImageFile } from '../utils/fileUtils';
-import { WeeklyPlansModal, ProtocolsModal } from './documents/PlanningModals';
+import { WeeklyPlansView, type WeeklyPlansViewHandle } from './documents/WeeklyPlansView';
+import { ProtocolsView, type ProtocolsViewHandle } from './documents/ProtocolsView';
+import { ModuleFilterIconButton } from './ui/ModuleFilterIconButton';
 
 interface DocumentsViewProps {
   docs: Doc[];
@@ -23,6 +25,8 @@ interface DocumentsViewProps {
   tables?: TableCollection[];
   tasks?: Task[];
   users?: User[];
+  departments?: Department[];
+  employees?: EmployeeInfo[];
   currentUser?: User;
   onOpenDoc: (doc: Doc) => void;
   onAddDoc: (folderId?: string) => void;
@@ -31,6 +35,7 @@ interface DocumentsViewProps {
   onDeleteDoc?: (id: string) => void;
   onEditDoc?: (doc: Doc) => void;
   onOpenTask?: (task: Task) => void;
+  onUpdateTask?: (taskId: string, updates: Partial<Task>) => void;
   onDeleteAttachment?: (taskId: string, attachmentId: string) => void;
 }
 
@@ -42,6 +47,8 @@ const DocumentsView: React.FC<DocumentsViewProps> = ({
     tables = [],
     tasks = [],
     users = [],
+    departments = [],
+    employees = [],
     currentUser,
     onOpenDoc, 
     onAddDoc, 
@@ -50,14 +57,15 @@ const DocumentsView: React.FC<DocumentsViewProps> = ({
     onDeleteDoc,
     onEditDoc,
     onOpenTask,
+    onUpdateTask,
     onDeleteAttachment
 }) => {
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [folderPath, setFolderPath] = useState<string[]>([]);
-  const [activeTab, setActiveTab] = useState<'docs' | 'attachments'>('docs');
+  const [activeTab, setActiveTab] = useState<'docs' | 'attachments' | 'weekly' | 'protocols'>('docs');
   const [previewFile, setPreviewFile] = useState<{ url: string; name: string; type: string } | null>(null);
-  const [weeklyPlansModalOpen, setWeeklyPlansModalOpen] = useState(false);
-  const [protocolsModalOpen, setProtocolsModalOpen] = useState(false);
+  const weeklyPlansRef = useRef<WeeklyPlansViewHandle>(null);
+  const protocolsRef = useRef<ProtocolsViewHandle>(null);
   
   // Modal State
   const [isFolderModalOpen, setIsFolderModalOpen] = useState(false);
@@ -250,83 +258,86 @@ const DocumentsView: React.FC<DocumentsViewProps> = ({
       <div className={`${MODULE_PAGE_GUTTER} pt-6 md:pt-8 flex-shrink-0`}>
         <div className="mb-6 space-y-5">
           <ModulePageHeader
-            accent="amber"
+            accent="slate"
             icon={<FileTextIcon size={24} strokeWidth={2} />}
             title="Документы"
             description="Управление документами и папками"
-            actions={
-              activeTab === 'docs' ? (
+            tabs={
+              <Tabs
+                tabs={[
+                  { id: 'docs', label: 'Документы' },
+                  { id: 'attachments', label: 'Вложения' },
+                  { id: 'weekly', label: 'Недельные планы' },
+                  { id: 'protocols', label: 'Протоколы' },
+                ]}
+                activeTab={activeTab}
+                onChange={(tabId) => setActiveTab(tabId as 'docs' | 'attachments' | 'weekly' | 'protocols')}
+              />
+            }
+            controls={
+              <>
+                {activeTab === 'docs' && (
+                  <ModuleSegmentedControl
+                    variant="accent"
+                    accent="slate"
+                    value={viewMode}
+                    onChange={(v) => setViewMode(v)}
+                    options={[
+                      { value: 'grid', label: 'Плитка' },
+                      { value: 'list', label: 'Список' },
+                    ]}
+                  />
+                )}
+                {(activeTab === 'weekly' || activeTab === 'protocols') && (
+                  <ModuleFilterIconButton
+                    active={false}
+                    onClick={() => {
+                      if (activeTab === 'weekly') {
+                        weeklyPlansRef.current?.toggleFilters();
+                        return;
+                      }
+                      protocolsRef.current?.toggleFilters();
+                    }}
+                    title={activeTab === 'weekly' ? 'Фильтры недельных планов' : 'Фильтры протоколов'}
+                  />
+                )}
                 <ModuleCreateDropdown
-                  accent="amber"
+                  accent="slate"
                   items={[
                     {
                       id: 'doc',
                       label: 'Документ',
                       icon: FileTextIcon,
                       onClick: () => onAddDoc(currentFolderId || undefined),
-                      iconClassName: 'text-amber-600 dark:text-amber-400',
                     },
-                    ...(!currentFolderId
+                    {
+                      id: 'weekly-plan',
+                      label: 'Недельный план',
+                      icon: Calendar,
+                      onClick: () => weeklyPlansRef.current?.openCreateModal(),
+                    },
+                    {
+                      id: 'protocol',
+                      label: 'Протокол',
+                      icon: Users,
+                      onClick: () => protocolsRef.current?.createProtocol(),
+                    },
+                    ...(!currentFolderId && activeTab === 'docs'
                       ? [
                           {
                             id: 'folder',
                             label: 'Папка',
                             icon: FolderPlus,
                             onClick: () => setIsFolderModalOpen(true),
-                            iconClassName: 'text-amber-600 dark:text-amber-400',
                           },
                         ]
                       : []),
                   ]}
                 />
-              ) : null
+              </>
             }
           />
 
-          {/* Вкладки + вид + планы и протоколы */}
-          <div className="flex flex-col gap-3">
-            <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
-              <Tabs
-                tabs={[
-                  { id: 'docs', label: 'Документы' },
-                  { id: 'attachments', label: 'Вложения' },
-                ]}
-                activeTab={activeTab}
-                onChange={(tabId) => setActiveTab(tabId as 'docs' | 'attachments')}
-              />
-              {activeTab === 'docs' && (
-                <ModuleSegmentedControl
-                  variant="accent"
-                  accent="amber"
-                  value={viewMode}
-                  onChange={(v) => setViewMode(v)}
-                  options={[
-                    { value: 'grid', label: 'Плитка' },
-                    { value: 'list', label: 'Список' },
-                  ]}
-                />
-              )}
-            </div>
-            <div className="flex flex-wrap gap-2">
-              <button
-                type="button"
-                onClick={() => setWeeklyPlansModalOpen(true)}
-                disabled={!currentUser}
-                className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border border-[#3337AD]/30 bg-[#3337AD]/5 dark:bg-[#3337AD]/15 text-[#3337AD] dark:text-[#a8abf0] text-sm font-semibold hover:bg-[#3337AD]/10 dark:hover:bg-[#3337AD]/25 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <Calendar size={18} strokeWidth={2} />
-                Недельные планы
-              </button>
-              <button
-                type="button"
-                onClick={() => setProtocolsModalOpen(true)}
-                className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border border-violet-300/60 dark:border-violet-800/60 bg-violet-50/80 dark:bg-violet-950/30 text-violet-800 dark:text-violet-200 text-sm font-semibold hover:bg-violet-100/80 dark:hover:bg-violet-950/50 transition-colors"
-              >
-                <Users size={18} strokeWidth={2} />
-                Протоколы
-              </button>
-            </div>
-          </div>
         </div>
       </div>
       <div className="flex-1 min-h-0 overflow-hidden">
@@ -501,9 +512,37 @@ const DocumentsView: React.FC<DocumentsViewProps> = ({
                </div>
            )}
             </>
-          ) : (
-            // Вкладка "Вложения из задач"
+          ) : activeTab === 'attachments' ? (
             renderAttachmentsTab()
+          ) : activeTab === 'weekly' ? (
+            currentUser ? (
+              <WeeklyPlansView
+                ref={weeklyPlansRef}
+                layout="embedded"
+                hideEmbeddedToolbar
+                scope="all"
+                currentUser={currentUser}
+                users={users}
+                tasks={tasks}
+                onOpenTask={onOpenTask}
+                onUpdateTask={onUpdateTask}
+              />
+            ) : (
+              <div className="rounded-2xl border border-dashed border-gray-200 dark:border-[#333] bg-gray-50/60 dark:bg-[#202020] p-8 text-center text-sm text-gray-500 dark:text-gray-400">
+                Нужна авторизация пользователя для просмотра недельных планов.
+              </div>
+            )
+          ) : (
+            <ProtocolsView
+              ref={protocolsRef}
+              layout="embedded"
+              hideEmbeddedToolbar
+              users={users}
+              tasks={tasks}
+              departments={departments}
+              employees={employees}
+              onOpenTask={onOpenTask}
+            />
           )}
         </div>
       </div>
@@ -541,22 +580,6 @@ const DocumentsView: React.FC<DocumentsViewProps> = ({
           onClose={() => setPreviewFile(null)}
         />
       )}
-      {currentUser && (
-        <WeeklyPlansModal
-          isOpen={weeklyPlansModalOpen}
-          onClose={() => setWeeklyPlansModalOpen(false)}
-          currentUser={currentUser}
-          tasks={tasks}
-          onOpenTask={onOpenTask}
-        />
-      )}
-      <ProtocolsModal
-        isOpen={protocolsModalOpen}
-        onClose={() => setProtocolsModalOpen(false)}
-        users={users}
-        tasks={tasks}
-        onOpenTask={onOpenTask}
-      />
     </ModulePageShell>
     </>
   );

@@ -5,6 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
 from app.models.content import Folder
+from app.services.domain_events import log_entity_mutation
 
 router = APIRouter(prefix="/folders", tags=["folders"])
 
@@ -32,6 +33,7 @@ async def update_folders(folders: list[dict], db: AsyncSession = Depends(get_db)
         if not fid:
             continue
         existing = await db.get(Folder, fid)
+        is_new = existing is None
         if existing:
             existing.table_id = f.get("tableId", existing.table_id)
             existing.name = f.get("name", existing.name)
@@ -45,5 +47,15 @@ async def update_folders(folders: list[dict], db: AsyncSession = Depends(get_db)
                 parent_folder_id=f.get("parentFolderId"),
                 is_archived=f.get("isArchived", False),
             ))
+        await db.flush()
+        row = await db.get(Folder, fid)
+        await log_entity_mutation(
+            db,
+            event_type="folder.created" if is_new else "folder.updated",
+            entity_type="folder",
+            entity_id=fid,
+            source="folders-router",
+            payload={"name": row.name if row else f.get("name"), "tableId": row.table_id if row else f.get("tableId")},
+        )
     await db.commit()
     return {"ok": True}

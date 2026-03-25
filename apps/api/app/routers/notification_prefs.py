@@ -5,6 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
 from app.models.notification import NotificationPreferences as NPrefModel
+from app.services.domain_events import log_entity_mutation
 
 router = APIRouter(prefix="/notification-prefs", tags=["notification-prefs"])
 
@@ -102,5 +103,18 @@ async def update_prefs(
             default_funnel_id=default_funnel,
             telegram_group_chat_id=telegram_group,
         ))
+    await db.flush()
+    tg = telegram_group
+    await log_entity_mutation(
+        db,
+        event_type="notification_prefs.updated",
+        entity_type="notification_prefs",
+        entity_id=pid,
+        source="notification-prefs-router",
+        payload={
+            "hasDefaultFunnel": default_funnel is not None and default_funnel != "",
+            "hasTelegramGroup": tg is not None and tg != "",
+        },
+    )
     await db.commit()
     return {"ok": True}

@@ -4,6 +4,7 @@ import { FinanceCategory } from '../../types';
 import { X, Edit2, Trash2 } from 'lucide-react';
 import { ModuleCreateIconButton } from '../ui/ModuleCreateIconButton';
 import { TaskSelect } from '../TaskSelect';
+import { SystemConfirmDialog } from '../ui';
 
 interface FinanceCategoriesSettingsProps {
     categories: FinanceCategory[];
@@ -16,6 +17,7 @@ const FinanceCategoriesSettings: React.FC<FinanceCategoriesSettingsProps> = ({ c
     const [editingCategory, setEditingCategory] = useState<FinanceCategory | null>(null);
     const [catName, setCatName] = useState('');
     const [catType, setCatType] = useState<'fixed' | 'percent'>('fixed');
+    const [deleteCategoryId, setDeleteCategoryId] = useState<string | null>(null);
 
     const handleOpenCreate = () => {
         setEditingCategory(null);
@@ -87,7 +89,7 @@ const FinanceCategoriesSettings: React.FC<FinanceCategoriesSettingsProps> = ({ c
                                     </td>
                                     <td className="px-4 py-3 text-right flex gap-2 justify-end">
                                         <button onClick={() => handleOpenEdit(cat)} className="p-1 text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"><Edit2 size={14}/></button>
-                                        <button onClick={() => { if(confirm('Удалить статью?')) onDelete(cat.id) }} className="p-1 text-gray-400 hover:text-red-600 dark:hover:text-red-400 transition-colors"><Trash2 size={14}/></button>
+                                        <button onClick={() => setDeleteCategoryId(cat.id)} className="p-1 text-gray-400 hover:text-red-600 dark:hover:text-red-400 transition-colors"><Trash2 size={14}/></button>
                                     </td>
                                 </tr>
                             ))
@@ -151,6 +153,19 @@ const FinanceCategoriesSettings: React.FC<FinanceCategoriesSettingsProps> = ({ c
                     </div>
                 </div>
             )}
+            <SystemConfirmDialog
+                open={Boolean(deleteCategoryId)}
+                title="Удалить статью"
+                message="Вы уверены, что хотите удалить статью расходов?"
+                danger
+                confirmText="Удалить"
+                cancelText="Отмена"
+                onCancel={() => setDeleteCategoryId(null)}
+                onConfirm={() => {
+                    if (deleteCategoryId) onDelete(deleteCategoryId);
+                    setDeleteCategoryId(null);
+                }}
+            />
         </div>
     );
 };

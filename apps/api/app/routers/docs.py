@@ -5,7 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
 from app.models.content import Doc
-from app.services.domain_events import emit_domain_event
+from app.services.domain_events import emit_domain_event, log_entity_mutation
 
 router = APIRouter(prefix="/docs", tags=["docs"])
 
@@ -37,6 +37,7 @@ async def update_docs(docs: list[dict], db: AsyncSession = Depends(get_db)):
         if not did:
             continue
         existing = await db.get(Doc, did)
+        is_new = existing is None
         if existing:
             existing.table_id = d.get("tableId")
             existing.folder_id = d.get("folderId")
@@ -60,6 +61,16 @@ async def update_docs(docs: list[dict], db: AsyncSession = Depends(get_db)):
                 is_archived=d.get("isArchived", False),
             ))
         await db.flush()
+        doc_row = await db.get(Doc, did)
+        await log_entity_mutation(
+            db,
+            event_type="document.created" if is_new else "document.updated",
+            entity_type="doc",
+            entity_id=did,
+            source="docs-router",
+            payload={"title": doc_row.title if doc_row else d.get("title", "")},
+            actor_id=d.get("updatedByUserId") or d.get("createdByUserId"),
+        )
         recipient_ids = d.get("recipientIds") or []
         if recipient_ids:
             await emit_domain_event(

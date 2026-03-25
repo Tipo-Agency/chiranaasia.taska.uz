@@ -8,6 +8,7 @@ export { MODULE_PAGE_GUTTER } from './moduleAccent';
 export type { ModuleAccentKey } from './moduleAccent';
 export { ModuleCreateIconButton } from './ModuleCreateIconButton';
 export type { ModuleCreateIconButtonProps } from './ModuleCreateIconButton';
+export { ModuleFilterIconButton } from './ModuleFilterIconButton';
 export { Button } from './Button';
 export { Input } from './Input';
 export { Textarea } from './Textarea';
@@ -25,4 +26,6 @@ export { Select } from './Select';
 export { Toast } from './Toast';
 export { Touchable } from './Touchable';
 export { DateInput } from './DateInput';
+export { SystemAlertDialog, SystemConfirmDialog } from './SystemDialogs';
+export { TaskSelect } from '../TaskSelect';
 

@@ -5,7 +5,8 @@ import { Container } from '../ui/Container';
 import { Button } from '../ui/Button';
 import { CheckCircle2, Bell, Inbox, Send, MessageCircle, Users as UsersIcon, Paperclip } from 'lucide-react';
 import { chatLocalService, ChatMessageLocal } from '../../services/chatLocalService';
-import { api } from '../../backend/api';
+import { useNotificationCenter } from '../../frontend/contexts/NotificationCenterContext';
+import { getDealDisplayTitle, isFunnelDeal } from '../../utils/dealModel';
 
 type TabId = 'inbox' | 'outbox' | 'notifications' | 'chat';
 
@@ -17,15 +18,6 @@ interface InboxCard {
   status?: string;
   amount?: number;
   dateLabel?: string;
-}
-
-interface SystemNotification {
-  id: string;
-  title: string;
-  body: string;
-  priority?: string;
-  isRead?: boolean;
-  createdAt?: string;
 }
 
 interface InboxPageProps {
@@ -47,10 +39,10 @@ export const InboxPage: React.FC<InboxPageProps> = ({
   purchaseRequests,
   onMarkAllRead,
 }) => {
-  const unreadCount = activities.filter(a => !a.read).length;
+  const activityUnreadCount = activities.filter(a => !a.read).length;
+  const { notifications: systemNotifications, unreadCount: notificationUnreadCount, markOneRead } = useNotificationCenter();
 
   const [activeTab, setActiveTab] = useState<TabId>('inbox');
-  const [systemNotifications, setSystemNotifications] = useState<SystemNotification[]>([]);
 
   // --- ВХОДЯЩИЕ / ИСХОДЯЩИЕ ---
 
@@ -92,14 +84,14 @@ export const InboxPage: React.FC<InboxPageProps> = ({
         });
     }
 
-    // Входящие сделки: я ответственный по сделке
+    // Входящие сделки: я ответственный по CRM-сделке (не договор из фин. блока)
     (deals || [])
-      .filter(d => d && d.assigneeId === currentUser.id && !d.isArchived)
+      .filter(d => d && d.assigneeId === currentUser.id && !d.isArchived && isFunnelDeal(d))
       .forEach(d => {
         cards.push({
           id: `deal-${d.id}`,
           kind: 'deal',
-          title: d.title,
+          title: getDealDisplayTitle(d),
           subtitle: d.stage,
           status: d.stage,
           amount: d.amount,
@@ -169,49 +161,6 @@ export const InboxPage: React.FC<InboxPageProps> = ({
     setChatMessages(chatLocalService.getMessagesForUser(currentUser.id));
   }, [currentUser.id]);
 
-  useEffect(() => {
-    let mounted = true;
-    api.notifications
-      .list(currentUser.id, false, 100)
-      .then((list) => {
-        if (!mounted) return;
-        setSystemNotifications((list || []) as SystemNotification[]);
-      })
-      .catch(() => {});
-
-    const wsUrl = api.notifications.wsUrl(currentUser.id);
-    const ws = new WebSocket(wsUrl);
-    ws.onmessage = (evt) => {
-      try {
-        const data = JSON.parse(evt.data);
-        if (data?.type === 'notification.created' && data.notification && mounted) {
-          setSystemNotifications((prev) => [
-            {
-              id: data.notification.id,
-              title: data.notification.title,
-              body: data.notification.body,
-              priority: data.notification.priority,
-              isRead: false,
-              createdAt: new Date().toISOString(),
-            },
-            ...prev,
-          ]);
-        }
-      } catch {
-        // ignore malformed message
-      }
-    };
-
-    return () => {
-      mounted = false;
-      try {
-        ws.close();
-      } catch {
-        // ignore
-      }
-    };
-  }, [currentUser.id]);
-
   const currentChatMessages = useMemo(() => {
     if (!activeChatUserId) return [];
     return chatMessages
@@ -249,14 +198,14 @@ export const InboxPage: React.FC<InboxPageProps> = ({
                 Входящие, исходящие, уведомления и личные чаты в одном месте
               </span>
             </div>
-            {unreadCount > 0 && (
+            {activityUnreadCount > 0 && (
               <Button
                 variant="ghost"
                 size="sm"
                 icon={CheckCircle2}
                 onClick={onMarkAllRead}
               >
-                Отметить все прочитанными ({unreadCount})
+                Отметить все прочитанными ({activityUnreadCount})
               </Button>
             )}
           </div>
@@ -302,9 +251,9 @@ export const InboxPage: React.FC<InboxPageProps> = ({
               }`}
             >
               <Bell size={14} /> Уведомления
-              {unreadCount > 0 && (
+              {notificationUnreadCount > 0 && (
                 <span className="ml-1 text-[10px] px-1.5 py-0.5 rounded-full bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300">
-                  {unreadCount}
+                  {notificationUnreadCount}
                 </span>
               )}
             </button>
@@ -336,10 +285,7 @@ export const InboxPage: React.FC<InboxPageProps> = ({
                         key={n.id}
                         type="button"
                         onClick={() => {
-                          api.notifications.markRead(n.id, true).catch(() => {});
-                          setSystemNotifications((prev) =>
-                            prev.map((x) => (x.id === n.id ? { ...x, isRead: true } : x))
-                          );
+                          markOneRead(n.id, true);
                         }}
                         className={`w-full text-left p-4 hover:bg-gray-50 dark:hover:bg-[#303030] transition-colors ${
                           n.isRead ? '' : 'bg-blue-50/40 dark:bg-blue-900/10'

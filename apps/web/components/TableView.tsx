@@ -2,9 +2,10 @@
 import React, { useRef, useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { Project, Role, Task, User, StatusOption, PriorityOption, TableCollection, BusinessProcess } from '../types';
-import { Trash2, Calendar, Layout, AlertCircle, ChevronDown, Check, Network, TrendingUp, FileText, Archive, Layers, Plus, CheckCircle2 as CheckIcon } from 'lucide-react';
-import { formatDate, normalizeDateForInput, isOverdue } from '../utils/dateUtils';
+import { Trash2, Layout, AlertCircle, ChevronDown, Check, Network, TrendingUp, FileText, Archive, Layers, Plus, CheckCircle2 as CheckIcon } from 'lucide-react';
+import { normalizeDateForInput, isOverdue } from '../utils/dateUtils';
 import { UserAvatar } from './features/common/UserAvatar';
+import { DateInput } from './ui/DateInput';
 
 interface TableViewProps {
   tasks: Task[];
@@ -306,34 +307,16 @@ const AssigneeCell: React.FC<{ task: Task, users: User[], onUpdate: (assigneeIds
 };
 
 const DatePickerCell: React.FC<{ date: string, onChange: (val: string) => void }> = ({ date, onChange }) => {
-    const inputRef = useRef<HTMLInputElement>(null);
-    
     const normalizedDate = normalizeDateForInput(date);
-    const displayDate = formatDate(normalizedDate || date);
     const dateIsOverdue = normalizedDate ? isOverdue(normalizedDate) : false;
 
-    const handleClick = (e: React.MouseEvent) => {
-        e.stopPropagation();
-        try { if (inputRef.current) inputRef.current.showPicker(); } 
-        catch (err) { inputRef.current?.focus(); }
-    };
-
     return (
-        <div className="relative group/date w-full cursor-pointer" onClick={handleClick}>
-            <div className={`flex items-center gap-2 rounded px-2 py-1 transition-colors min-h-[24px] whitespace-nowrap ${dateIsOverdue ? 'bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400' : 'hover:bg-gray-100 dark:hover:bg-[#333] text-gray-600 dark:text-gray-400'}`}>
-                <span className="text-xs pointer-events-none font-medium">{displayDate}</span>
-                <Calendar size={12} className={`md:opacity-0 md:group-hover/date:opacity-100 pointer-events-none ${dateIsOverdue ? 'text-red-400' : 'text-gray-400'}`} />
-            </div>
-            <input 
-                ref={inputRef} 
-                type="date" 
-                value={normalizedDate} 
-                onChange={(e) => onChange(e.target.value)}
-                className="absolute inset-0 opacity-0 w-full h-full cursor-pointer z-10"
-                onClick={(e) => e.stopPropagation()}
-                style={{
-                    colorScheme: 'dark'
-                }}
+        <div className={`w-full ${dateIsOverdue ? '[&>div>button]:border-red-300 [&>div>button]:bg-red-50 [&>div>button]:text-red-600 dark:[&>div>button]:border-red-800 dark:[&>div>button]:bg-red-900/20 dark:[&>div>button]:text-red-300' : ''}`}>
+            <DateInput
+                value={normalizedDate || ''}
+                onChange={onChange}
+                size="compact"
+                className="w-full"
             />
         </div>
     );

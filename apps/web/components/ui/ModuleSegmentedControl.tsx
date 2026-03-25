@@ -34,10 +34,11 @@ export function ModuleSegmentedControl<T extends string>({
   options,
   variant = 'neutral',
   accent = 'teal',
+  className = '',
 }: ModuleSegmentedControlProps<T>) {
   const activeAccent = MODULE_ACCENTS[accent].segmentActive;
   return (
-    <div className={shell} role="tablist">
+    <div className={`${shell} ${className}`} role="tablist">
       {options.map((opt) => {
         const isActive = opt.value === value;
         const activeClass =
@@ -53,7 +54,6 @@ export function ModuleSegmentedControl<T extends string>({
             onClick={() => onChange(opt.value)}
             className={`${baseBtn} ${isActive ? activeClass : inactive}`}
           >
-            {opt.icon ? <span className="shrink-0">{opt.icon}</span> : null}
             {opt.label}
           </button>
         );

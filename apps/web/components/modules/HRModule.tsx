@@ -1,6 +1,7 @@
 
 import React from 'react';
 import { EmployeeInfo, User, Department, OrgPosition, BusinessProcess, Task, TableCollection } from '../../types';
+import type { AppActions } from '../../frontend/hooks/useAppLogic';
 import EmployeesView from '../EmployeesView';
 import DepartmentsView from '../DepartmentsView';
 import BusinessProcessesView from '../BusinessProcessesView';
@@ -15,7 +16,7 @@ interface HRModuleProps {
   tasks?: Task[];
   tables?: TableCollection[];
   currentUser?: User | null;
-  actions: any;
+  actions: AppActions;
   autoOpenCreateModal?: boolean;
 }
 
@@ -38,7 +39,6 @@ export const HRModule: React.FC<HRModuleProps> = ({ view, employees, users, depa
             onDeleteProcess={actions.deleteProcess}
             onSaveTask={actions.saveTask}
             onOpenTask={actions.openTaskModal}
-            onQuickCreateTask={actions.openTaskModal ? () => actions.openTaskModal(null) : undefined}
             onCompleteProcessStepWithBranch={actions.completeProcessStepWithBranch}
             autoOpenCreateModal={autoOpenCreateModal}
         />;

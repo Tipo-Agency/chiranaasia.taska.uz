@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { EmployeeInfo, User, OrgPosition, Department } from '../types';
-import { UserCheck, Search, Trash2, Edit2, Calendar, FileText, X, Save, User as UserIcon, Phone, Send, Cake, Network, Building2, UserPlus } from 'lucide-react';
+import { UserCheck, Search, Trash2, Edit2, Calendar, FileText, X, Save, User as UserIcon, Phone, Send, Cake, Network, Building2, UserPlus, ChevronDown, ChevronRight, FolderTree } from 'lucide-react';
 import { ModuleCreateDropdown, ModulePageShell, ModulePageHeader, ModuleSegmentedControl, MODULE_PAGE_GUTTER } from './ui';
 import { TaskSelect } from './TaskSelect';
 import { getDefaultAvatarForId } from '../constants/avatars';
@@ -24,7 +24,7 @@ const EmployeesView: React.FC<EmployeesViewProps> = ({
     departments = [], orgPositions = [], 
     onSave, onDelete, onSavePosition, onDeletePosition 
 }) => {
-  const [activeTab, setActiveTab] = useState<'cards' | 'orgchart'>('cards');
+  const [activeTab, setActiveTab] = useState<'cards' | 'orgchart' | 'structure'>('cards');
   
   // Card Modals
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -36,9 +36,12 @@ const EmployeesView: React.FC<EmployeesViewProps> = ({
 
   // Form (Cards)
   const [userId, setUserId] = useState('');
+  const [orgPositionId, setOrgPositionId] = useState('');
   const [position, setPosition] = useState('');
   const [hireDate, setHireDate] = useState('');
   const [birthDate, setBirthDate] = useState('');
+  const [expandedNodes, setExpandedNodes] = useState<Record<string, boolean>>({});
+  const [draggedUserId, setDraggedUserId] = useState<string | null>(null);
 
   // Form (Org Position)
   const [posTitle, setPosTitle] = useState('');
@@ -54,14 +57,17 @@ const EmployeesView: React.FC<EmployeesViewProps> = ({
   const handleOpenCreate = () => {
       setEditingInfo(null);
       setUserId(users[0]?.id || '');
+      setOrgPositionId('');
       setPosition(''); setHireDate(''); setBirthDate('');
       setIsModalOpen(true);
   };
 
   const handleOpenEdit = (info: EmployeeInfo) => {
+      const linkedPosition = orgPositions.find((p) => p.holderUserId === info.userId);
       setEditingInfo(info);
       setUserId(info.userId);
-      setPosition(info.position);
+      setOrgPositionId(linkedPosition?.id || '');
+      setPosition(info.position || linkedPosition?.title || '');
       setHireDate(normalizeDateForInput(info.hireDate) || '');
       setBirthDate(normalizeDateForInput(info.birthDate) || '');
       setIsModalOpen(true);
@@ -69,10 +75,23 @@ const EmployeesView: React.FC<EmployeesViewProps> = ({
 
   const handleSubmit = (e?: React.FormEvent) => {
       if (e) e.preventDefault();
+      const selectedPos = orgPositions.find((p) => p.id === orgPositionId);
+      const previousPos = orgPositions.find((p) => p.holderUserId === userId);
       onSave({
           id: editingInfo ? editingInfo.id : `emp-${Date.now()}`,
-          userId, position, hireDate, birthDate: birthDate || undefined
+          userId,
+          position: (selectedPos?.title || position || '').trim(),
+          hireDate,
+          birthDate: birthDate || undefined
       });
+      if (onSavePosition && userId) {
+          if (previousPos && previousPos.id !== selectedPos?.id) {
+              onSavePosition({ ...previousPos, holderUserId: undefined });
+          }
+          if (selectedPos && selectedPos.holderUserId !== userId) {
+              onSavePosition({ ...selectedPos, holderUserId: userId });
+          }
+      }
       setIsModalOpen(false);
   };
 
@@ -103,14 +122,21 @@ const EmployeesView: React.FC<EmployeesViewProps> = ({
   const handleSubmitPos = (e?: React.FormEvent) => {
       if (e) e.preventDefault();
       if (!onSavePosition) return;
-      onSavePosition({
+      const payload: OrgPosition = {
           id: editingPos ? editingPos.id : `op-${Date.now()}`,
           title: posTitle,
           departmentId: posDep || undefined,
           managerPositionId: posManager || undefined,
           holderUserId: posHolder || undefined,
           order: posOrder
-      });
+      };
+      onSavePosition(payload);
+      if (posHolder) {
+          const holderInfo = employees.find((emp) => emp.userId === posHolder && !emp.isArchived);
+          if (holderInfo) {
+              onSave({ ...holderInfo, position: posTitle });
+          }
+      }
       setIsPosModalOpen(false);
   };
 
@@ -141,6 +167,7 @@ const EmployeesView: React.FC<EmployeesViewProps> = ({
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
            {employees.filter(info => !info.isArchived).map(info => {
                const user = getEmployeeUser(info.userId);
+               const linkedPosition = orgPositions.find((p) => p.holderUserId === info.userId);
                return (
                    <div key={info.id} className="bg-white dark:bg-[#252525] border border-gray-200 dark:border-[#333] rounded-xl p-5 shadow-sm hover:shadow-md transition-shadow group relative flex flex-col">
                        <button onClick={() => handleOpenEdit(info)} className="absolute top-4 right-4 text-gray-300 hover:text-purple-600 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -155,7 +182,7 @@ const EmployeesView: React.FC<EmployeesViewProps> = ({
                             />
                             <div className="overflow-hidden">
                                 <h3 className="font-bold text-gray-900 dark:text-gray-200 truncate">{user?.name}</h3>
-                                <div className="text-xs text-purple-600 dark:text-purple-400 font-medium bg-purple-50 dark:bg-purple-900/30 px-2 py-0.5 rounded border border-purple-100 dark:border-purple-800 inline-block mt-1 truncate max-w-full">{info.position}</div>
+                                <div className="text-xs text-purple-600 dark:text-purple-400 font-medium bg-purple-50 dark:bg-purple-900/30 px-2 py-0.5 rounded border border-purple-100 dark:border-purple-800 inline-block mt-1 truncate max-w-full">{linkedPosition?.title || info.position}</div>
                             </div>
                        </div>
                        
@@ -287,50 +314,184 @@ const EmployeesView: React.FC<EmployeesViewProps> = ({
       );
   };
 
+  const handleAssignUserToPosition = (targetPositionId: string, incomingUserId: string) => {
+      if (!onSavePosition) return;
+      const target = orgPositions.find((p) => p.id === targetPositionId);
+      if (!target) return;
+      const currentForUser = orgPositions.find((p) => p.holderUserId === incomingUserId);
+      if (currentForUser && currentForUser.id !== target.id) {
+          onSavePosition({ ...currentForUser, holderUserId: undefined });
+      }
+      if (target.holderUserId !== incomingUserId) {
+          onSavePosition({ ...target, holderUserId: incomingUserId });
+      }
+  };
+
+  const renderStructure = () => {
+      const roots = orgPositions
+          .filter((p) => !p.managerPositionId || !orgPositions.some((x) => x.id === p.managerPositionId))
+          .sort((a, b) => (a.order || 0) - (b.order || 0));
+      const childrenMap = new Map<string, OrgPosition[]>();
+      orgPositions.forEach((p) => {
+          if (!p.managerPositionId) return;
+          const arr = childrenMap.get(p.managerPositionId) || [];
+          arr.push(p);
+          childrenMap.set(p.managerPositionId, arr);
+      });
+      childrenMap.forEach((arr, key) => childrenMap.set(key, arr.sort((a, b) => (a.order || 0) - (b.order || 0))));
+
+      const renderNode = (node: OrgPosition, depth = 0): React.ReactNode => {
+          const children = childrenMap.get(node.id) || [];
+          const hasChildren = children.length > 0;
+          const isOpen = expandedNodes[node.id] ?? true;
+          const holder = users.find((u) => u.id === node.holderUserId);
+          const dept = departments.find((d) => d.id === node.departmentId);
+
+          return (
+              <div key={node.id} className="select-none">
+                  <div
+                      className="group rounded-lg border border-gray-200 dark:border-[#333] bg-white dark:bg-[#252525] hover:border-indigo-300 dark:hover:border-indigo-700"
+                      style={{ marginLeft: depth * 16 }}
+                      onDragOver={(e) => e.preventDefault()}
+                      onDrop={(e) => {
+                          e.preventDefault();
+                          const uid = draggedUserId || e.dataTransfer.getData('text/plain');
+                          if (!uid) return;
+                          handleAssignUserToPosition(node.id, uid);
+                          setDraggedUserId(null);
+                      }}
+                  >
+                      <div className="flex items-center gap-2 px-3 py-2.5">
+                          <button
+                              type="button"
+                              onClick={() => setExpandedNodes((prev) => ({ ...prev, [node.id]: !isOpen }))}
+                              className="p-1 rounded hover:bg-gray-100 dark:hover:bg-[#303030]"
+                          >
+                              {hasChildren ? <ChevronDown size={14} className={!isOpen ? '-rotate-90 transition-transform' : 'transition-transform'} /> : <ChevronRight size={14} className="opacity-30" />}
+                          </button>
+                          <FolderTree size={15} className="text-indigo-500" />
+                          <div className="min-w-0 flex-1">
+                              <div className="text-sm font-semibold text-gray-900 dark:text-gray-100 truncate">{node.title}</div>
+                              <div className="text-[11px] text-gray-500 dark:text-gray-400 truncate">{dept?.name || 'Без отдела'}</div>
+                          </div>
+                          <button type="button" onClick={() => handleOpenPosEdit(node)} className="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-indigo-600 transition-opacity">
+                              <Edit2 size={14} />
+                          </button>
+                      </div>
+                      <div className="px-3 pb-2.5">
+                          {holder ? (
+                              <div
+                                  draggable
+                                  onDragStart={(e) => {
+                                      setDraggedUserId(holder.id);
+                                      e.dataTransfer.setData('text/plain', holder.id);
+                                      e.dataTransfer.effectAllowed = 'move';
+                                  }}
+                                  className="flex items-center gap-2 rounded-md border border-gray-200 dark:border-[#3a3a3a] bg-gray-50 dark:bg-[#2f2f2f] px-2 py-1.5 cursor-move"
+                              >
+                                  <img src={holder.avatar || getDefaultAvatarForId(holder.id)} className="w-6 h-6 rounded-full object-cover object-center" />
+                                  <span className="text-xs font-medium text-gray-700 dark:text-gray-300 truncate">{holder.name}</span>
+                              </div>
+                          ) : (
+                              <div className="text-xs text-gray-400 italic rounded-md border border-dashed border-gray-200 dark:border-[#3a3a3a] px-2 py-1.5">
+                                  Перетащите сотрудника сюда
+                              </div>
+                          )}
+                      </div>
+                  </div>
+                  {hasChildren && isOpen && (
+                      <div className="mt-2 space-y-2">
+                          {children.map((child) => renderNode(child, depth + 1))}
+                      </div>
+                  )}
+              </div>
+          );
+      };
+
+      const assignedIds = new Set(orgPositions.map((p) => p.holderUserId).filter(Boolean) as string[]);
+      const freeEmployees = employees
+          .filter((info) => !info.isArchived && !!info.userId && !assignedIds.has(info.userId))
+          .map((info) => users.find((u) => u.id === info.userId))
+          .filter((u): u is User => Boolean(u));
+
+      return (
+          <div className="space-y-4">
+              <div className="rounded-xl border border-gray-200 dark:border-[#333] bg-gray-50/60 dark:bg-[#202020] p-3">
+                  <h4 className="text-sm font-semibold text-gray-800 dark:text-gray-200 mb-2">Свободные сотрудники</h4>
+                  {freeEmployees.length === 0 ? (
+                      <p className="text-xs text-gray-500 dark:text-gray-400">Все сотрудники уже назначены на должности.</p>
+                  ) : (
+                      <div className="flex flex-wrap gap-2">
+                          {freeEmployees.map((u) => (
+                              <div
+                                  key={u.id}
+                                  draggable
+                                  onDragStart={(e) => {
+                                      setDraggedUserId(u.id);
+                                      e.dataTransfer.setData('text/plain', u.id);
+                                      e.dataTransfer.effectAllowed = 'move';
+                                  }}
+                                  className="inline-flex items-center gap-2 px-2.5 py-1.5 rounded-lg border border-gray-200 dark:border-[#3a3a3a] bg-white dark:bg-[#252525] text-xs text-gray-700 dark:text-gray-300 cursor-move"
+                              >
+                                  <img src={u.avatar || getDefaultAvatarForId(u.id)} className="w-5 h-5 rounded-full object-cover object-center" />
+                                  <span>{u.name}</span>
+                              </div>
+                          ))}
+                      </div>
+                  )}
+              </div>
+
+              {roots.length === 0 ? (
+                  <div className="text-center py-10 text-gray-400 dark:text-gray-500">Структура пуста. Добавьте должности в оргсхеме.</div>
+              ) : (
+                  <div className="space-y-2">
+                      {roots.map((root) => renderNode(root))}
+                  </div>
+              )}
+          </div>
+      );
+  };
+
   return (
     <ModulePageShell>
       <div className={`${MODULE_PAGE_GUTTER} pt-6 md:pt-8 flex-shrink-0`}>
         <div className="mb-6 space-y-5">
           <ModulePageHeader
-            accent="violet"
+            accent="orange"
             icon={<UserCheck size={24} strokeWidth={2} />}
             title="Сотрудники"
             description="Управление сотрудниками и организационной структурой"
-            actions={
-              <ModuleCreateDropdown
-                accent="violet"
-                items={
-                  activeTab === 'cards'
-                    ? [
-                        {
-                          id: 'employee',
-                          label: 'Сотрудник',
-                          icon: UserPlus,
-                          onClick: handleOpenCreate,
-                          iconClassName: 'text-violet-600 dark:text-violet-400',
-                        },
-                      ]
-                    : [
-                        {
-                          id: 'position',
-                          label: 'Должность в оргсхеме',
-                          icon: Building2,
-                          onClick: handleOpenPosCreate,
-                          iconClassName: 'text-violet-600 dark:text-violet-400',
-                        },
-                      ]
-                }
+            tabs={
+              <ModuleSegmentedControl
+                variant="neutral"
+                value={activeTab}
+                onChange={(v) => setActiveTab(v as 'cards' | 'orgchart' | 'structure')}
+                options={[
+                  { value: 'cards', label: 'Карточки' },
+                  { value: 'orgchart', label: 'Оргсхема' },
+                  { value: 'structure', label: 'Структура' },
+                ]}
               />
             }
-          />
-          <ModuleSegmentedControl
-            variant="neutral"
-            value={activeTab}
-            onChange={(v) => setActiveTab(v as 'cards' | 'orgchart')}
-            options={[
-              { value: 'cards', label: 'Карточки' },
-              { value: 'orgchart', label: 'Оргсхема' },
-            ]}
+            controls={
+              <ModuleCreateDropdown
+                accent="orange"
+                items={[
+                  {
+                    id: 'employee',
+                    label: 'Сотрудник',
+                    icon: UserPlus,
+                    onClick: handleOpenCreate,
+                  },
+                  {
+                    id: 'position',
+                    label: 'Должность в оргсхеме',
+                    icon: Building2,
+                    onClick: handleOpenPosCreate,
+                  },
+                ]}
+              />
+            }
           />
         </div>
       </div>
@@ -338,6 +499,7 @@ const EmployeesView: React.FC<EmployeesViewProps> = ({
          <div className={`${MODULE_PAGE_GUTTER} pb-20 h-full overflow-y-auto custom-scrollbar`}>
        {activeTab === 'cards' && renderCards()}
        {activeTab === 'orgchart' && renderOrgChart()}
+       {activeTab === 'structure' && renderStructure()}
          </div>
        </div>
 
@@ -375,6 +537,22 @@ const EmployeesView: React.FC<EmployeesViewProps> = ({
                             options={[
                                 { value: '', label: 'Не назначен' },
                                 ...users.map(u => ({ value: u.id, label: u.name }))
+                            ]}
+                        />
+                    </div>
+
+                    <div>
+                        <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 mb-1">Пост в оргструктуре</label>
+                        <TaskSelect
+                            value={orgPositionId}
+                            onChange={(value) => {
+                                setOrgPositionId(value);
+                                const linked = orgPositions.find((p) => p.id === value);
+                                if (linked?.title) setPosition(linked.title);
+                            }}
+                            options={[
+                                { value: '', label: 'Не выбран' },
+                                ...orgPositions.map((p) => ({ value: p.id, label: p.title }))
                             ]}
                         />
                     </div>

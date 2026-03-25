@@ -6,9 +6,8 @@ import { DynamicIcon } from './AppIcons';
 import { STANDARD_CATEGORIES } from './FunctionalityView';
 import { FilePreviewModal } from './FilePreviewModal';
 import { getTodayLocalDate, getDateDaysFromNow, normalizeDateForInput } from '../utils/dateUtils';
-import { DateInput } from './ui/DateInput';
-import { Button } from './ui';
-import { TaskSelect } from './TaskSelect';
+import { DateRangeInput } from './ui/DateInput';
+import { Button, SystemAlertDialog } from './ui';
 
 interface TaskModalProps {
   users: User[];
@@ -73,6 +72,14 @@ const TaskModal: React.FC<TaskModalProps> = ({
   const [isAssigneeDropdownOpen, setIsAssigneeDropdownOpen] = useState(false);
   const [isAttachmentModalOpen, setIsAttachmentModalOpen] = useState(false);
   const [showDocSelector, setShowDocSelector] = useState(false);
+  const [systemAlert, setSystemAlert] = useState<{ open: boolean; title: string; message: string }>({
+    open: false,
+    title: '',
+    message: '',
+  });
+  const [isCloseConfirmOpen, setIsCloseConfirmOpen] = useState(false);
+  const [isParentTaskModalOpen, setIsParentTaskModalOpen] = useState(false);
+  const [parentTaskSearch, setParentTaskSearch] = useState('');
   const assigneeDropdownRef = useRef<HTMLDivElement>(null);
   const [currentTask, setCurrentTask] = useState<Partial<Task> | null>(task);
   const [previewFile, setPreviewFile] = useState<{ url: string; name: string; type: string } | null>(null);
@@ -110,6 +117,18 @@ const TaskModal: React.FC<TaskModalProps> = ({
     () => allTasks.filter(t => t.parentTaskId === currentTask?.id && !t.isArchived),
     [allTasks, currentTask?.id]
   );
+
+  const parentTaskCandidates = useMemo(() => {
+    const q = parentTaskSearch.trim().toLowerCase();
+    return allTasks.filter((t) => {
+      if (t.isArchived) return false;
+      if (t.entityType && t.entityType !== 'task') return false;
+      if (t.id === currentTask?.id) return false;
+      if (t.parentTaskId === currentTask?.id) return false;
+      if (!q) return true;
+      return (t.title || '').toLowerCase().includes(q);
+    });
+  }, [allTasks, parentTaskSearch, currentTask?.id]);
 
   // Обновляем currentTask при изменении task пропа (для синхронизации комментариев)
   useEffect(() => {
@@ -233,6 +252,16 @@ const TaskModal: React.FC<TaskModalProps> = ({
     }
   }, [currentTask, currentUser, prevTaskId, priorities, statuses]);
 
+  useEffect(() => {
+    if (taskType !== 'idea' && !status && statuses.length > 0) {
+      setStatus(statuses[0].name);
+    }
+
+    if (taskType !== 'idea' && taskType !== 'feature' && !priority && priorities.length > 0) {
+      setPriority(priorities[0].name);
+    }
+  }, [taskType, status, priority, statuses, priorities]);
+
   const handleSubmit = (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     
@@ -341,12 +370,7 @@ const TaskModal: React.FC<TaskModalProps> = ({
 
   const handleClose = () => {
     if (hasChanges()) {
-      if (window.confirm("Сохранить изменения перед закрытием?")) {
-        handleSubmit();
-        // handleSubmit уже вызывает onClose(), поэтому здесь не нужно
-      } else {
-        onClose();
-      }
+      setIsCloseConfirmOpen(true);
     } else {
       onClose();
     }
@@ -381,8 +405,18 @@ const TaskModal: React.FC<TaskModalProps> = ({
       };
   }, [isAssigneeDropdownOpen]);
 
-  const getStatusColor = (sName: string) => statuses.find(s => s.name === sName)?.color || 'bg-gray-100';
-  const getPriorityColor = (pName: string) => priorities.find(p => p.name === pName)?.color || 'bg-gray-100';
+  const ensureBadgeColor = (color: string | undefined) => {
+    const fallback = 'bg-gray-100 dark:bg-[#333] text-gray-800 dark:text-gray-200 border border-gray-200 dark:border-[#444]';
+    if (!color || !color.trim()) return fallback;
+    let cls = color.trim();
+    if (!cls.includes('bg-')) cls = `${fallback} ${cls}`;
+    if (!cls.includes('text-')) cls = `${cls} text-gray-800 dark:text-gray-200`;
+    if (!cls.includes('border')) cls = `${cls} border border-transparent`;
+    return cls;
+  };
+
+  const getStatusColor = (sName: string) => ensureBadgeColor(statuses.find(s => s.name === sName)?.color);
+  const getPriorityColor = (pName: string) => ensureBadgeColor(priorities.find(p => p.name === pName)?.color);
 
   // Компонент для красивого выпадающего списка статусов и приоритетов
   const StatusPrioritySelect = ({ value, options, onChange, type, getColor }: { 
@@ -417,7 +451,7 @@ const TaskModal: React.FC<TaskModalProps> = ({
                 onClick={() => setIsOpen(!isOpen)}
                 className={`h-8 min-h-8 max-h-8 px-2.5 py-0 rounded-md text-xs font-medium cursor-pointer transition-all flex items-center justify-between ${colorClass}`}
             >
-                <span className="truncate">{value}</span>
+                <span className="truncate">{value || 'Не выбрано'}</span>
                 <ChevronDown size={14} className={`ml-1.5 shrink-0 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
             </div>
             
@@ -453,6 +487,8 @@ const TaskModal: React.FC<TaskModalProps> = ({
     onCreateProject: (name: string) => void
   }) => {
     const [isOpen, setIsOpen] = useState(false);
+    const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+    const [newProjectName, setNewProjectName] = useState('');
     const containerRef = useRef<HTMLDivElement>(null);
     const selectedProject = options.find(p => p.id === value);
 
@@ -490,19 +526,17 @@ const TaskModal: React.FC<TaskModalProps> = ({
     }, [isOpen]);
 
     const handleCreateNew = () => {
-        const name = prompt('Новый модуль:');
-        if (name && name.trim()) {
-            onCreateProject(name.trim());
-            // После создания модуля нужно подождать, пока он появится в списке
-            // и автоматически выбрать его
-            setTimeout(() => {
-                const newProject = options.find(p => p.name === name.trim());
-                if (newProject) {
-                    onChange(newProject.id);
-                }
-            }, 100);
-            setIsOpen(false);
-        }
+        const name = newProjectName.trim();
+        if (!name) return;
+        onCreateProject(name);
+        setIsCreateModalOpen(false);
+        setNewProjectName('');
+        setIsOpen(false);
+        // Дожидаемся обновления списка модулей и выбираем только что созданный
+        window.setTimeout(() => {
+            const newProject = options.find((p) => p.name === name);
+            if (newProject) onChange(newProject.id);
+        }, 120);
     };
 
     return (
@@ -531,7 +565,10 @@ const TaskModal: React.FC<TaskModalProps> = ({
             </div>
             <button 
                 type="button" 
-                onClick={handleCreateNew}
+                onClick={() => {
+                    setIsOpen(false);
+                    setIsCreateModalOpen(true);
+                }}
                 className="h-8 w-8 shrink-0 flex items-center justify-center text-gray-400 hover:text-blue-500 hover:bg-gray-100 dark:hover:bg-[#303030] rounded-md transition-colors"
                 title="Создать модуль"
             >
@@ -574,12 +611,62 @@ const TaskModal: React.FC<TaskModalProps> = ({
                     })}
                 </div>
             )}
+
+            {isCreateModalOpen && (
+                <div
+                    className="fixed inset-0 z-[280] bg-black/35 flex items-center justify-center p-4"
+                    onClick={() => {
+                        setIsCreateModalOpen(false);
+                        setNewProjectName('');
+                    }}
+                >
+                    <div
+                        className="w-full max-w-sm rounded-xl border border-gray-200 dark:border-[#444] bg-white dark:bg-[#252525] shadow-2xl p-4"
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <h4 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">Новый модуль</h4>
+                        <input
+                            autoFocus
+                            value={newProjectName}
+                            onChange={(e) => setNewProjectName(e.target.value)}
+                            onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                    e.preventDefault();
+                                    handleCreateNew();
+                                }
+                            }}
+                            placeholder="Название модуля"
+                            className="w-full rounded-lg border border-gray-300 dark:border-[#555] bg-white dark:bg-[#1f1f1f] px-3 py-2 text-sm text-gray-900 dark:text-gray-100 outline-none focus:ring-2 focus:ring-blue-500/40"
+                        />
+                        <div className="mt-3 flex justify-end gap-2">
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setIsCreateModalOpen(false);
+                                    setNewProjectName('');
+                                }}
+                                className="px-3 py-2 rounded-lg border border-gray-300 dark:border-[#555] text-sm text-gray-700 dark:text-gray-200"
+                            >
+                                Отмена
+                            </button>
+                            <button
+                                type="button"
+                                onClick={handleCreateNew}
+                                disabled={!newProjectName.trim()}
+                                className={`px-3 py-2 rounded-lg text-sm text-white ${newProjectName.trim() ? 'bg-[#3337AD] hover:bg-[#2d3199]' : 'bg-[#3337AD]/50 cursor-not-allowed'}`}
+                            >
+                                Создать
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
   };
 
   return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-end md:items-center justify-center z-[100] animate-in fade-in duration-200 p-0 md:p-4" onClick={handleBackdropClick} style={{ paddingTop: 'env(safe-area-inset-top)', paddingBottom: 'env(safe-area-inset-bottom)' }}>
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-end md:items-center justify-center z-[260] animate-in fade-in duration-200 p-0 md:p-4" onClick={handleBackdropClick} style={{ paddingTop: 'env(safe-area-inset-top)', paddingBottom: 'env(safe-area-inset-bottom)' }}>
       <div className="bg-white dark:bg-[#1e1e1e] w-full h-full md:h-[min(680px,92vh)] md:max-h-[min(680px,92vh)] md:max-w-5xl md:rounded-xl shadow-2xl flex flex-col md:flex-row overflow-hidden border-0 md:border border-gray-200 dark:border-gray-800 rounded-t-2xl md:rounded-xl" onClick={e => e.stopPropagation()}>
         
         {/* LEFT COLUMN: DETAILS */}
@@ -743,21 +830,16 @@ const TaskModal: React.FC<TaskModalProps> = ({
                     {taskType !== 'idea' && (
                         <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-4 col-span-1 md:col-span-2 min-h-8">
                             <div className="w-full sm:w-28 sm:min-w-[7rem] sm:pr-2 text-[10px] font-semibold text-gray-500 dark:text-gray-400 uppercase flex items-center gap-2 shrink-0"><CalendarIcon size={14} className="shrink-0 text-gray-400" strokeWidth={2} /> Сроки</div>
-                            <div className="flex items-center gap-2 flex-1 w-full sm:w-auto">
-                                <DateInput
-                                    value={startDate}
-                                    onChange={setStartDate}
-                                    className="flex-1 sm:flex-none"
-                                    size="compact"
-                                />
-                                <span className="text-gray-400 dark:text-gray-500 text-xs shrink-0">➜</span>
-                                <DateInput
-                                    value={endDate}
-                                    onChange={setEndDate}
-                                    className="flex-1 sm:flex-none"
-                                    size="compact"
-                                />
-                            </div>
+                            <DateRangeInput
+                              startDate={startDate}
+                              endDate={endDate}
+                              onChange={(s, e) => {
+                                setStartDate(s);
+                                setEndDate(e);
+                              }}
+                              className="flex-1 w-full sm:w-auto"
+                              size="compact"
+                            />
                         </div>
                     )}
 
@@ -768,13 +850,16 @@ const TaskModal: React.FC<TaskModalProps> = ({
                             <ListTree size={14} className="shrink-0 text-gray-400" strokeWidth={2} /> Родитель
                           </div>
                           <div className="flex-1 min-w-0">
-                            <TaskSelect
-                              value={parentTaskId}
-                              onChange={setParentTaskId}
-                              options={parentTaskOptions}
-                              placeholder=""
-                              size="compact"
-                            />
+                            <button
+                              type="button"
+                              onClick={() => setIsParentTaskModalOpen(true)}
+                              className="w-full h-8 min-h-8 px-2.5 rounded-md border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-[#252525] text-left text-sm text-gray-800 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-[#303030] transition-colors flex items-center justify-between"
+                            >
+                              <span className="truncate">
+                                {parentTaskOptions.find((o) => o.value === parentTaskId)?.label || 'Нет (корневая)'}
+                              </span>
+                              <ChevronDown size={14} className="ml-2 shrink-0 text-gray-400" />
+                            </button>
                           </div>
                         </div>
                         {currentTask?.id && childTasks.length > 0 && (
@@ -974,9 +1059,124 @@ const TaskModal: React.FC<TaskModalProps> = ({
             </div>
         )}
 
+        {isParentTaskModalOpen && (
+          <div
+            className="fixed inset-0 z-[280] bg-black/35 flex items-center justify-center p-4"
+            onClick={() => {
+              setIsParentTaskModalOpen(false);
+              setParentTaskSearch('');
+            }}
+          >
+            <div
+              className="w-full max-w-2xl rounded-xl border border-gray-200 dark:border-[#444] bg-white dark:bg-[#252525] shadow-2xl overflow-hidden"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="px-4 py-3 border-b border-gray-100 dark:border-[#333] flex items-center justify-between gap-3">
+                <h4 className="text-sm font-semibold text-gray-900 dark:text-white">Выбор родительской задачи</h4>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsParentTaskModalOpen(false);
+                    setParentTaskSearch('');
+                  }}
+                  className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-[#333] text-gray-500"
+                >
+                  <X size={16} />
+                </button>
+              </div>
+              <div className="p-4">
+                <input
+                  autoFocus
+                  value={parentTaskSearch}
+                  onChange={(e) => setParentTaskSearch(e.target.value)}
+                  placeholder="Поиск задачи..."
+                  className="w-full rounded-lg border border-gray-300 dark:border-[#555] bg-white dark:bg-[#1f1f1f] px-3 py-2 text-sm text-gray-900 dark:text-gray-100 outline-none focus:ring-2 focus:ring-blue-500/40"
+                />
+                <div className="mt-3 max-h-[420px] overflow-y-auto custom-scrollbar border border-gray-200 dark:border-[#333] rounded-lg">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setParentTaskId('');
+                      setIsParentTaskModalOpen(false);
+                      setParentTaskSearch('');
+                    }}
+                    className={`w-full text-left px-3 py-2 text-sm border-b border-gray-100 dark:border-[#333] ${
+                      !parentTaskId ? 'bg-[#3337AD]/10 text-[#3337AD] dark:text-[#a8abf0]' : 'hover:bg-gray-50 dark:hover:bg-[#2a2a2a]'
+                    }`}
+                  >
+                    Нет (корневая)
+                  </button>
+                  {parentTaskCandidates.length === 0 ? (
+                    <div className="px-3 py-6 text-center text-sm text-gray-500">Ничего не найдено</div>
+                  ) : (
+                    parentTaskCandidates.map((t) => (
+                      <button
+                        key={t.id}
+                        type="button"
+                        onClick={() => {
+                          setParentTaskId(t.id);
+                          setIsParentTaskModalOpen(false);
+                          setParentTaskSearch('');
+                        }}
+                        className={`w-full text-left px-3 py-2 text-sm border-b last:border-b-0 border-gray-100 dark:border-[#333] ${
+                          parentTaskId === t.id ? 'bg-[#3337AD]/10 text-[#3337AD] dark:text-[#a8abf0]' : 'hover:bg-gray-50 dark:hover:bg-[#2a2a2a]'
+                        }`}
+                      >
+                        <div className="truncate font-medium">{t.title || 'Без названия'}</div>
+                        <div className="text-xs text-gray-500 truncate">{t.status || 'Без статуса'}</div>
+                      </button>
+                    ))
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {isCloseConfirmOpen && (
+          <div
+            className="fixed inset-0 z-[285] bg-black/35 flex items-center justify-center p-4"
+            onClick={() => setIsCloseConfirmOpen(false)}
+          >
+            <div
+              className="w-full max-w-md rounded-xl border border-gray-200 dark:border-[#444] bg-white dark:bg-[#252525] shadow-2xl overflow-hidden"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="px-4 py-3 border-b border-gray-100 dark:border-[#333]">
+                <h4 className="text-sm font-semibold text-gray-900 dark:text-white">Сохранить изменения?</h4>
+                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                  Есть несохраненные изменения в задаче.
+                </p>
+              </div>
+              <div className="px-4 py-3 flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsCloseConfirmOpen(false);
+                    onClose();
+                  }}
+                  className="px-3 py-2 rounded-lg border border-gray-200 dark:border-[#444] text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-[#2f2f2f]"
+                >
+                  Не сохранять
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsCloseConfirmOpen(false);
+                    handleSubmit();
+                  }}
+                  className="px-3 py-2 rounded-lg text-sm text-white bg-[#3337AD] hover:bg-[#2d3199]"
+                >
+                  Сохранить
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Attachment Type Modal */}
         {isAttachmentModalOpen && (
-          <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-[90] animate-in fade-in duration-200" onClick={() => setIsAttachmentModalOpen(false)}>
+          <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-[290] animate-in fade-in duration-200" onClick={() => setIsAttachmentModalOpen(false)}>
             <div className="bg-white dark:bg-[#252525] rounded-xl shadow-2xl w-full max-w-md overflow-hidden border border-gray-200 dark:border-[#333]" onClick={e => e.stopPropagation()}>
               <div className="p-4 border-b border-gray-100 dark:border-[#333] flex justify-between items-center">
                 <h3 className="font-bold text-gray-800 dark:text-white">Добавить вложение</h3>
@@ -1002,12 +1202,20 @@ const TaskModal: React.FC<TaskModalProps> = ({
                     type="button"
                     onClick={() => {
                       if (!currentTask?.id) {
-                        alert('Сначала сохраните задачу, затем прикрепите документ');
+                        setSystemAlert({
+                          open: true,
+                          title: 'Сначала сохраните задачу',
+                          message: 'Сначала сохраните задачу, затем прикрепите документ.',
+                        });
                         setIsAttachmentModalOpen(false);
                         return;
                       }
                       if (!docs || docs.length === 0) {
-                        alert('Нет доступных документов в модуле документов');
+                        setSystemAlert({
+                          open: true,
+                          title: 'Документы не найдены',
+                          message: 'Нет доступных документов в модуле документов.',
+                        });
                         setIsAttachmentModalOpen(false);
                         return;
                       }
@@ -1032,7 +1240,7 @@ const TaskModal: React.FC<TaskModalProps> = ({
 
         {/* Document Selector Modal */}
         {showDocSelector && onAddDocAttachment && (
-          <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-[90] animate-in fade-in duration-200" onClick={() => setShowDocSelector(false)}>
+          <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-[290] animate-in fade-in duration-200" onClick={() => setShowDocSelector(false)}>
             <div className="bg-white dark:bg-[#252525] rounded-xl shadow-2xl w-full max-w-lg overflow-hidden border border-gray-200 dark:border-[#333]" onClick={e => e.stopPropagation()}>
               <div className="p-4 border-b border-gray-100 dark:border-[#333] flex justify-between items-center">
                 <h3 className="font-bold text-gray-800 dark:text-white">Выберите документ</h3>
@@ -1052,7 +1260,11 @@ const TaskModal: React.FC<TaskModalProps> = ({
                             onAddDocAttachment(currentTask.id, doc.id);
                             setShowDocSelector(false);
                           } else {
-                            alert('Сначала сохраните задачу, затем прикрепите документ');
+                            setSystemAlert({
+                              open: true,
+                              title: 'Сначала сохраните задачу',
+                              message: 'Сначала сохраните задачу, затем прикрепите документ.',
+                            });
                             setShowDocSelector(false);
                           }
                         }}
@@ -1082,6 +1294,12 @@ const TaskModal: React.FC<TaskModalProps> = ({
           onClose={() => setPreviewFile(null)}
         />
       )}
+      <SystemAlertDialog
+        open={systemAlert.open}
+        title={systemAlert.title}
+        message={systemAlert.message}
+        onClose={() => setSystemAlert({ open: false, title: '', message: '' })}
+      />
     </div>
   );
 };

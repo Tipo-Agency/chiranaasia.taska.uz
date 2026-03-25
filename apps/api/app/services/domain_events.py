@@ -11,6 +11,35 @@ from app.models.notification import NotificationEvent
 from app.services.event_bus import publish_domain_event
 from app.services.notification_hub import process_domain_event
 
+DEFAULT_ORG_ID = "default"
+
+
+async def log_entity_mutation(
+    db: AsyncSession,
+    *,
+    event_type: str,
+    entity_type: str,
+    entity_id: str,
+    source: str,
+    payload: dict[str, Any] | None = None,
+    actor_id: str | None = None,
+) -> str:
+    """
+    Persist notification_event + publish to Redis Stream + run notification hub.
+    Используйте для любых CRUD-операций; hub создаст пользовательские уведомления
+    только для известных типов в notification_hub._route_event.
+    """
+    return await emit_domain_event(
+        db,
+        event_type=event_type,
+        org_id=DEFAULT_ORG_ID,
+        entity_type=entity_type,
+        entity_id=entity_id,
+        source=source,
+        payload=payload or {},
+        actor_id=actor_id,
+    )
+
 
 async def emit_domain_event(
     db: AsyncSession,

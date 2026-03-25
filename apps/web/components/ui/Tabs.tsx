@@ -38,7 +38,6 @@ export const Tabs: React.FC<TabsProps> = ({ tabs, activeTab, onChange, className
             }
           `}
         >
-          {tab.icon ? <span className="shrink-0">{tab.icon}</span> : null}
           <span>{tab.label}</span>
         </button>
       ))}

@@ -239,7 +239,7 @@ export const AutomationSettings: React.FC<AutomationSettingsProps> = ({
         }
     };
 
-    if (activeTab === 'notifications') {
+    if (activeTab === 'notifications' || activeTab === 'events') {
         return (
             <div className="space-y-6 max-w-5xl">
                 {/* Вкладки по модулям */}
@@ -295,6 +295,7 @@ export const AutomationSettings: React.FC<AutomationSettingsProps> = ({
                 </div>
 
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    {activeTab === 'notifications' && (
                     <div className="lg:col-span-2 bg-white dark:bg-[#252525] p-6 rounded-xl border border-gray-200 dark:border-[#333]">
                         <h3 className="font-bold text-gray-800 dark:text-white mb-4">Глобальные каналы доставки</h3>
                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
@@ -351,8 +352,10 @@ export const AutomationSettings: React.FC<AutomationSettingsProps> = ({
                             </div>
                         </div>
                     </div>
+                    )}
 
                     {/* Настройки уведомлений для модуля */}
+                    {activeTab === 'notifications' && (
                     <div className="bg-white dark:bg-[#252525] p-6 rounded-xl border border-gray-200 dark:border-[#333]">
                         <h3 className="font-bold text-gray-800 dark:text-white mb-2">Настройки уведомлений</h3>
                         <p className="text-xs text-gray-500 dark:text-gray-400 mb-4">
@@ -389,9 +392,10 @@ export const AutomationSettings: React.FC<AutomationSettingsProps> = ({
                             ))}
                         </div>
                     </div>
+                    )}
 
                     {/* Создание правил автоматизации */}
-                    <div className="bg-gray-50 dark:bg-[#202020] p-6 rounded-xl border border-gray-200 dark:border-[#333]">
+                    <div className={`${activeTab === 'events' ? 'lg:col-span-2' : ''} bg-gray-50 dark:bg-[#202020] p-6 rounded-xl border border-gray-200 dark:border-[#333]`}>
                         <h3 className="font-bold text-gray-800 dark:text-white mb-4">Создать правило</h3>
                         <form onSubmit={handleAutomationSubmit} className="space-y-4">
                             <input 

@@ -1,5 +1,5 @@
 
-import { TelegramButtonConfig, Deal, Comment } from "../types";
+import { TelegramButtonConfig, Deal, Comment, NotificationPreferences, SalesFunnel } from "../types";
 import { storageService } from "./storageService";
 import { api } from "../backend/api";
 
@@ -195,7 +195,7 @@ export const pollTelegramUpdates = async (): Promise<{ newDeals: Deal[], newMess
             let lastUpdateId = offset - 1;
             // ВАЖНО: Данные теперь загружаются только из Firebase через api
             // Используем api.deals.getAll() вместо storageService.getDeals()
-            const existingDeals = await api.deals.getAll(); // Get current deals from Firebase
+            const existingDeals = (await api.deals.getAll()) as Deal[];
 
             for (const update of data.result) {
                 lastUpdateId = update.update_id;
@@ -218,14 +218,14 @@ export const pollTelegramUpdates = async (): Promise<{ newDeals: Deal[], newMess
                     } else {
                         // It's a new lead
                         // Получаем основную воронку из настроек
-                        const notificationPrefs = await api.notificationPrefs.get();
+                        const notificationPrefs = (await api.notificationPrefs.get()) as NotificationPreferences;
                         const defaultFunnelId = notificationPrefs?.defaultFunnelId;
                         
                         // Если есть основная воронка, получаем первый этап
                         let stageId = 'new';
                         let funnelId = defaultFunnelId;
                         if (defaultFunnelId) {
-                            const funnels = await api.funnels.getAll();
+                            const funnels = (await api.funnels.getAll()) as SalesFunnel[];
                             const defaultFunnel = funnels.find(f => f.id === defaultFunnelId);
                             if (defaultFunnel && defaultFunnel.stages.length > 0) {
                                 stageId = defaultFunnel.stages[0].id;

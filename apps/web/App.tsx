@@ -1,6 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import Sidebar from './components/Sidebar';
+import type { SidebarProps } from './components/Sidebar';
 import { AppRouter } from './components/AppRouter';
 import { LoginView } from './components/LoginView';
 import { AppHeader } from './components/AppHeader';
@@ -15,16 +16,8 @@ import PublicContentPlanView from './components/PublicContentPlanView';
 import { MiniMessenger } from './components/features/chat/MiniMessenger';
 import { MessageCircle } from 'lucide-react';
 import { useAppLogic } from './frontend/hooks/useAppLogic';
-import { api } from './backend/api';
-
-interface SystemNotification {
-  id: string;
-  title: string;
-  body: string;
-  priority?: string;
-  isRead?: boolean;
-  createdAt?: string;
-}
+import { NotificationCenterProvider, useNotificationCenter } from './frontend/contexts/NotificationCenterContext';
+import type { AppHeaderProps } from './components/AppHeader';
 
 /** Синхронно из pathname — чтобы не монтировать useAppLogic на публичной странице (избегаем React #310). */
 function getPublicContentPlanIdFromPath(): string | null {
@@ -33,88 +26,36 @@ function getPublicContentPlanIdFromPath(): string | null {
   return m ? decodeURIComponent(m[1].trim()) : null;
 }
 
+function AppHeaderWithNotifications(
+  props: Omit<AppHeaderProps, 'activityLogs' | 'unreadNotificationsCount' | 'onMarkAllRead'>
+) {
+  const { notifications, unreadCount, markAllRead } = useNotificationCenter();
+  return (
+    <AppHeader
+      {...props}
+      activityLogs={notifications}
+      unreadNotificationsCount={unreadCount}
+      onMarkAllRead={markAllRead}
+    />
+  );
+}
+
+function SidebarWithUnread(props: Omit<SidebarProps, 'unreadCount'>) {
+  const { unreadCount } = useNotificationCenter();
+  return <Sidebar {...props} unreadCount={unreadCount} />;
+}
+
 function MainApp() {
   const { state, actions } = useAppLogic();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [chatPanelOpen, setChatPanelOpen] = useState(false);
-  const [systemNotifications, setSystemNotifications] = useState<SystemNotification[]>([]);
-  const [unreadNotificationsCount, setUnreadNotificationsCount] = useState(0);
-
-  useEffect(() => {
-    if (!state.currentUser?.id) return;
-    let mounted = true;
-    api.notifications
-      .list(state.currentUser.id, false, 100)
-      .then((list) => {
-        if (!mounted) return;
-        const typed = (list || []) as SystemNotification[];
-        setSystemNotifications(typed);
-        setUnreadNotificationsCount(typed.filter((n) => !n.isRead).length);
-      })
-      .catch(() => {});
-
-    api.notifications
-      .unreadCount(state.currentUser.id)
-      .then((res) => {
-        if (!mounted) return;
-        setUnreadNotificationsCount(res.unreadCount || 0);
-      })
-      .catch(() => {});
-
-    const ws = new WebSocket(api.notifications.wsUrl(state.currentUser.id));
-    ws.onmessage = (evt) => {
-      try {
-        const data = JSON.parse(evt.data);
-        if (data?.type === 'notification.created' && data.notification && mounted) {
-          setSystemNotifications((prev) => [
-            {
-              id: data.notification.id,
-              title: data.notification.title,
-              body: data.notification.body,
-              priority: data.notification.priority,
-              isRead: false,
-              createdAt: new Date().toISOString(),
-            },
-            ...prev,
-          ]);
-          setUnreadNotificationsCount((prev) => prev + 1);
-        }
-      } catch {
-        // ignore malformed ws payload
-      }
-    };
-    const pollId = window.setInterval(() => {
-      api.notifications
-        .unreadCount(state.currentUser.id)
-        .then((res) => {
-          if (!mounted) return;
-          setUnreadNotificationsCount(res.unreadCount || 0);
-        })
-        .catch(() => {});
-    }, 30000);
-    return () => {
-      mounted = false;
-      window.clearInterval(pollId);
-      try {
-        ws.close();
-      } catch {
-        // ignore close errors
-      }
-    };
-  }, [state.currentUser?.id]);
+  const [chatOpenToSystemFeed, setChatOpenToSystemFeed] = useState(false);
 
   if (state.isLoading) return <div className="h-screen flex items-center justify-center bg-gray-50 dark:bg-[#121212] dark:text-white">Загрузка...</div>;
 
   if (!state.currentUser) {
     return <LoginView users={state.users} onLogin={user => { actions.login(user); }} />;
   }
-
-  const handleMarkAllNotificationsRead = async () => {
-    const unread = systemNotifications.filter((n) => !n.isRead);
-    await Promise.all(unread.map((n) => api.notifications.markRead(n.id, true).catch(() => {})));
-    setSystemNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })));
-    setUnreadNotificationsCount(0);
-  };
 
   const handleOpenEditCurrentTable = () => {
       if (state.activeTable) actions.openEditTable(state.activeTable);
@@ -152,7 +93,7 @@ function MainApp() {
     if (type === 'task') {
       const task = {
         id: `chat-task-${Date.now()}`,
-        entityType: 'task',
+        entityType: 'task' as const,
         tableId: '',
         title,
         status: state.statuses?.[0]?.name || 'Не начато',
@@ -172,6 +113,7 @@ function MainApp() {
     if (type === 'deal') {
       const deal = {
         id: `chat-deal-${Date.now()}`,
+        dealKind: 'funnel' as const,
         title,
         amount: 0,
         currency: 'UZS',
@@ -180,7 +122,7 @@ function MainApp() {
         createdAt: nowIso,
       };
       await actions.saveDeal(deal);
-      return { id: deal.id, label: deal.title };
+      return { id: deal.id, label: deal.title || title };
     }
 
     if (type === 'meeting') {
@@ -192,7 +134,7 @@ function MainApp() {
         time: '10:00',
         participantIds: [state.currentUser.id],
         summary: '',
-        type: 'work',
+        type: 'work' as const,
       };
       await actions.saveMeeting(meeting);
       return { id: meeting.id, label: meeting.title };
@@ -211,6 +153,7 @@ function MainApp() {
   };
 
   return (
+    <NotificationCenterProvider userId={state.currentUser.id}>
     <div 
       className={`flex h-screen w-full transition-colors duration-200 overflow-hidden ${state.darkMode ? 'dark bg-[#191919] text-gray-100' : 'bg-white text-gray-900'}`}
       style={{
@@ -220,7 +163,7 @@ function MainApp() {
       }}
     >
         {/* Sidebar */}
-        <Sidebar 
+        <SidebarWithUnread 
             isOpen={isMobileMenuOpen}
             onClose={() => setIsMobileMenuOpen(false)}
             tables={state.tables}
@@ -233,7 +176,6 @@ function MainApp() {
             onOpenSettings={() => { actions.openSettings('users'); }}
             onDeleteTable={actions.deleteTable}
             onEditTable={actions.openEditTable}
-            unreadCount={unreadNotificationsCount}
             activeSpaceTab={state.activeSpaceTab}
             onNavigateToType={(type) => {
               actions.setCurrentView('spaces');
@@ -243,19 +185,20 @@ function MainApp() {
 
         <div className="flex-1 flex flex-col min-w-0 bg-white dark:bg-[#191919] relative">
             {/* Header */}
-            <AppHeader
+            <AppHeaderWithNotifications
               darkMode={state.darkMode}
               currentView={state.currentView}
               activeTable={state.activeTable}
               currentUser={state.currentUser}
               searchQuery={state.searchQuery}
-              unreadNotificationsCount={unreadNotificationsCount}
-              activityLogs={systemNotifications}
               onToggleDarkMode={actions.toggleDarkMode}
               onSearchChange={actions.setSearchQuery}
               onSearchFocus={() => { if(state.currentView !== 'search') actions.setCurrentView('search'); }}
               onNavigateToInbox={() => actions.setCurrentView('inbox')}
-              onMarkAllRead={handleMarkAllNotificationsRead}
+              onOpenSystemChat={() => {
+                setChatOpenToSystemFeed(true);
+                setChatPanelOpen(true);
+              }}
               onOpenSettings={(tab?: string) => { actions.openSettings(tab || 'users'); }}
               onLogout={actions.logout}
               onEditTable={handleOpenEditCurrentTable}
@@ -270,14 +213,16 @@ function MainApp() {
             )}
 
             {/* Кнопка чата справа внизу — только десктоп и планшет */}
-            <button
-              type="button"
-              onClick={() => setChatPanelOpen(true)}
-              className="hidden md:flex fixed bottom-6 right-6 z-40 w-14 h-14 rounded-full bg-[#3337AD] text-white shadow-lg hover:bg-[#292b8a] items-center justify-center"
-              title="Чат"
-            >
-              <MessageCircle size={24} />
-            </button>
+            {state.currentView !== 'home' && (
+              <button
+                type="button"
+                onClick={() => setChatPanelOpen(true)}
+                className="hidden md:flex fixed bottom-6 right-6 z-40 w-14 h-14 rounded-full bg-[#3337AD] text-white shadow-lg hover:bg-[#292b8a] items-center justify-center"
+                title="Чат"
+              >
+                <MessageCircle size={24} />
+              </button>
+            )}
 
             {/* Чат в модальном окне (десктоп) */}
             {chatPanelOpen && (
@@ -303,11 +248,38 @@ function MainApp() {
                       actions.handleDocClick(doc);
                       setChatPanelOpen(false);
                     }}
+                    onOpenTask={(task) => {
+                      actions.openTaskModal(task);
+                      setChatPanelOpen(false);
+                    }}
+                    onOpenDeals={() => {
+                      actions.setCurrentView('sales-funnel');
+                      setChatPanelOpen(false);
+                    }}
+                    onOpenDeal={(deal) => {
+                      actions.setCurrentView('sales-funnel');
+                      window.setTimeout(() => {
+                        window.dispatchEvent(new CustomEvent('openDealFromChat', { detail: { dealId: deal.id } }));
+                      }, 0);
+                      setChatPanelOpen(false);
+                    }}
+                    onOpenMeetings={() => {
+                      actions.setCurrentView('meetings');
+                      setChatPanelOpen(false);
+                    }}
+                    onOpenMeeting={(meeting) => {
+                      actions.setCurrentView('meetings');
+                      window.setTimeout(() => {
+                        window.dispatchEvent(new CustomEvent('openMeetingFromChat', { detail: { meetingId: meeting.id } }));
+                      }, 0);
+                      setChatPanelOpen(false);
+                    }}
                     onCreateEntity={createEntityFromChat}
                     processTemplates={state.businessProcesses}
                     onStartProcessTemplate={async (processId) => {
                       const selected = state.businessProcesses.find((p) => p.id === processId && !p.isArchived);
-                      if (!selected || !selected.steps?.length) return null;
+                      if (!selected) return null;
+                      if (!selected.steps?.length) return null;
                       const firstStep = selected.steps[0];
                       const assigneeId =
                         firstStep.assigneeType === 'position'
@@ -356,6 +328,8 @@ function MainApp() {
                       });
                       return { id: taskId, label: `${latestVersion.title}: ${firstStep.title}` };
                     }}
+                    initialOpenSystemFeed={chatOpenToSystemFeed}
+                    onConsumedInitialSystemFeed={() => setChatOpenToSystemFeed(false)}
                     onUpdateEntity={async (type, id, patch) => {
                       if (type === 'task') {
                         const current = state.tasks.find((t) => t.id === id);
@@ -391,7 +365,6 @@ function MainApp() {
             <AppRouter 
                 currentView={state.currentView}
                 viewMode={state.viewMode}
-                searchQuery={state.searchQuery}
                 activeTable={state.activeTable}
                 filteredTasks={state.tasks.filter(t => 
                     state.currentView === 'search' 
@@ -408,6 +381,8 @@ function MainApp() {
                 deals={state.deals}
                 clients={state.clients}
                 contracts={state.contracts}
+                oneTimeDeals={state.oneTimeDeals}
+                accountsReceivable={state.accountsReceivable}
                 employeeInfos={state.employeeInfos}
                 meetings={state.meetings}
                 contentPosts={state.contentPosts}
@@ -435,8 +410,6 @@ function MainApp() {
                 settingsActiveTab={state.settingsActiveTab}
                 activeSpaceTab={state.activeSpaceTab}
                 notificationPrefs={state.notificationPrefs}
-                inboxMessages={state.inboxMessages}
-                outboxMessages={state.outboxMessages}
                 actions={actions}
             />
             </div>
@@ -554,6 +527,7 @@ function MainApp() {
              </div>
         )}
     </div>
+    </NotificationCenterProvider>
   );
 }
 

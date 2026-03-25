@@ -1,12 +1,27 @@
-"""Auth smoke tests. Requires seeded DB (e.g. demo user with login 'demo', empty password)."""
-import pytest
+"""Auth smoke tests."""
+import uuid
 
 
 def test_login_success(api_client):
-    """POST /api/auth/login with demo user returns token and user."""
+    """POST /api/auth/login returns token for a valid user."""
+    login = f"pytest_{uuid.uuid4().hex[:8]}"
+    password = "pytest-pass-123"
+    create_resp = api_client.put(
+        "/api/auth/users",
+        json=[
+            {
+                "name": "Pytest User",
+                "role": "EMPLOYEE",
+                "login": login,
+                "password": password,
+            }
+        ],
+    )
+    assert create_resp.status_code == 200
+
     r = api_client.post(
         "/api/auth/login",
-        json={"login": "demo", "password": ""},
+        json={"login": login, "password": password},
     )
     assert r.status_code == 200
     data = r.json()

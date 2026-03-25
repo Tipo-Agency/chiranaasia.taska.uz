@@ -3,6 +3,7 @@
  * Значение наружу: строка YYYY-MM-DD (как у input type="date").
  */
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { Calendar, ChevronLeft, ChevronRight } from 'lucide-react';
 
 const pad = (n: number) => (n < 10 ? `0${n}` : `${n}`);
@@ -51,6 +52,27 @@ function buildMonthCellsFixed(viewYear: number, viewMonth0: number): Date[] {
   return cells;
 }
 
+const YEARS_AROUND = 15;
+
+function buildYears(center: number): number[] {
+  const years: number[] = [];
+  for (let y = center - YEARS_AROUND; y <= center + YEARS_AROUND; y++) years.push(y);
+  return years;
+}
+
+function getPopoverPosition(triggerEl: HTMLElement | null, width = 300) {
+  if (!triggerEl) return { top: 0, left: 0 };
+  const rect = triggerEl.getBoundingClientRect();
+  const margin = 8;
+  const vw = window.innerWidth;
+  const vh = window.innerHeight;
+  let left = rect.left;
+  if (left + width > vw - margin) left = Math.max(margin, vw - width - margin);
+  const spaceBottom = vh - rect.bottom;
+  const top = spaceBottom >= 320 ? rect.bottom + 6 : Math.max(margin, rect.top - 320 - 6);
+  return { top, left };
+}
+
 interface DateInputProps {
   value: string;
   onChange: (value: string) => void;
@@ -75,6 +97,11 @@ export const DateInput: React.FC<DateInputProps> = ({
   const compact = size === 'compact';
   const [open, setOpen] = useState(false);
   const wrapRef = useRef<HTMLDivElement>(null);
+  const buttonRef = useRef<HTMLButtonElement>(null);
+  const popRef = useRef<HTMLDivElement>(null);
+  const [showMonthPicker, setShowMonthPicker] = useState(false);
+  const [showYearPicker, setShowYearPicker] = useState(false);
+  const [popoverPos, setPopoverPos] = useState({ top: 0, left: 0 });
 
   const [viewYear, setViewYear] = useState(() => {
     const p = parseISODate(value);
@@ -96,12 +123,29 @@ export const DateInput: React.FC<DateInputProps> = ({
   useEffect(() => {
     if (!open) return;
     const onDoc = (e: MouseEvent) => {
-      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) {
+      const t = e.target as Node;
+      if (popRef.current?.contains(t)) return;
+      if (wrapRef.current?.contains(t)) return;
+      if (buttonRef.current?.contains(t)) return;
+      setOpen(false);
+    };
+    const onEsc = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
         setOpen(false);
       }
     };
+    const recalc = () => setPopoverPos(getPopoverPosition(buttonRef.current));
+    recalc();
     document.addEventListener('mousedown', onDoc);
-    return () => document.removeEventListener('mousedown', onDoc);
+    document.addEventListener('keydown', onEsc);
+    window.addEventListener('resize', recalc);
+    window.addEventListener('scroll', recalc, true);
+    return () => {
+      document.removeEventListener('mousedown', onDoc);
+      document.removeEventListener('keydown', onEsc);
+      window.removeEventListener('resize', recalc);
+      window.removeEventListener('scroll', recalc, true);
+    };
   }, [open]);
 
   const isDisabledDay = useCallback(
@@ -125,6 +169,8 @@ export const DateInput: React.FC<DateInputProps> = ({
   const isInViewMonth = (d: Date) => d.getMonth() === viewMonth0 && d.getFullYear() === viewYear;
 
   const goPrevMonth = () => {
+    setShowMonthPicker(false);
+    setShowYearPicker(false);
     if (viewMonth0 === 0) {
       setViewMonth0(11);
       setViewYear((y) => y - 1);
@@ -134,6 +180,8 @@ export const DateInput: React.FC<DateInputProps> = ({
   };
 
   const goNextMonth = () => {
+    setShowMonthPicker(false);
+    setShowYearPicker(false);
     if (viewMonth0 === 11) {
       setViewMonth0(0);
       setViewYear((y) => y + 1);
@@ -149,51 +197,91 @@ export const DateInput: React.FC<DateInputProps> = ({
   const iconSz = compact ? 14 : 16;
 
   const display = value ? formatDisplayRu(value) : 'Выберите дату';
+  const years = useMemo(() => buildYears(viewYear), [viewYear]);
 
-  return (
-    <div className={`relative ${className}`} ref={wrapRef}>
-      {label && (
-        <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase mb-2">
-          {label}
-          {required && <span className="text-red-500 ml-1">*</span>}
-        </label>
-      )}
-      <button
-        type="button"
-        onClick={() => setOpen((o) => !o)}
-        className={`relative w-full text-left bg-white dark:bg-[#252525] text-gray-900 dark:text-gray-100 border border-gray-300 dark:border-[#555] ${btnPad} focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all flex items-center justify-between gap-2`}
-      >
-        <span className={!value ? 'text-gray-400 dark:text-gray-500' : ''}>{display}</span>
-        <Calendar size={iconSz} className={`absolute ${iconRight} top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500 shrink-0 pointer-events-none`} />
-      </button>
-
-      {open && (
-        <div
-          className="absolute top-full left-0 z-[200] mt-1 w-[min(calc(100vw-1.5rem),280px)] rounded-xl border border-gray-200 dark:border-[#444] bg-white dark:bg-[#252525] shadow-xl p-3"
-          role="dialog"
-          aria-label="Календарь"
+  const calendarPanel = (
+    <div
+      ref={popRef}
+      className="fixed z-[320] w-[300px] rounded-xl border border-gray-200 dark:border-[#444] bg-white dark:bg-[#252525] shadow-2xl p-3"
+      style={{ top: popoverPos.top, left: popoverPos.left }}
+      role="dialog"
+      aria-label="Календарь"
+    >
+      <div className="flex items-center justify-between mb-3">
+        <button
+          type="button"
+          onClick={goPrevMonth}
+          className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-[#333] text-gray-600 dark:text-gray-300"
+          aria-label="Предыдущий месяц"
         >
-          <div className="flex items-center justify-between mb-3">
+          <ChevronLeft size={18} />
+        </button>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => {
+              setShowMonthPicker((v) => !v);
+              setShowYearPicker(false);
+            }}
+            className="text-sm font-semibold text-gray-800 dark:text-gray-100 px-2 py-1 rounded hover:bg-gray-100 dark:hover:bg-[#333]"
+          >
+            {MONTHS_RU[viewMonth0]}
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setShowYearPicker((v) => !v);
+              setShowMonthPicker(false);
+            }}
+            className="text-sm font-semibold text-gray-800 dark:text-gray-100 px-2 py-1 rounded hover:bg-gray-100 dark:hover:bg-[#333]"
+          >
+            {viewYear}
+          </button>
+        </div>
+        <button
+          type="button"
+          onClick={goNextMonth}
+          className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-[#333] text-gray-600 dark:text-gray-300"
+          aria-label="Следующий месяц"
+        >
+          <ChevronRight size={18} />
+        </button>
+      </div>
+
+      {showMonthPicker ? (
+        <div className="grid grid-cols-3 gap-1 mb-2">
+          {MONTHS_RU.map((m, idx) => (
             <button
+              key={m}
               type="button"
-              onClick={goPrevMonth}
-              className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-[#333] text-gray-600 dark:text-gray-300"
-              aria-label="Предыдущий месяц"
+              onClick={() => {
+                setViewMonth0(idx);
+                setShowMonthPicker(false);
+              }}
+              className={`px-2 py-2 rounded-lg text-xs ${idx === viewMonth0 ? 'bg-[#3337AD] text-white' : 'hover:bg-gray-100 dark:hover:bg-[#333] text-gray-700 dark:text-gray-300'}`}
             >
-              <ChevronLeft size={18} />
+              {m.slice(0, 3)}
             </button>
-            <div className="text-sm font-semibold text-gray-800 dark:text-gray-100">
-              {MONTHS_RU[viewMonth0]} {viewYear}
-            </div>
+          ))}
+        </div>
+      ) : showYearPicker ? (
+        <div className="grid grid-cols-3 gap-1 mb-2 max-h-48 overflow-y-auto custom-scrollbar">
+          {years.map((y) => (
             <button
+              key={y}
               type="button"
-              onClick={goNextMonth}
-              className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-[#333] text-gray-600 dark:text-gray-300"
-              aria-label="Следующий месяц"
+              onClick={() => {
+                setViewYear(y);
+                setShowYearPicker(false);
+              }}
+              className={`px-2 py-2 rounded-lg text-xs ${y === viewYear ? 'bg-[#3337AD] text-white' : 'hover:bg-gray-100 dark:hover:bg-[#333] text-gray-700 dark:text-gray-300'}`}
             >
-              <ChevronRight size={18} />
+              {y}
             </button>
-          </div>
+          ))}
+        </div>
+      ) : (
+        <>
           <div className="grid grid-cols-7 gap-0.5 text-center text-[10px] font-semibold text-gray-400 dark:text-gray-500 mb-1">
             {WEEKDAYS_RU.map((w) => (
               <div key={w} className="py-1">
@@ -229,22 +317,316 @@ export const DateInput: React.FC<DateInputProps> = ({
               );
             })}
           </div>
-          {!required && (
-            <div className="mt-2 flex justify-end gap-2 border-t border-gray-100 dark:border-[#333] pt-2">
-              <button
-                type="button"
-                className="text-xs text-gray-500 hover:text-gray-800 dark:hover:text-gray-200"
-                onClick={() => {
-                  onChange('');
-                  setOpen(false);
-                }}
-              >
-                Очистить
-              </button>
-            </div>
-          )}
+        </>
+      )}
+
+      {!required && (
+        <div className="mt-2 flex justify-end gap-2 border-t border-gray-100 dark:border-[#333] pt-2">
+          <button
+            type="button"
+            className="text-xs text-gray-500 hover:text-gray-800 dark:hover:text-gray-200"
+            onClick={() => {
+              onChange('');
+              setOpen(false);
+            }}
+          >
+            Очистить
+          </button>
         </div>
       )}
+    </div>
+  );
+
+  return (
+    <div className={`relative ${className}`} ref={wrapRef}>
+      {label && (
+        <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase mb-2">
+          {label}
+          {required && <span className="text-red-500 ml-1">*</span>}
+        </label>
+      )}
+      <button
+        ref={buttonRef}
+        type="button"
+        onClick={() => {
+          setOpen((o) => !o);
+          setShowMonthPicker(false);
+          setShowYearPicker(false);
+        }}
+        className={`relative w-full text-left bg-white dark:bg-[#252525] text-gray-900 dark:text-gray-100 border border-gray-300 dark:border-[#555] ${btnPad} focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all flex items-center justify-between gap-2`}
+      >
+        <span className={!value ? 'text-gray-400 dark:text-gray-500' : ''}>{display}</span>
+        <Calendar size={iconSz} className={`absolute ${iconRight} top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500 shrink-0 pointer-events-none`} />
+      </button>
+
+      {open && createPortal(calendarPanel, document.body)}
+    </div>
+  );
+};
+
+interface DateRangeInputProps {
+  startDate: string;
+  endDate: string;
+  onChange: (startDate: string, endDate: string) => void;
+  className?: string;
+  required?: boolean;
+  size?: 'default' | 'compact';
+  /** Если задано (например 7), диапазон подставляется в 1 клик от выбранной даты */
+  autoRangeDays?: number;
+}
+
+export const DateRangeInput: React.FC<DateRangeInputProps> = ({
+  startDate,
+  endDate,
+  onChange,
+  className = '',
+  required = false,
+  size = 'default',
+  autoRangeDays,
+}) => {
+  const compact = size === 'compact';
+  const [open, setOpen] = useState(false);
+  const wrapRef = useRef<HTMLDivElement>(null);
+  const buttonRef = useRef<HTMLButtonElement>(null);
+  const popRef = useRef<HTMLDivElement>(null);
+  const [viewYear, setViewYear] = useState(() => parseISODate(startDate)?.y || new Date().getFullYear());
+  const [viewMonth0, setViewMonth0] = useState(() => (parseISODate(startDate)?.m || new Date().getMonth() + 1) - 1);
+  const [draftStart, setDraftStart] = useState(startDate || '');
+  const [draftEnd, setDraftEnd] = useState(endDate || '');
+  const [pickingEnd, setPickingEnd] = useState(false);
+  const [showMonthPicker, setShowMonthPicker] = useState(false);
+  const [showYearPicker, setShowYearPicker] = useState(false);
+  const [popoverPos, setPopoverPos] = useState({ top: 0, left: 0 });
+
+  useEffect(() => {
+    setDraftStart(startDate || '');
+    setDraftEnd(endDate || '');
+  }, [startDate, endDate]);
+
+  useEffect(() => {
+    if (!open) return;
+    const onDoc = (e: MouseEvent) => {
+      const t = e.target as Node;
+      if (popRef.current?.contains(t)) return;
+      if (wrapRef.current?.contains(t)) return;
+      if (buttonRef.current?.contains(t)) return;
+      setOpen(false);
+    };
+    const onEsc = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setOpen(false);
+    };
+    const recalc = () => setPopoverPos(getPopoverPosition(buttonRef.current, 320));
+    recalc();
+    document.addEventListener('mousedown', onDoc);
+    document.addEventListener('keydown', onEsc);
+    window.addEventListener('resize', recalc);
+    window.addEventListener('scroll', recalc, true);
+    return () => {
+      document.removeEventListener('mousedown', onDoc);
+      document.removeEventListener('keydown', onEsc);
+      window.removeEventListener('resize', recalc);
+      window.removeEventListener('scroll', recalc, true);
+    };
+  }, [open]);
+
+  const cells = useMemo(() => buildMonthCellsFixed(viewYear, viewMonth0), [viewYear, viewMonth0]);
+  const years = useMemo(() => buildYears(viewYear), [viewYear]);
+  const isInViewMonth = (d: Date) => d.getMonth() === viewMonth0 && d.getFullYear() === viewYear;
+
+  const ordered = useMemo(() => {
+    if (!draftStart || !draftEnd) return { s: draftStart, e: draftEnd };
+    return draftStart <= draftEnd ? { s: draftStart, e: draftEnd } : { s: draftEnd, e: draftStart };
+  }, [draftStart, draftEnd]);
+
+  const addDaysISO = (iso: string, days: number) => {
+    const date = new Date(`${iso}T12:00:00`);
+    date.setDate(date.getDate() + days);
+    return date.toISOString().slice(0, 10);
+  };
+
+  const pick = (iso: string) => {
+    if (!draftStart || (draftStart && draftEnd)) {
+      if (autoRangeDays && autoRangeDays > 1) {
+        const autoEnd = addDaysISO(iso, autoRangeDays - 1);
+        setDraftStart(iso);
+        setDraftEnd(autoEnd);
+        onChange(iso, autoEnd);
+        setOpen(false);
+        return;
+      }
+      setDraftStart(iso);
+      setDraftEnd('');
+      setPickingEnd(true);
+      return;
+    }
+    if (draftStart && !draftEnd) {
+      const s = iso < draftStart ? iso : draftStart;
+      const e = iso < draftStart ? draftStart : iso;
+      setDraftStart(s);
+      setDraftEnd(e);
+      onChange(s, e);
+      setOpen(false);
+      return;
+    }
+  };
+
+  const clearRange = () => {
+    setDraftStart('');
+    setDraftEnd('');
+    onChange('', '');
+    setOpen(false);
+  };
+
+  const goPrevMonth = () => {
+    setShowMonthPicker(false);
+    setShowYearPicker(false);
+    if (viewMonth0 === 0) {
+      setViewMonth0(11);
+      setViewYear((y) => y - 1);
+    } else {
+      setViewMonth0((m) => m - 1);
+    }
+  };
+
+  const goNextMonth = () => {
+    setShowMonthPicker(false);
+    setShowYearPicker(false);
+    if (viewMonth0 === 11) {
+      setViewMonth0(0);
+      setViewYear((y) => y + 1);
+    } else {
+      setViewMonth0((m) => m + 1);
+    }
+  };
+
+  const btnPad = compact
+    ? 'px-2.5 py-1.5 pr-9 h-8 text-sm leading-none rounded-md'
+    : 'px-3 py-2 pr-10 min-h-[40px] text-sm rounded-lg';
+  const iconRight = compact ? 'right-2' : 'right-3';
+  const iconSz = compact ? 14 : 16;
+
+  const display = draftStart && draftEnd
+    ? `${formatDisplayRu(draftStart)} - ${formatDisplayRu(draftEnd)}`
+    : draftStart
+      ? `${formatDisplayRu(draftStart)} - ...`
+      : 'Выберите период';
+
+  const panel = (
+    <div
+      ref={popRef}
+      className="fixed z-[320] w-[320px] rounded-xl border border-gray-200 dark:border-[#444] bg-white dark:bg-[#252525] shadow-2xl p-3"
+      style={{ top: popoverPos.top, left: popoverPos.left }}
+    >
+      <div className="flex items-center justify-between mb-2">
+        <button type="button" onClick={goPrevMonth} className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-[#333]">
+          <ChevronLeft size={18} />
+        </button>
+        <div className="flex items-center gap-2">
+          <button type="button" onClick={() => { setShowMonthPicker((v) => !v); setShowYearPicker(false); }} className="text-sm font-semibold px-2 py-1 rounded hover:bg-gray-100 dark:hover:bg-[#333]">
+            {MONTHS_RU[viewMonth0]}
+          </button>
+          <button type="button" onClick={() => { setShowYearPicker((v) => !v); setShowMonthPicker(false); }} className="text-sm font-semibold px-2 py-1 rounded hover:bg-gray-100 dark:hover:bg-[#333]">
+            {viewYear}
+          </button>
+        </div>
+        <button type="button" onClick={goNextMonth} className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-[#333]">
+          <ChevronRight size={18} />
+        </button>
+      </div>
+
+      <div className="mb-2 text-xs text-gray-500 dark:text-gray-400">
+        {pickingEnd ? 'Выберите дату окончания' : 'Выберите дату начала'}
+      </div>
+
+      {showMonthPicker ? (
+        <div className="grid grid-cols-3 gap-1 mb-2">
+          {MONTHS_RU.map((m, idx) => (
+            <button key={m} type="button" onClick={() => { setViewMonth0(idx); setShowMonthPicker(false); }} className={`px-2 py-2 rounded-lg text-xs ${idx === viewMonth0 ? 'bg-[#3337AD] text-white' : 'hover:bg-gray-100 dark:hover:bg-[#333]'}`}>
+              {m.slice(0, 3)}
+            </button>
+          ))}
+        </div>
+      ) : showYearPicker ? (
+        <div className="grid grid-cols-3 gap-1 mb-2 max-h-48 overflow-y-auto custom-scrollbar">
+          {years.map((y) => (
+            <button key={y} type="button" onClick={() => { setViewYear(y); setShowYearPicker(false); }} className={`px-2 py-2 rounded-lg text-xs ${y === viewYear ? 'bg-[#3337AD] text-white' : 'hover:bg-gray-100 dark:hover:bg-[#333]'}`}>
+              {y}
+            </button>
+          ))}
+        </div>
+      ) : (
+        <>
+          <div className="grid grid-cols-7 gap-0.5 text-center text-[10px] font-semibold text-gray-400 dark:text-gray-500 mb-1">
+            {WEEKDAYS_RU.map((w) => <div key={w} className="py-1">{w}</div>)}
+          </div>
+          <div className="grid grid-cols-7 gap-0.5">
+            {cells.map((cellDate, idx) => {
+              const y = cellDate.getFullYear();
+              const m0 = cellDate.getMonth();
+              const d = cellDate.getDate();
+              const iso = isoFromParts(y, m0 + 1, d);
+              const inMonth = isInViewMonth(cellDate);
+              const isStart = ordered.s === iso;
+              const isEnd = ordered.e === iso;
+              const inRange = ordered.s && ordered.e && iso > ordered.s && iso < ordered.e;
+              return (
+                <button
+                  key={idx}
+                  type="button"
+                  onClick={() => pick(iso)}
+                  className={`aspect-square max-h-9 rounded-lg text-xs font-medium transition-colors ${
+                    !inMonth ? 'text-gray-300 dark:text-gray-600' : 'text-gray-800 dark:text-gray-200'
+                  } ${
+                    inRange ? 'bg-indigo-100 dark:bg-indigo-950/40' : ''
+                  } ${
+                    isStart || isEnd ? 'bg-[#3337AD] text-white' : 'hover:bg-indigo-50 dark:hover:bg-indigo-950/30'
+                  }`}
+                >
+                  {d}
+                </button>
+              );
+            })}
+          </div>
+        </>
+      )}
+
+      <div className="mt-2 flex items-center justify-between border-t border-gray-100 dark:border-[#333] pt-2">
+        <button type="button" onClick={clearRange} className="text-xs text-gray-500 hover:text-gray-800 dark:hover:text-gray-200">
+          Очистить
+        </button>
+        {!required && draftStart && draftEnd && (
+          <button
+            type="button"
+            onClick={() => {
+              onChange(ordered.s || '', ordered.e || '');
+              setOpen(false);
+            }}
+            className="text-xs px-2 py-1 rounded bg-[#3337AD] text-white"
+          >
+            Применить
+          </button>
+        )}
+      </div>
+    </div>
+  );
+
+  return (
+    <div className={`relative ${className}`} ref={wrapRef}>
+      <button
+        ref={buttonRef}
+        type="button"
+        onClick={() => {
+          setOpen((o) => !o);
+          setShowMonthPicker(false);
+          setShowYearPicker(false);
+          setPickingEnd(!draftStart || !!draftEnd ? false : true);
+        }}
+        className={`relative w-full text-left bg-white dark:bg-[#252525] text-gray-900 dark:text-gray-100 border border-gray-300 dark:border-[#555] ${btnPad} focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all flex items-center justify-between gap-2`}
+      >
+        <span className={!draftStart ? 'text-gray-400 dark:text-gray-500 truncate' : 'truncate'}>{display}</span>
+        <Calendar size={iconSz} className={`absolute ${iconRight} top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500 shrink-0 pointer-events-none`} />
+      </button>
+      {open && createPortal(panel, document.body)}
     </div>
   );
 };

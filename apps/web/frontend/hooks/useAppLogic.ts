@@ -2,7 +2,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { api } from '../../backend/api';
 import { FAVICON_SVG_DATA_URI } from '../../components/AppIcons';
-import { storageService } from '../../services/storageService';
 import { 
   notifyDealCreated, 
   notifyDealStatusChanged, 
@@ -13,10 +12,10 @@ import {
   notifyPurchaseRequestCreated,
   NotificationContext 
 } from '../../services/notificationService';
-import { leadSyncService } from '../../services/leadSyncService';
-import { Comment, Deal, Task, BusinessProcess, Client, Contract, PurchaseRequest, Doc, Meeting, SalesFunnel, Role, InboxMessage, MessageAttachment } from '../../types';
-import { createDeleteHandler } from '../../utils/crudUtils';
+import { Deal, Task, BusinessProcess, ProcessStep, Client, Contract, PurchaseRequest, Doc, Meeting, SalesFunnel, Role, InboxMessage, MessageAttachment, User, ContentPost, Project, TableCollection, Department, FinanceCategory, EmployeeInfo } from '../../types';
+import { getStepsForInstance } from '../../utils/bpmDealFunnel';
 import { chatLocalService } from '../../services/chatLocalService';
+import { isFunnelDeal } from '../../utils/dealModel';
 
 import { useAuthLogic } from './slices/useAuthLogic';
 import { useTaskLogic } from './slices/useTaskLogic';
@@ -33,8 +32,7 @@ import { buildLocation, parseLocation } from '../../utils/urlSync';
 export const useAppLogic = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [notification, setNotification] = useState<string | null>(null);
-  // Отслеживание загруженных модулей для ленивой загрузки
-  const [loadedModules, setLoadedModules] = useState<Set<string>>(new Set());
+  /** Защита от повторной загрузки данных модулей (lazy load) — без лишнего state в React */
   const loadedModulesRef = useRef<Set<string>>(new Set());
 
   const lastToastRef = useRef<{ msg: string; at: number } | null>(null);
@@ -71,7 +69,7 @@ export const useAppLogic = () => {
   // Уровень 0: Загрузка данных для аутентификации (только users)
   const loadAuthData = async () => {
       try {
-          const users = await api.users.getAll();
+          const users = (await api.users.getAll()) as User[];
           if (users.length !== authSlice.state.users.length ||
               users.some(u => !authSlice.state.users.find(au => au.id === u.id))) {
             authSlice.actions.updateUsers(users);
@@ -121,24 +119,26 @@ export const useAppLogic = () => {
       taskSlice.setters.setTasks(tasks);
       taskSlice.setters.setProjects(projects);
       loadedModulesRef.current.add('tasks');
-      setLoadedModules(new Set(loadedModulesRef.current));
   };
 
   // Уровень 2: Загрузка данных модуля CRM (lazy loading)
   const loadCRMData = async () => {
       if (loadedModulesRef.current.has('crm')) return; // Уже загружено
-      const [clients, deals, accountsReceivable, employees] = await Promise.all([
+      const [clients, deals, contracts, oneTimeDeals, accountsReceivable, employees] = await Promise.all([
           api.clients.getAll(),
-          api.deals.getAll(), // Объединенная коллекция для договоров и продаж
+          api.deals.getAll(),
+          api.contracts.getAll(),
+          api.oneTimeDeals.getAll(),
           api.accountsReceivable.getAll(),
           api.employees.getAll(),
       ]);
       crmSlice.setters.setClients(clients);
-      crmSlice.setters.setDeals(deals); // Устанавливаем все сделки (договоры и продажи)
+      crmSlice.setters.setDeals(deals);
+      crmSlice.setters.setContracts(contracts);
+      crmSlice.setters.setOneTimeDeals(oneTimeDeals);
       crmSlice.setters.setAccountsReceivable(accountsReceivable);
       crmSlice.setters.setEmployeeInfos(employees);
       loadedModulesRef.current.add('crm');
-      setLoadedModules(new Set(loadedModulesRef.current));
   };
 
   // Уровень 2: Загрузка данных модуля Content (lazy loading)
@@ -156,7 +156,6 @@ export const useAppLogic = () => {
       contentSlice.setters.setMeetings(meetings);
       contentSlice.setters.setContentPosts(contentPosts);
       loadedModulesRef.current.add('content');
-      setLoadedModules(new Set(loadedModulesRef.current));
   };
 
   // Загрузка сообщений входящие/исходящие (для главной)
@@ -196,7 +195,6 @@ export const useAppLogic = () => {
       financeSlice.setters.setFinancialPlannings(plannings);
       await financeSlice.actions.loadBdr();
       loadedModulesRef.current.add('finance');
-      setLoadedModules(new Set(loadedModulesRef.current));
   };
 
   // Уровень 2: Загрузка данных модуля BPM (lazy loading)
@@ -207,9 +205,8 @@ export const useAppLogic = () => {
           api.bpm.getProcesses(),
       ]);
       bpmSlice.setters.setOrgPositions(positions);
-      bpmSlice.setters.setBusinessProcesses(processes);
+      bpmSlice.setters.setBusinessProcesses(processes as BusinessProcess[]);
       loadedModulesRef.current.add('bpm');
-      setLoadedModules(new Set(loadedModulesRef.current));
   };
 
   // Уровень 2: Загрузка данных модуля Inventory (lazy loading)
@@ -226,7 +223,6 @@ export const useAppLogic = () => {
       inventorySlice.setters.setMovements(movements);
       inventorySlice.setters.setRevisions(revisions);
       loadedModulesRef.current.add('inventory');
-      setLoadedModules(new Set(loadedModulesRef.current));
   };
 
   // Обновление данных модуля (перезагрузка из локального хранилища)
@@ -474,7 +470,6 @@ export const useAppLogic = () => {
               await loadTasksData();
               await loadMessages();
               break;
-          case 'sites':
           case 'admin':
               await loadTasksData();
               break;
@@ -607,15 +602,37 @@ export const useAppLogic = () => {
       // Сохраняем задачу
       taskSlice.actions.saveTask(taskData, targetTableId);
 
-      // Новая задача для другого пользователя — системное сообщение в чат
-      if (!oldTask && authSlice.state.currentUser && taskData.assigneeId && taskData.assigneeId !== authSlice.state.currentUser.id) {
-          chatLocalService.addSystemMessageForEntity({
-              actorId: authSlice.state.currentUser.id,
+      // Новая задача — пишем в «Систему» (включая случай «сам себе»)
+      if (!oldTask && authSlice.state.currentUser && taskData.assigneeId) {
+          const tid = taskData.id;
+          const isSelfAssigned = taskData.assigneeId === authSlice.state.currentUser.id;
+          if (!isSelfAssigned) {
+            chatLocalService.addSystemMessageForEntity({
+                actorId: authSlice.state.currentUser.id,
+                targetUserId: taskData.assigneeId,
+                text: `Я поставил тебе задачу: ${taskData.title || 'без названия'}`,
+                entityType: 'task',
+                entityId: tid,
+            });
+          }
+          if (tid) {
+            chatLocalService.addSystemFeedMessage({
               targetUserId: taskData.assigneeId,
-              text: `Я поставил тебе задачу: ${taskData.title || 'без названия'}`,
+              text: isSelfAssigned
+                ? `Создана новая задача: ${taskData.title || 'без названия'}`
+                : `${authSlice.state.currentUser.name} назначил вам задачу: ${taskData.title || 'без названия'}`,
               entityType: 'task',
-              entityId: taskData.id,
-          });
+              entityId: tid,
+            });
+            if (!isSelfAssigned) {
+              chatLocalService.addSystemFeedMessage({
+                targetUserId: authSlice.state.currentUser.id,
+                text: `Вы назначили задачу ${authSlice.state.users.find((u) => u.id === taskData.assigneeId)?.name || 'сотруднику'}: ${taskData.title || 'без названия'}`,
+                entityType: 'task',
+                entityId: tid,
+              });
+            }
+          }
       }
       
       // Если задача процесса только что выполнена - переходим к следующему шагу или ожидаем выбор ветки
@@ -626,7 +643,8 @@ export const useAppLogic = () => {
           if (process) {
               const instance = process.instances!.find(i => i.id === oldTask.processInstanceId);
               if (instance && instance.status === 'active') {
-                  const currentStep = process.steps.find(s => s.id === instance.currentStepId);
+                  const steps = getStepsForInstance(process, instance);
+                  const currentStep = steps.find(s => s.id === instance.currentStepId);
                   if (!currentStep) return;
 
                   // Отмечаем шаг как выполненный в истории экземпляра
@@ -650,29 +668,36 @@ export const useAppLogic = () => {
                       return;
                   }
 
-                  // Определяем следующий шаг: nextStepId или линейный порядок
-                  const currentStepIndex = process.steps.findIndex(s => s.id === instance.currentStepId);
-                  let nextStep = currentStep.nextStepId
-                      ? process.steps.find(s => s.id === currentStep.nextStepId)
-                      : process.steps[currentStepIndex + 1];
+                  const currentStepIndex = steps.findIndex(s => s.id === instance.currentStepId);
+                  let nextStep: ProcessStep | undefined = currentStep.nextStepId
+                      ? steps.find(s => s.id === currentStep.nextStepId)
+                      : steps[currentStepIndex + 1];
+
+                  const dealForInstance = instance.dealId
+                      ? crmSlice.state.deals.find(d => d.id === instance.dealId)
+                      : undefined;
 
                   if (nextStep) {
                       const tasksTable = settingsSlice.state.tables.find(t => t.type === 'tasks');
                       if (tasksTable) {
                           let nextAssigneeId: string | null = null;
-                          if (nextStep!.assigneeType === 'position') {
-                              const position = bpmSlice.state.orgPositions.find(p => p.id === nextStep!.assigneeId);
+                          if (nextStep.assigneeType === 'position') {
+                              const position = bpmSlice.state.orgPositions.find(p => p.id === nextStep.assigneeId);
                               nextAssigneeId = position?.holderUserId || null;
                           } else {
-                              nextAssigneeId = nextStep!.assigneeId || null;
+                              nextAssigneeId = nextStep.assigneeId || null;
                           }
 
                           if (nextAssigneeId) {
+                              const isDealFunnel = !!instance.dealId;
+                              const taskTitle = isDealFunnel && dealForInstance
+                                  ? `${dealForInstance.title}: ${nextStep.title}`
+                                  : `${process.title}: ${nextStep.title}`;
                               const nextTask: Partial<Task> = {
                                   id: `task-${Date.now()}`,
                                   tableId: tasksTable.id,
-                                  title: `${process.title}: ${nextStep!.title}`,
-                                  description: nextStep!.description || '',
+                                  title: taskTitle,
+                                  description: nextStep.description || '',
                                   status: 'Не начато',
                                   priority: 'Средний',
                                   assigneeId: nextAssigneeId,
@@ -680,14 +705,36 @@ export const useAppLogic = () => {
                                   endDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
                                   processId: process.id,
                                   processInstanceId: instance.id,
-                                  stepId: nextStep!.id
+                                  stepId: nextStep.id,
+                                  dealId: instance.dealId,
+                                  source: isDealFunnel ? 'Сделка' : 'Процесс',
+                                  entityType: 'task',
+                                  createdByUserId: authSlice.state.currentUser?.id,
                               };
 
                               taskSlice.actions.saveTask(nextTask, tasksTable.id);
 
+                              if (instance.dealId && dealForInstance) {
+                                  crmSlice.actions.saveDeal({ ...dealForInstance, stage: nextStep.id });
+                              }
+
+                              if (
+                                  nextTask.id &&
+                                  nextAssigneeId &&
+                                  authSlice.state.currentUser &&
+                                  nextAssigneeId !== authSlice.state.currentUser.id
+                              ) {
+                                  chatLocalService.addSystemFeedMessage({
+                                      targetUserId: nextAssigneeId,
+                                      text: `Новая задача по сделке: ${taskTitle}`,
+                                      entityType: 'task',
+                                      entityId: nextTask.id,
+                                  });
+                              }
+
                               const updatedInstance = {
                                   ...instance,
-                                  currentStepId: nextStep!.id,
+                                  currentStepId: nextStep.id,
                                   taskIds: [...instance.taskIds, nextTask.id!],
                                   completedStepIds: Array.from(completedSet)
                               };
@@ -698,10 +745,13 @@ export const useAppLogic = () => {
                               };
 
                               bpmSlice.actions.saveProcess(updatedProcess);
-                              showNotification(`Процесс перешел к шагу: ${nextStep!.title}`);
+                              showNotification(`Процесс перешёл к шагу: ${nextStep.title}`);
                           }
                       }
                   } else {
+                      if (instance.dealId && dealForInstance) {
+                          crmSlice.actions.saveDeal({ ...dealForInstance, stage: currentStep.id });
+                      }
                       const updatedInstance = {
                           ...instance,
                           status: 'completed' as const,
@@ -715,10 +765,76 @@ export const useAppLogic = () => {
                       };
 
                       bpmSlice.actions.saveProcess(updatedProcess);
-                      showNotification(`Процесс "${process.title}" завершен!`);
+                      showNotification(`Процесс «${process.title}» завершён!`);
                   }
               }
           }
+      }
+  };
+
+  const isDoneStatus = (status?: string) => status === 'Выполнено' || status === 'Done' || status === 'Завершено';
+
+  const syncDealStageTasks = (oldDeal: Deal | undefined, newDeal: Deal, actorUserId: string) => {
+      const funnel = salesFunnels.find((f) => f.id === newDeal.funnelId) || salesFunnels[0];
+      const tasksTable = settingsSlice.state.tables.find((t) => t.type === 'tasks');
+      if (!funnel || !tasksTable) return;
+
+      const targetStageId = newDeal.stage || funnel.stages?.[0]?.id;
+      if (!targetStageId) return;
+      const stage = funnel.stages.find((s) => s.id === targetStageId);
+      const template = stage?.taskTemplate;
+      const shouldCreate = template?.enabled !== false;
+      const taskTitle = (template?.title || '').trim() || `Сделка: ${stage?.label || targetStageId}`;
+      const stageChanged = !!oldDeal && oldDeal.stage !== newDeal.stage;
+      const isCreated = !oldDeal;
+      if (!isCreated && !stageChanged) return;
+
+      const relatedTasks = taskSlice.state.tasks.filter((t) => !t.isArchived && t.dealId === newDeal.id && t.source === 'Сделка');
+      relatedTasks.forEach((t) => {
+          if (!isDoneStatus(t.status) && t.stepId && t.stepId !== targetStageId) {
+              taskSlice.actions.saveTask({ ...t, status: 'Выполнено' }, tasksTable.id);
+          }
+      });
+
+      if (!shouldCreate) return;
+      const sameStageActive = relatedTasks.some((t) => t.stepId === targetStageId && !isDoneStatus(t.status));
+      if (sameStageActive) return;
+
+      const assigneeId =
+          template?.assigneeMode === 'specific_user'
+              ? (template.assigneeUserId || null)
+              : (newDeal.assigneeId || actorUserId || null);
+      if (!assigneeId) return;
+
+      const nowIso = new Date().toISOString();
+      const taskId = `task-${Date.now()}`;
+      taskSlice.actions.saveTask(
+          {
+              id: taskId,
+              entityType: 'task',
+              tableId: tasksTable.id,
+              title: `${newDeal.title || 'Сделка'}: ${taskTitle}`,
+              description: '',
+              status: 'Не начато',
+              priority: 'Средний',
+              assigneeId,
+              source: 'Сделка',
+              startDate: nowIso.slice(0, 10),
+              endDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10),
+              stepId: targetStageId,
+              dealId: newDeal.id,
+              createdAt: nowIso,
+              createdByUserId: actorUserId,
+          },
+          tasksTable.id
+      );
+      if (assigneeId !== actorUserId) {
+          chatLocalService.addSystemFeedMessage({
+              targetUserId: assigneeId,
+              text: `Новая задача по сделке «${newDeal.title || 'Без названия'}»: ${taskTitle}`,
+              entityType: 'task',
+              entityId: taskId,
+          });
       }
   };
 
@@ -729,7 +845,8 @@ export const useAppLogic = () => {
           const instance = process.instances?.find(i => i.id === instanceId);
           if (!instance || !instance.pendingBranchSelection) continue;
 
-          const nextStep = process.steps.find(s => s.id === nextStepId);
+          const steps = getStepsForInstance(process, instance);
+          const nextStep = steps.find(s => s.id === nextStepId);
           if (!nextStep) return;
 
           const tasksTable = settingsSlice.state.tables.find(t => t.type === 'tasks');
@@ -747,10 +864,18 @@ export const useAppLogic = () => {
 
           const fromStepId = instance.pendingBranchSelection.stepId;
 
+          const dealForInstance = instance.dealId
+              ? crmSlice.state.deals.find(d => d.id === instance.dealId)
+              : undefined;
+          const isDealFunnel = !!instance.dealId;
+          const taskTitle = isDealFunnel && dealForInstance
+              ? `${dealForInstance.title}: ${nextStep.title}`
+              : `${process.title}: ${nextStep.title}`;
+
           const nextTask: Partial<Task> = {
               id: `task-${Date.now()}`,
               tableId: tasksTable.id,
-              title: `${process.title}: ${nextStep.title}`,
+              title: taskTitle,
               description: nextStep.description || '',
               status: 'Не начато',
               priority: 'Средний',
@@ -759,15 +884,23 @@ export const useAppLogic = () => {
               endDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
               processId: process.id,
               processInstanceId: instanceId,
-              stepId: nextStep.id
+              stepId: nextStep.id,
+              dealId: instance.dealId,
+              source: isDealFunnel ? 'Сделка' : 'Процесс',
+              entityType: 'task',
+              createdByUserId: authSlice.state.currentUser?.id,
           };
 
           taskSlice.actions.saveTask(nextTask, tasksTable.id);
 
+          if (instance.dealId && dealForInstance) {
+              crmSlice.actions.saveDeal({ ...dealForInstance, stage: nextStep.id });
+          }
+
           const completedSet = new Set(instance.completedStepIds || []);
           completedSet.add(fromStepId);
 
-          const chosenBranch = process.steps
+          const chosenBranch = steps
             .find(s => s.id === fromStepId)
             ?.branches?.find(b => b.nextStepId === nextStep.id);
 
@@ -842,34 +975,57 @@ export const useAppLogic = () => {
       saveEmployee: crmSlice.actions.saveEmployee,
       deleteEmployee: crmSlice.actions.deleteEmployee,
       saveDeal: (deal: Deal) => {
+        const normalizedDeal: Deal = isFunnelDeal(deal) ? { ...deal, dealKind: 'funnel' } : deal;
         const existing = crmSlice.state.deals.find(d => d.id === deal.id);
         const oldStage = existing?.stage;
-        crmSlice.actions.saveDeal(deal);
-        if (!existing && authSlice.state.currentUser) {
-          const assignee = authSlice.state.users.find(u => u.id === deal.assigneeId) || null;
+        crmSlice.actions.saveDeal(normalizedDeal);
+        if (!existing && authSlice.state.currentUser && isFunnelDeal(normalizedDeal)) {
+          syncDealStageTasks(existing, normalizedDeal, authSlice.state.currentUser.id);
+
+          const assignee = authSlice.state.users.find(u => u.id === normalizedDeal.assigneeId) || null;
           const context: NotificationContext = {
             currentUser: authSlice.state.currentUser,
             allUsers: authSlice.state.users,
             notificationPrefs: settingsSlice.state.notificationPrefs
           };
-          notifyDealCreated(deal, assignee, { context }).catch(() => {});
-          // Новая сделка для менеджера — системное сообщение в чат
-          if (deal.assigneeId && deal.assigneeId !== authSlice.state.currentUser.id) {
-            chatLocalService.addSystemMessageForEntity({
-              actorId: authSlice.state.currentUser.id,
-              targetUserId: deal.assigneeId,
-              text: `Я создал для тебя сделку: ${deal.title}`,
+          notifyDealCreated(normalizedDeal, assignee, { context }).catch(() => {});
+          // Новая сделка — пишем в «Систему» (включая случай «сам себе»)
+          if (normalizedDeal.assigneeId) {
+            const isSelfAssignedDeal = normalizedDeal.assigneeId === authSlice.state.currentUser.id;
+            if (!isSelfAssignedDeal) {
+              chatLocalService.addSystemMessageForEntity({
+                actorId: authSlice.state.currentUser.id,
+                targetUserId: normalizedDeal.assigneeId,
+                text: `Я создал для тебя сделку: ${normalizedDeal.title}`,
+                entityType: 'deal',
+                entityId: normalizedDeal.id,
+              });
+            }
+            chatLocalService.addSystemFeedMessage({
+              targetUserId: normalizedDeal.assigneeId,
+              text: isSelfAssignedDeal
+                ? `Создана новая сделка: ${normalizedDeal.title}`
+                : `${authSlice.state.currentUser.name} назначил вам сделку: ${normalizedDeal.title}`,
               entityType: 'deal',
-              entityId: deal.id,
+              entityId: normalizedDeal.id,
             });
+            if (!isSelfAssignedDeal) {
+              chatLocalService.addSystemFeedMessage({
+                targetUserId: authSlice.state.currentUser.id,
+                text: `Вы создали сделку для ${authSlice.state.users.find((u) => u.id === normalizedDeal.assigneeId)?.name || 'сотрудника'}: ${normalizedDeal.title}`,
+                entityType: 'deal',
+                entityId: normalizedDeal.id,
+              });
+            }
           }
-        } else if (existing && oldStage !== deal.stage && authSlice.state.currentUser) {
+        } else if (existing && oldStage !== normalizedDeal.stage && authSlice.state.currentUser && isFunnelDeal(normalizedDeal)) {
+          syncDealStageTasks(existing, normalizedDeal, authSlice.state.currentUser.id);
           const context: NotificationContext = {
             currentUser: authSlice.state.currentUser,
             allUsers: authSlice.state.users,
             notificationPrefs: settingsSlice.state.notificationPrefs
           };
-          notifyDealStatusChanged(deal, oldStage || 'Новая', deal.stage, { context }).catch(() => {});
+          notifyDealStatusChanged(normalizedDeal, oldStage || 'Новая', normalizedDeal.stage, { context }).catch(() => {});
         }
       },
       deleteDeal: crmSlice.actions.deleteDeal,
@@ -940,7 +1096,7 @@ export const useAppLogic = () => {
       saveSalesFunnel: async (funnel: SalesFunnel) => {
           try {
               // Проверяем, существует ли воронка с таким id
-              const existingFunnels = await api.funnels.getAll();
+              const existingFunnels = (await api.funnels.getAll()) as SalesFunnel[];
               const exists = existingFunnels.some(f => f.id === funnel.id);
               
               if (exists) {
@@ -952,7 +1108,7 @@ export const useAppLogic = () => {
                   await api.funnels.create(funnelWithoutId);
               }
               // После сохранения перезагружаем данные из локального хранилища
-              const funnels = await api.funnels.getAll();
+              const funnels = (await api.funnels.getAll()) as SalesFunnel[];
               setSalesFunnels(funnels);
               showNotification('Воронка сохранена');
           } catch (error) {
@@ -964,7 +1120,7 @@ export const useAppLogic = () => {
           try {
               await api.funnels.delete(id);
               // После удаления перезагружаем данные
-              const funnels = await api.funnels.getAll();
+              const funnels = (await api.funnels.getAll()) as SalesFunnel[];
               setSalesFunnels(funnels);
               showNotification('Воронка удалена');
           } catch (error) {
@@ -974,7 +1130,7 @@ export const useAppLogic = () => {
       },
       restoreUser: async (userId: string) => {
           try {
-              const allUsers = await api.users.getAll();
+              const allUsers = (await api.users.getAll()) as User[];
               const user = allUsers.find(u => u.id === userId);
               if (!user) return;
               const now = new Date().toISOString();
@@ -990,7 +1146,7 @@ export const useAppLogic = () => {
       },
       restoreDoc: async (docId: string) => {
           try {
-              const allDocs = await api.docs.getAll();
+              const allDocs = (await api.docs.getAll()) as Doc[];
               const doc = allDocs.find(d => d.id === docId);
               if (!doc) return;
               const now = new Date().toISOString();
@@ -1006,7 +1162,7 @@ export const useAppLogic = () => {
       },
       restorePost: async (postId: string) => {
           try {
-              const allPosts = await api.contentPosts.getAll();
+              const allPosts = (await api.contentPosts.getAll()) as ContentPost[];
               const post = allPosts.find(p => p.id === postId);
               if (!post) return;
               const now = new Date().toISOString();
@@ -1021,7 +1177,7 @@ export const useAppLogic = () => {
       },
       restoreEmployee: async (employeeId: string) => {
           try {
-              const allEmployees = await api.employees.getAll();
+              const allEmployees = (await api.employees.getAll()) as EmployeeInfo[];
               const employee = allEmployees.find(e => e.id === employeeId);
               if (!employee) return;
               const now = new Date().toISOString();
@@ -1036,7 +1192,7 @@ export const useAppLogic = () => {
       },
       restoreProject: async (projectId: string) => {
           try {
-              const allProjects = await api.projects.getAll();
+              const allProjects = (await api.projects.getAll()) as Project[];
               const project = allProjects.find(p => p.id === projectId);
               if (!project) return;
               const now = new Date().toISOString();
@@ -1051,7 +1207,7 @@ export const useAppLogic = () => {
       },
       restoreDepartment: async (departmentId: string) => {
           try {
-              const allDepartments = await api.departments.getAll();
+              const allDepartments = (await api.departments.getAll()) as Department[];
               const department = allDepartments.find(d => d.id === departmentId);
               if (!department) return;
               const now = new Date().toISOString();
@@ -1066,7 +1222,7 @@ export const useAppLogic = () => {
       },
       restoreFinanceCategory: async (categoryId: string) => {
           try {
-              const allCategories = await api.finance.getCategories();
+              const allCategories = (await api.finance.getCategories()) as FinanceCategory[];
               const category = allCategories.find(c => c.id === categoryId);
               if (!category) return;
               const now = new Date().toISOString();
@@ -1081,7 +1237,7 @@ export const useAppLogic = () => {
       },
       restoreSalesFunnel: async (funnelId: string) => {
           try {
-              const allFunnels = await api.funnels.getAll();
+              const allFunnels = (await api.funnels.getAll()) as SalesFunnel[];
               const funnel = allFunnels.find(f => f.id === funnelId);
               if (!funnel) return;
               const now = new Date().toISOString();
@@ -1096,7 +1252,7 @@ export const useAppLogic = () => {
       },
       restoreTable: async (tableId: string) => {
           try {
-              const allTables = await api.tables.getAll();
+              const allTables = (await api.tables.getAll()) as TableCollection[];
               const table = allTables.find(t => t.id === tableId);
               if (!table) return;
               const now = new Date().toISOString();
@@ -1111,7 +1267,7 @@ export const useAppLogic = () => {
       },
       restoreBusinessProcess: async (processId: string) => {
           try {
-              const allProcesses = await api.bpm.getProcesses();
+              const allProcesses = (await api.bpm.getProcesses()) as BusinessProcess[];
               const process = allProcesses.find(p => p.id === processId);
               if (!process) return;
               const now = new Date().toISOString();
@@ -1126,7 +1282,7 @@ export const useAppLogic = () => {
       },
       restoreDeal: async (dealId: string) => {
           try {
-              const allDeals = await api.deals.getAll();
+              const allDeals = (await api.deals.getAll()) as Deal[];
               const deal = allDeals.find(d => d.id === dealId);
               if (!deal) return;
               const now = new Date().toISOString();
@@ -1141,7 +1297,7 @@ export const useAppLogic = () => {
       },
       restoreClient: async (clientId: string) => {
           try {
-              const allClients = await api.clients.getAll();
+              const allClients = (await api.clients.getAll()) as Client[];
               const client = allClients.find(c => c.id === clientId);
               if (!client) return;
               const now = new Date().toISOString();
@@ -1156,13 +1312,13 @@ export const useAppLogic = () => {
       },
       restoreContract: async (contractId: string) => {
           try {
-              const allDeals = await api.deals.getAll();
-              const deal = allDeals.find(d => d.id === contractId && d.recurring === true);
+              const allContracts = (await api.contracts.getAll()) as Deal[];
+              const deal = allContracts.find(d => d.id === contractId);
               if (!deal) return;
               const now = new Date().toISOString();
-              const updated = allDeals.map(d => d.id === contractId ? { ...d, isArchived: false, updatedAt: now } : d);
-              await api.deals.updateAll(updated);
-              crmSlice.setters.setDeals(updated);
+              const updated = allContracts.map(d => d.id === contractId ? { ...d, isArchived: false, updatedAt: now } : d);
+              await api.contracts.updateAll(updated);
+              crmSlice.setters.setContracts(updated);
               showNotification('Договор восстановлен');
           } catch (error) {
               console.error('Ошибка восстановления договора:', error);
@@ -1171,7 +1327,7 @@ export const useAppLogic = () => {
       },
       restoreMeeting: async (meetingId: string) => {
           try {
-              const allMeetings = await api.meetings.getAll();
+              const allMeetings = (await api.meetings.getAll()) as Meeting[];
               const meeting = allMeetings.find(m => m.id === meetingId);
               if (!meeting) return;
               const now = new Date().toISOString();
@@ -1204,6 +1360,11 @@ export const useAppLogic = () => {
           showNotification('Ошибка отправки');
         }
       },
+      /** Короткое уведомление (тост) — для UI вне хука */
+      showToast: showNotification,
     }
   };
 };
+
+/** Тип экшнов приложения для пропсов модулей вместо `any` */
+export type AppActions = ReturnType<typeof useAppLogic>['actions'];

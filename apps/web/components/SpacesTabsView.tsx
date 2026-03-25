@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { TableCollection, User, Role } from '../types';
 import { DynamicIcon } from './AppIcons';
-import { Instagram, Archive, Layers, Edit2, Trash2, Grid, List } from 'lucide-react';
+import { Instagram, Archive, Layers, Edit2, Trash2 } from 'lucide-react';
 import { ModulePageShell, ModulePageHeader, ModuleSegmentedControl, MODULE_PAGE_GUTTER, ModuleCreateIconButton } from './ui';
 
 interface SpacesTabsViewProps {
@@ -67,18 +67,19 @@ export const SpacesTabsView: React.FC<SpacesTabsViewProps> = ({
           icon={React.cloneElement(getTypeIcon(activeTab) as React.ReactElement, { size: 24, strokeWidth: 2 })}
           title={getTypeLabel(activeTab)}
           description={`${currentSpaces.length} ${currentSpaces.length === 1 ? 'пространство' : 'пространств'}`}
-          actions={
+          tabs={
+            <ModuleSegmentedControl
+              variant="neutral"
+              value={viewMode}
+              onChange={(v) => setViewMode(v as ViewMode)}
+              options={[
+                { value: 'grid', label: 'Плитка' },
+                { value: 'list', label: 'Список' },
+              ]}
+            />
+          }
+          controls={
             <>
-              <ModuleSegmentedControl
-                variant="accent"
-                accent="indigo"
-                value={viewMode}
-                onChange={(v) => setViewMode(v as ViewMode)}
-                options={[
-                  { value: 'grid', label: 'Плитка', icon: <Grid size={16} /> },
-                  { value: 'list', label: 'Список', icon: <List size={16} /> },
-                ]}
-              />
               {currentUser.role === Role.ADMIN && (
                 <ModuleCreateIconButton
                   accent="indigo"
@@ -88,6 +89,8 @@ export const SpacesTabsView: React.FC<SpacesTabsViewProps> = ({
               )}
             </>
           }
+          actions={undefined}
+          className="w-full"
         />
       </div>
 

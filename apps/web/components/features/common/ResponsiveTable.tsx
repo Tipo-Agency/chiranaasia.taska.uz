@@ -12,7 +12,7 @@ import { Card } from '../../ui/Card';
 interface Column<T> {
   key: string;
   label: string;
-  render?: (item: T) => React.ReactNode;
+  render?: (item: T, index: number) => React.ReactNode;
   className?: string;
   mobileLabel?: string;
 }
@@ -60,7 +60,7 @@ export function ResponsiveTable<T>({
             </tr>
           </thead>
           <tbody>
-            {data.map((item) => (
+            {data.map((item, rowIndex) => (
               <tr
                 key={keyExtractor(item)}
                 onClick={onRowClick ? () => onRowClick(item) : undefined}
@@ -74,7 +74,7 @@ export function ResponsiveTable<T>({
                     key={column.key}
                     className={`px-4 py-3 text-sm text-gray-900 dark:text-white ${column.className || ''}`}
                   >
-                    {column.render ? column.render(item) : (item as any)[column.key]}
+                    {column.render ? column.render(item, rowIndex) : (item as any)[column.key]}
                   </td>
                 ))}
               </tr>
@@ -85,7 +85,7 @@ export function ResponsiveTable<T>({
 
       {/* Mobile Card View */}
       <div className={`md:hidden space-y-2 ${className}`}>
-        {data.map((item) => (
+        {data.map((item, rowIndex) => (
           <Card
             key={keyExtractor(item)}
             onClick={onRowClick ? () => onRowClick(item) : undefined}
@@ -98,7 +98,7 @@ export function ResponsiveTable<T>({
                     {column.mobileLabel || column.label}
                   </span>
                   <span className="text-sm text-gray-900 dark:text-white">
-                    {column.render ? column.render(item) : (item as any)[column.key]}
+                    {column.render ? column.render(item, rowIndex) : (item as any)[column.key]}
                   </span>
                 </div>
               ))}

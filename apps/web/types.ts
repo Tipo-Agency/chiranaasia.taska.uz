@@ -27,7 +27,7 @@ export interface User {
   name: string;
   role: Role;
   avatar?: string;
-  login?: string; 
+  login?: string;
   email?: string;
   phone?: string;
   telegram?: string;
@@ -35,12 +35,14 @@ export interface User {
   password?: string;
   mustChangePassword?: boolean;
   isArchived?: boolean; // Архив (мягкое удаление)
+  updatedAt?: string;
 }
 
 export interface Client {
   id: string;
   name: string;
   contactPerson?: string;
+  responsibleUserId?: string; // Закрепленный ответственный сотрудник
   phone?: string;
   email?: string;
   telegram?: string;
@@ -50,35 +52,56 @@ export interface Client {
   notes?: string;
   funnelId?: string; // ID воронки продаж
   isArchived?: boolean; // Архив (мягкое удаление)
+  updatedAt?: string;
 }
 
-// Объединенная сущность для договоров и продаж
+/** Тип сделки: воронка CRM (лид) или договор/разовая продажа (финансы). Задавать в новых записях; иначе см. inferDealKind в utils/dealModel */
+export type DealKind = 'funnel' | 'contract';
+
+/**
+ * Единая сущность Deal: CRM-воронка и договор/разовая продажа в одной таблице API `/deals`.
+ * Поля воронки и договора опциональны там, где не применимы; различение — dealKind или inferDealKind.
+ */
 export interface Deal {
   id: string;
-  clientId: string;
-  recurring: boolean; // true = договор с ежемесячными платежами, false = разовая услуга
-  number: string; // Номер договора/сделки
-  amount: number; // Сумма
-  currency: string; // Валюта
-  status: 'pending' | 'paid' | 'overdue' | 'active' | 'completed'; // Статус
-  description: string; // Описание услуги/товара
-  notes?: string; // Примечания
-  funnelId?: string; // ID воронки продаж
-  isArchived?: boolean; // Архив (мягкое удаление)
-  createdAt?: string; // ISO дата создания
-  updatedAt?: string; // ISO дата последнего обновления
-  // Общие поля
-  date?: string; // Дата сделки/договора
-  dueDate?: string; // Срок оплаты
-  paidAmount?: number; // Оплаченная сумма
-  paidDate?: string; // Дата оплаты
-  // Поля для договоров (recurring = true)
-  startDate?: string; // Дата начала договора
-  endDate?: string; // Дата окончания договора
-  paymentDay?: number; // День месяца для оплаты
+  dealKind?: DealKind;
+
+  // --- CRM (воронка) ---
+  title?: string;
+  stage?: string;
+  assigneeId?: string;
+  contactName?: string;
+  source?: 'instagram' | 'telegram' | 'site' | 'manual' | 'recommendation' | 'vk';
+  telegramChatId?: string;
+  telegramUsername?: string;
+  projectId?: string;
+  comments?: Comment[];
+
+  // --- Договор / разовая продажа ---
+  clientId?: string;
+  recurring?: boolean;
+  number?: string;
+  /** Статус оплаты/договора (финансы) */
+  status?: 'pending' | 'paid' | 'overdue' | 'active' | 'completed' | string;
+  description?: string;
+
+  // --- Общее ---
+  amount: number;
+  currency: string;
+  funnelId?: string;
+  notes?: string;
+  isArchived?: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+  date?: string;
+  dueDate?: string;
+  paidAmount?: number;
+  paidDate?: string;
+  startDate?: string;
+  endDate?: string;
+  paymentDay?: number;
 }
 
-// Алиасы для обратной совместимости (deprecated)
 export type Contract = Deal;
 export type OneTimeDeal = Deal;
 
@@ -110,6 +133,12 @@ export interface FunnelStage {
   id: string;
   label: string;
   color: string; // CSS color class (например, 'bg-gray-200 dark:bg-gray-700')
+  taskTemplate?: {
+    enabled?: boolean;
+    title?: string;
+    assigneeMode?: 'deal_assignee' | 'specific_user';
+    assigneeUserId?: string;
+  };
 }
 
 export interface InstagramSourceConfig {
@@ -142,31 +171,13 @@ export interface SalesFunnel {
   isArchived?: boolean; // Архив
 }
 
-export interface Deal {
-  id: string;
-  title: string;
-  clientId?: string; 
-  contactName?: string; 
-  amount: number;
-  currency: string; 
-  stage: string; // ID этапа из воронки (больше не фиксированный тип)
-  funnelId?: string; // ID воронки, к которой относится сделка
-  source?: 'instagram' | 'telegram' | 'site' | 'manual' | 'recommendation' | 'vk'; // Lead Source
-  telegramChatId?: string; // For chatting with lead
-  telegramUsername?: string;
-  assigneeId: string;
-  createdAt: string;
-  notes?: string; // Комментарии к сделке
-  projectId?: string; // Вид услуг (модуль/проект)
-  comments?: Comment[];
-  isArchived?: boolean; // Архив
-}
-
 export interface Department {
     id: string;
     name: string;
     headId?: string; 
     description?: string;
+    isArchived?: boolean;
+    updatedAt?: string;
 }
 
 export interface EmployeeInfo {
@@ -178,6 +189,7 @@ export interface EmployeeInfo {
   birthDate?: string;
   // Поля salary и conditions удалены согласно ТЗ
   isArchived?: boolean; // Архив (мягкое удаление)
+  updatedAt?: string;
 }
 
 // --- BPM TYPES ---
@@ -222,6 +234,10 @@ export interface ProcessInstance {
     startedAt: string;
     completedAt?: string;
     taskIds: string[]; // ID задач, созданных для этого экземпляра
+    /** Сделка (процесс «Воронка сделки») */
+    dealId?: string;
+    /** Шаги, сгенерированные при запуске (например из этапов воронки) — иначе берутся из шаблона процесса */
+    dynamicSteps?: ProcessStep[];
     /** Шаг с вариантами завершён — ожидание выбора ветки пользователем */
     pendingBranchSelection?: { stepId: string };
     /** История выполненных шагов (по мере прохождения процесса) */
@@ -235,6 +251,8 @@ export interface BusinessProcess {
     version: number; // Версия процесса (для избежания конфликтов)
     title: string;
     description?: string;
+    /** Системный шаблон: этапы подставляются при запуске (например из воронки сделки) */
+    systemKey?: string;
     steps: ProcessStep[];
     instances?: ProcessInstance[]; // Экземпляры запущенных процессов
     isArchived?: boolean; // Архив
@@ -301,6 +319,7 @@ export interface Project {
   icon?: string;
   color?: string;
   isArchived?: boolean; // Архив (мягкое удаление)
+  updatedAt?: string;
 }
 
 export interface TaskComment {
@@ -361,6 +380,8 @@ export interface Task {
   categoryId?: string; // ID категории финансов (для заявок)
   amount?: number; // Сумма (для заявок)
   decisionDate?: string; // ISO дата решения (для заявок)
+  updatedAt?: string;
+  linkedFeatureId?: string;
 }
 
 export interface Meeting {
@@ -376,6 +397,8 @@ export interface Meeting {
   clientId?: string; // ID клиента (необязательно, берется из сделки)
   recurrence?: 'none' | 'daily' | 'weekly' | 'monthly'; // Повторение (только для рабочих встреч)
   isArchived?: boolean; // Архив
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface ContentPost {
@@ -390,6 +413,7 @@ export interface ContentPost {
   copy?: string; // Текст поста (готовый текст для публикации)
   mediaUrl?: string;
   isArchived?: boolean; // Архив
+  updatedAt?: string;
 }
 
 export interface TableCollection {
@@ -400,6 +424,7 @@ export interface TableCollection {
   color?: string;
   isSystem?: boolean;
   isArchived?: boolean; // Архив (мягкое удаление)
+  updatedAt?: string;
 }
 
 export interface Folder {
@@ -420,6 +445,7 @@ export interface Doc {
   content?: string; // Для типа 'internal' (HTML)
   tags: string[];
   isArchived?: boolean; // Архив
+  updatedAt?: string;
 }
 
 export interface ActivityLog {
@@ -523,6 +549,10 @@ export interface FinanceCategory {
     name: string;
     type: 'fixed' | 'percent'; 
     color?: string;
+    /** Плановая сумма (fixed) или доля (percent) для моков и БДР */
+    value?: number;
+    isArchived?: boolean;
+    updatedAt?: string;
 }
 
 export interface FinancePlan {
@@ -544,6 +574,7 @@ export interface PurchaseRequest {
     description: string;
     status: 'pending' | 'approved' | 'rejected' | 'deferred';
     date: string;
+    paymentDate?: string;
     decisionDate?: string;
     isArchived?: boolean; // Архив
 }
@@ -714,54 +745,3 @@ export interface ContentPlanPage {
   publicLink?: string; // Публичная ссылка для клиента
 }
 
-// Типы для управления контентом сайтов
-export interface Tag {
-  id: string;
-  name: string; // Название тега
-  color?: string; // Цвет тега (hex)
-  createdAt: string;
-  updatedAt?: string;
-  isArchived?: boolean;
-}
-
-export interface PartnerLogo {
-  id: string;
-  name: string; // Название партнера
-  logoUrl: string; // URL логотипа
-  websiteUrl?: string; // Ссылка на сайт партнера
-  order: number; // Порядок отображения
-  createdAt: string;
-  updatedAt?: string;
-  isArchived?: boolean;
-}
-
-export interface News {
-  id: string;
-  title: string; // Заголовок новости
-  content: string; // HTML контент (из редактора)
-  imageUrl?: string; // URL главного изображения
-  excerpt?: string; // Краткое описание для превью
-  tags: string[]; // Массив ID тегов
-  published: boolean; // Опубликована ли новость
-  publishedAt?: string; // Дата публикации
-  createdAt: string;
-  updatedAt?: string;
-  isArchived?: boolean;
-}
-
-export interface Case {
-  id: string;
-  title: string; // Название кейса
-  description: string; // HTML описание кейса
-  imageUrl?: string; // URL главного изображения
-  excerpt?: string; // Аннотация для превью
-  clientName?: string; // Название клиента (необязательно)
-  websiteUrl?: string; // Ссылка на сайт проекта/клиента
-  instagramUrl?: string; // Ссылка на Instagram проекта/клиента
-  tags: string[]; // Массив ID тегов
-  order: number; // Порядок отображения
-  published: boolean; // Опубликован ли кейс
-  createdAt: string;
-  updatedAt?: string;
-  isArchived?: boolean;
-}

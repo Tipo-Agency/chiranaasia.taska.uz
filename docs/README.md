@@ -11,6 +11,7 @@
 | [architecture/REPO_LAYOUT.md](./architecture/REPO_LAYOUT.md) | Структура каталогов |
 | [architecture/DATABASE.md](./architecture/DATABASE.md) | Таблицы PostgreSQL и связь с кодом |
 | [architecture/NOTIFICATIONS_ARCHITECTURE.md](./architecture/NOTIFICATIONS_ARCHITECTURE.md) | Архитектура централизованных уведомлений (Redis + realtime) |
+| [architecture/CLEANUP_DECISIONS.md](./architecture/CLEANUP_DECISIONS.md) | Чистка кода: что сделано и решения по спорным пунктам |
 | [operations/DEPLOY.md](./operations/DEPLOY.md) | Автодеплой, nginx, Docker |
 | [operations/ENV_AND_SECRETS.md](./operations/ENV_AND_SECRETS.md) | Env и секреты GitHub |
 | [operations/TROUBLESHOOTING.md](./operations/TROUBLESHOOTING.md) | Типичные проблемы |

@@ -7,6 +7,7 @@ from pydantic import BaseModel
 from app.database import get_db
 from app.models.user import User
 from app.auth import verify_password, get_password_hash, create_access_token
+from app.services.domain_events import log_entity_mutation
 from app.utils import row_to_user
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -62,6 +63,15 @@ async def update_users(users: list[dict], db: AsyncSession = Depends(get_db)):
             existing = await db.get(User, u["id"])
             if existing:
                 existing.is_archived = True
+                await db.flush()
+                await log_entity_mutation(
+                    db,
+                    event_type="user.archived",
+                    entity_type="user",
+                    entity_id=u["id"],
+                    source="auth-router",
+                    payload={"login": existing.login},
+                )
             continue
         uid = u.get("id")
         existing = await db.get(User, uid) if uid else None
@@ -89,6 +99,15 @@ async def update_users(users: list[dict], db: AsyncSession = Depends(get_db)):
                     existing.password_hash = get_password_hash(raw_password)
             existing.must_change_password = bool(u.get("mustChangePassword", False))
             existing.is_archived = False
+            await db.flush()
+            await log_entity_mutation(
+                db,
+                event_type="user.updated",
+                entity_type="user",
+                entity_id=existing.id,
+                source="auth-router",
+                payload={"login": existing.login, "name": existing.name, "role": existing.role},
+            )
         else:
             new_user = User(
                 id=uid or __import__("uuid").uuid4().__str__(),
@@ -108,5 +127,14 @@ async def update_users(users: list[dict], db: AsyncSession = Depends(get_db)):
                     new_user.password_hash = get_password_hash(raw_password)
             new_user.must_change_password = bool(u.get("mustChangePassword", False))
             db.add(new_user)
+            await db.flush()
+            await log_entity_mutation(
+                db,
+                event_type="user.created",
+                entity_type="user",
+                entity_id=new_user.id,
+                source="auth-router",
+                payload={"login": new_user.login, "name": new_user.name, "role": new_user.role},
+            )
     await db.commit()
     return {"ok": True}

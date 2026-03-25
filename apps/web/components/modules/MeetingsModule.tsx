@@ -1,5 +1,6 @@
 import React from 'react';
 import { TableCollection, Meeting, User, Client, Deal, TableCollection as Table } from '../../types';
+import type { AppActions } from '../../frontend/hooks/useAppLogic';
 import MeetingsView from '../MeetingsView';
 
 interface MeetingsModuleProps {
@@ -9,7 +10,7 @@ interface MeetingsModuleProps {
   clients?: Client[];
   deals?: Deal[];
   tables: Table[];
-  actions: any;
+  actions: AppActions;
 }
 
 export const MeetingsModule: React.FC<MeetingsModuleProps> = ({

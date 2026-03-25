@@ -7,7 +7,7 @@
  * - Централизованное управление safe areas
  */
 import React from 'react';
-import { Sidebar } from '../Sidebar';
+import Sidebar from '../Sidebar';
 import { AppHeader } from '../AppHeader';
 import { SafeAreaAll } from '../ui/SafeArea';
 import { User, TableCollection, ActivityLog } from '../../types';

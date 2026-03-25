@@ -1,6 +1,7 @@
 
 import React from 'react';
 import { FinanceCategory, Fund, FinancePlan, PurchaseRequest, Department, User, FinancialPlanDocument, FinancialPlanning, Bdr } from '../../types';
+import type { AppActions } from '../../frontend/hooks/useAppLogic';
 import FinanceView from '../FinanceView';
 
 interface FinanceModuleProps {
@@ -14,7 +15,7 @@ interface FinanceModuleProps {
   financialPlanDocuments?: FinancialPlanDocument[];
   financialPlannings?: FinancialPlanning[];
   bdr?: Bdr | null;
-  actions: any;
+  actions: AppActions;
 }
 
 export const FinanceModule: React.FC<FinanceModuleProps> = ({ categories, funds = [], plan, requests, departments, users, currentUser, financialPlanDocuments = [], financialPlannings = [], bdr = null, actions }) => {

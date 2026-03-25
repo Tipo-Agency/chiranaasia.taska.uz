@@ -1,5 +1,5 @@
 
-import { Doc, Project, Role, TableCollection, Task, User, Meeting, ActivityLog, StatusOption, PriorityOption, ContentPost, Client, EmployeeInfo, Contract, Folder, Deal, NotificationPreferences, Department, FinanceCategory, FinancePlan, PurchaseRequest, OrgPosition, BusinessProcess, AutomationRule, Warehouse, InventoryItem, StockMovement, OneTimeDeal, AccountsReceivable, SalesFunnel } from "../types";
+import { Doc, Project, Role, TableCollection, Task, User, Meeting, ActivityLog, StatusOption, PriorityOption, ContentPost, Client, EmployeeInfo, Contract, Folder, Deal, NotificationPreferences, Department, FinanceCategory, FinancePlan, PurchaseRequest, OrgPosition, BusinessProcess, AutomationRule, Warehouse, InventoryItem, StockMovement, OneTimeDeal, AccountsReceivable, SalesFunnel, FinancialPlanDocument, FinancialPlanning } from "../types";
 import { MOCK_PROJECTS, MOCK_TABLES, DEFAULT_STATUSES, DEFAULT_PRIORITIES, DEFAULT_NOTIFICATION_PREFS, MOCK_DEPARTMENTS, DEFAULT_FINANCE_CATEGORIES, MOCK_ORG_POSITIONS, DEFAULT_AUTOMATION_RULES } from "../constants";
 
 
@@ -37,6 +37,8 @@ const STORAGE_KEYS = {
   CONTRACTS: 'cfo_contracts',
   EMPLOYEE_INFOS: 'cfo_employee_infos',
   DEALS: 'cfo_deals',
+  ONE_TIME_DEALS: 'cfo_one_time_deals',
+  ACCOUNTS_RECEIVABLE: 'cfo_accounts_receivable',
   NOTIFICATION_PREFS: 'cfo_notification_prefs',
   // Finance
   DEPARTMENTS: 'cfo_departments',
@@ -75,17 +77,6 @@ const getLocal = <T>(key: string, seed: T): T => {
 
 const setLocal = (key: string, data: any) => {
     localStorage.setItem(key, JSON.stringify(data));
-};
-
-// Helper to convert objects to arrays
-const normalizeArray = <T>(data: any): T[] => {
-    if (!data) return [];
-    if (Array.isArray(data)) return data;
-    if (typeof data === 'object') {
-        // If data is { "key1": val1, "key2": val2 }, return [val1, val2]
-        return Object.values(data);
-    }
-    return [];
 };
 
 export const storageService = {

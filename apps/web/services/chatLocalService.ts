@@ -22,6 +22,9 @@ export interface ChatMessageLocal {
 
 const STORAGE_KEY = 'local_chat_messages_v1';
 
+/** Системный отправитель: лента «Система» в мессенджере */
+export const SYSTEM_CHAT_SENDER_ID = '__system__';
+
 function readAll(): ChatMessageLocal[] {
   if (typeof window === 'undefined') return [];
   try {
@@ -42,7 +45,11 @@ function writeAll(messages: ChatMessageLocal[]): void {
 export const chatLocalService = {
   getMessagesForUser(userId: string): ChatMessageLocal[] {
     return readAll().filter(
-      (m) => m.fromId === userId || m.toId === userId || m.toId === '__all__'
+      (m) =>
+        m.fromId === userId ||
+        m.toId === userId ||
+        m.toId === '__all__' ||
+        (m.fromId === SYSTEM_CHAT_SENDER_ID && m.toId === userId)
     );
   },
 
@@ -80,6 +87,23 @@ export const chatLocalService = {
   }) {
     return chatLocalService.addMessage({
       fromId: opts.actorId,
+      toId: opts.targetUserId,
+      text: opts.text,
+      isSystem: true,
+      entityType: opts.entityType,
+      entityId: opts.entityId,
+    });
+  },
+
+  /** Лента «Система»: уведомления о задачах, сделках и т.д. с прикреплённой сущностью */
+  addSystemFeedMessage(opts: {
+    targetUserId: string;
+    text: string;
+    entityType?: ChatEntityType;
+    entityId?: string;
+  }) {
+    return chatLocalService.addMessage({
+      fromId: SYSTEM_CHAT_SENDER_ID,
       toId: opts.targetUserId,
       text: opts.text,
       isSystem: true,

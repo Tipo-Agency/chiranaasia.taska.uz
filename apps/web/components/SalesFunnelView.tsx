@@ -1,14 +1,16 @@
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { Deal, Client, User, Comment, Task, Project, SalesFunnel, Meeting } from '../types';
+import { Deal, Client, User, Comment, Task, Project, SalesFunnel, Meeting, NotificationPreferences } from '../types';
 import { Plus, KanbanSquare, List as ListIcon, X, Send, MessageSquare, Instagram, Globe, UserPlus, Bot, Edit2, TrendingUp, CheckSquare, CheckCircle2, XCircle, Trash2, Calendar, Clock, Users, Tag, GitBranch, Filter, User as UserIcon } from 'lucide-react';
 // Telegram / Instagram интеграции отключены в локальной демо-версии
 // import { sendClientMessage } from '../services/telegramService';
 // import { instagramService } from '../services/instagramService';
 import { DynamicIcon } from './AppIcons';
 import { TaskSelect } from './TaskSelect';
-import { Button, ModulePageShell, ModulePageHeader, ModuleSegmentedControl, MODULE_PAGE_GUTTER, ModuleCreateIconButton } from './ui';
+import { Button, ModulePageShell, ModulePageHeader, ModuleSegmentedControl, MODULE_PAGE_GUTTER, ModuleCreateIconButton, SystemAlertDialog, SystemConfirmDialog } from './ui';
+import { DateInput } from './ui/DateInput';
 import { api } from '../backend/api';
+import { isFunnelDeal } from '../utils/dealModel';
 
 interface SalesFunnelViewProps {
   deals: Deal[];
@@ -55,10 +57,17 @@ const SalesFunnelView: React.FC<SalesFunnelViewProps> = ({ deals, clients, users
   const [chatMessage, setChatMessage] = useState('');
   const [draggedDealId, setDraggedDealId] = useState<string | null>(null);
   const [showTaskDropdown, setShowTaskDropdown] = useState(false);
+  const [showCustomTaskInput, setShowCustomTaskInput] = useState(false);
+  const [customTaskTitle, setCustomTaskTitle] = useState('');
+  const [showCreateMeetingForm, setShowCreateMeetingForm] = useState(false);
+  const [newMeetingDate, setNewMeetingDate] = useState('');
+  const [newMeetingTime, setNewMeetingTime] = useState('10:00');
   const [selectedFunnelId, setSelectedFunnelId] = useState<string>('');
   const [funnelId, setFunnelId] = useState<string>('');
   const [dealProjectId, setDealProjectId] = useState<string>(''); // вид услуг (модуль/проект)
   const [defaultFunnelId, setDefaultFunnelId] = useState<string | undefined>(undefined);
+  const [alertState, setAlertState] = useState<{ open: boolean; title: string; message: string }>({ open: false, title: '', message: '' });
+  const [confirmState, setConfirmState] = useState<{ open: boolean; title: string; message: string; onConfirm?: () => void }>({ open: false, title: '', message: '' });
 
   /** Этапы для канбана — из выбранной воронки в шапке страницы */
   const kanbanStages = useMemo(() => {
@@ -71,7 +80,7 @@ const SalesFunnelView: React.FC<SalesFunnelViewProps> = ({ deals, clients, users
   useEffect(() => {
     const loadDefaultFunnel = async () => {
       try {
-        const notificationPrefs = await api.notificationPrefs.get();
+        const notificationPrefs = (await api.notificationPrefs.get()) as NotificationPreferences;
         const defaultId = notificationPrefs?.defaultFunnelId;
         setDefaultFunnelId(defaultId);
         
@@ -102,7 +111,7 @@ const SalesFunnelView: React.FC<SalesFunnelViewProps> = ({ deals, clients, users
     }
   }, [autoOpenCreateModal]);
 
-  // Слушаем событие для открытия модалки из HomeView
+  // Слушаем событие для открытия модалки с рабочего стола (WorkdeskView)
   useEffect(() => {
     const handleOpenModal = () => {
       handleOpenCreate();
@@ -111,7 +120,24 @@ const SalesFunnelView: React.FC<SalesFunnelViewProps> = ({ deals, clients, users
     return () => window.removeEventListener('openCreateDealModal', handleOpenModal);
   }, []);
 
-  const handleOpenCreate = () => { 
+  const funnelDeals = useMemo(() => deals.filter((d) => !d.isArchived && isFunnelDeal(d)), [deals]);
+
+  // Открытие сделки из контекста чата
+  useEffect(() => {
+    const handleOpenDealById = (event: Event) => {
+      const custom = event as CustomEvent<{ dealId?: string }>;
+      const dealId = custom.detail?.dealId;
+      if (!dealId) return;
+      const target = funnelDeals.find((d) => d.id === dealId);
+      if (!target) return;
+      if (target.funnelId) setSelectedFunnelId(target.funnelId);
+      handleOpenEdit(target);
+    };
+    window.addEventListener('openDealFromChat', handleOpenDealById as EventListener);
+    return () => window.removeEventListener('openDealFromChat', handleOpenDealById as EventListener);
+  }, [funnelDeals]);
+
+  const handleOpenCreate = (presetStageId?: string) => { 
     setEditingDeal(null); 
     setTitle(''); 
     setClientName(''); 
@@ -121,7 +147,7 @@ const SalesFunnelView: React.FC<SalesFunnelViewProps> = ({ deals, clients, users
     const fid = selectedFunnelId || salesFunnels[0]?.id || '';
     setFunnelId(fid);
     const fu = salesFunnels.find(f => f.id === fid);
-    setStage(fu?.stages?.[0]?.id || 'new');
+    setStage(presetStageId || fu?.stages?.[0]?.id || 'new');
     setDealProjectId('');
     setAssigneeId(users[0]?.id || ''); 
     setNotes('');
@@ -168,7 +194,7 @@ const SalesFunnelView: React.FC<SalesFunnelViewProps> = ({ deals, clients, users
           // Проверяем обязательные поля
           const trimmedTitle = title.trim();
           if (!trimmedTitle) {
-              alert('Пожалуйста, введите название сделки');
+              setAlertState({ open: true, title: 'Проверьте данные', message: 'Пожалуйста, введите название сделки.' });
               return;
           }
           
@@ -176,7 +202,7 @@ const SalesFunnelView: React.FC<SalesFunnelViewProps> = ({ deals, clients, users
           let finalFunnelId = funnelId || selectedFunnelId;
           if (!finalFunnelId) {
               try {
-                  const notificationPrefs = await api.notificationPrefs.get();
+                  const notificationPrefs = (await api.notificationPrefs.get()) as NotificationPreferences;
                   finalFunnelId = notificationPrefs?.defaultFunnelId || defaultFunnelId;
               } catch (error) {
                   console.error('Error loading notification prefs:', error);
@@ -228,7 +254,7 @@ const SalesFunnelView: React.FC<SalesFunnelViewProps> = ({ deals, clients, users
           setIsModalOpen(false);
       } catch (error) {
           console.error('[DEAL] Error saving deal:', error);
-          alert('Произошла ошибка при сохранении сделки. Попробуйте еще раз.');
+          setAlertState({ open: true, title: 'Ошибка сохранения', message: 'Произошла ошибка при сохранении сделки. Попробуйте еще раз.' });
       }
   };
 
@@ -254,7 +280,7 @@ const SalesFunnelView: React.FC<SalesFunnelViewProps> = ({ deals, clients, users
   const onDrop = (e: React.DragEvent, stage: any) => { 
     e.preventDefault(); 
     if(draggedDealId) { 
-      const d = deals.find(x => x.id === draggedDealId); 
+      const d = funnelDeals.find(x => x.id === draggedDealId);
       if(d && d.stage !== stage) {
         const updatedDeal = {...d, stage};
         onSaveDeal(updatedDeal);
@@ -269,12 +295,14 @@ const SalesFunnelView: React.FC<SalesFunnelViewProps> = ({ deals, clients, users
             id: `cl-${Date.now()}`,
               name: clientName,
             contactPerson: d.contactName,
+              responsibleUserId: d.assigneeId,
               phone: undefined, // Можно добавить из комментариев
               email: undefined,
               telegram: d.telegramUsername,
               instagram: d.source === 'instagram' ? d.telegramUsername : undefined,
               companyName: d.title,
               companyInfo: d.notes,
+              funnelId: d.funnelId || selectedFunnelId || undefined,
             notes: `Создано из сделки: ${d.title}. Сумма: ${d.amount} ${d.currency}`
           };
           onCreateClient(client);
@@ -295,7 +323,7 @@ const SalesFunnelView: React.FC<SalesFunnelViewProps> = ({ deals, clients, users
     
     const task: Partial<Task> = {
       entityType: 'task',
-      title: `${taskTitle} - ${companyName}`,
+      title: `${taskTitle.trim()} - ${companyName}`,
       description: `Задача по сделке: ${editingDeal.title}`,
       status: 'Не начато',
       priority: 'Средний',
@@ -316,6 +344,21 @@ const SalesFunnelView: React.FC<SalesFunnelViewProps> = ({ deals, clients, users
   // Получаем задачи, связанные с текущей сделкой
   const dealTasks = editingDeal ? tasks.filter(t => t.dealId === editingDeal.id) : [];
   const dealMeetings = editingDeal ? (meetings || []).filter(m => m.dealId === editingDeal.id && !m.isArchived) : [];
+  const sortedComments = [...(comments || [])].sort((a, b) => {
+    const aTime = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+    const bTime = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+    return aTime - bTime;
+  });
+  const getCommentAuthorName = (comment: Comment) => {
+    const user = users.find((u) => u.id === comment.authorId);
+    return user?.name || 'Система';
+  };
+  const formatCommentTime = (iso?: string) => {
+    if (!iso) return '';
+    const dt = new Date(iso);
+    if (Number.isNaN(dt.getTime())) return '';
+    return dt.toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+  };
 
   const handleMarkAsWon = () => {
     if (!editingDeal) return;
@@ -327,12 +370,14 @@ const SalesFunnelView: React.FC<SalesFunnelViewProps> = ({ deals, clients, users
         id: `cl-${Date.now()}`,
         name: contactName || title || editingDeal.title,
         contactPerson: contactName || editingDeal.contactName,
+        responsibleUserId: assigneeId || editingDeal.assigneeId,
         phone: undefined,
         email: undefined,
         telegram: editingDeal.telegramUsername,
         instagram: source === 'instagram' ? editingDeal.telegramUsername : undefined,
         companyName: title || editingDeal.title,
         companyInfo: notes || editingDeal.notes,
+        funnelId: funnelId || editingDeal.funnelId || selectedFunnelId || undefined,
         notes: `Создано из сделки: ${editingDeal.title}. Сумма: ${editingDeal.amount} ${editingDeal.currency}`
       };
       onCreateClient(client);
@@ -359,17 +404,17 @@ const SalesFunnelView: React.FC<SalesFunnelViewProps> = ({ deals, clients, users
   // Если выбрана основная воронка, показываем сделки с этой воронкой И сделки без воронки
   const filteredDeals = useMemo(() => {
     if (!selectedFunnelId) {
-      return deals.filter(d => !d.isArchived);
+      return funnelDeals;
     }
     
     // Если выбрана основная воронка, показываем сделки с этой воронкой и сделки без воронки
     if (selectedFunnelId === defaultFunnelId) {
-      return deals.filter(d => !d.isArchived && (!d.funnelId || d.funnelId === selectedFunnelId));
+      return funnelDeals.filter(d => !d.funnelId || d.funnelId === selectedFunnelId);
     }
     
     // Для других воронок показываем только сделки с этой воронкой
-    return deals.filter(d => !d.isArchived && d.funnelId === selectedFunnelId);
-  }, [deals, selectedFunnelId, defaultFunnelId]);
+    return funnelDeals.filter(d => d.funnelId === selectedFunnelId);
+  }, [funnelDeals, selectedFunnelId, defaultFunnelId]);
   
   const activeDeals = filteredDeals.filter(d => d.stage !== 'won' && d.stage !== 'lost');
   const wonDeals = filteredDeals.filter(d => d.stage === 'won');
@@ -468,7 +513,19 @@ const SalesFunnelView: React.FC<SalesFunnelViewProps> = ({ deals, clients, users
             icon={<TrendingUp size={24} strokeWidth={2} />}
             title="Воронка продаж"
             description="Управление сделками и продажами"
-            actions={
+            tabs={
+              <ModuleSegmentedControl
+                variant="neutral"
+                value={viewMode}
+                onChange={(v) => setViewMode(v as 'kanban' | 'list' | 'rejected')}
+                options={[
+                  { value: 'kanban', label: 'Канбан' },
+                  { value: 'list', label: 'Список' },
+                  { value: 'rejected', label: 'Отказы' },
+                ]}
+              />
+            }
+            controls={
               <>
                 <div className="min-w-[160px] sm:min-w-[180px]">
                   <TaskSelect
@@ -482,32 +539,28 @@ const SalesFunnelView: React.FC<SalesFunnelViewProps> = ({ deals, clients, users
               </>
             }
           />
-          <ModuleSegmentedControl
-            variant="accent"
-            accent="violet"
-            value={viewMode}
-            onChange={(v) => setViewMode(v as 'kanban' | 'list' | 'rejected')}
-            options={[
-              { value: 'kanban', label: 'Канбан' },
-              { value: 'list', label: 'Список' },
-              { value: 'rejected', label: 'Отказы' },
-            ]}
-          />
         </div>
       </div>
       <div className="flex-1 min-h-0 overflow-hidden">
         <div className={`${MODULE_PAGE_GUTTER} pb-24 md:pb-32 h-full overflow-y-auto overflow-x-hidden custom-scrollbar`}>
           {viewMode === 'kanban' ? (
-              <div className="h-full flex flex-col gap-4">
-                  <div className="flex h-full overflow-x-auto gap-3 md:gap-4 pb-4">
+              <div className="h-full relative">
+                  <div className={`flex h-full overflow-x-auto gap-3 md:gap-4 ${draggedDealId ? 'pb-28 md:pb-32' : 'pb-4'}`}>
                       {kanbanStages.map(s => (
                           <div key={s.id} className="w-64 md:w-80 flex-shrink-0 flex flex-col bg-gray-50/50 dark:bg-[#1e1e1e] rounded-lg border border-gray-200 dark:border-[#333]" onDragOver={(e) => e.preventDefault()} onDrop={(e) => onDrop(e, s.id)}>
                               <div className="p-2 md:p-3 font-bold text-xs md:text-sm text-gray-700 dark:text-gray-200 flex justify-between">{s.label} <span className="bg-gray-200 dark:bg-[#333] px-2 rounded text-xs">{activeDeals.filter(d => d.stage === s.id).length}</span></div>
-                              <div className="p-2 flex-1 overflow-y-auto space-y-2 custom-scrollbar min-h-0">
+                              <div
+                                className="p-2 flex-1 overflow-y-auto space-y-2 custom-scrollbar min-h-0"
+                                onClick={(e) => {
+                                  if (e.target === e.currentTarget) {
+                                    handleOpenCreate(s.id);
+                                  }
+                                }}
+                              >
                                   {activeDeals.filter(d => d.stage === s.id).map(d => {
                                       const dealProject = projects.find(p => p.id === d.projectId);
                                       return (
-                                          <div key={d.id} draggable onDragStart={(e) => onDragStart(e, d.id)} onClick={() => handleOpenEdit(d)} className="bg-white dark:bg-[#2b2b2b] p-2 md:p-3 rounded shadow-sm border border-gray-200 dark:border-[#3a3a3a] cursor-pointer hover:shadow-md transition-all">
+                                          <div key={d.id} draggable onDragStart={(e) => onDragStart(e, d.id)} onDragEnd={() => setDraggedDealId(null)} onClick={(e) => { e.stopPropagation(); handleOpenEdit(d); }} className="bg-white dark:bg-[#2b2b2b] p-2 md:p-3 rounded shadow-sm border border-gray-200 dark:border-[#3a3a3a] cursor-pointer hover:shadow-md transition-all">
                                               <div className="font-medium text-xs md:text-sm text-gray-800 dark:text-gray-100 mb-1 line-clamp-2">{d.title}</div>
                                               <div className="flex items-center justify-between gap-2 mb-1">
                                                   <span className="text-xs text-gray-500">{(d.amount || 0).toLocaleString()} UZS</span>
@@ -527,10 +580,15 @@ const SalesFunnelView: React.FC<SalesFunnelViewProps> = ({ deals, clients, users
                       ))}
                   </div>
                   
-                  {/* Области для перетаскивания: Успех / Отказ */}
-                  <div className="flex flex-col sm:flex-row gap-3 md:gap-4 shrink-0 px-2 md:px-0">
+                  {/* Области для перетаскивания: Успех / Отказ (плавающий низ с затемнением сверху) */}
+                  {draggedDealId && (
+                  <div className="absolute inset-x-0 bottom-0 z-20 pointer-events-none">
+                    <div className="h-7 bg-gradient-to-t from-white/90 dark:from-[#141414]/95 to-transparent" />
+                    <div className={`${MODULE_PAGE_GUTTER} pb-2 md:pb-3`}>
+                      <div className="pointer-events-auto rounded-xl border border-gray-200/80 dark:border-[#333] bg-white/90 dark:bg-[#1b1b1b]/90 backdrop-blur-sm shadow-[0_-8px_24px_rgba(0,0,0,0.12)] px-2 py-2 md:px-3 md:py-3">
+                        <div className="flex flex-col sm:flex-row gap-3 md:gap-4">
                       <div 
-                          className="flex-1 bg-green-50 dark:bg-green-900/20 border-2 border-dashed border-green-300 dark:border-green-700 rounded-lg p-3 md:p-4 flex items-center justify-center gap-2 md:gap-3"
+                          className="flex-1 bg-green-50 dark:bg-green-900/20 border-2 border-dashed border-green-300 dark:border-green-700 rounded-lg p-3 md:p-4 flex items-center justify-center gap-2 md:gap-3 min-h-[66px]"
                           onDragOver={(e) => e.preventDefault()}
                           onDrop={(e) => onDrop(e, 'won')}
                       >
@@ -543,7 +601,7 @@ const SalesFunnelView: React.FC<SalesFunnelViewProps> = ({ deals, clients, users
                       </div>
                       
                       <div 
-                          className="flex-1 bg-red-50 dark:bg-red-900/20 border-2 border-dashed border-red-300 dark:border-red-700 rounded-lg p-3 md:p-4 flex items-center justify-center gap-2 md:gap-3"
+                          className="flex-1 bg-red-50 dark:bg-red-900/20 border-2 border-dashed border-red-300 dark:border-red-700 rounded-lg p-3 md:p-4 flex items-center justify-center gap-2 md:gap-3 min-h-[66px]"
                           onDragOver={(e) => e.preventDefault()}
                           onDrop={(e) => onDrop(e, 'lost')}
                       >
@@ -554,7 +612,11 @@ const SalesFunnelView: React.FC<SalesFunnelViewProps> = ({ deals, clients, users
                           </div>
                           <span className="bg-red-200 dark:bg-red-900/30 text-red-700 dark:text-red-400 px-2 py-1 rounded text-xs font-bold shrink-0">{lostDeals.length}</span>
                       </div>
+                        </div>
+                      </div>
+                    </div>
                   </div>
+                  )}
               </div>
           ) : viewMode === 'rejected' ? (
               <div className="bg-white dark:bg-[#1e1e1e] border border-gray-200 dark:border-[#333] rounded-xl overflow-hidden shadow-sm h-full flex flex-col">
@@ -604,8 +666,8 @@ const SalesFunnelView: React.FC<SalesFunnelViewProps> = ({ deals, clients, users
         </div>
       </div>
       {isModalOpen && (
-          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-end md:items-center justify-center z-[80] p-0 md:p-4" onClick={handleBackdropClick}>
-              <div className="bg-white dark:bg-[#1e1e1e] w-full h-full md:h-auto md:max-h-[min(680px,92vh)] md:max-w-5xl md:rounded-xl shadow-2xl flex flex-col md:flex-row overflow-hidden border-0 md:border border-gray-200 dark:border-gray-800 rounded-t-2xl md:rounded-xl" onClick={e => e.stopPropagation()}>
+          <div className="fixed inset-0 bg-black/35 backdrop-blur-sm flex items-end md:items-center justify-center z-[220] p-0 md:p-4" onClick={handleBackdropClick}>
+              <div className="bg-white dark:bg-[#1e1e1e] w-full h-full md:h-auto md:max-h-[min(720px,92vh)] md:max-w-5xl md:rounded-xl shadow-2xl flex flex-col md:flex-row overflow-hidden border-0 md:border border-gray-200 dark:border-gray-800 rounded-t-2xl md:rounded-xl" onClick={e => e.stopPropagation()}>
                   {/* Левая колонка — поля (как в модалке задачи) */}
                   <div className="flex-1 flex flex-col min-w-0 border-b md:border-b-0 md:border-r border-gray-200 dark:border-gray-800 max-h-[52vh] md:max-h-none overflow-hidden">
                       <div className="p-3 border-b border-gray-100 dark:border-gray-800 flex justify-between items-start gap-2 shrink-0">
@@ -623,10 +685,16 @@ const SalesFunnelView: React.FC<SalesFunnelViewProps> = ({ deals, clients, users
                                   <button
                                       type="button"
                                       onClick={() => {
-                                          if (window.confirm('Удалить сделку в архив?')) {
+                                          setConfirmState({
+                                            open: true,
+                                            title: 'Удалить сделку',
+                                            message: 'Переместить сделку в архив?',
+                                            onConfirm: () => {
                                               onDeleteDeal(editingDeal.id);
                                               setIsModalOpen(false);
-                                          }
+                                              setConfirmState({ open: false, title: '', message: '' });
+                                            },
+                                          });
                                       }}
                                       className="p-2 text-gray-400 hover:text-red-500 hover:bg-gray-100 dark:hover:bg-gray-800 rounded transition-colors"
                                       title="В архив"
@@ -811,35 +879,48 @@ const SalesFunnelView: React.FC<SalesFunnelViewProps> = ({ deals, clients, users
                           <button
                               type="button"
                               onClick={() => setModalTab('chat')}
-                              className={`flex-1 px-2 py-1.5 rounded-lg text-xs font-medium transition-colors ${modalTab === 'chat' ? 'bg-[#3337AD] text-white' : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-[#333]'}`}
+                              className={`flex-1 px-2 py-1.5 rounded-lg text-xs font-medium transition-colors ${modalTab === 'chat' ? 'bg-black text-white dark:bg-white dark:text-black' : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-[#333]'}`}
                           >
-                              <MessageSquare size={14} className="inline mr-1 -mt-0.5 opacity-90" />
                               Чат
                           </button>
                           <button
                               type="button"
                               onClick={() => setModalTab('tasks')}
-                              className={`flex-1 px-2 py-1.5 rounded-lg text-xs font-medium transition-colors ${modalTab === 'tasks' ? 'bg-[#3337AD] text-white' : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-[#333]'}`}
+                              className={`flex-1 px-2 py-1.5 rounded-lg text-xs font-medium transition-colors ${modalTab === 'tasks' ? 'bg-black text-white dark:bg-white dark:text-black' : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-[#333]'}`}
                           >
-                              <CheckSquare size={14} className="inline mr-1 -mt-0.5 opacity-90" />
                               Задачи
                           </button>
                           <button
                               type="button"
                               onClick={() => setModalTab('meetings')}
-                              className={`flex-1 px-2 py-1.5 rounded-lg text-xs font-medium transition-colors ${modalTab === 'meetings' ? 'bg-[#3337AD] text-white' : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-[#333]'}`}
+                              className={`flex-1 px-2 py-1.5 rounded-lg text-xs font-medium transition-colors ${modalTab === 'meetings' ? 'bg-black text-white dark:bg-white dark:text-black' : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-[#333]'}`}
                           >
-                              <Calendar size={14} className="inline mr-1 -mt-0.5 opacity-90" />
                               Встречи
                           </button>
                       </div>
                       <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
                           {modalTab === 'chat' ? (
                               <>
-                                  <div className="flex-1 p-4 overflow-y-auto space-y-2">
-                                      {comments.map(c => (
-                                          <div key={c.id} className={`p-2 rounded text-sm max-w-[80%] ${c.type === 'telegram_out' ? 'bg-blue-500 text-white self-end ml-auto' : 'bg-white dark:bg-[#333] text-gray-800 dark:text-gray-200'}`}>{c.text}</div>
-                                      ))}
+                                  <div className="flex-1 p-4 overflow-y-auto space-y-3">
+                                      {sortedComments.length === 0 ? (
+                                        <div className="h-full flex items-center justify-center text-sm text-gray-400 dark:text-gray-500">
+                                          Пока нет сообщений по сделке
+                                        </div>
+                                      ) : (
+                                        sortedComments.map((c) => {
+                                          const mine = c.authorId === currentUser?.id || c.type === 'telegram_out';
+                                          return (
+                                            <div key={c.id} className={`max-w-[88%] ${mine ? 'ml-auto' : ''}`}>
+                                              <div className={`rounded-xl px-3 py-2 text-sm ${mine ? 'bg-[#3337AD] text-white' : 'bg-white dark:bg-[#333] text-gray-800 dark:text-gray-200 border border-gray-200 dark:border-[#444]'}`}>
+                                                <div className={`mb-1 text-[11px] ${mine ? 'text-white/80' : 'text-gray-500 dark:text-gray-400'}`}>
+                                                  {getCommentAuthorName(c)}{formatCommentTime(c.createdAt) ? ` • ${formatCommentTime(c.createdAt)}` : ''}
+                                                </div>
+                                                <div className="whitespace-pre-wrap break-words">{c.text}</div>
+                                              </div>
+                                            </div>
+                                          );
+                                        })
+                                      )}
                                   </div>
                                   <div className="p-4 border-t border-gray-200 dark:border-[#333] flex gap-2">
                                       <input value={chatMessage} onChange={e => setChatMessage(e.target.value)} className="flex-1 border border-gray-300 dark:border-gray-600 rounded-lg px-2.5 py-1.5 min-h-[36px] text-sm bg-white dark:bg-[#333] text-gray-900 dark:text-gray-100" placeholder="Сообщение по сделке..."/>
@@ -894,6 +975,16 @@ const SalesFunnelView: React.FC<SalesFunnelViewProps> = ({ deals, clients, users
                                               <div className="fixed inset-0 z-30" onClick={() => setShowTaskDropdown(false)}></div>
                                               <div className="absolute top-full left-0 right-0 mt-2 bg-white dark:bg-[#333] border border-gray-200 dark:border-[#444] rounded-lg shadow-lg z-40 overflow-hidden">
                                                   <button
+                                                      onClick={() => {
+                                                          setShowCustomTaskInput(true);
+                                                          setCustomTaskTitle('');
+                                                          setShowTaskDropdown(false);
+                                                      }}
+                                                      className="w-full text-left px-4 py-2.5 hover:bg-gray-50 dark:hover:bg-[#404040] transition-colors text-sm text-gray-700 dark:text-gray-300 border-b border-gray-100 dark:border-[#444]"
+                                                  >
+                                                      Новая задача...
+                                                  </button>
+                                                  <button
                                                       onClick={() => { handleCreateTask('Подготовить КП'); setShowTaskDropdown(false); }}
                                                       className="w-full text-left px-4 py-2.5 hover:bg-gray-50 dark:hover:bg-[#404040] transition-colors text-sm text-gray-700 dark:text-gray-300"
                                                   >
@@ -921,6 +1012,34 @@ const SalesFunnelView: React.FC<SalesFunnelViewProps> = ({ deals, clients, users
                                           </>
                                       )}
                                   </div>
+                                  {showCustomTaskInput && (
+                                      <div className="mt-2 p-2 border border-gray-200 dark:border-[#444] rounded-lg bg-white dark:bg-[#333]">
+                                          <div className="flex gap-2">
+                                              <input
+                                                  value={customTaskTitle}
+                                                  onChange={(e) => setCustomTaskTitle(e.target.value)}
+                                                  placeholder="Название новой задачи"
+                                                  className="flex-1 border border-gray-300 dark:border-gray-600 rounded-md px-2.5 py-1.5 text-sm bg-white dark:bg-[#252525] text-gray-900 dark:text-gray-100"
+                                              />
+                                              <button
+                                                  type="button"
+                                                  onClick={() => {
+                                                      const title = customTaskTitle.trim();
+                                                      if (!title) {
+                                                        setAlertState({ open: true, title: 'Введите название', message: 'Укажите название новой задачи.' });
+                                                        return;
+                                                      }
+                                                      handleCreateTask(title);
+                                                      setShowCustomTaskInput(false);
+                                                      setCustomTaskTitle('');
+                                                  }}
+                                                  className="px-3 py-1.5 rounded-md bg-[#3337AD] text-white text-sm hover:bg-[#2d3199]"
+                                              >
+                                                  Добавить
+                                              </button>
+                                          </div>
+                                      </div>
+                                  )}
                               </div>
                           ) : modalTab === 'meetings' ? (
                               <div className="flex-1 p-4 md:p-6 overflow-y-auto flex flex-col">
@@ -966,9 +1085,15 @@ const SalesFunnelView: React.FC<SalesFunnelViewProps> = ({ deals, clients, users
                                                   {onDeleteMeeting && (
                                                       <button
                                                           onClick={() => {
-                                                              if (confirm('Удалить встречу?')) {
+                                                              setConfirmState({
+                                                                open: true,
+                                                                title: 'Удалить встречу',
+                                                                message: 'Вы уверены, что хотите удалить встречу?',
+                                                                onConfirm: () => {
                                                                   onDeleteMeeting(meeting.id);
-                                                              }
+                                                                  setConfirmState({ open: false, title: '', message: '' });
+                                                                },
+                                                              });
                                                           }}
                                                           className="mt-2 text-xs text-red-500 hover:text-red-700 dark:hover:text-red-400"
                                                       >
@@ -985,32 +1110,88 @@ const SalesFunnelView: React.FC<SalesFunnelViewProps> = ({ deals, clients, users
                                   )}
                                   
                                   {/* Кнопка создания встречи */}
-                                  {onSaveMeeting && editingDeal && (
-                                      <button
-                                          type="button"
-                                          title="Создать встречу"
-                                          aria-label="Создать встречу"
-                                          onClick={() => {
-                                              // Создаем новую встречу, привязанную к сделке
-                                              const newMeeting: Meeting = {
-                                                  id: `m-${Date.now()}`,
-                                                  tableId: 'meetings-system',
-                                                  type: 'client',
-                                                  dealId: editingDeal.id,
-                                                  clientId: editingDeal.clientId,
-                                                  title: `Встреча: ${editingDeal.title}`,
-                                                  date: new Date().toISOString().split('T')[0],
-                                                  time: '10:00',
-                                                  participantIds: editingDeal.assigneeId ? [editingDeal.assigneeId] : [],
-                                                  summary: '',
-                                                  isArchived: false
-                                              };
-                                              onSaveMeeting(newMeeting);
-                                          }}
-                                          className="w-full p-3 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg hover:border-violet-500 hover:bg-violet-50 dark:hover:bg-violet-900/20 transition-colors flex items-center justify-center text-violet-600 dark:text-violet-400"
-                                      >
-                                          <Plus size={22} strokeWidth={2.5} />
-                                      </button>
+                                  {onSaveMeeting && (
+                                      <>
+                                        {!showCreateMeetingForm ? (
+                                          <button
+                                              type="button"
+                                              title="Создать встречу"
+                                              aria-label="Создать встречу"
+                                              onClick={() => {
+                                                  if (!editingDeal) {
+                                                    setAlertState({ open: true, title: 'Сначала сохраните сделку', message: 'Чтобы создать встречу по сделке, сначала сохраните саму сделку.' });
+                                                    return;
+                                                  }
+                                                  const today = new Date().toISOString().split('T')[0];
+                                                  setNewMeetingDate(today);
+                                                  setNewMeetingTime('10:00');
+                                                  setShowCreateMeetingForm(true);
+                                              }}
+                                              className="w-full p-3 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg hover:border-violet-500 hover:bg-violet-50 dark:hover:bg-violet-900/20 transition-colors flex items-center justify-center text-violet-600 dark:text-violet-400"
+                                          >
+                                              <Plus size={22} strokeWidth={2.5} />
+                                          </button>
+                                        ) : (
+                                          <div className="p-3 border border-gray-200 dark:border-[#444] rounded-lg bg-white dark:bg-[#333] space-y-3">
+                                            <div className="text-xs font-semibold uppercase text-gray-500 dark:text-gray-400">Новая встреча</div>
+                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                              <DateInput
+                                                value={newMeetingDate}
+                                                onChange={setNewMeetingDate}
+                                                size="compact"
+                                              />
+                                              <input
+                                                type="time"
+                                                step={60}
+                                                value={newMeetingTime}
+                                                onChange={(e) => setNewMeetingTime(e.target.value)}
+                                                className="h-8 min-h-8 px-2.5 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-[#252525] text-sm text-gray-900 dark:text-gray-100 outline-none focus:ring-2 focus:ring-blue-500/30"
+                                              />
+                                            </div>
+                                            <div className="flex justify-end gap-2">
+                                              <button
+                                                type="button"
+                                                onClick={() => setShowCreateMeetingForm(false)}
+                                                className="px-3 py-1.5 rounded-md border border-gray-200 dark:border-[#444] text-xs text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-[#2c2c2c]"
+                                              >
+                                                Отмена
+                                              </button>
+                                              <button
+                                                type="button"
+                                                onClick={() => {
+                                                  if (!editingDeal) return;
+                                                  if (!newMeetingDate || !newMeetingTime) {
+                                                    setAlertState({ open: true, title: 'Заполните дату и время', message: 'Для создания встречи обязательно укажите дату и время.' });
+                                                    return;
+                                                  }
+                                                  const now = new Date();
+                                                  const newMeeting: Meeting = {
+                                                    id: `m-${now.getTime()}`,
+                                                    tableId: 'meetings-system',
+                                                    type: 'client',
+                                                    dealId: editingDeal.id,
+                                                    clientId: editingDeal.clientId,
+                                                    title: `Встреча: ${editingDeal.title}`,
+                                                    date: newMeetingDate,
+                                                    time: newMeetingTime,
+                                                    participantIds: editingDeal.assigneeId ? [editingDeal.assigneeId] : [],
+                                                    summary: '',
+                                                    isArchived: false,
+                                                    createdAt: now.toISOString(),
+                                                    updatedAt: now.toISOString(),
+                                                  };
+                                                  onSaveMeeting(newMeeting);
+                                                  setShowCreateMeetingForm(false);
+                                                  setAlertState({ open: true, title: 'Встреча создана', message: 'Новая встреча по сделке успешно добавлена.' });
+                                                }}
+                                                className="px-3 py-1.5 rounded-md text-xs text-white bg-[#3337AD] hover:bg-[#2d3199]"
+                                              >
+                                                Создать встречу
+                                              </button>
+                                            </div>
+                                          </div>
+                                        )}
+                                      </>
                                   )}
                               </div>
                           ) : null}
@@ -1019,6 +1200,22 @@ const SalesFunnelView: React.FC<SalesFunnelViewProps> = ({ deals, clients, users
               </div>
           </div>
       )}
+      <SystemAlertDialog
+        open={alertState.open}
+        title={alertState.title}
+        message={alertState.message}
+        onClose={() => setAlertState({ open: false, title: '', message: '' })}
+      />
+      <SystemConfirmDialog
+        open={confirmState.open}
+        title={confirmState.title}
+        message={confirmState.message}
+        danger
+        confirmText="Удалить"
+        cancelText="Отмена"
+        onCancel={() => setConfirmState({ open: false, title: '', message: '' })}
+        onConfirm={() => confirmState.onConfirm?.()}
+      />
     </ModulePageShell>
   );
 };

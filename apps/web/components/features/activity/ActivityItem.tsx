@@ -2,7 +2,7 @@
  * ActivityItem - элемент активности для отображения в списках
  * 
  * Зачем отдельно:
- * - Переиспользуется в InboxView, HomeView
+ * - Переиспользуется в InboxPage, WorkdeskView
  * - Единый стиль отображения активности
  */
 import React from 'react';

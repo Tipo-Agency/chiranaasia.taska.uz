@@ -5,6 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
 from app.models.settings import ActivityLog
+from app.services.domain_events import log_entity_mutation
 from app.utils import row_to_activity
 
 router = APIRouter(prefix="/activity", tags=["activity"])
@@ -18,10 +19,15 @@ async def get_activity(db: AsyncSession = Depends(get_db)):
 
 @router.put("")
 async def update_activity(logs: list[dict], db: AsyncSession = Depends(get_db)):
+    import uuid
+
+    batch_id = str(uuid.uuid4())
+    row_count = 0
     for lg in logs:
         lid = lg.get("id")
         if not lid:
             continue
+        row_count += 1
         existing = await db.get(ActivityLog, lid)
         if existing:
             existing.user_id = lg.get("userId", existing.user_id)
@@ -42,6 +48,15 @@ async def update_activity(logs: list[dict], db: AsyncSession = Depends(get_db)):
                 timestamp=lg.get("timestamp", ""),
                 read=lg.get("read", False),
             ))
+    await db.flush()
+    await log_entity_mutation(
+        db,
+        event_type="activity_log.bulk_synced",
+        entity_type="activity_log",
+        entity_id=batch_id,
+        source="activity-router",
+        payload={"rowCount": row_count},
+    )
     await db.commit()
     return {"ok": True}
 
@@ -60,5 +75,15 @@ async def add_activity(log: dict, db: AsyncSession = Depends(get_db)):
         timestamp=log.get("timestamp", ""),
         read=log.get("read", False),
     ))
+    await db.flush()
+    await log_entity_mutation(
+        db,
+        event_type="activity_log.created",
+        entity_type="activity_log",
+        entity_id=lid,
+        source="activity-router",
+        actor_id=log.get("userId") or None,
+        payload={"action": log.get("action")},
+    )
     await db.commit()
     return {"ok": True}

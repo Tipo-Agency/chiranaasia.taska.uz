@@ -20,6 +20,7 @@ import {
 import { TaskSelect } from './TaskSelect';
 import { normalizeDateForInput } from '../utils/dateUtils';
 import { ModulePageShell, ModulePageHeader, ModuleSegmentedControl, MODULE_PAGE_GUTTER, ModuleCreateIconButton } from './ui';
+import { DateInput } from './ui/DateInput';
 
 interface MeetingsViewProps {
   meetings: Meeting[];
@@ -55,6 +56,19 @@ const MeetingsView: React.FC<MeetingsViewProps> = ({ meetings = [], users, clien
 
   // DnD State
   const [draggedMeetingId, setDraggedMeetingId] = useState<string | null>(null);
+
+  React.useEffect(() => {
+    const handleOpenMeetingById = (event: Event) => {
+      const custom = event as CustomEvent<{ meetingId?: string }>;
+      const meetingId = custom.detail?.meetingId;
+      if (!meetingId) return;
+      const target = meetings.find((m) => m.id === meetingId && !m.isArchived);
+      if (!target) return;
+      handleOpenEdit(target);
+    };
+    window.addEventListener('openMeetingFromChat', handleOpenMeetingById as EventListener);
+    return () => window.removeEventListener('openMeetingFromChat', handleOpenMeetingById as EventListener);
+  }, [meetings]);
 
   const filteredMeetings = useMemo(() => {
     let filtered = (meetings || [])
@@ -101,6 +115,10 @@ const MeetingsView: React.FC<MeetingsViewProps> = ({ meetings = [], users, clien
 
   const handleCreate = (e?: React.FormEvent) => {
       if (e) e.preventDefault();
+      // Закрываем нативные popover (date/time picker), чтобы они не блокировали submit.
+      if (document.activeElement instanceof HTMLElement) {
+        document.activeElement.blur();
+      }
       
       // Валидация для встреч с клиентами
       if (meetingType === 'client' && !selectedDealId) {
@@ -346,33 +364,37 @@ const MeetingsView: React.FC<MeetingsViewProps> = ({ meetings = [], users, clien
             icon={<CalendarDays size={24} strokeWidth={2} />}
             title="Встречи"
             description="Планирование, календарь и итоги переговоров"
+            tabs={
+              <ModuleSegmentedControl
+                variant="neutral"
+                value={meetingTypeFilter}
+                onChange={(v) => setMeetingTypeFilter(v)}
+                options={[
+                  { value: 'all', label: 'Все' },
+                  { value: 'client', label: 'С клиентами' },
+                  { value: 'work', label: 'Рабочие' },
+                ]}
+              />
+            }
+            controls={
+              <>
+                <ModuleSegmentedControl
+                  variant="accent"
+                  accent="teal"
+                  value={viewMode}
+                  onChange={(v) => setViewMode(v)}
+                  options={[
+                    { value: 'list', label: 'Список', icon: <List size={16} /> },
+                    { value: 'calendar', label: 'Календарь', icon: <LayoutGrid size={16} /> },
+                  ]}
+                />
+                <ModuleCreateIconButton accent="teal" label="Новая встреча" onClick={handleOpenCreate} />
+              </>
+            }
             actions={
               <ModuleCreateIconButton accent="teal" label="Новая встреча" onClick={handleOpenCreate} />
             }
           />
-
-          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
-            <ModuleSegmentedControl
-              variant="neutral"
-              value={meetingTypeFilter}
-              onChange={(v) => setMeetingTypeFilter(v)}
-              options={[
-                { value: 'all', label: 'Все' },
-                { value: 'client', label: 'С клиентами' },
-                { value: 'work', label: 'Рабочие' },
-              ]}
-            />
-            <ModuleSegmentedControl
-              variant="accent"
-              accent="teal"
-              value={viewMode}
-              onChange={(v) => setViewMode(v)}
-              options={[
-                { value: 'list', label: 'Список', icon: <List size={16} /> },
-                { value: 'calendar', label: 'Календарь', icon: <LayoutGrid size={16} /> },
-              ]}
-            />
-          </div>
         </div>
       </div>
       <div className="flex-1 min-h-0 overflow-hidden">
@@ -494,7 +516,7 @@ const MeetingsView: React.FC<MeetingsViewProps> = ({ meetings = [], users, clien
 
       {/* Create/Edit Modal — один скролл по центру, шапка и футер фиксированы */}
       {isModalOpen && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={handleBackdropClick}>
+        <div className="fixed inset-0 bg-black/35 flex items-center justify-center z-50 p-4" onClick={handleBackdropClick}>
             <div
               className="bg-white dark:bg-[#252525] rounded-2xl shadow-2xl w-full max-w-xl border border-gray-200 dark:border-[#333] flex flex-col max-h-[min(92vh,840px)] min-h-0"
               onClick={e => e.stopPropagation()}
@@ -585,12 +607,11 @@ const MeetingsView: React.FC<MeetingsViewProps> = ({ meetings = [], users, clien
                         <div className="grid grid-cols-2 gap-3">
                             <div>
                                 <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1.5">Дата</label>
-                                <input 
-                                    required 
-                                    type="date" 
-                                    value={normalizeDateForInput(date) || date} 
-                                    onChange={e => setDate(e.target.value)} 
-                                    className="w-full bg-white dark:bg-[#1e1e1e] text-gray-900 dark:text-gray-100 border border-gray-300 dark:border-[#444] rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-teal-500/40 outline-none"
+                                <DateInput
+                                  required
+                                  value={normalizeDateForInput(date) || date}
+                                  onChange={setDate}
+                                  className="w-full"
                                 />
                             </div>
                             <div>

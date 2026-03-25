@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useMemo } from 'react';
 import { Warehouse, InventoryItem, StockMovement, StockMovementType, StockBalance, InventoryRevision, InventoryRevisionLine } from '../../../types';
 import { api } from '../../../backend/api';
 
@@ -44,12 +44,8 @@ export const useInventoryLogic = (showNotification: (msg: string) => void) => {
       return balances;
   };
 
-  const [balances, setBalances] = useState<StockBalance[]>([]);
-
-  // Пересчитываем балансы при изменении движений
-  useEffect(() => {
-      setBalances(recalcBalances(movements));
-  }, [movements]);
+  /** Производное состояние: один пересчёт на снимок movements, без лишнего useEffect */
+  const balances = useMemo(() => recalcBalances(movements), [movements]);
 
   const saveWarehouses = (next: Warehouse[]) => {
       setWarehouses(next);
@@ -196,7 +192,6 @@ export const useInventoryLogic = (showNotification: (msg: string) => void) => {
           setWarehouses,
           setItems,
           setMovements,
-          setBalances,
           setRevisions,
       },
   };

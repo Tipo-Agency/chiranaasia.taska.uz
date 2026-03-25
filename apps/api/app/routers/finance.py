@@ -1,4 +1,5 @@
 """Finance router - categories, funds, plan, requests, bank statements, income reports."""
+from __future__ import annotations
 from fastapi import APIRouter, Depends
 from sqlalchemy import select, delete
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -10,6 +11,7 @@ from app.models.finance import (
     BankStatement, BankStatementLine, IncomeReport,
     Bdr,
 )
+from app.services.domain_events import log_entity_mutation
 
 router = APIRouter(prefix="/finance", tags=["finance"])
 
@@ -110,6 +112,7 @@ async def update_categories(categories: list[dict], db: AsyncSession = Depends(g
         if not cid:
             continue
         existing = await db.get(FinanceCategory, cid)
+        is_new = existing is None
         if existing:
             existing.name = c.get("name", existing.name)
             existing.type = c.get("type", existing.type)
@@ -123,6 +126,15 @@ async def update_categories(categories: list[dict], db: AsyncSession = Depends(g
                 value=str(c.get("value")) if c.get("value") is not None else None,
                 color=c.get("color"),
             ))
+        await db.flush()
+        await log_entity_mutation(
+            db,
+            event_type="finance.category.created" if is_new else "finance.category.updated",
+            entity_type="finance_category",
+            entity_id=cid,
+            source="finance-router",
+            payload={"name": c.get("name")},
+        )
     await db.commit()
     return {"ok": True}
 
@@ -144,6 +156,7 @@ async def update_funds(funds: list[dict], db: AsyncSession = Depends(get_db)):
         if not fid:
             continue
         existing = await db.get(Fund, fid)
+        is_new = existing is None
         if existing:
             existing.name = f.get("name", existing.name)
             existing.order_val = str(f.get("order", 0))
@@ -155,6 +168,15 @@ async def update_funds(funds: list[dict], db: AsyncSession = Depends(get_db)):
                 order_val=str(f.get("order", 0)),
                 is_archived=f.get("isArchived", False),
             ))
+        await db.flush()
+        await log_entity_mutation(
+            db,
+            event_type="finance.fund.created" if is_new else "finance.fund.updated",
+            entity_type="fund",
+            entity_id=fid,
+            source="finance-router",
+            payload={"name": f.get("name")},
+        )
     await db.commit()
     return {"ok": True}
 
@@ -177,6 +199,7 @@ async def update_plan(plan: dict, db: AsyncSession = Depends(get_db)):
         row.period = plan.get("period", row.period)
         row.sales_plan = str(plan.get("salesPlan", row.sales_plan))
         row.current_income = str(plan.get("currentIncome", row.current_income))
+        entity_id = row.id
     else:
         db.add(FinancePlan(
             id=pid,
@@ -184,6 +207,16 @@ async def update_plan(plan: dict, db: AsyncSession = Depends(get_db)):
             sales_plan=str(plan.get("salesPlan", 0)),
             current_income=str(plan.get("currentIncome", 0)),
         ))
+        entity_id = pid
+    await db.flush()
+    await log_entity_mutation(
+        db,
+        event_type="finance.plan.updated",
+        entity_type="finance_plan",
+        entity_id=entity_id,
+        source="finance-router",
+        payload={"period": plan.get("period")},
+    )
     await db.commit()
     return {"ok": True}
 
@@ -201,6 +234,8 @@ async def update_requests(requests: list[dict], db: AsyncSession = Depends(get_d
         if not rid:
             continue
         existing = await db.get(PurchaseRequest, rid)
+        prev_status = existing.status if existing else None
+        is_new = existing is None
         if existing:
             existing.requester_id = r.get("requesterId", existing.requester_id)
             existing.department_id = r.get("departmentId", existing.department_id)
@@ -224,6 +259,28 @@ async def update_requests(requests: list[dict], db: AsyncSession = Depends(get_d
                 decision_date=r.get("decisionDate"),
                 is_archived=r.get("isArchived", False),
             ))
+        await db.flush()
+        pr_row = await db.get(PurchaseRequest, rid)
+        st = pr_row.status if pr_row else r.get("status")
+        await log_entity_mutation(
+            db,
+            event_type="purchase_request.created" if is_new else "purchase_request.updated",
+            entity_type="purchase_request",
+            entity_id=rid,
+            source="finance-router",
+            actor_id=r.get("requesterId") or r.get("userId"),
+            payload={"description": r.get("description"), "amount": r.get("amount"), "status": st},
+        )
+        if not is_new and pr_row and prev_status is not None and pr_row.status != prev_status:
+            await log_entity_mutation(
+                db,
+                event_type="purchase_request.status.changed",
+                entity_type="purchase_request",
+                entity_id=rid,
+                source="finance-router",
+                actor_id=r.get("requesterId") or r.get("userId"),
+                payload={"fromStatus": prev_status, "toStatus": pr_row.status, "description": pr_row.description},
+            )
     await db.commit()
     return {"ok": True}
 
@@ -241,6 +298,8 @@ async def update_financial_plan_documents(docs: list[dict], db: AsyncSession = D
         if not did:
             continue
         existing = await db.get(FinancialPlanDocument, did)
+        is_new = existing is None
+        prev_status = existing.status if existing else None
         if existing:
             existing.department_id = d.get("departmentId", existing.department_id)
             existing.period = d.get("period", existing.period)
@@ -266,6 +325,26 @@ async def update_financial_plan_documents(docs: list[dict], db: AsyncSession = D
                 approved_at=d.get("approvedAt"),
                 is_archived=d.get("isArchived", False),
             ))
+        await db.flush()
+        doc_row = await db.get(FinancialPlanDocument, did)
+        st = doc_row.status if doc_row else d.get("status")
+        await log_entity_mutation(
+            db,
+            event_type="financial_plan_document.created" if is_new else "financial_plan_document.updated",
+            entity_type="financial_plan_document",
+            entity_id=did,
+            source="finance-router",
+            payload={"departmentId": d.get("departmentId"), "period": d.get("period"), "status": st},
+        )
+        if not is_new and doc_row and prev_status is not None and doc_row.status != prev_status:
+            await log_entity_mutation(
+                db,
+                event_type="financial_plan_document.status.changed",
+                entity_type="financial_plan_document",
+                entity_id=did,
+                source="finance-router",
+                payload={"fromStatus": prev_status, "toStatus": doc_row.status},
+            )
     await db.commit()
     return {"ok": True}
 
@@ -283,6 +362,8 @@ async def update_financial_plannings(plannings: list[dict], db: AsyncSession = D
         if not pid:
             continue
         existing = await db.get(FinancialPlanning, pid)
+        is_new = existing is None
+        prev_status = existing.status if existing else None
         if existing:
             existing.department_id = p.get("departmentId", existing.department_id)
             existing.period = p.get("period", existing.period)
@@ -316,6 +397,26 @@ async def update_financial_plannings(plannings: list[dict], db: AsyncSession = D
                 notes=p.get("notes"),
                 is_archived=p.get("isArchived", False),
             ))
+        await db.flush()
+        pl_row = await db.get(FinancialPlanning, pid)
+        st = pl_row.status if pl_row else p.get("status")
+        await log_entity_mutation(
+            db,
+            event_type="financial_planning.created" if is_new else "financial_planning.updated",
+            entity_type="financial_planning",
+            entity_id=pid,
+            source="finance-router",
+            payload={"departmentId": p.get("departmentId"), "period": p.get("period"), "status": st},
+        )
+        if not is_new and pl_row and prev_status is not None and pl_row.status != prev_status:
+            await log_entity_mutation(
+                db,
+                event_type="financial_planning.status.changed",
+                entity_type="financial_planning",
+                entity_id=pid,
+                source="finance-router",
+                payload={"fromStatus": prev_status, "toStatus": pl_row.status},
+            )
     await db.commit()
     return {"ok": True}
 
@@ -362,6 +463,7 @@ async def update_bank_statements(payload: list[dict], db: AsyncSession = Depends
         if not sid:
             continue
         existing = await db.get(BankStatement, sid)
+        is_new = existing is None
         if existing:
             existing.name = s.get("name", existing.name)
             existing.period = s.get("period", existing.period)
@@ -386,6 +488,15 @@ async def update_bank_statements(payload: list[dict], db: AsyncSession = Depends
                 amount=str(ln.get("amount", 0)),
                 line_type=ln.get("lineType", "in"),
             ))
+        await db.flush()
+        await log_entity_mutation(
+            db,
+            event_type="bank_statement.created" if is_new else "bank_statement.updated",
+            entity_type="bank_statement",
+            entity_id=sid,
+            source="finance-router",
+            payload={"name": s.get("name"), "period": s.get("period"), "lineCount": len(lines)},
+        )
     await db.commit()
     return {"ok": True}
 
@@ -396,6 +507,15 @@ async def delete_bank_statement(statement_id: str, db: AsyncSession = Depends(ge
     st = await db.get(BankStatement, statement_id)
     if st:
         await db.delete(st)
+    await db.flush()
+    await log_entity_mutation(
+        db,
+        event_type="bank_statement.deleted",
+        entity_type="bank_statement",
+        entity_id=statement_id,
+        source="finance-router",
+        payload={},
+    )
     await db.commit()
     return {"ok": True}
 
@@ -425,6 +545,7 @@ async def update_income_reports(payload: list[dict], db: AsyncSession = Depends(
         if not rid:
             continue
         existing = await db.get(IncomeReport, rid)
+        is_new = existing is None
         if existing:
             existing.period = r.get("period", existing.period)
             existing.data = r.get("data", existing.data or {})
@@ -438,6 +559,15 @@ async def update_income_reports(payload: list[dict], db: AsyncSession = Depends(
                 created_at=r.get("createdAt", ""),
                 updated_at=r.get("updatedAt"),
             ))
+        await db.flush()
+        await log_entity_mutation(
+            db,
+            event_type="income_report.created" if is_new else "income_report.updated",
+            entity_type="income_report",
+            entity_id=rid,
+            source="finance-router",
+            payload={"period": r.get("period")},
+        )
     await db.commit()
     return {"ok": True}
 
@@ -473,10 +603,20 @@ async def update_bdr(payload: dict, db: AsyncSession = Depends(get_db)):
     existing = result.scalar_one_or_none()
     import datetime
     now = datetime.datetime.utcnow().isoformat()[:19] + "Z"
+    is_new = existing is None
     if existing:
         existing.rows = rows
         existing.updated_at = now
     else:
         db.add(Bdr(id=y, year=y, rows=rows, updated_at=now))
+    await db.flush()
+    await log_entity_mutation(
+        db,
+        event_type="bdr.created" if is_new else "bdr.updated",
+        entity_type="bdr",
+        entity_id=y,
+        source="finance-router",
+        payload={"year": y, "rowCount": len(rows) if isinstance(rows, list) else 0},
+    )
     await db.commit()
     return {"ok": True}

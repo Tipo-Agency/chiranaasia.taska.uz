@@ -6,6 +6,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { Bdr, BdrRow } from '../../types';
 import { Trash2, Save, TrendingUp, TrendingDown, Check, Pencil } from 'lucide-react';
 import { ModuleCreateIconButton } from '../ui/ModuleCreateIconButton';
+import { TaskSelect } from '../TaskSelect';
 
 const MONTHS = ['Янв', 'Фев', 'Мар', 'Апр', 'Май', 'Июн', 'Июл', 'Авг', 'Сен', 'Окт', 'Ноя', 'Дек'];
 
@@ -83,7 +84,7 @@ export const BdrView: React.FC<BdrViewProps> = ({ bdr, onLoadBdr, onSaveBdr }) =
     setDirty(true);
   };
 
-  const getCellValue = (row: BdrRow, period: { key: string; months: string[] }): number => {
+  const getCellValue = (row: BdrRow, period: { months: string[] }): number => {
     const sum = period.months.reduce((s, m) => s + (row.amounts[m] ?? 0), 0);
     return Math.round(sum * 100) / 100;
   };
@@ -138,21 +139,20 @@ export const BdrView: React.FC<BdrViewProps> = ({ bdr, onLoadBdr, onSaveBdr }) =
     incomeRows.reduce((s, r) => s + getCellValue(r, period), 0);
   const totalExpenseByPeriod = (period: { months: string[] }) =>
     expenseRows.reduce((s, r) => s + getCellValue(r, period), 0);
+  const profitByPeriod = (period: { months: string[] }) => totalIncomeByPeriod(period) - totalExpenseByPeriod(period);
 
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div className="flex flex-wrap items-center gap-3">
           <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Год:</label>
-          <select
-            value={year}
-            onChange={(e) => setYear(parseInt(e.target.value, 10))}
-            className="rounded-lg border border-gray-300 dark:border-[#333] bg-white dark:bg-[#252525] px-3 py-2 text-sm text-gray-900 dark:text-gray-100"
-          >
-            {[currentYear - 1, currentYear, currentYear + 1].map(y => (
-              <option key={y} value={y}>{y}</option>
-            ))}
-          </select>
+          <div className="w-36">
+            <TaskSelect
+              value={String(year)}
+              onChange={(v) => setYear(parseInt(v, 10))}
+              options={[currentYear - 1, currentYear, currentYear + 1].map((y) => ({ value: String(y), label: String(y) }))}
+            />
+          </div>
           <span className="text-sm text-gray-500 dark:text-gray-400">|</span>
           <div className="flex rounded-lg border border-gray-200 dark:border-[#333] p-0.5 bg-gray-100 dark:bg-[#252525]">
             {(['month', 'quarter', 'year'] as const).map(mode => (
@@ -317,6 +317,18 @@ export const BdrView: React.FC<BdrViewProps> = ({ bdr, onLoadBdr, onSaveBdr }) =
                 </tr>
               );
             })}
+            <tr className="bg-indigo-50/60 dark:bg-indigo-900/20 border-t border-gray-200 dark:border-[#333]">
+              <td className="py-2.5 px-3 font-semibold text-indigo-700 dark:text-indigo-300">Прибыль (Доходы - Расходы)</td>
+              {periods.map((p) => {
+                const val = profitByPeriod(p);
+                return (
+                  <td key={p.key} className={`py-2.5 px-2 text-right font-semibold ${val >= 0 ? 'text-emerald-700 dark:text-emerald-300' : 'text-rose-700 dark:text-rose-300'}`}>
+                    {val.toLocaleString('ru-RU')}
+                  </td>
+                );
+              })}
+              <td />
+            </tr>
           </tbody>
         </table>
       </div>

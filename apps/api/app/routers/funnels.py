@@ -5,6 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
 from app.models.funnel import SalesFunnel
+from app.services.domain_events import log_entity_mutation
 
 router = APIRouter(prefix="/funnels", tags=["funnels"])
 
@@ -34,6 +35,7 @@ async def update_funnels(funnels: list[dict], db: AsyncSession = Depends(get_db)
         if not fid:
             continue
         existing = await db.get(SalesFunnel, fid)
+        is_new = existing is None
         if existing:
             existing.name = f.get("name", existing.name)
             existing.stages = f.get("stages", existing.stages or [])
@@ -51,6 +53,15 @@ async def update_funnels(funnels: list[dict], db: AsyncSession = Depends(get_db)
                 updated_at=f.get("updatedAt"),
                 is_archived="true" if f.get("isArchived") else "false",
             ))
+        await db.flush()
+        await log_entity_mutation(
+            db,
+            event_type="sales_funnel.created" if is_new else "sales_funnel.updated",
+            entity_type="sales_funnel",
+            entity_id=fid,
+            source="funnels-router",
+            payload={"name": f.get("name")},
+        )
     await db.commit()
     return {"ok": True}
 
@@ -70,6 +81,15 @@ async def create_funnel(funnel: dict, db: AsyncSession = Depends(get_db)):
         updated_at=now,
         is_archived="false",
     ))
+    await db.flush()
+    await log_entity_mutation(
+        db,
+        event_type="sales_funnel.created",
+        entity_type="sales_funnel",
+        entity_id=fid,
+        source="funnels-router",
+        payload={"name": funnel.get("name", "Новая воронка")},
+    )
     await db.commit()
     result = await db.get(SalesFunnel, fid)
     return row_to_funnel(result)
@@ -98,6 +118,15 @@ async def update_funnel(funnel_id: str, updates: dict, db: AsyncSession = Depend
         f.is_archived = "true" if updates["isArchived"] else "false"
     from datetime import datetime
     f.updated_at = datetime.utcnow().isoformat()
+    await db.flush()
+    await log_entity_mutation(
+        db,
+        event_type="sales_funnel.patched",
+        entity_type="sales_funnel",
+        entity_id=funnel_id,
+        source="funnels-router",
+        payload={"name": f.name, "updates": list(updates.keys())},
+    )
     await db.commit()
     await db.refresh(f)
     return row_to_funnel(f)
@@ -108,5 +137,14 @@ async def delete_funnel(funnel_id: str, db: AsyncSession = Depends(get_db)):
     f = await db.get(SalesFunnel, funnel_id)
     if f:
         f.is_archived = "true"
+        await db.flush()
+        await log_entity_mutation(
+            db,
+            event_type="sales_funnel.archived",
+            entity_type="sales_funnel",
+            entity_id=funnel_id,
+            source="funnels-router",
+            payload={"name": f.name},
+        )
         await db.commit()
     return {"ok": True}

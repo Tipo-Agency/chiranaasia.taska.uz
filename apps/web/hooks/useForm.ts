@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef, useEffect } from 'react';
+import { useState, useCallback, useRef, useEffect, type FormEvent } from 'react';
 
 /**
  * Хук для управления формой с отслеживанием изменений
@@ -40,7 +40,7 @@ export function useForm<T extends Record<string, any>>(
     setIsDirty(false);
   }, []);
 
-  const handleSubmit = useCallback(async (e?: React.FormEvent) => {
+  const handleSubmit = useCallback(async (e?: FormEvent) => {
     if (e) {
       e.preventDefault();
     }

@@ -17,11 +17,14 @@ import {
   X,
   Search,
   Info,
+  Sparkles,
 } from 'lucide-react';
 import { User, Doc, Task, Deal, Meeting, BusinessProcess } from '../../../types';
-import { chatLocalService, ChatMessageLocal } from '../../../services/chatLocalService';
+import { chatLocalService, ChatMessageLocal, SYSTEM_CHAT_SENDER_ID } from '../../../services/chatLocalService';
 
 const TO_ALL_ID = '__all__';
+/** Виртуальный диалог: системные уведомления */
+const SYSTEM_FEED_UI = '__system_feed__';
 const MAX_FILE_BYTES = 512 * 1024;
 
 export interface MiniMessengerProps {
@@ -40,6 +43,9 @@ export interface MiniMessengerProps {
   onOpenDocumentsModule?: () => void;
   onOpenDeals?: () => void;
   onOpenMeetings?: () => void;
+  onOpenTask?: (task: Task) => void;
+  onOpenDeal?: (deal: Deal) => void;
+  onOpenMeeting?: (meeting: Meeting) => void;
   onCreateEntity?: (type: 'task' | 'deal' | 'meeting' | 'doc', title: string) => Promise<{ id: string; label: string } | null> | { id: string; label: string } | null;
   onUpdateEntity?: (
     type: 'task' | 'deal' | 'meeting' | 'doc',
@@ -48,6 +54,9 @@ export interface MiniMessengerProps {
   ) => Promise<boolean> | boolean;
   processTemplates?: BusinessProcess[];
   onStartProcessTemplate?: (processId: string) => Promise<{ id: string; label: string } | null> | { id: string; label: string } | null;
+  /** Открыть ленту «Система» при монтировании (из колокольчика) */
+  initialOpenSystemFeed?: boolean;
+  onConsumedInitialSystemFeed?: () => void;
 }
 
 function formatDayLabel(d: Date): string {
@@ -72,16 +81,21 @@ export const MiniMessenger: React.FC<MiniMessengerProps> = ({
   onOpenDocumentsModule,
   onOpenDeals,
   onOpenMeetings,
+  onOpenTask,
+  onOpenDeal,
+  onOpenMeeting,
   onCreateEntity,
   onUpdateEntity,
   processTemplates = [],
   onStartProcessTemplate,
+  initialOpenSystemFeed = false,
+  onConsumedInitialSystemFeed,
 }) => {
   const colleagues = useMemo(
     () => users.filter((u) => u.id !== currentUser.id && !u.isArchived),
     [users, currentUser.id]
   );
-  const [activeId, setActiveId] = useState<string | null>(TO_ALL_ID);
+  const [activeId, setActiveId] = useState<string | null>(SYSTEM_FEED_UI);
   const [messages, setMessages] = useState<ChatMessageLocal[]>([]);
   const [input, setInput] = useState('');
   const [activePanel, setActivePanel] = useState<null | 'entity' | 'create' | 'process'>(null);
@@ -91,14 +105,9 @@ export const MiniMessenger: React.FC<MiniMessengerProps> = ({
   const [createEntityType, setCreateEntityType] = useState<'task' | 'deal' | 'meeting' | 'doc'>('task');
   const [createEntityTitle, setCreateEntityTitle] = useState('');
   const [processSearch, setProcessSearch] = useState('');
-  const [editModalOpen, setEditModalOpen] = useState(false);
-  const [editTitle, setEditTitle] = useState('');
-  const [editSecondaryA, setEditSecondaryA] = useState('');
-  const [editSecondaryB, setEditSecondaryB] = useState('');
-  const [editMeetingDate, setEditMeetingDate] = useState('');
-  const [editMeetingTime, setEditMeetingTime] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const messagesContainerRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const refresh = () => setMessages(chatLocalService.getMessagesForUser(currentUser.id));
@@ -108,32 +117,24 @@ export const MiniMessenger: React.FC<MiniMessengerProps> = ({
   }, [currentUser.id]);
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages, activeId]);
+    if (initialOpenSystemFeed) {
+      setActiveId(SYSTEM_FEED_UI);
+      onConsumedInitialSystemFeed?.();
+    }
+  }, [initialOpenSystemFeed, onConsumedInitialSystemFeed]);
 
   useEffect(() => {
-    if (!editModalOpen) return;
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setEditModalOpen(false);
-    };
-    window.addEventListener('keydown', onKeyDown);
-    return () => window.removeEventListener('keydown', onKeyDown);
-  }, [editModalOpen]);
-
-  const canSaveEdit = useMemo(() => {
-    if (!selectedEntity) return false;
-    const titleOk = editTitle.trim().length > 0;
-    if (!titleOk) return false;
-    if (selectedEntity.type === 'meeting') {
-      return editMeetingDate.trim().length > 0 && editMeetingTime.trim().length > 0;
-    }
-    if (selectedEntity.type === 'task') return editSecondaryA.trim().length > 0;
-    if (selectedEntity.type === 'deal') return editSecondaryA.trim().length > 0;
-    if (selectedEntity.type === 'doc') return editSecondaryA.trim().length > 0;
-    return true;
-  }, [selectedEntity, editTitle, editSecondaryA, editSecondaryB, editMeetingDate, editMeetingTime]);
+    const container = messagesContainerRef.current;
+    if (!container) return;
+    container.scrollTop = container.scrollHeight;
+  }, [messages, activeId]);
 
   const threadMessages = useMemo(() => {
+    if (activeId === SYSTEM_FEED_UI) {
+      return messages
+        .filter((m) => m.fromId === SYSTEM_CHAT_SENDER_ID && m.toId === currentUser.id)
+        .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+    }
     if (activeId === TO_ALL_ID) {
       return messages
         .filter((m) => m.toId === TO_ALL_ID)
@@ -180,14 +181,24 @@ export const MiniMessenger: React.FC<MiniMessengerProps> = ({
 
   const filteredProcessTemplates = useMemo(() => {
     const q = processSearch.trim().toLowerCase();
-    const list = (processTemplates || []).filter((p) => !p.isArchived);
+    const latestById = new Map<string, BusinessProcess>();
+    for (const p of processTemplates || []) {
+      if (p.isArchived || p.systemKey) continue;
+      const prev = latestById.get(p.id);
+      if (!prev || (p.version || 1) > (prev.version || 1)) {
+        latestById.set(p.id, p);
+      }
+    }
+    const list = [...latestById.values()];
     if (!q) return list.slice(0, 80);
-    return list.filter((p) => (p.title || '').toLowerCase().includes(q)).slice(0, 80);
+    return list
+      .filter((p) => (p.title || '').toLowerCase().includes(q))
+      .slice(0, 80);
   }, [processTemplates, processSearch]);
 
   const sendText = () => {
     const text = input.trim();
-    if (!text || !activeId) return;
+    if (!text || !activeId || activeId === SYSTEM_FEED_UI) return;
     chatLocalService.addMessage({
       fromId: currentUser.id,
       toId: activeId === TO_ALL_ID ? TO_ALL_ID : activeId,
@@ -285,7 +296,11 @@ export const MiniMessenger: React.FC<MiniMessengerProps> = ({
   };
 
   const activeName =
-    activeId === TO_ALL_ID ? 'Общий чат' : colleagues.find((u) => u.id === activeId)?.name ?? activeId;
+    activeId === SYSTEM_FEED_UI
+      ? 'Системные уведомления'
+      : activeId === TO_ALL_ID
+        ? 'Общий чат'
+        : colleagues.find((u) => u.id === activeId)?.name ?? activeId;
 
   const openLinkedDoc = (docId: string) => {
     const doc = docs.find((d) => d.id === docId);
@@ -385,6 +400,24 @@ export const MiniMessenger: React.FC<MiniMessengerProps> = ({
           <div className="flex-1 overflow-y-auto custom-scrollbar p-2 space-y-0.5">
             <button
               type="button"
+              onClick={() => setActiveId(SYSTEM_FEED_UI)}
+              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-left text-sm transition-colors ${
+                activeId === SYSTEM_FEED_UI
+                  ? 'bg-gradient-to-r from-violet-600 to-indigo-600 text-white shadow-md'
+                  : 'text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-[#2a2a2a]'
+              }`}
+            >
+              <div
+                className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${
+                  activeId === SYSTEM_FEED_UI ? 'bg-white/20' : 'bg-violet-500/15 text-violet-600 dark:text-violet-300'
+                }`}
+              >
+                <Sparkles size={18} />
+              </div>
+              <span className="font-medium truncate">Система</span>
+            </button>
+            <button
+              type="button"
               onClick={() => setActiveId(TO_ALL_ID)}
               className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-left text-sm transition-colors ${
                 activeId === TO_ALL_ID
@@ -412,13 +445,25 @@ export const MiniMessenger: React.FC<MiniMessengerProps> = ({
                     : 'text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-[#2a2a2a]'
                 }`}
               >
-                <img
-                  src={u.avatar}
-                  alt=""
-                  className={`h-9 w-9 rounded-full object-cover shrink-0 ring-2 ${
-                    activeId === u.id ? 'ring-white/40' : 'ring-gray-200 dark:ring-[#444]'
-                  }`}
-                />
+                {u.avatar ? (
+                  <img
+                    src={u.avatar}
+                    alt=""
+                    className={`h-9 w-9 rounded-full object-cover shrink-0 ring-2 ${
+                      activeId === u.id ? 'ring-white/40' : 'ring-gray-200 dark:ring-[#444]'
+                    }`}
+                  />
+                ) : (
+                  <div
+                    className={`h-9 w-9 rounded-full shrink-0 ring-2 flex items-center justify-center text-xs font-semibold ${
+                      activeId === u.id
+                        ? 'ring-white/40 bg-white/20 text-white'
+                        : 'ring-gray-200 dark:ring-[#444] bg-[#3337AD]/10 text-[#3337AD]'
+                    }`}
+                  >
+                    {(u.name || '?').trim().charAt(0).toUpperCase() || '?'}
+                  </div>
+                )}
                 <span className="truncate font-medium">{u.name}</span>
               </button>
             ))}
@@ -427,15 +472,25 @@ export const MiniMessenger: React.FC<MiniMessengerProps> = ({
 
         {/* Лента и ввод */}
         <div className="flex-1 flex flex-col min-w-0 bg-white/40 dark:bg-[#222]/50">
-          <div className="flex-1 overflow-y-auto custom-scrollbar px-3 sm:px-4 py-3 space-y-3">
+          <div ref={messagesContainerRef} className="flex-1 overflow-y-auto custom-scrollbar px-3 sm:px-4 py-3 space-y-3">
             {threadMessages.length === 0 ? (
               <div className="h-full flex flex-col items-center justify-center text-center px-4 py-8">
-                <div className="w-14 h-14 rounded-2xl bg-gray-100 dark:bg-[#333] flex items-center justify-center mb-3 text-gray-400">
-                  <MessageCircle size={28} />
+                <div
+                  className={`w-14 h-14 rounded-2xl flex items-center justify-center mb-3 ${
+                    activeId === SYSTEM_FEED_UI
+                      ? 'bg-violet-100 dark:bg-violet-950/50 text-violet-500'
+                      : 'bg-gray-100 dark:bg-[#333] text-gray-400'
+                  }`}
+                >
+                  {activeId === SYSTEM_FEED_UI ? <Sparkles size={28} /> : <MessageCircle size={28} />}
                 </div>
-                <p className="text-sm font-medium text-gray-700 dark:text-gray-200">Нет сообщений</p>
+                <p className="text-sm font-medium text-gray-700 dark:text-gray-200">
+                  {activeId === SYSTEM_FEED_UI ? 'Пока тихо' : 'Нет сообщений'}
+                </p>
                 <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 max-w-xs">
-                  Напишите коллегам, прикрепите файл или документ из системы — панель действий под полем ввода.
+                  {activeId === SYSTEM_FEED_UI
+                    ? 'Здесь появятся назначения задач, события по сделкам и другие системные уведомления.'
+                    : 'Напишите коллегам, прикрепите файл или документ из системы — панель действий под полем ввода.'}
                 </p>
               </div>
             ) : (
@@ -464,6 +519,12 @@ export const MiniMessenger: React.FC<MiniMessengerProps> = ({
 
           {/* Панель действий */}
           <div className="border-t border-gray-200/80 dark:border-[#333] bg-white/90 dark:bg-[#252525]/95 px-2 sm:px-3 pt-2 pb-3 shrink-0">
+            {activeId === SYSTEM_FEED_UI ? (
+              <p className="text-xs text-center text-gray-500 dark:text-gray-400 py-3 px-2 leading-relaxed">
+                Системная лента только для просмотра. Нажмите на блок с задачей или сделкой в сообщении, чтобы открыть карточку.
+              </p>
+            ) : (
+              <>
             <div className="flex flex-wrap items-center gap-1 mb-2">
               <ToolbarBtn
                 title="Прикрепить файл"
@@ -499,135 +560,6 @@ export const MiniMessenger: React.FC<MiniMessengerProps> = ({
 
             <input ref={fileInputRef} type="file" className="hidden" onChange={onFileSelected} />
 
-            {activePanel === 'entity' && (
-              <div className="mb-2 rounded-xl border border-gray-200 dark:border-[#444] bg-white dark:bg-[#1e1e1e] shadow-lg overflow-hidden">
-                <div className="flex items-center gap-2 px-3 py-2 border-b border-gray-100 dark:border-[#333]">
-                  <div className="inline-flex items-center rounded-lg border border-gray-200 dark:border-[#444] overflow-hidden text-xs">
-                    {(['task', 'deal', 'meeting', 'doc'] as const).map((t) => (
-                      <button
-                        key={t}
-                        type="button"
-                        onClick={() => setEntityType(t)}
-                        className={`px-2.5 py-1.5 ${entityType === t ? 'bg-[#3337AD] text-white' : 'bg-transparent text-gray-600 dark:text-gray-300'}`}
-                      >
-                        {t === 'task' ? 'Задачи' : t === 'deal' ? 'Сделки' : t === 'meeting' ? 'Встречи' : 'Документы'}
-                      </button>
-                    ))}
-                  </div>
-                  <Search size={16} className="text-gray-400 shrink-0" />
-                  <input
-                    value={entitySearch}
-                    onChange={(e) => setEntitySearch(e.target.value)}
-                    placeholder="Поиск сущности…"
-                    className="flex-1 min-w-0 bg-transparent text-sm text-gray-900 dark:text-gray-100 outline-none placeholder:text-gray-400"
-                  />
-                  <button
-                    type="button"
-                    className="p-1 rounded-lg hover:bg-gray-100 dark:hover:bg-[#333]"
-                    onClick={() => setActivePanel(null)}
-                  >
-                    <X size={16} />
-                  </button>
-                </div>
-                <div className="max-h-52 overflow-y-auto custom-scrollbar p-1">
-                  {filteredEntities.length === 0 ? (
-                    <p className="text-xs text-gray-500 px-3 py-4 text-center">Ничего не найдено</p>
-                  ) : (
-                    filteredEntities.map((item) => (
-                      <button
-                        key={item.id}
-                        type="button"
-                        onClick={() => attachEntity(item.id, item.label)}
-                        className="w-full text-left px-3 py-2 rounded-lg text-sm text-gray-800 dark:text-gray-100 hover:bg-[#3337AD]/10"
-                      >
-                        <div className="truncate">{item.label}</div>
-                        {item.subtitle ? <div className="text-xs text-gray-500 dark:text-gray-400 truncate">{item.subtitle}</div> : null}
-                      </button>
-                    ))
-                  )}
-                </div>
-              </div>
-            )}
-
-            {activePanel === 'create' && (
-              <div className="mb-2 rounded-xl border border-gray-200 dark:border-[#444] bg-white dark:bg-[#1e1e1e] shadow-lg overflow-hidden p-3">
-                <div className="flex items-center gap-2 mb-2">
-                  <div className="inline-flex items-center rounded-lg border border-gray-200 dark:border-[#444] overflow-hidden text-xs">
-                    {(['task', 'deal', 'meeting', 'doc'] as const).map((t) => (
-                      <button
-                        key={t}
-                        type="button"
-                        onClick={() => setCreateEntityType(t)}
-                        className={`px-2.5 py-1.5 ${createEntityType === t ? 'bg-[#3337AD] text-white' : 'bg-transparent text-gray-600 dark:text-gray-300'}`}
-                      >
-                        {t === 'task' ? 'Задача' : t === 'deal' ? 'Сделка' : t === 'meeting' ? 'Встреча' : 'Документ'}
-                      </button>
-                    ))}
-                  </div>
-                  <button
-                    type="button"
-                    className="ml-auto p-1 rounded-lg hover:bg-gray-100 dark:hover:bg-[#333]"
-                    onClick={() => setActivePanel(null)}
-                  >
-                    <X size={16} />
-                  </button>
-                </div>
-                <div className="flex gap-2">
-                  <input
-                    value={createEntityTitle}
-                    onChange={(e) => setCreateEntityTitle(e.target.value)}
-                    placeholder="Название"
-                    className="flex-1 min-w-0 rounded-lg border border-gray-200 dark:border-[#444] bg-transparent px-3 py-2 text-sm"
-                  />
-                  <button
-                    type="button"
-                    onClick={createAndAttachEntity}
-                    className="px-3 py-2 rounded-lg bg-[#3337AD] text-white text-sm"
-                  >
-                    Создать и прикрепить
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {activePanel === 'process' && (
-              <div className="mb-2 rounded-xl border border-gray-200 dark:border-[#444] bg-white dark:bg-[#1e1e1e] shadow-lg overflow-hidden">
-                <div className="flex items-center gap-2 px-3 py-2 border-b border-gray-100 dark:border-[#333]">
-                  <Search size={16} className="text-gray-400 shrink-0" />
-                  <input
-                    value={processSearch}
-                    onChange={(e) => setProcessSearch(e.target.value)}
-                    placeholder="Поиск шаблона процесса…"
-                    className="flex-1 min-w-0 bg-transparent text-sm text-gray-900 dark:text-gray-100 outline-none placeholder:text-gray-400"
-                  />
-                  <button
-                    type="button"
-                    className="p-1 rounded-lg hover:bg-gray-100 dark:hover:bg-[#333]"
-                    onClick={() => setActivePanel(null)}
-                  >
-                    <X size={16} />
-                  </button>
-                </div>
-                <div className="max-h-52 overflow-y-auto custom-scrollbar p-1">
-                  {filteredProcessTemplates.length === 0 ? (
-                    <p className="text-xs text-gray-500 px-3 py-4 text-center">Нет шаблонов</p>
-                  ) : (
-                    filteredProcessTemplates.map((p) => (
-                      <button
-                        key={p.id}
-                        type="button"
-                        onClick={() => startFromTemplate(p.id, p.title)}
-                        className="w-full text-left px-3 py-2 rounded-lg text-sm text-gray-800 dark:text-gray-100 hover:bg-[#3337AD]/10"
-                      >
-                        <div className="truncate">{p.title}</div>
-                        {p.description ? <div className="text-xs text-gray-500 dark:text-gray-400 truncate">{p.description}</div> : null}
-                      </button>
-                    ))
-                  )}
-                </div>
-              </div>
-            )}
-
             <div className="flex items-end gap-2">
               <textarea
                 ref={textareaRef}
@@ -657,8 +589,118 @@ export const MiniMessenger: React.FC<MiniMessengerProps> = ({
                 <Send size={18} />
               </button>
             </div>
+              </>
+            )}
           </div>
         </div>
+
+        {activeId !== SYSTEM_FEED_UI && activePanel === 'entity' && (
+          <ChatActionModal title="Привязать сущность" onClose={() => setActivePanel(null)}>
+            <div className="flex items-center gap-2 px-3 py-2 border-b border-gray-100 dark:border-[#333]">
+              <div className="inline-flex items-center rounded-lg border border-gray-200 dark:border-[#444] overflow-hidden text-xs">
+                {(['task', 'deal', 'meeting', 'doc'] as const).map((t) => (
+                  <button
+                    key={t}
+                    type="button"
+                    onClick={() => setEntityType(t)}
+                    className={`px-2.5 py-1.5 ${entityType === t ? 'bg-[#3337AD] text-white' : 'bg-transparent text-gray-600 dark:text-gray-300'}`}
+                  >
+                    {t === 'task' ? 'Задачи' : t === 'deal' ? 'Сделки' : t === 'meeting' ? 'Встречи' : 'Документы'}
+                  </button>
+                ))}
+              </div>
+              <Search size={16} className="text-gray-400 shrink-0" />
+              <input
+                value={entitySearch}
+                onChange={(e) => setEntitySearch(e.target.value)}
+                placeholder="Поиск сущности…"
+                className="flex-1 min-w-0 bg-transparent text-sm text-gray-900 dark:text-gray-100 outline-none placeholder:text-gray-400"
+              />
+            </div>
+            <div className="max-h-72 overflow-y-auto custom-scrollbar p-1">
+              {filteredEntities.length === 0 ? (
+                <p className="text-xs text-gray-500 px-3 py-4 text-center">Ничего не найдено</p>
+              ) : (
+                filteredEntities.map((item) => (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => attachEntity(item.id, item.label)}
+                    className="w-full text-left px-3 py-2 rounded-lg text-sm text-gray-800 dark:text-gray-100 hover:bg-[#3337AD]/10"
+                  >
+                    <div className="truncate">{item.label}</div>
+                    {item.subtitle ? <div className="text-xs text-gray-500 dark:text-gray-400 truncate">{item.subtitle}</div> : null}
+                  </button>
+                ))
+              )}
+            </div>
+          </ChatActionModal>
+        )}
+
+        {activeId !== SYSTEM_FEED_UI && activePanel === 'create' && (
+          <ChatActionModal title="Создать и прикрепить" onClose={() => setActivePanel(null)}>
+            <div className="p-3 space-y-3">
+              <div className="inline-flex items-center rounded-lg border border-gray-200 dark:border-[#444] overflow-hidden text-xs">
+                {(['task', 'deal', 'meeting', 'doc'] as const).map((t) => (
+                  <button
+                    key={t}
+                    type="button"
+                    onClick={() => setCreateEntityType(t)}
+                    className={`px-2.5 py-1.5 ${createEntityType === t ? 'bg-[#3337AD] text-white' : 'bg-transparent text-gray-600 dark:text-gray-300'}`}
+                  >
+                    {t === 'task' ? 'Задача' : t === 'deal' ? 'Сделка' : t === 'meeting' ? 'Встреча' : 'Документ'}
+                  </button>
+                ))}
+              </div>
+              <div className="flex gap-2">
+                <input
+                  value={createEntityTitle}
+                  onChange={(e) => setCreateEntityTitle(e.target.value)}
+                  placeholder="Название"
+                  className="flex-1 min-w-0 rounded-lg border border-gray-200 dark:border-[#444] bg-transparent px-3 py-2 text-sm"
+                />
+                <button
+                  type="button"
+                  onClick={createAndAttachEntity}
+                  className="px-3 py-2 rounded-lg bg-[#3337AD] text-white text-sm"
+                >
+                  Создать и прикрепить
+                </button>
+              </div>
+            </div>
+          </ChatActionModal>
+        )}
+
+        {activeId !== SYSTEM_FEED_UI && activePanel === 'process' && (
+          <ChatActionModal title="Запуск бизнес-процесса" onClose={() => setActivePanel(null)}>
+            <div className="flex items-center gap-2 px-3 py-2 border-b border-gray-100 dark:border-[#333]">
+              <Search size={16} className="text-gray-400 shrink-0" />
+              <input
+                value={processSearch}
+                onChange={(e) => setProcessSearch(e.target.value)}
+                placeholder="Поиск шаблона процесса…"
+                className="flex-1 min-w-0 bg-transparent text-sm text-gray-900 dark:text-gray-100 outline-none placeholder:text-gray-400"
+              />
+            </div>
+            <div className="max-h-72 overflow-y-auto custom-scrollbar p-1">
+              {filteredProcessTemplates.length === 0 ? (
+                <p className="text-xs text-gray-500 px-3 py-4 text-center">Нет шаблонов</p>
+              ) : (
+                filteredProcessTemplates.map((p) => (
+                  <button
+                    key={p.id}
+                    type="button"
+                    onClick={() => startFromTemplate(p.id, p.title || p.name || 'Бизнес-процесс')}
+                    className="w-full text-left px-3 py-2 rounded-lg text-sm text-gray-800 dark:text-gray-100 hover:bg-[#3337AD]/10"
+                  >
+                    <div className="truncate">{p.title || p.name || 'Без названия'}</div>
+                    {p.description ? <div className="text-xs text-gray-500 dark:text-gray-400 truncate">{p.description}</div> : null}
+                  </button>
+                ))
+              )}
+            </div>
+          </ChatActionModal>
+        )}
 
         {selectedEntity && (
           <div className="hidden lg:flex w-72 border-l border-gray-200/80 dark:border-[#333] bg-white/70 dark:bg-[#1f1f1f]/85 p-3">
@@ -700,45 +742,44 @@ export const MiniMessenger: React.FC<MiniMessengerProps> = ({
                       Открыть раздел встреч
                     </button>
                   )}
-                  {onUpdateEntity && (
+                  {(onOpenTask || onOpenDeal || onOpenMeeting || onOpenDocument || onOpenDeals || onOpenMeetings) && (
                     <button
                       type="button"
                       onClick={() => {
                         if (!selectedEntity) return;
                         if (selectedEntity.type === 'task') {
                           const t = tasks.find((x) => x.id === selectedEntity.id);
-                          setEditTitle(t?.title || '');
-                          setEditSecondaryA((t as any)?.status || '');
-                          setEditSecondaryB((t as any)?.description || '');
-                          setEditMeetingDate('');
-                          setEditMeetingTime('');
+                          if (t && onOpenTask) {
+                            onOpenTask(t);
+                            return;
+                          }
                         } else if (selectedEntity.type === 'deal') {
                           const d = deals.find((x) => x.id === selectedEntity.id);
-                          setEditTitle(d?.title || '');
-                          setEditSecondaryA((d as any)?.stage || '');
-                          setEditSecondaryB(String((d as any)?.amount || ''));
-                          setEditMeetingDate('');
-                          setEditMeetingTime('');
+                          if (d && onOpenDeal) {
+                            onOpenDeal(d);
+                            return;
+                          }
+                          onOpenDeals?.();
+                          return;
                         } else if (selectedEntity.type === 'meeting') {
                           const m = meetings.find((x) => x.id === selectedEntity.id);
-                          setEditTitle(m?.title || '');
-                          setEditMeetingDate(m?.date || '');
-                          setEditMeetingTime(m?.time || '');
-                          setEditSecondaryA('');
-                          setEditSecondaryB((m as any)?.summary || '');
+                          if (m && onOpenMeeting) {
+                            onOpenMeeting(m);
+                            return;
+                          }
+                          onOpenMeetings?.();
+                          return;
                         } else {
                           const d = docs.find((x) => x.id === selectedEntity.id);
-                          setEditTitle(d?.title || '');
-                          setEditSecondaryA((d as any)?.type || 'internal');
-                          setEditSecondaryB((d as any)?.content || '');
-                          setEditMeetingDate('');
-                          setEditMeetingTime('');
+                          if (d && onOpenDocument) {
+                            onOpenDocument(d);
+                            return;
+                          }
                         }
-                        setEditModalOpen(true);
                       }}
                       className="block text-xs text-[#3337AD] hover:underline mt-1"
                     >
-                      Открыть модалку редактирования
+                      Открыть карточку
                     </button>
                   )}
                 </div>
@@ -750,93 +791,6 @@ export const MiniMessenger: React.FC<MiniMessengerProps> = ({
           </div>
         )}
       </div>
-      {editModalOpen && selectedEntity && onUpdateEntity && (
-        <div className="fixed inset-0 z-[120] bg-black/40 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setEditModalOpen(false)}>
-          <div className="w-full max-w-lg rounded-2xl border border-gray-200 dark:border-[#333] bg-white dark:bg-[#252525] p-4" onClick={(e) => e.stopPropagation()}>
-            <h4 className="font-semibold text-gray-900 dark:text-white mb-3">Редактирование сущности</h4>
-            <div className="space-y-2">
-              <input value={editTitle} onChange={(e) => setEditTitle(e.target.value)} placeholder="Название" className="w-full rounded-lg border border-gray-300 dark:border-[#444] bg-transparent px-3 py-2 text-sm" />
-              {selectedEntity.type === 'task' && (
-                <>
-                  <input value={editSecondaryA} onChange={(e) => setEditSecondaryA(e.target.value)} placeholder="Статус" className="w-full rounded-lg border border-gray-300 dark:border-[#444] bg-transparent px-3 py-2 text-sm" />
-                  <textarea value={editSecondaryB} onChange={(e) => setEditSecondaryB(e.target.value)} placeholder="Описание" className="w-full rounded-lg border border-gray-300 dark:border-[#444] bg-transparent px-3 py-2 text-sm min-h-[84px]" />
-                </>
-              )}
-
-              {selectedEntity.type === 'deal' && (
-                <>
-                  <input value={editSecondaryA} onChange={(e) => setEditSecondaryA(e.target.value)} placeholder="Этап" className="w-full rounded-lg border border-gray-300 dark:border-[#444] bg-transparent px-3 py-2 text-sm" />
-                  <input
-                    value={editSecondaryB}
-                    onChange={(e) => setEditSecondaryB(e.target.value)}
-                    type="number"
-                    step="1"
-                    placeholder="Сумма"
-                    className="w-full rounded-lg border border-gray-300 dark:border-[#444] bg-transparent px-3 py-2 text-sm"
-                  />
-                </>
-              )}
-
-              {selectedEntity.type === 'meeting' && (
-                <>
-                  <div className="flex gap-2">
-                    <input
-                      value={editMeetingDate}
-                      onChange={(e) => setEditMeetingDate(e.target.value)}
-                      type="date"
-                      className="flex-1 rounded-lg border border-gray-300 dark:border-[#444] bg-transparent px-3 py-2 text-sm"
-                    />
-                    <input
-                      value={editMeetingTime}
-                      onChange={(e) => setEditMeetingTime(e.target.value)}
-                      type="time"
-                      step={60}
-                      className="flex-1 rounded-lg border border-gray-300 dark:border-[#444] bg-transparent px-3 py-2 text-sm"
-                    />
-                  </div>
-                  <textarea value={editSecondaryB} onChange={(e) => setEditSecondaryB(e.target.value)} placeholder="Описание встречи" className="w-full rounded-lg border border-gray-300 dark:border-[#444] bg-transparent px-3 py-2 text-sm min-h-[84px]" />
-                </>
-              )}
-
-              {selectedEntity.type === 'doc' && (
-                <>
-                  <input value={editSecondaryA} onChange={(e) => setEditSecondaryA(e.target.value)} placeholder="Тип (internal/link)" className="w-full rounded-lg border border-gray-300 dark:border-[#444] bg-transparent px-3 py-2 text-sm" />
-                  <textarea value={editSecondaryB} onChange={(e) => setEditSecondaryB(e.target.value)} placeholder="Content (для internal)" className="w-full rounded-lg border border-gray-300 dark:border-[#444] bg-transparent px-3 py-2 text-sm min-h-[84px]" />
-                </>
-              )}
-            </div>
-            <div className="mt-3 flex justify-end gap-2">
-              <button type="button" onClick={() => setEditModalOpen(false)} className="px-3 py-2 rounded-lg border border-gray-300 dark:border-[#444] text-sm">Отмена</button>
-              <button
-                type="button"
-                onClick={async () => {
-                  const patch: Record<string, unknown> = { title: editTitle };
-                  if (selectedEntity.type === 'task') {
-                    patch.status = editSecondaryA;
-                    patch.description = editSecondaryB;
-                  } else if (selectedEntity.type === 'deal') {
-                    patch.stage = editSecondaryA;
-                    patch.amount = Number(editSecondaryB || '0') || 0;
-                  } else if (selectedEntity.type === 'meeting') {
-                    patch.date = editMeetingDate;
-                    patch.time = editMeetingTime;
-                    patch.summary = editSecondaryB;
-                  } else {
-                    patch.type = editSecondaryA || 'internal';
-                    if (editSecondaryB) patch.content = editSecondaryB;
-                  }
-                  await onUpdateEntity(selectedEntity.type, selectedEntity.id, patch);
-                  setEditModalOpen(false);
-                }}
-                disabled={!canSaveEdit}
-                className={`px-3 py-2 rounded-lg bg-[#3337AD] text-white text-sm ${!canSaveEdit ? 'opacity-50 cursor-not-allowed' : ''}`}
-              >
-                Сохранить
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 };
@@ -865,6 +819,41 @@ function ToolbarBtn({
     >
       {icon}
     </button>
+  );
+}
+
+function ChatActionModal({
+  title,
+  onClose,
+  children,
+}: {
+  title: string;
+  onClose: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <div
+      className="fixed inset-0 z-[140] bg-black/40 backdrop-blur-sm flex items-center justify-center p-4"
+      onClick={onClose}
+    >
+      <div
+        className="w-full max-w-2xl rounded-2xl border border-gray-200 dark:border-[#333] bg-white dark:bg-[#1e1e1e] shadow-2xl overflow-hidden"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 dark:border-[#333]">
+          <h4 className="text-sm font-semibold text-gray-900 dark:text-white">{title}</h4>
+          <button
+            type="button"
+            onClick={onClose}
+            className="p-1 rounded-lg text-gray-500 hover:bg-gray-100 dark:hover:bg-[#333]"
+            aria-label="Закрыть"
+          >
+            <X size={16} />
+          </button>
+        </div>
+        {children}
+      </div>
+    </div>
   );
 }
 

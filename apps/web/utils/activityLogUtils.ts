@@ -1,5 +1,13 @@
 import { ActivityLog, User, Task, Deal, Client, Contract, Doc, Meeting, Role } from '../types';
+import { getDealDisplayTitle } from './dealModel';
 import { api } from '../backend/api';
+
+const makeActivityId = (): string => {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID();
+  }
+  return `a-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`.slice(0, 36);
+};
 
 /**
  * Создает activity log для события
@@ -19,7 +27,7 @@ export const createActivityLog = async (
   if (!currentUser) return null;
 
   const log: ActivityLog = {
-    id: `activity-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+    id: makeActivityId(),
     userId: targetUserId || currentUser.id,
     userName: currentUser.name,
     userAvatar: currentUser.avatar || '',
@@ -60,7 +68,7 @@ export const createActivityLogsForAll = async (
     : allUsers.filter(u => !u.isArchived);
 
   const logs: ActivityLog[] = targetUsers.map(user => ({
-    id: `activity-${Date.now()}-${Math.random().toString(36).substr(2, 9)}-${user.id}`,
+    id: makeActivityId(),
     userId: user.id,
     userName: currentUser.name,
     userAvatar: currentUser.avatar || '',
@@ -151,11 +159,12 @@ export const createDealCreatedLog = async (
   allUsers: User[]
 ): Promise<void> => {
   // Уведомление для ответственного (если он есть и не является создателем)
+  const label = getDealDisplayTitle(deal);
   if (assigneeUser && assigneeUser.id !== currentUser.id) {
     await createActivityLog(
       currentUser,
       'назначил вам сделку',
-      deal.title,
+      label,
       assigneeUser.id,
       allUsers
     );
@@ -165,7 +174,7 @@ export const createDealCreatedLog = async (
   await createActivityLogsForAll(
     currentUser,
     'создал сделку',
-    deal.title,
+    label,
     allUsers,
     true // Только для администраторов
   );
@@ -181,7 +190,7 @@ export const createDealStatusChangedLog = async (
   currentUser: User,
   allUsers: User[]
 ): Promise<void> => {
-  const details = `${deal.title}: ${oldStage} → ${newStage}`;
+  const details = `${getDealDisplayTitle(deal)}: ${oldStage} → ${newStage}`;
 
   // Уведомление для всех пользователей
   await createActivityLogsForAll(
@@ -285,7 +294,7 @@ export const createMeetingCreatedLog = async (
  * Создает activity log при создании заявки на покупку
  */
 export const createPurchaseRequestCreatedLog = async (
-  request: PurchaseRequest,
+  request: { id: string; description?: string },
   currentUser: User,
   allUsers: User[]
 ): Promise<void> => {
@@ -293,7 +302,7 @@ export const createPurchaseRequestCreatedLog = async (
   await createActivityLogsForAll(
     currentUser,
     'создал заявку на покупку',
-    request.title || 'Без названия',
+    request.description || 'Без названия',
     allUsers,
     true // Только для администраторов
   );

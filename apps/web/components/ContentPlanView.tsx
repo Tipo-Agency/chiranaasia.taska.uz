@@ -8,6 +8,7 @@ import { ModulePageShell, ModulePageHeader, ModuleSegmentedControl, MODULE_PAGE_
 import { TaskSelect } from './TaskSelect';
 import { api } from '../backend/api';
 import { normalizeDateForInput } from '../utils/dateUtils';
+import { DateInput } from './ui/DateInput';
 
 interface ContentPlanViewProps {
   posts: ContentPost[];
@@ -777,28 +778,22 @@ const ContentPlanView: React.FC<ContentPlanViewProps> = ({
           title={activeTable?.name || 'Контент-план'}
           description="Планирование контента"
           accent="yellow"
-          actions={
-            <div className="flex flex-wrap items-center gap-2 justify-end">
-              <div className="bg-green-50 dark:bg-green-900/10 px-3 py-2 rounded-xl border border-green-200 dark:border-green-900/30">
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="text-xs text-green-700 dark:text-green-300 font-medium">Публичная ссылка:</span>
-                  <input 
-                    readOnly
-                    value={`${window.location.origin}/content-plan/${tableId}`}
-                    className="text-xs text-gray-700 dark:text-gray-300 bg-transparent border-none outline-none min-w-0 max-w-[12rem] sm:max-w-xs"
-                  />
-                  <button 
-                    type="button"
-                    onClick={() => {
-                      navigator.clipboard.writeText(`${window.location.origin}/content-plan/${tableId}`);
-                      alert('Ссылка скопирована!');
-                    }}
-                    className="text-green-600 dark:text-green-400 hover:text-green-700 text-xs font-bold"
-                  >
-                    Копировать
-                  </button>
-                </div>
-              </div>
+          tabs={
+            <ModuleSegmentedControl
+              value={viewMode}
+              onChange={setViewMode}
+              variant="neutral"
+              options={[
+                { value: 'calendar', label: 'Календарь' },
+                { value: 'table', label: 'Список' },
+                { value: 'kanban', label: 'Доска' },
+                { value: 'gantt', label: 'Таймлайн' },
+                { value: 'tasks', label: 'Задачи' },
+              ]}
+            />
+          }
+          controls={
+            <div className="flex items-center gap-2">
               <button 
                 onClick={refreshData} 
                 disabled={isRefreshing}
@@ -812,20 +807,19 @@ const ContentPlanView: React.FC<ContentPlanViewProps> = ({
             </div>
           }
         />
-        <div className="mt-4">
-          <ModuleSegmentedControl
-            value={viewMode}
-            onChange={setViewMode}
-            variant="accent"
-            accent="yellow"
-            options={[
-              { value: 'calendar', label: 'Календарь' },
-              { value: 'table', label: 'Список' },
-              { value: 'kanban', label: 'Доска' },
-              { value: 'gantt', label: 'Таймлайн' },
-              { value: 'tasks', label: 'Задачи' },
-            ]}
-          />
+        <div className="mt-3 inline-flex max-w-full items-center gap-2 rounded-xl border border-green-200 bg-green-50 px-3 py-2 text-xs text-green-700 dark:border-green-900/30 dark:bg-green-900/10 dark:text-green-300">
+          <span className="font-medium">Публичная ссылка:</span>
+          <span className="truncate">{`${window.location.origin}/content-plan/${tableId}`}</span>
+          <button
+            type="button"
+            onClick={() => {
+              navigator.clipboard.writeText(`${window.location.origin}/content-plan/${tableId}`);
+              alert('Ссылка скопирована!');
+            }}
+            className="font-bold hover:opacity-80 shrink-0"
+          >
+            Копировать
+          </button>
         </div>
       </div>
       <div className="flex-1 overflow-y-auto custom-scrollbar min-h-0">
@@ -856,16 +850,12 @@ const ContentPlanView: React.FC<ContentPlanViewProps> = ({
                         {/* Date Input - First Field */}
                         <div>
                             <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 uppercase mb-2">Дата публикации <span className="text-red-500">*</span></label>
-                            <div className="relative">
-                                <input 
-                                    required 
-                                    type="date" 
-                                    value={normalizeDateForInput(date) || date} 
-                                    onChange={e => setDate(e.target.value)} 
-                                    className="w-full bg-white dark:bg-[#333] text-gray-900 dark:text-gray-100 border border-gray-300 dark:border-[#555] rounded-lg px-4 py-3 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
-                                />
-                                <Calendar className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" size={16}/>
-                            </div>
+                            <DateInput
+                              required
+                              value={normalizeDateForInput(date) || date}
+                              onChange={setDate}
+                              className="w-full"
+                            />
                         </div>
 
                         <div>

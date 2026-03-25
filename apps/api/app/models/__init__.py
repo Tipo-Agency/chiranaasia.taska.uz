@@ -19,7 +19,6 @@ from app.models.finance import BankStatement, BankStatementLine, IncomeReport, B
 from app.models.bpm import OrgPosition, BusinessProcess
 from app.models.inventory import Warehouse, InventoryItem, StockMovement, InventoryRevision
 from app.models.funnel import SalesFunnel
-from app.models.site import PartnerLogo, News, Case, Tag
 from app.models.system_log import SystemLog
 from app.models.weekly_plan import WeeklyPlan, Protocol
 
@@ -65,10 +64,6 @@ __all__ = [
     "StockMovement",
     "InventoryRevision",
     "SalesFunnel",
-    "PartnerLogo",
-    "News",
-    "Case",
-    "Tag",
     "SystemLog",
     "WeeklyPlan",
     "Protocol",

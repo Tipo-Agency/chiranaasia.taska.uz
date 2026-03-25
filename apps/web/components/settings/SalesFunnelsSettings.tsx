@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
-import { SalesFunnel, FunnelStage, NotificationPreferences } from '../../types';
+import { SalesFunnel, FunnelStage, NotificationPreferences, FunnelSourceConfig, User } from '../../types';
 import { Plus, X, Edit2, Trash2, GripVertical, Settings, Instagram, MessageSquare, Star } from 'lucide-react';
 import { ModuleCreateIconButton } from '../ui/ModuleCreateIconButton';
 
 interface SalesFunnelsSettingsProps {
     funnels: SalesFunnel[];
+    users?: User[];
     onSave: (funnel: SalesFunnel) => void;
     onDelete: (id: string) => void;
     notificationPrefs?: NotificationPreferences;
@@ -34,7 +35,7 @@ const STAGE_COLOR_OPTIONS = [
     { name: 'Amber', class: 'bg-amber-200 dark:bg-amber-900' },
 ];
 
-const SalesFunnelsSettings: React.FC<SalesFunnelsSettingsProps> = ({ funnels, onSave, onDelete, notificationPrefs, onUpdatePrefs }) => {
+const SalesFunnelsSettings: React.FC<SalesFunnelsSettingsProps> = ({ funnels, users = [], onSave, onDelete, notificationPrefs, onUpdatePrefs }) => {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingFunnel, setEditingFunnel] = useState<SalesFunnel | null>(null);
     const [funnelName, setFunnelName] = useState('');
@@ -54,10 +55,10 @@ const SalesFunnelsSettings: React.FC<SalesFunnelsSettingsProps> = ({ funnels, on
         setActiveTab('stages');
         // Создаем воронку с дефолтными этапами
         setStages([
-            { id: 'new', label: 'Новая заявка', color: DEFAULT_STAGE_COLORS[0] },
-            { id: 'qualification', label: 'Квалификация', color: DEFAULT_STAGE_COLORS[1] },
-            { id: 'proposal', label: 'Предложение (КП)', color: DEFAULT_STAGE_COLORS[2] },
-            { id: 'negotiation', label: 'Переговоры', color: DEFAULT_STAGE_COLORS[3] },
+            { id: 'new', label: 'Новая заявка', color: DEFAULT_STAGE_COLORS[0], taskTemplate: { enabled: true, title: 'Связаться с клиентом', assigneeMode: 'deal_assignee' } },
+            { id: 'qualification', label: 'Квалификация', color: DEFAULT_STAGE_COLORS[1], taskTemplate: { enabled: true, title: 'Уточнить потребности клиента', assigneeMode: 'deal_assignee' } },
+            { id: 'proposal', label: 'Предложение (КП)', color: DEFAULT_STAGE_COLORS[2], taskTemplate: { enabled: true, title: 'Подготовить и отправить коммерческое предложение', assigneeMode: 'deal_assignee' } },
+            { id: 'negotiation', label: 'Переговоры', color: DEFAULT_STAGE_COLORS[3], taskTemplate: { enabled: true, title: 'Провести переговоры и зафиксировать договоренности', assigneeMode: 'deal_assignee' } },
         ]);
         // Сброс настроек источников
         setInstagramEnabled(false);
@@ -357,6 +358,13 @@ const SalesFunnelsSettings: React.FC<SalesFunnelsSettingsProps> = ({ funnels, on
                                         Источники лидов
                                     </div>
                                 </button>
+                                <button
+                                    type="button"
+                                    disabled
+                                    className="px-4 py-2 text-sm font-medium border-b-2 border-transparent text-gray-400 dark:text-gray-500 cursor-not-allowed"
+                                >
+                                    Автоматизация в этапах
+                                </button>
                             </div>
 
                             {activeTab === 'stages' && (
@@ -376,8 +384,9 @@ const SalesFunnelsSettings: React.FC<SalesFunnelsSettingsProps> = ({ funnels, on
                                 </div>
                                 <div className="space-y-2">
                                     {stages.map((stage, index) => (
-                                        <div key={stage.id} className="flex items-center gap-2 p-2 border border-gray-200 dark:border-[#333] rounded">
-                                            <div className="flex items-center gap-1 text-gray-400">
+                                        <div key={stage.id} className="p-3 border border-gray-200 dark:border-[#333] rounded space-y-3">
+                                            <div className="flex items-center gap-2">
+                                            <div className="flex items-center gap-1 text-gray-400 shrink-0">
                                                 <GripVertical size={16} />
                                                 <span className="text-xs w-6 text-center">{index + 1}</span>
                                             </div>
@@ -425,6 +434,73 @@ const SalesFunnelsSettings: React.FC<SalesFunnelsSettingsProps> = ({ funnels, on
                                             >
                                                 <Trash2 size={14} />
                                             </button>
+                                            </div>
+                                            <div className="rounded-lg bg-gray-50 dark:bg-[#2b2b2b] p-3 space-y-2">
+                                                <div className="flex items-center justify-between">
+                                                    <p className="text-xs font-semibold text-gray-600 dark:text-gray-300">Авто-задача для этапа</p>
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={stage.taskTemplate?.enabled !== false}
+                                                        onChange={(e) =>
+                                                            handleUpdateStage(index, {
+                                                                taskTemplate: {
+                                                                    ...(stage.taskTemplate || {}),
+                                                                    enabled: e.target.checked,
+                                                                },
+                                                            })
+                                                        }
+                                                    />
+                                                </div>
+                                                <input
+                                                    value={stage.taskTemplate?.title || ''}
+                                                    onChange={(e) =>
+                                                        handleUpdateStage(index, {
+                                                            taskTemplate: {
+                                                                ...(stage.taskTemplate || {}),
+                                                                title: e.target.value,
+                                                            },
+                                                        })
+                                                    }
+                                                    className="w-full border border-gray-300 dark:border-gray-600 rounded px-2 py-1 text-xs bg-white dark:bg-[#333] text-gray-900 dark:text-gray-100"
+                                                    placeholder={index === 0 ? 'Например: Связаться с клиентом' : 'Например: Обновить КП и созвониться'}
+                                                />
+                                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                                    <select
+                                                        value={stage.taskTemplate?.assigneeMode || 'deal_assignee'}
+                                                        onChange={(e) =>
+                                                            handleUpdateStage(index, {
+                                                                taskTemplate: {
+                                                                    ...(stage.taskTemplate || {}),
+                                                                    assigneeMode: e.target.value as 'deal_assignee' | 'specific_user',
+                                                                },
+                                                            })
+                                                        }
+                                                        className="border border-gray-300 dark:border-gray-600 rounded px-2 py-1 text-xs bg-white dark:bg-[#333] text-gray-900 dark:text-gray-100"
+                                                    >
+                                                        <option value="deal_assignee">Ответственный по сделке</option>
+                                                        <option value="specific_user">Конкретный сотрудник</option>
+                                                    </select>
+                                                    {(stage.taskTemplate?.assigneeMode || 'deal_assignee') === 'specific_user' && (
+                                                        <select
+                                                            value={stage.taskTemplate?.assigneeUserId || ''}
+                                                            onChange={(e) =>
+                                                                handleUpdateStage(index, {
+                                                                    taskTemplate: {
+                                                                        ...(stage.taskTemplate || {}),
+                                                                        assigneeUserId: e.target.value,
+                                                                    },
+                                                                })
+                                                            }
+                                                            className="border border-gray-300 dark:border-gray-600 rounded px-2 py-1 text-xs bg-white dark:bg-[#333] text-gray-900 dark:text-gray-100"
+                                                        >
+                                                            <option value="">Выберите сотрудника</option>
+                                                            {users.filter((u) => !u.isArchived).map((u) => (
+                                                                <option key={u.id} value={u.id}>{u.name}</option>
+                                                            ))}
+                                                        </select>
+                                                    )}
+                                                </div>
+                                            </div>
                                         </div>
                                     ))}
                                 </div>

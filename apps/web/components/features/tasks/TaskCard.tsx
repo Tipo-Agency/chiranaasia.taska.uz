@@ -2,7 +2,7 @@
  * TaskCard - карточка задачи для отображения в списках
  * 
  * Зачем отдельно:
- * - Переиспользуется в TasksView, HomeView, TableView, Search
+ * - Переиспользуется в TasksPage, WorkdeskView, TableView, Search
  * - Единый стиль отображения задач
  * - Изолированная логика отображения
  */

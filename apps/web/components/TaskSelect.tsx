@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { ChevronDown } from 'lucide-react';
 
 interface TaskSelectProps {
@@ -25,55 +25,102 @@ export const TaskSelect: React.FC<TaskSelectProps> = ({
   disabled = false,
   size = 'default',
 }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const rootRef = useRef<HTMLDivElement>(null);
   const sizeClass =
     size === 'compact'
-      ? 'px-2.5 pr-8 py-1.5 min-h-[32px] text-sm leading-tight rounded-md'
-      : 'px-3 pr-10 py-2.5 text-sm rounded-lg';
+      ? 'h-8 min-h-8 px-2.5 pr-8 text-sm leading-tight rounded-md'
+      : 'min-h-[42px] px-3 pr-10 py-2.5 text-sm rounded-lg';
   const chevronRight = size === 'compact' ? 'right-2' : 'right-3';
   const chevronSize = size === 'compact' ? 14 : 16;
+  const selectedOption = useMemo(() => options.find((opt) => opt.value === value), [options, value]);
+  const displayLabel = selectedOption?.label || placeholder;
+
+  useEffect(() => {
+    const onClickOutside = (event: MouseEvent) => {
+      if (!rootRef.current) return;
+      if (!rootRef.current.contains(event.target as Node)) {
+        setIsOpen(false);
+      }
+    };
+
+    const onEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setIsOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', onClickOutside);
+    document.addEventListener('keydown', onEscape);
+    return () => {
+      document.removeEventListener('mousedown', onClickOutside);
+      document.removeEventListener('keydown', onEscape);
+    };
+  }, []);
+
+  const handlePick = (nextValue: string) => {
+    onChange(nextValue);
+    setIsOpen(false);
+  };
 
   return (
-    <div className="relative">
-      <select
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
+    <div className="relative" ref={rootRef}>
+      <button
+        type="button"
         disabled={disabled}
+        onClick={() => !disabled && setIsOpen((prev) => !prev)}
         className={`
-          w-full 
+          w-full
+          text-left
+          flex items-center
           ${sizeClass}
-          bg-white 
-          dark:bg-[#252525] 
-          border 
-          border-gray-300 
-          dark:border-gray-600 
-          text-gray-900 
-          dark:text-gray-100 
-          appearance-none 
-          focus:ring-2 
-          focus:ring-blue-500/50 
-          focus:border-blue-500 
-          outline-none 
+          bg-white
+          dark:bg-[#252525]
+          border
+          border-gray-300
+          dark:border-gray-600
+          text-gray-900
+          dark:text-gray-100
+          focus:ring-2
+          focus:ring-blue-500/50
+          focus:border-blue-500
+          outline-none
           transition-all
-          disabled:opacity-50 
+          disabled:opacity-50
           disabled:cursor-not-allowed
+          ${!selectedOption ? 'text-gray-400 dark:text-gray-500' : ''}
           ${className}
         `.trim()}
       >
-        {placeholder && (
-          <option value="" disabled>
-            {placeholder}
-          </option>
-        )}
-        {options.map((option) => (
-          <option key={option.value} value={option.value}>
-            {option.label}
-          </option>
-        ))}
-      </select>
-      <ChevronDown 
-        size={chevronSize} 
-        className={`absolute ${chevronRight} top-1/2 -translate-y-1/2 pointer-events-none text-gray-400 dark:text-gray-500`} 
+        <span className="truncate">{displayLabel}</span>
+      </button>
+      <ChevronDown
+        size={chevronSize}
+        className={`absolute ${chevronRight} top-1/2 -translate-y-1/2 pointer-events-none text-gray-400 dark:text-gray-500 transition-transform ${isOpen ? 'rotate-180' : ''}`}
       />
+      {isOpen && !disabled && (
+        <div className="absolute z-[220] top-full left-0 mt-1 w-full rounded-lg border border-gray-200 dark:border-[#333] bg-white dark:bg-[#252525] shadow-xl overflow-hidden">
+          <div className="max-h-64 overflow-y-auto custom-scrollbar p-1">
+            {options.map((option) => {
+              const active = option.value === value;
+              return (
+                <button
+                  key={option.value}
+                  type="button"
+                  onClick={() => handlePick(option.value)}
+                  className={`w-full text-left px-2.5 py-2 rounded-md text-sm transition-colors ${
+                    active
+                      ? 'bg-[#3337AD]/10 text-[#3337AD] dark:text-[#a8abf0]'
+                      : 'text-gray-800 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-[#303030]'
+                  }`}
+                >
+                  <span className="truncate block">{option.label}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
     </div>
   );
 };

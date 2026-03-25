@@ -52,7 +52,7 @@ export const ProcessCard: React.FC<ProcessCardProps> = ({
               <div className="flex flex-wrap gap-1.5 mt-3">
                 <span className="inline-flex items-center gap-1 rounded-md bg-gray-100 dark:bg-[#2a2a2a] px-2 py-0.5 text-[11px] font-medium text-gray-600 dark:text-gray-300">
                   <FileText size={12} className="opacity-70" />
-                  {process.steps.length} шагов
+                  {`${process.steps.length} шагов`}
                 </span>
                 <span className="inline-flex items-center rounded-md bg-gray-100 dark:bg-[#2a2a2a] px-2 py-0.5 text-[11px] font-medium text-gray-500 dark:text-gray-400">
                   v{process.version || 1}

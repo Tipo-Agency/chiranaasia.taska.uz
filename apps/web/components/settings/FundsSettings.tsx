@@ -3,6 +3,7 @@ import React, { useState } from 'react';
 import { Fund } from '../../types';
 import { X, Edit2, Trash2 } from 'lucide-react';
 import { ModuleCreateIconButton } from '../ui/ModuleCreateIconButton';
+import { SystemConfirmDialog } from '../ui';
 
 interface FundsSettingsProps {
   funds: Fund[];
@@ -15,6 +16,7 @@ const FundsSettings: React.FC<FundsSettingsProps> = ({ funds, onSave, onDelete }
   const [editingFund, setEditingFund] = useState<Fund | null>(null);
   const [fundName, setFundName] = useState('');
   const [fundOrder, setFundOrder] = useState(0);
+  const [deleteFundId, setDeleteFundId] = useState<string | null>(null);
 
   const handleOpenCreate = () => {
     setEditingFund(null);
@@ -84,7 +86,7 @@ const FundsSettings: React.FC<FundsSettingsProps> = ({ funds, onSave, onDelete }
                   <td className="px-4 py-3 font-medium text-gray-800 dark:text-gray-200">{fund.name}</td>
                   <td className="px-4 py-3 text-right flex gap-2 justify-end">
                     <button onClick={() => handleOpenEdit(fund)} className="p-1 text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"><Edit2 size={14}/></button>
-                    <button onClick={() => { if (confirm('Удалить фонд?')) onDelete(fund.id); }} className="p-1 text-gray-400 hover:text-red-600 dark:hover:text-red-400 transition-colors"><Trash2 size={14}/></button>
+                    <button onClick={() => setDeleteFundId(fund.id)} className="p-1 text-gray-400 hover:text-red-600 dark:hover:text-red-400 transition-colors"><Trash2 size={14}/></button>
                   </td>
                 </tr>
               ))
@@ -134,6 +136,19 @@ const FundsSettings: React.FC<FundsSettingsProps> = ({ funds, onSave, onDelete }
           </div>
         </div>
       )}
+      <SystemConfirmDialog
+        open={Boolean(deleteFundId)}
+        title="Удалить фонд"
+        message="Вы уверены, что хотите удалить фонд?"
+        danger
+        confirmText="Удалить"
+        cancelText="Отмена"
+        onCancel={() => setDeleteFundId(null)}
+        onConfirm={() => {
+          if (deleteFundId) onDelete(deleteFundId);
+          setDeleteFundId(null);
+        }}
+      />
     </div>
   );
 };

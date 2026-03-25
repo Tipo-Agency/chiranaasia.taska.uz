@@ -2,6 +2,7 @@
  * Утилиты для CRUD операций
  * Устраняет дублирование кода в логике сохранения/удаления
  */
+import type { Dispatch, SetStateAction } from 'react';
 
 export interface CrudItem {
   id: string;
@@ -52,7 +53,7 @@ export function findItemById<T extends CrudItem>(items: T[], id: string): T | un
  * @returns функция сохранения
  */
 export function createSaveHandler<T extends CrudItem>(
-  setter: (items: T[]) => void,
+  setter: Dispatch<SetStateAction<T[]>>,
   apiUpdate: (items: T[]) => void | Promise<unknown>,
   notification: (msg: string) => void,
   successMessage: string,
@@ -85,8 +86,8 @@ export function createSaveHandler<T extends CrudItem>(
  * @returns функция удаления
  */
 export function createDeleteHandler<T extends CrudItem & { isArchived?: boolean }>(
-  setter: (items: T[]) => void,
-  apiUpdate: (items: T[]) => void | Promise<void>,
+  setter: Dispatch<SetStateAction<T[]>>,
+  apiUpdate: (items: T[]) => void | Promise<unknown>,
   notification: (msg: string) => void,
   successMessage: string
 ) {

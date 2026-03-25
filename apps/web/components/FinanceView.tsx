@@ -2,12 +2,11 @@
 import React, { useState, useRef, useMemo, useEffect, useCallback } from 'react';
 import { TaskSelect } from './TaskSelect';
 import { FinanceCategory, Fund, FinancePlan, PurchaseRequest, Department, User, Role, FinancialPlanDocument, FinancialPlanning, Bdr } from '../types';
-import { Wallet, Plus, X, Edit2, Trash2, PieChart, TrendingUp, DollarSign, Check, AlertCircle, Calendar, Settings, ArrowLeft, ArrowRight, Save, FileText, Clock, CheckCircle2, ChevronDown } from 'lucide-react';
-import { Tabs, Button, Card, ModulePageShell, ModulePageHeader, MODULE_PAGE_GUTTER, ModuleCreateIconButton } from './ui';
-import { BankStatementsView } from './finance/BankStatementsView';
+import { Wallet, Plus, X, Edit2, Trash2, PieChart, TrendingUp, DollarSign, Check, AlertCircle, Calendar, Settings, ArrowLeft, ArrowRight, Save, FileText, Clock, CheckCircle2, ChevronDown, Upload } from 'lucide-react';
+import { Button, Card, ModulePageShell, ModulePageHeader, MODULE_PAGE_GUTTER, ModuleCreateDropdown, ModuleFilterIconButton, DateInput, ModuleSegmentedControl, SystemAlertDialog } from './ui';
+import { BankStatementsView, type BankStatementsViewHandle } from './finance/BankStatementsView';
 import { BdrView } from './finance/BdrView';
 import { FilterConfig } from './FiltersPanel';
-import { Filter } from 'lucide-react';
 
 interface FinanceViewProps {
   categories: FinanceCategory[];
@@ -61,18 +60,21 @@ const FinanceView: React.FC<FinanceViewProps> = ({
   const [requestCategoryFilter, setRequestCategoryFilter] = useState<string>('all');
   const [showRequestFilters, setShowRequestFilters] = useState(false);
   
-  // Модалки
+  /** Список | полноэкранное создание | полноэкранная карточка сущности */
+  const [planningSubView, setPlanningSubView] = useState<'list' | 'create' | 'detail'>('list');
+  const [planSubView, setPlanSubView] = useState<'list' | 'create' | 'detail'>('list');
+
   const [isRequestModalOpen, setIsRequestModalOpen] = useState(false);
-  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
-  const [isPlanCreateModalOpen, setIsPlanCreateModalOpen] = useState(false);
-  const [isPlanningCreateModalOpen, setIsPlanningCreateModalOpen] = useState(false);
   const [editingRequest, setEditingRequest] = useState<PurchaseRequest | null>(null);
+  const [alertText, setAlertText] = useState<string | null>(null);
+  const bankStatementsRef = useRef<BankStatementsViewHandle>(null);
 
   // Формы
   const [reqAmount, setReqAmount] = useState('');
   const [reqDesc, setReqDesc] = useState('');
   const [reqDep, setReqDep] = useState('');
   const [reqCat, setReqCat] = useState('');
+  const [reqPaymentDate, setReqPaymentDate] = useState('');
   
   // Получаем текущий период (месяц)
   const currentPeriod = useMemo(() => {
@@ -94,6 +96,17 @@ const FinanceView: React.FC<FinanceViewProps> = ({
     if (!newPlanPeriod) setNewPlanPeriod(currentPeriod);
     if (!newPlanningPeriod) setNewPlanningPeriod(currentPeriod);
   }, [currentPeriod, newPlanPeriod, newPlanningPeriod]);
+
+  useEffect(() => {
+    if (planningSubView === 'detail' && !selectedPlanning) setPlanningSubView('list');
+  }, [planningSubView, selectedPlanning]);
+  useEffect(() => {
+    if (planSubView === 'detail' && !selectedPlanDoc) setPlanSubView('list');
+  }, [planSubView, selectedPlanDoc]);
+
+  const financeFullScreen =
+    (activeTab === 'planning' && planningSubView !== 'list') ||
+    (activeTab === 'plan' && planSubView !== 'list');
   
   // Состояния для детальной страницы планирования
   const planningDetailInitialValuesRef = useRef<{
@@ -388,13 +401,17 @@ const FinanceView: React.FC<FinanceViewProps> = ({
   const handleOpenRequestCreate = () => {
       setEditingRequest(null);
       setReqAmount(''); setReqDesc(''); setReqDep(departments[0]?.id || ''); setReqCat(categories[0]?.id || '');
+      setReqPaymentDate('');
       setIsRequestModalOpen(true);
   };
   
   const handleOpenRequestEdit = (req: PurchaseRequest) => {
       setEditingRequest(req);
       setReqAmount(req.amount.toString()); 
-      setReqDesc(req.description || ''); 
+      const sourceDesc = req.description || '';
+      const m = sourceDesc.match(/\[paymentDate:([0-9]{4}-[0-9]{2}-[0-9]{2})\]/);
+      setReqPaymentDate(m?.[1] || '');
+      setReqDesc(sourceDesc.replace(/\s*\[paymentDate:[0-9]{4}-[0-9]{2}-[0-9]{2}\]\s*/g, '').trim()); 
       setReqDep(req.departmentId || ''); 
       setReqCat(req.categoryId || '');
       setIsRequestModalOpen(true);
@@ -408,7 +425,7 @@ const FinanceView: React.FC<FinanceViewProps> = ({
           departmentId: reqDep,
           categoryId: reqCat,
           amount: parseFloat(reqAmount) || 0,
-          description: reqDesc,
+          description: `${reqDesc || ''}${reqPaymentDate ? ` [paymentDate:${reqPaymentDate}]` : ''}`.trim(),
           status: editingRequest ? editingRequest.status : 'pending',
           date: editingRequest ? editingRequest.date : new Date().toISOString()
       });
@@ -458,7 +475,10 @@ const FinanceView: React.FC<FinanceViewProps> = ({
             return (
               <Card
                 key={planning.id}
-                onClick={() => setSelectedPlanning(planning)}
+                onClick={() => {
+                  setSelectedPlanning(planning);
+                  setPlanningSubView('detail');
+                }}
                 padding="lg"
                 hover
                 className="group"
@@ -522,15 +542,18 @@ const FinanceView: React.FC<FinanceViewProps> = ({
     };
     
     const handleBack = () => {
-      if (hasChanges()) {
-        if (window.confirm('Есть несохраненные изменения. Сохранить перед выходом?')) {
-          handleSave();
-        } else {
-          setSelectedPlanning(null);
-        }
-      } else {
+      const goList = () => {
+        setPlanningSubView('list');
         setSelectedPlanning(null);
+      };
+      if (!hasChanges()) {
+        goList();
+        return;
       }
+      if (window.confirm('Сохранить изменения перед выходом?')) {
+        handleSave();
+      }
+      goList();
     };
     
     const handleSave = () => {
@@ -603,49 +626,53 @@ const FinanceView: React.FC<FinanceViewProps> = ({
     };
     
     return (
-      <div className="space-y-6">
-        {/* Header */}
-        <div className="flex items-center gap-4 mb-6">
+      <div className="flex flex-col flex-1 min-h-0 -mx-4 md:-mx-6">
+        <div className="sticky top-0 z-20 flex flex-wrap items-center gap-3 px-4 py-3 border-b border-gray-200 dark:border-[#333] bg-white/95 dark:bg-[#191919]/95 backdrop-blur-md">
           <button
+            type="button"
             onClick={handleBack}
-            className="p-2 hover:bg-gray-100 dark:hover:bg-[#333] rounded-lg transition-colors"
+            className="p-2 rounded-xl border border-gray-200 dark:border-[#333] hover:bg-gray-50 dark:hover:bg-[#252525] transition-colors"
           >
             <ArrowLeft size={20} className="text-gray-600 dark:text-gray-400" />
           </button>
-          <div className="flex-1">
-            <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
+          <div className="flex-1 min-w-0">
+            <h2 className="text-lg font-bold text-gray-900 dark:text-white truncate">
               Финансовое планирование
             </h2>
-            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-              {dep?.name || 'Неизвестное подразделение'} • {periodLabel}
+            <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
+              {dep?.name || '—'} · {periodLabel}
             </p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap justify-end">
             {selectedPlanning.status === 'created' && (
               <button
+                type="button"
                 onClick={handleConduct}
-                className="px-4 py-2 bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 rounded-lg"
+                className="px-3 py-2 bg-emerald-600 text-white text-sm font-medium hover:bg-emerald-700 rounded-xl"
               >
                 Провести
               </button>
             )}
             {selectedPlanning.status === 'conducted' && currentUser.role === Role.ADMIN && (
               <button
+                type="button"
                 onClick={handleApprove}
-                className="px-4 py-2 bg-green-600 text-white text-sm font-medium hover:bg-green-700 rounded-lg"
+                className="px-3 py-2 bg-emerald-700 text-white text-sm font-medium hover:bg-emerald-800 rounded-xl"
               >
                 Одобрить
               </button>
             )}
             <button
+              type="button"
               onClick={handleSave}
-              className="px-4 py-2 bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 rounded-lg flex items-center gap-2"
+              className="px-3 py-2 bg-gray-900 dark:bg-white text-white dark:text-gray-900 text-sm font-medium hover:opacity-90 rounded-xl flex items-center gap-2"
             >
               <Save size={16} />
               Сохранить
             </button>
           </div>
         </div>
+        <div className="flex-1 overflow-y-auto custom-scrollbar min-h-0 px-4 md:px-6 py-6 space-y-6 max-w-5xl w-full mx-auto">
         
         {/* Доход */}
         <div className="bg-white dark:bg-[#252525] border border-gray-200 dark:border-[#333] rounded-xl p-6">
@@ -683,7 +710,7 @@ const FinanceView: React.FC<FinanceViewProps> = ({
               ))}
             </div>
             {planningDetailIncome > 0 && (() => {
-              const allocated = Object.values(planningDetailFundAllocations).reduce((a, b) => a + b, 0);
+              const allocated = (Object.values(planningDetailFundAllocations) as number[]).reduce((a, b) => a + b, 0);
               const rest = planningDetailIncome - allocated;
               return (
                 <div className="mt-3 text-xs text-gray-500 dark:text-gray-400">
@@ -815,9 +842,10 @@ const FinanceView: React.FC<FinanceViewProps> = ({
             value={planningDetailNotes}
             onChange={(e) => setPlanningDetailNotes(e.target.value)}
             rows={4}
-            className="w-full bg-white dark:bg-[#333] border border-gray-300 dark:border-[#555] rounded-lg px-4 py-3 text-sm text-gray-900 dark:text-gray-100 resize-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+            className="w-full bg-white dark:bg-[#333] border border-gray-300 dark:border-[#555] rounded-lg px-4 py-3 text-sm text-gray-900 dark:text-gray-100 resize-none focus:ring-2 focus:ring-emerald-500/40 focus:border-emerald-500 outline-none"
             placeholder="Добавьте примечания..."
           />
+        </div>
         </div>
       </div>
     );
@@ -840,12 +868,15 @@ const FinanceView: React.FC<FinanceViewProps> = ({
             const dep = departments.find(d => d.id === planDoc.departmentId);
             const periodDate = new Date(planDoc.period + '-01');
             const periodLabel = periodDate.toLocaleDateString('ru-RU', { month: 'long', year: 'numeric' });
-            const totalExpenses = Object.values(planDoc.expenses || {}).reduce((sum, val) => sum + val, 0);
+            const totalExpenses = (Object.values(planDoc.expenses || {}) as number[]).reduce((sum, val) => sum + val, 0);
             
             return (
               <Card
                 key={planDoc.id}
-                onClick={() => setSelectedPlanDoc(planDoc)}
+                onClick={() => {
+                  setSelectedPlanDoc(planDoc);
+                  setPlanSubView('detail');
+                }}
                 padding="lg"
                 hover
                 className="group"
@@ -905,15 +936,18 @@ const FinanceView: React.FC<FinanceViewProps> = ({
     };
     
     const handleBack = () => {
-      if (hasChanges()) {
-        if (window.confirm('Есть несохраненные изменения. Сохранить перед выходом?')) {
-          handleSave();
-        } else {
-          setSelectedPlanDoc(null);
-        }
-      } else {
+      const goList = () => {
+        setPlanSubView('list');
         setSelectedPlanDoc(null);
+      };
+      if (!hasChanges()) {
+        goList();
+        return;
       }
+      if (window.confirm('Сохранить изменения перед выходом?')) {
+        handleSave();
+      }
+      goList();
     };
     
     const handleSave = () => {
@@ -985,49 +1019,53 @@ const FinanceView: React.FC<FinanceViewProps> = ({
     const balance = planDetailIncome - planDetailTotalExpenses;
     
     return (
-      <div className="space-y-6">
-        {/* Header */}
-        <div className="flex items-center gap-4 mb-6">
+      <div className="flex flex-col flex-1 min-h-0 -mx-4 md:-mx-6">
+        <div className="sticky top-0 z-20 flex flex-wrap items-center gap-3 px-4 py-3 border-b border-gray-200 dark:border-[#333] bg-white/95 dark:bg-[#191919]/95 backdrop-blur-md">
           <button
+            type="button"
             onClick={handleBack}
-            className="p-2 hover:bg-gray-100 dark:hover:bg-[#333] rounded-lg transition-colors"
+            className="p-2 rounded-xl border border-gray-200 dark:border-[#333] hover:bg-gray-50 dark:hover:bg-[#252525] transition-colors"
           >
             <ArrowLeft size={20} className="text-gray-600 dark:text-gray-400" />
           </button>
-          <div className="flex-1">
-            <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
+          <div className="flex-1 min-w-0">
+            <h2 className="text-lg font-bold text-gray-900 dark:text-white truncate">
               Финансовый план
             </h2>
-            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-              {dep?.name || 'Неизвестное подразделение'} • {periodLabel}
+            <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
+              {dep?.name || '—'} · {periodLabel}
             </p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap justify-end">
             {selectedPlanDoc.status === 'created' && (
               <button
+                type="button"
                 onClick={handleConduct}
-                className="px-4 py-2 bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 rounded-lg"
+                className="px-3 py-2 bg-emerald-600 text-white text-sm font-medium hover:bg-emerald-700 rounded-xl"
               >
                 Провести
               </button>
             )}
             {selectedPlanDoc.status === 'conducted' && currentUser.role === Role.ADMIN && (
               <button
+                type="button"
                 onClick={handleApprove}
-                className="px-4 py-2 bg-green-600 text-white text-sm font-medium hover:bg-green-700 rounded-lg"
+                className="px-3 py-2 bg-emerald-700 text-white text-sm font-medium hover:bg-emerald-800 rounded-xl"
               >
                 Утвердить
               </button>
             )}
             <button
+              type="button"
               onClick={handleSave}
-              className="px-4 py-2 bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 rounded-lg flex items-center gap-2"
+              className="px-3 py-2 bg-gray-900 dark:bg-white text-white dark:text-gray-900 text-sm font-medium hover:opacity-90 rounded-xl flex items-center gap-2"
             >
               <Save size={16} />
               Сохранить
             </button>
           </div>
         </div>
+        <div className="flex-1 overflow-y-auto custom-scrollbar min-h-0 px-4 md:px-6 py-6 space-y-6 max-w-5xl w-full mx-auto">
         
         {/* Доход */}
         <div className="bg-white dark:bg-[#252525] border border-gray-200 dark:border-[#333] rounded-xl p-6">
@@ -1218,6 +1256,7 @@ const FinanceView: React.FC<FinanceViewProps> = ({
             </div>
           </div>
         </div>
+        </div>
       </div>
     );
   };
@@ -1264,7 +1303,14 @@ const FinanceView: React.FC<FinanceViewProps> = ({
                                   <td className="px-4 py-3 text-gray-600 dark:text-gray-400 text-xs">{dep?.name}</td>
                                   <td className="px-4 py-3 text-gray-600 dark:text-gray-400 text-xs">{cat?.name}</td>
                                   <td className="px-4 py-3 font-bold text-gray-900 dark:text-gray-100">{req.amount.toLocaleString()}</td>
-                                  <td className="px-4 py-3 text-gray-600 dark:text-gray-400 truncate max-w-xs">{req.description}</td>
+                                  <td className="px-4 py-3 text-gray-600 dark:text-gray-400 truncate max-w-xs">
+                                    {(req.description || '').replace(/\s*\[paymentDate:[0-9]{4}-[0-9]{2}-[0-9]{2}\]\s*/g, '')}
+                                    {/\[paymentDate:([0-9]{4}-[0-9]{2}-[0-9]{2})\]/.test(req.description || '') && (
+                                      <span className="ml-1 text-xs text-emerald-600 dark:text-emerald-400">
+                                        • Оплата до {((req.description || '').match(/\[paymentDate:([0-9]{4}-[0-9]{2}-[0-9]{2})\]/) || [])[1]}
+                                      </span>
+                                    )}
+                                  </td>
                                   <td className="px-4 py-3">
                                       <span className={`px-2 py-1 rounded text-[10px] font-bold uppercase ${
                                           req.status === 'approved' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' :
@@ -1299,41 +1345,26 @@ const FinanceView: React.FC<FinanceViewProps> = ({
   );
   };
 
-  // --- Create Modal Handlers ---
-  const handleCreateRequest = () => {
-    setIsCreateModalOpen(false);
-    handleOpenRequestCreate();
-  };
-
-  const handleCreatePlan = () => {
-    setIsCreateModalOpen(false);
-    if (departments.length === 0) {
-      alert('Сначала создайте подразделение в настройках');
-      return;
-    }
-    setIsPlanCreateModalOpen(true);
-  };
-
   useEffect(() => {
-    if (isPlanCreateModalOpen && departments.length > 0) {
+    if (planSubView === 'create' && activeTab === 'plan' && departments.length > 0) {
       setNewPlanDepartment(departments[0].id);
       setNewPlanPeriod(currentPeriod);
     }
-  }, [isPlanCreateModalOpen, departments.length, currentPeriod]);
+  }, [planSubView, activeTab, departments.length, currentPeriod]);
 
   const handlePlanSubmit = (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     if (!onSaveFinancialPlanDocument) {
-      alert('Функция сохранения недоступна');
+      setAlertText('Функция сохранения недоступна');
       return;
     }
     if (!newPlanDepartment || newPlanDepartment === '' || newPlanDepartment === 'undefined') {
-      alert('Выберите подразделение');
+      setAlertText('Выберите подразделение');
       return;
     }
     
     if (!newPlanPeriod || newPlanPeriod === '') {
-      alert('Выберите период');
+      setAlertText('Выберите период');
       return;
     }
     
@@ -1349,47 +1380,38 @@ const FinanceView: React.FC<FinanceViewProps> = ({
     
     try {
       onSaveFinancialPlanDocument(planDoc);
-      setIsPlanCreateModalOpen(false);
+      setPlanSubView('detail');
       setNewPlanDepartment('');
       setNewPlanPeriod(currentPeriod);
       setActiveTab('plan');
       setSelectedPlanDoc(planDoc);
     } catch (error) {
       console.error('Ошибка при создании финансового плана:', error);
-      alert('Ошибка при создании финансового плана');
+      setAlertText('Ошибка при создании финансового плана');
     }
-  };
-
-  const handleCreatePlanning = () => {
-    setIsCreateModalOpen(false);
-    if (departments.length === 0) {
-      alert('Сначала создайте подразделение в настройках');
-      return;
-    }
-    setIsPlanningCreateModalOpen(true);
   };
 
   useEffect(() => {
-    if (isPlanningCreateModalOpen && departments.length > 0) {
+    if (planningSubView === 'create' && activeTab === 'planning' && departments.length > 0) {
       setNewPlanningDepartment(departments[0].id);
       setNewPlanningPeriod(currentPeriod);
       setNewPlanningIncome(0);
     }
-  }, [isPlanningCreateModalOpen, departments.length, currentPeriod]);
+  }, [planningSubView, activeTab, departments.length, currentPeriod]);
 
   const handlePlanningSubmit = (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     if (!onSaveFinancialPlanning) {
-      alert('Функция сохранения недоступна');
+      setAlertText('Функция сохранения недоступна');
       return;
     }
     if (!newPlanningDepartment || newPlanningDepartment === '') {
-      alert('Выберите подразделение');
+      setAlertText('Выберите подразделение');
       return;
     }
     const income = Number(newPlanningIncome) || 0;
     if (income <= 0) {
-      alert('Введите сумму дохода за период (по кассовому методу)');
+      setAlertText('Введите сумму дохода за период (по кассовому методу)');
       return;
     }
 
@@ -1413,115 +1435,240 @@ const FinanceView: React.FC<FinanceViewProps> = ({
     };
 
     onSaveFinancialPlanning(planning);
-    setIsPlanningCreateModalOpen(false);
+    setPlanningSubView('detail');
     setActiveTab('planning');
     setSelectedPlanning(planning);
   };
 
+  const renderPlanningCreate = () => (
+    <div className="flex flex-col flex-1 min-h-0 -mx-4 md:-mx-6">
+      <div className="sticky top-0 z-20 flex flex-wrap items-center gap-3 px-4 py-3 border-b border-gray-200 dark:border-[#333] bg-white/95 dark:bg-[#191919]/95 backdrop-blur-md">
+        <button
+          type="button"
+          onClick={() => setPlanningSubView('list')}
+          className="p-2 rounded-xl border border-gray-200 dark:border-[#333] hover:bg-gray-50 dark:hover:bg-[#252525] transition-colors"
+        >
+          <ArrowLeft size={20} className="text-gray-600 dark:text-gray-400" />
+        </button>
+        <div className="flex-1 min-w-0">
+          <h2 className="text-lg font-bold text-gray-900 dark:text-white">Новое финансовое планирование</h2>
+          <p className="text-xs text-gray-500 dark:text-gray-400">Подразделение, период и доход за месяц</p>
+        </div>
+      </div>
+      <form
+        onSubmit={handlePlanningSubmit}
+        className="flex-1 overflow-y-auto custom-scrollbar min-h-0 px-4 md:px-6 py-6 max-w-xl w-full mx-auto space-y-5"
+      >
+        <div>
+          <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 mb-1 uppercase">Подразделение</label>
+          <TaskSelect
+            value={newPlanningDepartment}
+            onChange={setNewPlanningDepartment}
+            options={[
+              { value: '', label: 'Выберите подразделение' },
+              ...departments.map(d => ({ value: d.id, label: d.name })),
+            ]}
+          />
+        </div>
+        <div>
+          <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 mb-1 uppercase">Период (месяц)</label>
+          <DateInput value={newPlanningPeriod ? `${newPlanningPeriod}-01` : ''} onChange={(v) => setNewPlanningPeriod(v ? v.slice(0, 7) : '')} placeholder="Выберите месяц" />
+        </div>
+        <div>
+          <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 mb-1 uppercase">Доход за период (UZS)</label>
+          <input
+            type="number"
+            min={1}
+            value={newPlanningIncome || ''}
+            onChange={(e) => setNewPlanningIncome(parseFloat(e.target.value) || 0)}
+            className="w-full bg-white dark:bg-[#333] border border-gray-200 dark:border-[#444] rounded-xl px-4 py-3 text-sm text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-emerald-500/40 outline-none [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+            placeholder="0"
+          />
+        </div>
+        <div className="flex flex-wrap justify-end gap-2 pt-4 border-t border-gray-200 dark:border-[#333]">
+          <Button type="button" variant="secondary" onClick={() => setPlanningSubView('list')} size="md">
+            Отмена
+          </Button>
+          <Button type="submit" size="md">
+            Создать
+          </Button>
+        </div>
+      </form>
+    </div>
+  );
+
+  const renderPlanCreate = () => (
+    <div className="flex flex-col flex-1 min-h-0 -mx-4 md:-mx-6">
+      <div className="sticky top-0 z-20 flex flex-wrap items-center gap-3 px-4 py-3 border-b border-gray-200 dark:border-[#333] bg-white/95 dark:bg-[#191919]/95 backdrop-blur-md">
+        <button
+          type="button"
+          onClick={() => setPlanSubView('list')}
+          className="p-2 rounded-xl border border-gray-200 dark:border-[#333] hover:bg-gray-50 dark:hover:bg-[#252525] transition-colors"
+        >
+          <ArrowLeft size={20} className="text-gray-600 dark:text-gray-400" />
+        </button>
+        <div className="flex-1 min-w-0">
+          <h2 className="text-lg font-bold text-gray-900 dark:text-white">Новый финансовый план</h2>
+          <p className="text-xs text-gray-500 dark:text-gray-400">Документ на месяц по подразделению</p>
+        </div>
+      </div>
+      <form onSubmit={handlePlanSubmit} className="flex-1 overflow-y-auto custom-scrollbar min-h-0 px-4 md:px-6 py-6 max-w-xl w-full mx-auto space-y-5">
+        <div>
+          <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 mb-1 uppercase">Подразделение</label>
+          <TaskSelect
+            value={newPlanDepartment}
+            onChange={setNewPlanDepartment}
+            options={[
+              { value: '', label: 'Выберите подразделение' },
+              ...departments.map(d => ({ value: d.id, label: d.name })),
+            ]}
+          />
+        </div>
+        <div>
+          <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 mb-1 uppercase">Период (месяц)</label>
+          <DateInput value={newPlanPeriod ? `${newPlanPeriod}-01` : ''} onChange={(v) => setNewPlanPeriod(v ? v.slice(0, 7) : '')} placeholder="Выберите месяц" />
+        </div>
+        <div className="flex flex-wrap justify-end gap-2 pt-4 border-t border-gray-200 dark:border-[#333]">
+          <Button type="button" variant="secondary" onClick={() => setPlanSubView('list')} size="md">
+            Отмена
+          </Button>
+          <Button type="submit" size="md">
+            Создать
+          </Button>
+        </div>
+      </form>
+    </div>
+  );
+
+  const financeTabOptions = useMemo(
+    () => [
+      { value: 'planning' as const, label: 'Планирование' },
+      { value: 'bdr' as const, label: 'БДР' },
+      { value: 'requests' as const, label: 'Заявки' },
+      { value: 'statements' as const, label: 'Выписки и сверка' },
+      ...(currentUser.role === Role.ADMIN ? [{ value: 'plan' as const, label: 'Финансовый план' }] : []),
+    ],
+    [currentUser.role]
+  );
+
+  const handleFinanceTabChange = (tabId: string) => {
+    setPlanningSubView('list');
+    setPlanSubView('list');
+    setSelectedPlanning(null);
+    setSelectedPlanDoc(null);
+    if (tabId === 'planning') {
+      setActiveTab('planning');
+    } else if (tabId === 'plan') {
+      setActiveTab('plan');
+    } else if (tabId === 'statements') {
+      setActiveTab('statements');
+    } else if (tabId === 'bdr') {
+      setActiveTab('bdr');
+    } else {
+      setActiveTab('requests');
+    }
+  };
+
   return (
     <ModulePageShell>
-      <div className={`${MODULE_PAGE_GUTTER} pt-8 pb-4 flex-shrink-0`}>
-       <div className="mb-6">
+      {!financeFullScreen && (
+      <div className={`${MODULE_PAGE_GUTTER} pt-6 md:pt-8 pb-4 flex-shrink-0`}>
+       <div className="mb-5 space-y-5">
             <ModulePageHeader
               icon={<Wallet size={24} strokeWidth={2} />}
-              title="Финансовое планирование"
-              description="Планирование и контроль финансов"
+              title="Финансы"
+              description="Планирование, заявки, БДР и выписки"
               accent="emerald"
-              actions={
-                <div className="flex items-center gap-2 flex-wrap justify-end">
-                    {activeTab === 'planning' && (
-                        <button
-                            onClick={() => setShowPlanningFilters(!showPlanningFilters)}
-                            className={`px-3 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-colors ${
-                                showPlanningFilters || hasActivePlanningFilters
-                                    ? 'bg-blue-600 text-white hover:bg-blue-700'
-                                    : 'bg-gray-100 dark:bg-[#252525] text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-[#303030]'
-                            }`}
-                        >
-                            <Filter size={16} />
-                            <span className="hidden sm:inline">Фильтры</span>
-                            {hasActivePlanningFilters && (
-                                <span className="bg-white/20 dark:bg-white/20 text-white px-1.5 py-0.5 rounded text-xs font-semibold">
-                                    {planningFilters.filter(f => f.value && f.value !== 'all' && f.value !== '' && f.value !== 'hide').length}
-                                </span>
-                            )}
-                        </button>
+              tabs={
+                <ModuleSegmentedControl
+                  variant="neutral"
+                  value={activeTab}
+                  onChange={(v) => handleFinanceTabChange(String(v))}
+                  options={financeTabOptions}
+                />
+              }
+              controls={
+                <div className="flex items-center gap-2 flex-wrap lg:justify-end">
+                    {activeTab === 'planning' && planningSubView === 'list' && (
+                      <ModuleFilterIconButton
+                        accent="emerald"
+                        active={showPlanningFilters || hasActivePlanningFilters}
+                        activeCount={planningFilters.filter(f => f.value && f.value !== 'all' && f.value !== '' && f.value !== 'hide').length}
+                        onClick={() => setShowPlanningFilters(!showPlanningFilters)}
+                      />
                     )}
-                    {activeTab === 'plan' && (
-                        <button
-                            onClick={() => setShowPlanFilters(!showPlanFilters)}
-                            className={`px-3 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-colors ${
-                                showPlanFilters || hasActivePlanFilters
-                                    ? 'bg-blue-600 text-white hover:bg-blue-700'
-                                    : 'bg-gray-100 dark:bg-[#252525] text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-[#303030]'
-                            }`}
-                        >
-                            <Filter size={16} />
-                            <span className="hidden sm:inline">Фильтры</span>
-                            {hasActivePlanFilters && (
-                                <span className="bg-white/20 dark:bg-white/20 text-white px-1.5 py-0.5 rounded text-xs font-semibold">
-                                    {planFilters.filter(f => f.value && f.value !== 'all' && f.value !== '' && f.value !== 'hide').length}
-                                </span>
-                            )}
-                        </button>
+                    {activeTab === 'plan' && planSubView === 'list' && (
+                      <ModuleFilterIconButton
+                        accent="emerald"
+                        active={showPlanFilters || hasActivePlanFilters}
+                        activeCount={planFilters.filter(f => f.value && f.value !== 'all' && f.value !== '' && f.value !== 'hide').length}
+                        onClick={() => setShowPlanFilters(!showPlanFilters)}
+                      />
                     )}
                     {activeTab === 'requests' && (
-                        <button
-                            onClick={() => setShowRequestFilters(!showRequestFilters)}
-                            className={`px-3 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-colors ${
-                                showRequestFilters || hasActiveRequestFilters
-                                    ? 'bg-blue-600 text-white hover:bg-blue-700'
-                                    : 'bg-gray-100 dark:bg-[#252525] text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-[#303030]'
-                            }`}
-                        >
-                            <Filter size={16} />
-                            <span className="hidden sm:inline">Фильтры</span>
-                            {hasActiveRequestFilters && (
-                                <span className="bg-white/20 dark:bg-white/20 text-white px-1.5 py-0.5 rounded text-xs font-semibold">
-                                    {requestFilters.filter(f => f.value && f.value !== 'all' && f.value !== '' && f.value !== 'hide').length}
-                                </span>
-                            )}
-                        </button>
+                      <ModuleFilterIconButton
+                        accent="emerald"
+                        active={showRequestFilters || hasActiveRequestFilters}
+                        activeCount={requestFilters.filter(f => f.value && f.value !== 'all' && f.value !== '' && f.value !== 'hide').length}
+                        onClick={() => setShowRequestFilters(!showRequestFilters)}
+                      />
                     )}
-                    <ModuleCreateIconButton
+                    <ModuleCreateDropdown
                       accent="emerald"
-                      label="Создать"
-                      onClick={() => setIsCreateModalOpen(true)}
+                      label={activeTab === 'statements' ? 'Действия' : 'Создать'}
+                      items={[
+                        ...(activeTab === 'statements'
+                          ? [
+                              {
+                                id: 'upload-statement',
+                                label: 'Загрузить выписку',
+                                icon: Upload,
+                                onClick: () => bankStatementsRef.current?.triggerUpload(),
+                              },
+                            ]
+                          : []),
+                        {
+                          id: 'create-request',
+                          label: 'Заявка на приобретение',
+                          icon: DollarSign,
+                          onClick: handleOpenRequestCreate,
+                        },
+                        {
+                          id: 'create-fin-plan',
+                          label: 'Финансовый план',
+                          icon: FileText,
+                          onClick: () => {
+                            if (departments.length === 0) {
+                              setAlertText('Сначала создайте подразделение в настройках');
+                              return;
+                            }
+                            setActiveTab('plan');
+                            setSelectedPlanDoc(null);
+                            setPlanSubView('create');
+                          },
+                        },
+                        {
+                          id: 'create-fin-planning',
+                          label: 'Финансовое планирование',
+                          icon: PieChart,
+                          onClick: () => {
+                            if (departments.length === 0) {
+                              setAlertText('Сначала создайте подразделение в настройках');
+                              return;
+                            }
+                            setActiveTab('planning');
+                            setSelectedPlanning(null);
+                            setPlanningSubView('create');
+                          },
+                        },
+                      ]}
                     />
                 </div>
               }
             />
             
-            {/* TABS */}
-            <div className="mb-4 mt-4">
-                <Tabs
-                    tabs={[
-                        { id: 'planning', label: 'Планирование' },
-                        { id: 'bdr', label: 'БДР' },
-                        { id: 'requests', label: 'Заявки' },
-                        { id: 'statements', label: 'Выписки и сверка' },
-                        ...(currentUser.role === Role.ADMIN ? [{ id: 'plan', label: 'Финансовый план' }] : [])
-                    ]}
-                    activeTab={activeTab}
-                    onChange={(tabId) => {
-                        if (tabId === 'planning') {
-                            setSelectedPlanning(null);
-                            setActiveTab('planning');
-                        } else if (tabId === 'plan') {
-                            setSelectedPlanDoc(null);
-                            setActiveTab('plan');
-                        } else if (tabId === 'statements') {
-                            setActiveTab('statements');
-                        } else if (tabId === 'bdr') {
-                            setActiveTab('bdr');
-                        } else {
-                            setSelectedPlanning(null);
-                            setSelectedPlanDoc(null);
-                            setActiveTab('requests');
-                        }
-                    }}
-                />
-                {showPlanningFilters && activeTab === 'planning' && (
+            <div className="mt-1">
+                {showPlanningFilters && activeTab === 'planning' && planningSubView === 'list' && (
                     <div className="mt-4 p-4 bg-gray-50 dark:bg-[#252525] rounded-lg border border-gray-200 dark:border-[#333]">
                         <div className="grid gap-3" style={{ gridTemplateColumns: `repeat(auto-fit, minmax(150px, 1fr))`, maxWidth: '100%' }}>
                             {planningFilters.map((filter, index) => (
@@ -1540,7 +1687,7 @@ const FinanceView: React.FC<FinanceViewProps> = ({
                         )}
                     </div>
                 )}
-                {showPlanFilters && activeTab === 'plan' && (
+                {showPlanFilters && activeTab === 'plan' && planSubView === 'list' && (
                     <div className="mt-4 p-4 bg-gray-50 dark:bg-[#252525] rounded-lg border border-gray-200 dark:border-[#333]">
                         <div className="grid gap-3" style={{ gridTemplateColumns: `repeat(auto-fit, minmax(150px, 1fr))`, maxWidth: '100%' }}>
                             {planFilters.map((filter, index) => (
@@ -1581,26 +1728,27 @@ const FinanceView: React.FC<FinanceViewProps> = ({
             </div>
        </div>
        </div>
-       <div className="flex-1 min-h-0 overflow-hidden">
-         <div className={`${MODULE_PAGE_GUTTER} pb-20 h-full overflow-y-auto custom-scrollbar`}>
-           {activeTab === 'planning' && (
-             selectedPlanning ? renderPlanningDetail() : renderPlanningList()
-           )}
+      )}
+       <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
+         <div className={`${MODULE_PAGE_GUTTER} pb-20 h-full overflow-y-auto custom-scrollbar flex-1 flex flex-col min-h-0`}>
+           {activeTab === 'planning' && planningSubView === 'list' && renderPlanningList()}
+           {activeTab === 'planning' && planningSubView === 'create' && renderPlanningCreate()}
+           {activeTab === 'planning' && planningSubView === 'detail' && selectedPlanning && renderPlanningDetail()}
            {activeTab === 'bdr' && onLoadBdr && onSaveBdr && (
              <BdrView bdr={bdr ?? null} onLoadBdr={onLoadBdr} onSaveBdr={onSaveBdr} />
            )}
            {activeTab === 'requests' && renderRequestsTab()}
-           {activeTab === 'statements' && <BankStatementsView />}
-           {activeTab === 'plan' && (
-             selectedPlanDoc ? renderPlanDetail() : renderPlanList()
-           )}
+           {activeTab === 'statements' && <BankStatementsView ref={bankStatementsRef} />}
+           {activeTab === 'plan' && planSubView === 'list' && renderPlanList()}
+           {activeTab === 'plan' && planSubView === 'create' && renderPlanCreate()}
+           {activeTab === 'plan' && planSubView === 'detail' && selectedPlanDoc && renderPlanDetail()}
          </div>
        </div>
 
        {/* Request Modal */}
        {isRequestModalOpen && (
-        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-end md:items-center justify-center z-[80] animate-in fade-in duration-200" onClick={(e) => { if(e.target === e.currentTarget) setIsRequestModalOpen(false) }}>
-            <div className="bg-white dark:bg-[#252525] rounded-t-2xl md:rounded-xl shadow-2xl w-full max-w-md max-h-[95vh] md:max-h-[90vh] overflow-hidden border border-gray-200 dark:border-[#333]">
+        <div className="fixed inset-0 bg-black/35 backdrop-blur-sm flex items-end md:items-center justify-center z-[220] animate-in fade-in duration-200" onClick={(e) => { if(e.target === e.currentTarget) setIsRequestModalOpen(false) }}>
+            <div className="bg-white dark:bg-[#252525] rounded-t-2xl md:rounded-xl shadow-2xl w-full max-w-lg max-h-[95vh] md:max-h-[90vh] overflow-hidden border border-gray-200 dark:border-[#333]">
                 <div className="p-4 border-b border-gray-100 dark:border-[#333] flex justify-between items-center bg-white dark:bg-[#252525]">
                     <h3 className="font-bold text-gray-800 dark:text-white">Заявка на приобретение</h3>
                     <button onClick={() => setIsRequestModalOpen(false)} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 p-1 rounded-full hover:bg-gray-100 dark:hover:bg-[#333]"><X size={18} /></button>
@@ -1641,6 +1789,10 @@ const FinanceView: React.FC<FinanceViewProps> = ({
                         </div>
                     </div>
                     <div>
+                      <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 mb-1">Плановая дата оплаты</label>
+                      <DateInput value={reqPaymentDate} onChange={setReqPaymentDate} placeholder="Выберите дату оплаты" />
+                    </div>
+                    <div>
                         <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 mb-1">Описание / Обоснование</label>
                         <textarea required value={reqDesc} onChange={e => setReqDesc(e.target.value)} className="w-full h-24 border border-gray-300 dark:border-gray-600 rounded px-3 py-2 text-sm bg-white dark:bg-[#333] text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 resize-none" placeholder="Что покупаем и зачем?"/>
                     </div>
@@ -1652,130 +1804,13 @@ const FinanceView: React.FC<FinanceViewProps> = ({
             </div>
         </div>
        )}
-       
-       {/* Create Modal - стандартное оформление */}
-       {isCreateModalOpen && (
-        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-end md:items-center justify-center z-[80] animate-in fade-in duration-200" onClick={() => setIsCreateModalOpen(false)}>
-            <div className="bg-white dark:bg-[#252525] rounded-t-2xl md:rounded-xl shadow-2xl w-full max-w-md max-h-[95vh] md:max-h-[90vh] overflow-hidden border border-gray-200 dark:border-[#333]" onClick={e => e.stopPropagation()}>
-                <div className="p-4 border-b border-gray-100 dark:border-[#333] flex justify-between items-center bg-white dark:bg-[#252525]">
-                    <h3 className="font-bold text-gray-800 dark:text-white">Создать</h3>
-                    <button onClick={() => setIsCreateModalOpen(false)} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 p-1 rounded-full hover:bg-gray-100 dark:hover:bg-[#333]"><X size={18} /></button>
-                </div>
-                <div className="p-6 space-y-3">
-                    <button 
-                        onClick={handleCreateRequest}
-                        className="w-full p-4 bg-white dark:bg-[#333] border border-gray-200 dark:border-[#444] rounded-lg text-left hover:bg-gray-50 dark:hover:bg-[#404040] transition-colors"
-                    >
-                        <div className="font-semibold text-gray-800 dark:text-white mb-1">Заявка на приобретение</div>
-                        <div className="text-xs text-gray-500 dark:text-gray-400">Создать новую заявку на приобретение</div>
-                    </button>
-                    <button 
-                        onClick={handleCreatePlan}
-                        className="w-full p-4 bg-white dark:bg-[#333] border border-gray-200 dark:border-[#444] rounded-lg text-left hover:bg-gray-50 dark:hover:bg-[#404040] transition-colors"
-                    >
-                        <div className="font-semibold text-gray-800 dark:text-white mb-1">Финансовый план</div>
-                        <div className="text-xs text-gray-500 dark:text-gray-400">Создать финансовый план на месяц</div>
-                    </button>
-                    <button 
-                        onClick={handleCreatePlanning}
-                        className="w-full p-4 bg-white dark:bg-[#333] border border-gray-200 dark:border-[#444] rounded-lg text-left hover:bg-gray-50 dark:hover:bg-[#404040] transition-colors"
-                    >
-                        <div className="font-semibold text-gray-800 dark:text-white mb-1">Финансовое планирование</div>
-                        <div className="text-xs text-gray-500 dark:text-gray-400">Создать планирование за период для подразделения</div>
-                    </button>
-                </div>
-            </div>
-        </div>
-       )}
 
-       {/* Plan Create Modal */}
-       {isPlanCreateModalOpen && (
-        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-end md:items-center justify-center z-[80] animate-in fade-in duration-200" onClick={() => setIsPlanCreateModalOpen(false)}>
-            <div className="bg-white dark:bg-[#252525] rounded-t-2xl md:rounded-xl shadow-2xl w-full max-w-md max-h-[95vh] md:max-h-[90vh] overflow-hidden border border-gray-200 dark:border-[#333]" onClick={e => e.stopPropagation()}>
-                <div className="p-4 border-b border-gray-100 dark:border-[#333] flex justify-between items-center bg-white dark:bg-[#252525]">
-                    <h3 className="font-bold text-gray-800 dark:text-white">Создать финансовый план</h3>
-                    <button onClick={() => setIsPlanCreateModalOpen(false)} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 p-1 rounded-full hover:bg-gray-100 dark:hover:bg-[#333]"><X size={18} /></button>
-                </div>
-                <form onSubmit={handlePlanSubmit} className="p-6 space-y-4">
-                    <div>
-                        <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 mb-1 uppercase">Подразделение <span className="text-red-500">*</span></label>
-                        <TaskSelect
-                            value={newPlanDepartment}
-                            onChange={setNewPlanDepartment}
-                            options={[
-                                { value: '', label: 'Выберите подразделение' },
-                                ...departments.map(d => ({ value: d.id, label: d.name }))
-                            ]}
-                        />
-                    </div>
-                    <div>
-                        <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 mb-1 uppercase">Период (месяц) <span className="text-red-500">*</span></label>
-                        <input
-                            type="month"
-                            required
-                            value={newPlanPeriod}
-                            onChange={(e) => setNewPlanPeriod(e.target.value)}
-                            className="w-full bg-white dark:bg-[#333] border border-gray-300 dark:border-[#555] rounded-lg px-4 py-3 text-sm text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
-                        />
-                    </div>
-                    <div className="flex justify-end gap-2 pt-2">
-                        <Button type="button" variant="secondary" onClick={() => setIsPlanCreateModalOpen(false)} size="md">Отмена</Button>
-                        <Button type="submit" size="md">Создать</Button>
-                    </div>
-                </form>
-            </div>
-        </div>
-       )}
-
-       {/* Planning Create Modal */}
-       {isPlanningCreateModalOpen && (
-        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-end md:items-center justify-center z-[80] animate-in fade-in duration-200" onClick={() => setIsPlanningCreateModalOpen(false)}>
-            <div className="bg-white dark:bg-[#252525] rounded-t-2xl md:rounded-xl shadow-2xl w-full max-w-md max-h-[95vh] md:max-h-[90vh] overflow-hidden border border-gray-200 dark:border-[#333]" onClick={e => e.stopPropagation()}>
-                <div className="p-4 border-b border-gray-100 dark:border-[#333] flex justify-between items-center bg-white dark:bg-[#252525]">
-                    <h3 className="font-bold text-gray-800 dark:text-white">Создать финансовое планирование</h3>
-                    <button onClick={() => setIsPlanningCreateModalOpen(false)} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 p-1 rounded-full hover:bg-gray-100 dark:hover:bg-[#333]"><X size={18} /></button>
-                </div>
-                <form onSubmit={handlePlanningSubmit} className="p-6 space-y-4">
-                    <div>
-                        <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 mb-1 uppercase">Подразделение <span className="text-red-500">*</span></label>
-                        <TaskSelect
-                            value={newPlanningDepartment}
-                            onChange={setNewPlanningDepartment}
-                            options={[
-                                { value: '', label: 'Выберите подразделение' },
-                                ...departments.map(d => ({ value: d.id, label: d.name }))
-                            ]}
-                        />
-                    </div>
-                    <div>
-                        <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 mb-1 uppercase">Период <span className="text-red-500">*</span></label>
-                        <input
-                            type="month"
-                            required
-                            value={newPlanningPeriod}
-                            onChange={(e) => setNewPlanningPeriod(e.target.value)}
-                            className="w-full bg-white dark:bg-[#333] border border-gray-300 dark:border-[#555] rounded-lg px-4 py-3 text-sm text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
-                        />
-                    </div>
-                    <div>
-                        <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 mb-1 uppercase">Доход за период (UZS), кассовый метод <span className="text-red-500">*</span></label>
-                        <input
-                            type="number"
-                            min={1}
-                            value={newPlanningIncome || ''}
-                            onChange={(e) => setNewPlanningIncome(parseFloat(e.target.value) || 0)}
-                            className="w-full bg-white dark:bg-[#333] border border-gray-300 dark:border-[#555] rounded-lg px-4 py-3 text-sm text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                            placeholder="0"
-                        />
-                    </div>
-                    <div className="flex justify-end gap-2 pt-2">
-                        <Button type="button" variant="secondary" onClick={() => setIsPlanningCreateModalOpen(false)} size="md">Отмена</Button>
-                        <Button type="submit" size="md">Создать</Button>
-                    </div>
-                </form>
-            </div>
-        </div>
-       )}
+       <SystemAlertDialog
+         open={!!alertText}
+         title="Финансы"
+         message={alertText || ''}
+         onClose={() => setAlertText(null)}
+       />
     </ModulePageShell>
   );
 };

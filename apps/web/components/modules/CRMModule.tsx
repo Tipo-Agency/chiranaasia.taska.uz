@@ -1,6 +1,7 @@
 
 import React from 'react';
-import { Deal, Client, Contract, User, Project, Task, OneTimeDeal, AccountsReceivable, Meeting } from '../../types';
+import { Deal, Client, Contract, User, Project, Task, OneTimeDeal, AccountsReceivable, Meeting, SalesFunnel } from '../../types';
+import type { AppActions } from '../../frontend/hooks/useAppLogic';
 import SalesFunnelView from '../SalesFunnelView';
 import ClientsView from '../ClientsView';
 
@@ -15,8 +16,9 @@ interface CRMModuleProps {
   projects?: Project[];
   tasks?: Task[];
   meetings?: Meeting[];
+  salesFunnels?: SalesFunnel[];
   currentUser?: User | null;
-  actions: any;
+  actions: AppActions;
   autoOpenCreateModal?: boolean;
 }
 
@@ -46,6 +48,7 @@ export const CRMModule: React.FC<CRMModuleProps> = ({ view, deals, clients, cont
   if (view === 'clients') {
       return <ClientsView 
         clients={clients} 
+        users={users}
         contracts={contracts}
         oneTimeDeals={oneTimeDeals}
         accountsReceivable={accountsReceivable}

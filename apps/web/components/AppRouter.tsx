@@ -6,21 +6,19 @@ import {
   Doc, Folder, TableCollection, Department, FinanceCategory, Fund,
   FinancePlan, PurchaseRequest, FinancialPlanDocument, FinancialPlanning, OrgPosition, BusinessProcess, SalesFunnel,
   ViewMode, AutomationRule, Warehouse, InventoryItem, StockBalance, StockMovement, InventoryRevision, OneTimeDeal, AccountsReceivable,
-  NotificationPreferences, InboxMessage
+  NotificationPreferences
 } from '../types';
 
-import HomeView from './HomeView';
-import { HomePage } from './pages/HomePage';
+import type { AppActions } from '../frontend/hooks/useAppLogic';
+
 import { WorkdeskView } from './pages/WorkdeskView';
 import { TasksPage } from './pages/TasksPage';
-import { ClientsPage } from './pages/ClientsPage';
+import ClientsView from './ClientsView';
 import { InboxPage } from './pages/InboxPage';
-import InboxView from './InboxView';
 import SettingsView from './SettingsView';
 import AnalyticsView from './AnalyticsView';
 import DocEditor from './DocEditor';
 import TableView from './TableView'; // Needed for Global Search
-import { TasksView } from './TasksView';
 import { SpacesTabsView } from './SpacesTabsView';
 import { SpaceModule } from './modules/SpaceModule';
 import { CRMModule } from './modules/CRMModule';
@@ -28,7 +26,6 @@ import { FinanceModule } from './modules/FinanceModule';
 import { HRModule } from './modules/HRModule';
 import { MeetingsModule } from './modules/MeetingsModule';
 import { DocumentsModule } from './modules/DocumentsModule';
-import { SitesView } from './sites/SitesView';
 import InventoryView from './InventoryView';
 import { AdminView } from './admin/AdminView';
 import { MiniMessenger } from './features/chat/MiniMessenger';
@@ -38,7 +35,6 @@ import { Container } from './ui/Container';
 interface AppRouterProps {
   currentView: string;
   viewMode: ViewMode;
-  searchQuery: string;
   activeTable?: TableCollection;
   filteredTasks: Task[];
   allTasks: Task[];
@@ -80,9 +76,7 @@ interface AppRouterProps {
   settingsActiveTab?: string;
   activeSpaceTab?: 'content-plan' | 'backlog' | 'functionality';
   notificationPrefs?: NotificationPreferences;
-  inboxMessages?: InboxMessage[];
-  outboxMessages?: InboxMessage[];
-  actions: any;
+  actions: AppActions;
 }
 
 export const AppRouter: React.FC<AppRouterProps> = (props) => {
@@ -329,10 +323,23 @@ export const AppRouter: React.FC<AppRouterProps> = (props) => {
                         tasks={props.allTasks}
                         deals={props.deals}
                         meetings={props.meetings}
+                        onOpenTask={actions.openTaskModal}
                         onOpenDocument={props.actions.handleDocClick}
                         onOpenDocumentsModule={() => props.actions.setCurrentView('docs')}
                         onOpenDeals={() => props.actions.setCurrentView('sales-funnel')}
+                        onOpenDeal={(deal) => {
+                          props.actions.setCurrentView('sales-funnel');
+                          window.setTimeout(() => {
+                            window.dispatchEvent(new CustomEvent('openDealFromChat', { detail: { dealId: deal.id } }));
+                          }, 0);
+                        }}
                         onOpenMeetings={() => props.actions.setCurrentView('meetings')}
+                        onOpenMeeting={(meeting) => {
+                          props.actions.setCurrentView('meetings');
+                          window.setTimeout(() => {
+                            window.dispatchEvent(new CustomEvent('openMeetingFromChat', { detail: { meetingId: meeting.id } }));
+                          }, 0);
+                        }}
                         onCreateEntity={createEntityFromChat}
                         onUpdateEntity={updateEntityFromChat}
                         processTemplates={props.businessProcesses}
@@ -376,6 +383,7 @@ export const AppRouter: React.FC<AppRouterProps> = (props) => {
               onUpdateProfile={actions.updateProfile} onSaveDeal={actions.saveDeal} onClose={actions.closeSettings} initialTab={props.settingsActiveTab}
               onSaveDepartment={actions.saveDepartment} onDeleteDepartment={actions.deleteDepartment}
               onSaveFinanceCategory={actions.saveFinanceCategory} onDeleteFinanceCategory={actions.deleteFinanceCategory} onSaveFund={actions.saveFund} onDeleteFund={actions.deleteFund}
+              onSaveWarehouse={actions.saveWarehouse} onDeleteWarehouse={actions.deleteWarehouse} warehouses={props.warehouses}
               onSaveSalesFunnel={actions.saveSalesFunnel} onDeleteSalesFunnel={actions.deleteSalesFunnel}
               notificationPrefs={props.notificationPrefs}
               onRestoreTask={actions.restoreTask}
@@ -431,7 +439,7 @@ export const AppRouter: React.FC<AppRouterProps> = (props) => {
 
   if (view === 'clients') {
       return (
-          <ClientsPage
+          <ClientsView
               clients={props.clients}
               contracts={props.contracts}
               oneTimeDeals={props.oneTimeDeals}
@@ -510,11 +518,7 @@ export const AppRouter: React.FC<AppRouterProps> = (props) => {
           // Добавляем в таблицы, но не сохраняем (чтобы не показывалась в настройках)
           // Модуль будет работать с этой фиктивной таблицей
       }
-      return <DocumentsModule table={docsTable} docs={props.docs} folders={props.folders} tables={props.tables} tasks={props.allTasks} users={props.users} currentUser={props.currentUser} actions={actions} />;
-  }
-
-  if (view === 'sites') {
-      return <SitesView currentUser={props.currentUser} />;
+      return <DocumentsModule table={docsTable} docs={props.docs} folders={props.folders} tables={props.tables} tasks={props.allTasks} users={props.users} departments={props.departments} employees={props.employeeInfos} currentUser={props.currentUser} actions={actions} />;
   }
 
   if (view === 'inventory') {

@@ -64,7 +64,8 @@ export const DEFAULT_AUTOMATION_RULES: AutomationRule[] = [
         id: 'rule-1',
         name: 'Согласование договора',
         isActive: true,
-        trigger: 'status_change',
+        module: 'tasks',
+        trigger: 'task_status_changed',
         conditions: { statusTo: 'На проверке' },
         action: {
             type: 'telegram_message',

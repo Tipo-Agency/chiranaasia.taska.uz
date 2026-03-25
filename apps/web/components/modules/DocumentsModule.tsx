@@ -1,5 +1,6 @@
 import React from 'react';
-import { TableCollection, Doc, Folder, TableCollection as Table, User } from '../../types';
+import { TableCollection, Doc, Folder, TableCollection as Table, User, Department, EmployeeInfo, Task } from '../../types';
+import type { AppActions } from '../../frontend/hooks/useAppLogic';
 import DocumentsView from '../DocumentsView';
 
 interface DocumentsModuleProps {
@@ -7,10 +8,12 @@ interface DocumentsModuleProps {
   docs: Doc[];
   folders: Folder[];
   tables: Table[];
-  tasks?: any[];
+  tasks?: Task[];
   users: User[];
+  departments?: Department[];
+  employees?: EmployeeInfo[];
   currentUser: User;
-  actions: any;
+  actions: AppActions;
 }
 
 export const DocumentsModule: React.FC<DocumentsModuleProps> = ({
@@ -20,6 +23,8 @@ export const DocumentsModule: React.FC<DocumentsModuleProps> = ({
   tables,
   tasks = [],
   users,
+  departments = [],
+  employees = [],
   currentUser,
   actions,
 }) => {
@@ -33,6 +38,8 @@ export const DocumentsModule: React.FC<DocumentsModuleProps> = ({
         tables={tables}
         tasks={tasks}
         users={users}
+        departments={departments}
+        employees={employees}
         currentUser={currentUser}
         onOpenDoc={actions.handleDocClick} 
         onAddDoc={(folderId) => actions.openDocModal(folderId)} 
@@ -41,6 +48,7 @@ export const DocumentsModule: React.FC<DocumentsModuleProps> = ({
         onDeleteFolder={actions.deleteFolder} 
         onDeleteDoc={actions.deleteDoc}
         onOpenTask={actions.openTaskModal}
+        onUpdateTask={(taskId, updates) => actions.saveTask({ id: taskId, ...updates })}
         onDeleteAttachment={(taskId, attachmentId) => {
           const task = tasks.find(t => t.id === taskId);
           if (task) {

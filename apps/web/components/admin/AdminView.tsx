@@ -487,7 +487,7 @@ function RedisTab({ onAuthError }: { onAuthError: (msg: string) => void }) {
             <div className="p-4 rounded-xl border border-gray-200 dark:border-[#333] bg-gray-50 dark:bg-[#252525]">
               <p className="text-sm text-gray-500 dark:text-gray-400">Redis</p>
               <p className={`text-xl font-semibold ${monitor.redis_ok ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
-                {monitor.redis_ok ? 'OK' : 'DOWN'}
+                {monitor.redis_ok ? 'Работает' : 'Недоступен'}
               </p>
               {!monitor.redis_ok && monitor.redis_error && (
                 <p className="text-xs text-red-600 dark:text-red-400 mt-1 break-all">{monitor.redis_error}</p>
@@ -496,7 +496,7 @@ function RedisTab({ onAuthError }: { onAuthError: (msg: string) => void }) {
             <div className="p-4 rounded-xl border border-gray-200 dark:border-[#333] bg-gray-50 dark:bg-[#252525]">
               <p className="text-sm text-gray-500 dark:text-gray-400">Стрим</p>
               <p className="text-lg font-semibold text-[#3337AD] break-all">{monitor.stream_name}</p>
-              <p className="text-xs text-gray-500 mt-1">len: {monitor.stream_length ?? 0}, groups: {monitor.stream_groups ?? 0}</p>
+              <p className="text-xs text-gray-500 mt-1">Длина: {monitor.stream_length ?? 0}, групп: {monitor.stream_groups ?? 0}</p>
             </div>
             <div className="p-4 rounded-xl border border-gray-200 dark:border-[#333] bg-gray-50 dark:bg-[#252525]">
               <p className="text-sm text-gray-500 dark:text-gray-400">События</p>
@@ -509,33 +509,33 @@ function RedisTab({ onAuthError }: { onAuthError: (msg: string) => void }) {
             <h3 className="font-medium mb-3">Очередь доставок</h3>
             <div className="grid gap-3 sm:grid-cols-3">
               <div className="rounded-lg border border-gray-200 dark:border-[#333] p-3">
-                <p className="text-xs text-gray-500">Pending</p>
+                <p className="text-xs text-gray-500">В ожидании</p>
                 <p className="text-2xl font-semibold">{monitor.deliveries_pending}</p>
               </div>
               <div className="rounded-lg border border-gray-200 dark:border-[#333] p-3">
-                <p className="text-xs text-gray-500">Failed</p>
+                <p className="text-xs text-gray-500">С ошибкой</p>
                 <p className={`text-2xl font-semibold ${monitor.deliveries_failed > 0 ? 'text-red-600 dark:text-red-400' : ''}`}>
                   {monitor.deliveries_failed}
                 </p>
               </div>
               <div className="rounded-lg border border-gray-200 dark:border-[#333] p-3">
-                <p className="text-xs text-gray-500">Sent</p>
+                <p className="text-xs text-gray-500">Отправлено</p>
                 <p className="text-2xl font-semibold text-green-600 dark:text-green-400">{monitor.deliveries_sent}</p>
               </div>
             </div>
           </div>
           {monitor.stream_group_details && monitor.stream_group_details.length > 0 && (
             <div className="p-4 rounded-xl border border-gray-200 dark:border-[#333] bg-white dark:bg-[#252525]">
-              <h3 className="font-medium mb-3">Consumer groups / lag</h3>
+              <h3 className="font-medium mb-3">Группы потребителей / задержка</h3>
               <div className="overflow-x-auto border border-gray-200 dark:border-[#333] rounded-lg">
                 <table className="w-full text-sm">
                   <thead className="bg-gray-50 dark:bg-[#202020] border-b border-gray-200 dark:border-[#333]">
                     <tr>
-                      <th className="text-left px-3 py-2">Group</th>
-                      <th className="text-left px-3 py-2">Consumers</th>
-                      <th className="text-left px-3 py-2">Pending</th>
-                      <th className="text-left px-3 py-2">Lag</th>
-                      <th className="text-left px-3 py-2">Last delivered ID</th>
+                      <th className="text-left px-3 py-2">Группа</th>
+                      <th className="text-left px-3 py-2">Потребители</th>
+                      <th className="text-left px-3 py-2">В ожидании</th>
+                      <th className="text-left px-3 py-2">Задержка</th>
+                      <th className="text-left px-3 py-2">Последний ID доставки</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -564,7 +564,7 @@ function RedisTab({ onAuthError }: { onAuthError: (msg: string) => void }) {
                   setActionResult(null);
                   try {
                     const res = await adminEndpoint.runNotificationDeliveries(500);
-                    setActionResult(`Deliveries: processed=${res.processed}, sent=${res.sent}, failed=${res.failed}`);
+                    setActionResult(`Доставки: обработано=${res.processed}, отправлено=${res.sent}, ошибок=${res.failed}`);
                     await load();
                   } finally {
                     setActionLoading(null);
@@ -573,7 +573,7 @@ function RedisTab({ onAuthError }: { onAuthError: (msg: string) => void }) {
                 disabled={actionLoading !== null}
                 className="px-3 py-1.5 rounded-lg bg-[#3337AD] text-white text-sm disabled:opacity-50"
               >
-                {actionLoading === 'deliveries' ? 'Выполняется…' : 'Run deliveries now'}
+                {actionLoading === 'deliveries' ? 'Выполняется…' : 'Запустить доставки сейчас'}
               </button>
               <button
                 type="button"
@@ -582,7 +582,7 @@ function RedisTab({ onAuthError }: { onAuthError: (msg: string) => void }) {
                   setActionResult(null);
                   try {
                     const res = await adminEndpoint.runNotificationRetention();
-                    setActionResult(`Retention(${res.days}d): archived=${res.archived_notifications}, events=${res.deleted_events}, deliveries=${res.deleted_deliveries}`);
+                    setActionResult(`Ретеншен (${res.days} дн.): архивировано=${res.archived_notifications}, удалено событий=${res.deleted_events}, удалено доставок=${res.deleted_deliveries}`);
                     await load();
                   } finally {
                     setActionLoading(null);
@@ -591,7 +591,7 @@ function RedisTab({ onAuthError }: { onAuthError: (msg: string) => void }) {
                 disabled={actionLoading !== null}
                 className="px-3 py-1.5 rounded-lg bg-gray-800 text-white text-sm disabled:opacity-50"
               >
-                {actionLoading === 'retention' ? 'Выполняется…' : 'Run retention now'}
+                {actionLoading === 'retention' ? 'Выполняется…' : 'Запустить ретеншен сейчас'}
               </button>
               <button
                 type="button"
@@ -600,7 +600,7 @@ function RedisTab({ onAuthError }: { onAuthError: (msg: string) => void }) {
                   setActionResult(null);
                   try {
                     const res = await adminEndpoint.requeueFailedDeliveries(500);
-                    setActionResult(`Requeued failed: ${res.requeued}`);
+                    setActionResult(`Повторно поставлено в очередь: ${res.requeued}`);
                     await load();
                   } finally {
                     setActionLoading(null);
@@ -609,7 +609,7 @@ function RedisTab({ onAuthError }: { onAuthError: (msg: string) => void }) {
                 disabled={actionLoading !== null}
                 className="px-3 py-1.5 rounded-lg bg-red-600 text-white text-sm disabled:opacity-50"
               >
-                {actionLoading === 'requeue' ? 'Выполняется…' : 'Requeue failed'}
+                {actionLoading === 'requeue' ? 'Выполняется…' : 'Перезапустить ошибочные'}
               </button>
             </div>
             {actionResult && (
@@ -618,7 +618,7 @@ function RedisTab({ onAuthError }: { onAuthError: (msg: string) => void }) {
           </div>
 
           <div className="p-4 rounded-xl border border-gray-200 dark:border-[#333] bg-white dark:bg-[#252525]">
-            <h3 className="font-medium mb-3">Последние failed deliveries</h3>
+            <h3 className="font-medium mb-3">Последние ошибочные доставки</h3>
             <div className="mb-3 flex flex-wrap gap-2">
               <select
                 value={failedChannelFilter}
@@ -647,7 +647,7 @@ function RedisTab({ onAuthError }: { onAuthError: (msg: string) => void }) {
                     <tr>
                       <th className="text-left px-3 py-2">Время</th>
                       <th className="text-left px-3 py-2">Канал</th>
-                      <th className="text-left px-3 py-2">Attempts</th>
+                      <th className="text-left px-3 py-2">Попытки</th>
                       <th className="text-left px-3 py-2">Уведомление</th>
                       <th className="text-left px-3 py-2">Ошибка</th>
                       <th className="text-left px-3 py-2">Действие</th>
@@ -676,7 +676,7 @@ function RedisTab({ onAuthError }: { onAuthError: (msg: string) => void }) {
                               setActionResult(null);
                               try {
                                 const res = await adminEndpoint.requeueFailedDeliveryById(row.id);
-                                setActionResult(res.requeued > 0 ? `Requeued delivery ${row.id}` : `Delivery ${row.id} не в failed`);
+                                setActionResult(res.requeued > 0 ? `Доставка ${row.id} повторно поставлена в очередь` : `Доставка ${row.id} не имеет статуса "ошибка"`);
                                 await load();
                               } finally {
                                 setRowRequeueLoadingId(null);
@@ -684,7 +684,7 @@ function RedisTab({ onAuthError }: { onAuthError: (msg: string) => void }) {
                             }}
                             className="px-2 py-1 rounded bg-red-600 text-white text-xs disabled:opacity-50"
                           >
-                            {rowRequeueLoadingId === row.id ? '...' : 'Requeue'}
+                            {rowRequeueLoadingId === row.id ? '...' : 'Повторить'}
                           </button>
                         </td>
                       </tr>
@@ -698,7 +698,7 @@ function RedisTab({ onAuthError }: { onAuthError: (msg: string) => void }) {
           <div className="text-xs text-gray-500 dark:text-gray-400">
             <p>Redis URL: <span className="font-mono break-all">{monitor.redis_url}</span></p>
             {monitor.stream_last_generated_id && (
-              <p>Last stream id: <span className="font-mono break-all">{monitor.stream_last_generated_id}</span></p>
+              <p>Последний ID стрима: <span className="font-mono break-all">{monitor.stream_last_generated_id}</span></p>
             )}
             <p>Автообновление: каждые 10 секунд.</p>
           </div>

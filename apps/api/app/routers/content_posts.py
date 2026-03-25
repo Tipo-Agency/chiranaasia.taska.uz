@@ -5,6 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
 from app.models.content import ContentPost
+from app.services.domain_events import log_entity_mutation
 
 router = APIRouter(prefix="/content-posts", tags=["content-posts"])
 
@@ -38,6 +39,8 @@ async def update_content_posts(posts: list[dict], db: AsyncSession = Depends(get
         if not pid:
             continue
         existing = await db.get(ContentPost, pid)
+        prev_status = existing.status if existing else None
+        is_new = existing is None
         if existing:
             existing.table_id = p.get("tableId")
             existing.topic = p.get("topic", existing.topic)
@@ -63,5 +66,26 @@ async def update_content_posts(posts: list[dict], db: AsyncSession = Depends(get
                 media_url=p.get("mediaUrl"),
                 is_archived=p.get("isArchived", False),
             ))
+        await db.flush()
+        row = await db.get(ContentPost, pid)
+        await log_entity_mutation(
+            db,
+            event_type="content_post.created" if is_new else "content_post.updated",
+            entity_type="content_post",
+            entity_id=pid,
+            source="content-posts-router",
+            payload={"topic": row.topic if row else p.get("topic"), "status": row.status if row else p.get("status")},
+            actor_id=p.get("updatedByUserId") or p.get("createdByUserId"),
+        )
+        if not is_new and row and prev_status is not None and row.status != prev_status:
+            await log_entity_mutation(
+                db,
+                event_type="content_post.status.changed",
+                entity_type="content_post",
+                entity_id=pid,
+                source="content-posts-router",
+                payload={"topic": row.topic, "fromStatus": prev_status, "toStatus": row.status},
+                actor_id=p.get("updatedByUserId"),
+            )
     await db.commit()
     return {"ok": True}

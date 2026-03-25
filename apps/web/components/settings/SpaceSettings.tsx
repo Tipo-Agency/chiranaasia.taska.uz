@@ -3,6 +3,7 @@ import React, { useState } from 'react';
 import { Project, StatusOption, PriorityOption, TableCollection } from '../../types';
 import { Trash2, Pencil, CheckSquare, FileText, Users, Instagram, Archive, Layers } from 'lucide-react';
 import { ModuleCreateIconButton } from '../ui/ModuleCreateIconButton';
+import { SystemConfirmDialog } from '../ui';
 import { LABEL_COLORS, PRIORITY_COLORS, ICON_OPTIONS, COLOR_OPTIONS } from '../../constants';
 import { DynamicIcon } from '../AppIcons';
 
@@ -26,6 +27,7 @@ export const SpaceSettings: React.FC<SpaceSettingsProps> = ({
     onUpdateProjects, onUpdateStatuses, onUpdatePriorities
 }) => {
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [deletePageId, setDeletePageId] = useState<string | null>(null);
 
   // Projects
   const [newProjectName, setNewProjectName] = useState('');
@@ -191,12 +193,25 @@ export const SpaceSettings: React.FC<SpaceSettingsProps> = ({
                           <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                               <button onClick={() => handleEditPage(table)} className="p-2 text-gray-400 hover:text-blue-500 rounded-lg bg-gray-50 dark:bg-[#333]"><Pencil size={16}/></button>
                               {!table.isSystem && onDeleteTable && (
-                                  <button onClick={() => { if(confirm('Удалить?')) onDeleteTable(table.id) }} className="p-2 text-gray-400 hover:text-red-500 rounded-lg bg-gray-50 dark:bg-[#333]"><Trash2 size={16}/></button>
+                                  <button onClick={() => setDeletePageId(table.id)} className="p-2 text-gray-400 hover:text-red-500 rounded-lg bg-gray-50 dark:bg-[#333]"><Trash2 size={16}/></button>
                               )}
                           </div>
                       </div>
                   ))}
               </div>
+              <SystemConfirmDialog
+                open={Boolean(deletePageId)}
+                title="Удалить страницу"
+                message="Вы уверены, что хотите удалить страницу?"
+                danger
+                confirmText="Удалить"
+                cancelText="Отмена"
+                onCancel={() => setDeletePageId(null)}
+                onConfirm={() => {
+                  if (deletePageId) onDeleteTable(deletePageId);
+                  setDeletePageId(null);
+                }}
+              />
           </div>
       );
   }
