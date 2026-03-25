@@ -8,7 +8,6 @@ import { StructureSettings } from './settings/StructureSettings';
 import { SpaceSettings } from './settings/SpaceSettings';
 import { AutomationSettings } from './settings/AutomationSettings';
 import DepartmentsView from './DepartmentsView';
-import { storageService } from '../services/storageService';
 import SalesFunnelsSettings from './settings/SalesFunnelsSettings';
 import { DEFAULT_NOTIFICATION_PREFS } from '../constants';
 // Integrations are managed outside Settings now.

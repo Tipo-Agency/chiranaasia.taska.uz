@@ -183,7 +183,7 @@ export const PRIORITY_COLORS = [
     { name: 'Yellow', class: 'bg-yellow-100 dark:bg-yellow-900/40 text-yellow-700 dark:text-yellow-300 border border-yellow-300 dark:border-yellow-700' },
 ];
 
-// Fallback значения для начальной загрузки (используются только если в Firestore нет данных)
+// Fallback для начальной загрузки / дефолты UI до ответа API
 export const MOCK_PROJECTS: Project[] = [];
 
 export const MOCK_TABLES: TableCollection[] = [];

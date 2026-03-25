@@ -211,8 +211,6 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
           return { ...u, updatedAt: u.updatedAt || now };
         });
         onUpdateUsers(updatedUsers);
-        const { storageService } = await import('../services/storageService');
-        await storageService.saveToCloud();
         setConfirmState({ open: false, title: '', message: '' });
       },
     });
