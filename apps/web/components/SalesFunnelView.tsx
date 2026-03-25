@@ -2,15 +2,14 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Deal, Client, User, Comment, Task, Project, SalesFunnel, Meeting, NotificationPreferences } from '../types';
 import { Plus, KanbanSquare, List as ListIcon, X, Send, MessageSquare, Instagram, Globe, UserPlus, Bot, Edit2, TrendingUp, CheckSquare, CheckCircle2, XCircle, Trash2, Calendar, Clock, Users, Tag, GitBranch, Filter, User as UserIcon } from 'lucide-react';
-// Telegram / Instagram интеграции отключены в локальной демо-версии
-// import { sendClientMessage } from '../services/telegramService';
-// import { instagramService } from '../services/instagramService';
+// Клиентский Telegram/Instagram — при необходимости подключать через api/telegramService.
 import { DynamicIcon } from './AppIcons';
 import { Button, ModulePageShell, ModulePageHeader, ModuleSegmentedControl, MODULE_PAGE_GUTTER, ModuleCreateIconButton, ModuleSelectDropdown, SystemAlertDialog, SystemConfirmDialog } from './ui';
 import { DateInput } from './ui/DateInput';
 import { TaskSelect } from './TaskSelect';
 import { api } from '../backend/api';
 import { isFunnelDeal } from '../utils/dealModel';
+import { devWarn } from '../utils/devLog';
 
 interface SalesFunnelViewProps {
   deals: Deal[];
@@ -249,11 +248,10 @@ const SalesFunnelView: React.FC<SalesFunnelViewProps> = ({ deals, clients, users
               comments: comments || []
           };
           
-          console.log('[DEAL] Saving deal:', dealData);
           onSaveDeal(dealData);
           setIsModalOpen(false);
       } catch (error) {
-          console.error('[DEAL] Error saving deal:', error);
+          devWarn('[DEAL] Error saving deal:', error);
           setAlertState({ open: true, title: 'Ошибка сохранения', message: 'Произошла ошибка при сохранении сделки. Попробуйте еще раз.' });
       }
   };
@@ -262,7 +260,7 @@ const SalesFunnelView: React.FC<SalesFunnelViewProps> = ({ deals, clients, users
       if (!chatMessage.trim() || !editingDeal) return;
       
       const deal = editingDeal;
-      // Локальный демо-режим: просто добавляем комментарий в сделку, без внешних API
+      // Комментарий сохраняется в сделке через onSaveDeal
       const c: Comment = { 
           id: `c-${Date.now()}`, 
           text: chatMessage, 

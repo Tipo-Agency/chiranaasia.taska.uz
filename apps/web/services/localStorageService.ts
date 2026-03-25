@@ -1,6 +1,6 @@
 /**
- * Локальное хранилище файлов для демо (вместо облачного Storage).
- * Файлы сохраняются как data URL в localStorage по ключу path.
+ * Вложения/файлы в localStorage (data URL по ключу path).
+ * Для черновиков и предпросмотра без отдельного object storage.
  */
 
 const FILES_PREFIX = 'local_files_';

@@ -1,6 +1,6 @@
 /**
- * Локальное хранилище (localStorage) — замена облачной БД для демо.
- * API совместимо с прежним firestoreService: getAll, getById, save, delete.
+ * Коллекции в localStorage (getAll / getById / save / delete).
+ * Используется там, где нужен клиентский кэш; основной источник данных — API.
  */
 
 const STORAGE_PREFIX = 'local_db_';

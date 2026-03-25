@@ -19,8 +19,6 @@ interface ModuleCreateDropdownProps {
   items: ModuleCreateMenuItem[];
   /** Акцент кнопки «+» (как у модуля) */
   accent?: ModuleAccentKey;
-  /** @deprecated используйте accent */
-  buttonClassName?: string;
   align?: 'left' | 'right';
   disabled?: boolean;
   /** Подсказка на кнопке */
@@ -30,7 +28,6 @@ interface ModuleCreateDropdownProps {
 export const ModuleCreateDropdown: React.FC<ModuleCreateDropdownProps> = ({
   items,
   accent = 'indigo',
-  buttonClassName,
   align = 'right',
   disabled = false,
   label = 'Создать',
@@ -56,7 +53,6 @@ export const ModuleCreateDropdown: React.FC<ModuleCreateDropdownProps> = ({
         label={label}
         disabled={disabled}
         onClick={() => setOpen((o) => !o)}
-        className={buttonClassName ?? ''}
       />
 
       {open && (

@@ -4,10 +4,7 @@ import './index.css';
 import App from './App';
 import { runSeed } from './seed/mockData';
 
-/**
- * Локальное демо localStorage: только DEV и явный флаг VITE_ENABLE_DEMO_SEED=true|1
- * (без «тихого» сида в production).
- */
+/** Опциональный сид mock-данных в localStorage: только DEV + VITE_ENABLE_DEMO_SEED. */
 const demoSeedEnabled =
   import.meta.env.DEV &&
   (import.meta.env.VITE_ENABLE_DEMO_SEED === 'true' || import.meta.env.VITE_ENABLE_DEMO_SEED === '1');

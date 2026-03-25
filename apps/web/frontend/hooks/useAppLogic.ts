@@ -27,6 +27,7 @@ import { useBPMLogic } from './slices/useBPMLogic';
 import { useInventoryLogic } from './slices/useInventoryLogic';
 import { STANDARD_FEATURES } from '../../components/FunctionalityView';
 import { buildLocation, parseLocation } from '../../utils/urlSync';
+import { devWarn } from '../../utils/devLog';
 // Функция заполнения тестовыми данными полностью удалена
 
 export const useAppLogic = () => {
@@ -170,7 +171,7 @@ export const useAppLogic = () => {
       setInboxMessages((inbox || []) as InboxMessage[]);
       setOutboxMessages((outbox || []) as InboxMessage[]);
     } catch (e) {
-      console.warn('[Messages] load failed', e);
+      devWarn('[Messages] load failed', e);
     }
   };
 
@@ -394,9 +395,6 @@ export const useAppLogic = () => {
   }, []);
 
   // Данные хранятся локально, загружаются по требованию
-
-  // Instagram синхронизация для воронок с подключенным Instagram
-  // Внешняя синхронизация лидов (Instagram и т.п.) отключена в локальной демо-версии
 
   // Ленивая загрузка данных при открытии разделов (Уровень 2)
   useEffect(() => {

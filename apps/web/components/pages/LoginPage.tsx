@@ -1,6 +1,4 @@
-/**
- * LoginPage — демо: один вход по кнопке «Вход»
- */
+/** Форма входа: логин/пароль, запрос к API `/api/auth/login`. */
 import React from 'react';
 import { User } from '../../types';
 import { AuthLayout } from '../layouts/AuthLayout';

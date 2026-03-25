@@ -1,6 +1,4 @@
-/**
- * Мок-данные для демо. Один раз заполняет localStorage по всем модулям.
- */
+/** Сид для локальной разработки (см. `index.tsx`, флаг VITE_ENABLE_DEMO_SEED). */
 import { localStoreService } from '../services/localStoreService';
 import { Role } from '../types';
 import {

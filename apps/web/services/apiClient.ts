@@ -197,8 +197,8 @@ export const automationEndpoint = {
 };
 
 /**
- * @deprecated Доставка Telegram/in-app идёт через notification hub на бэкенде
- * (domain events → notifications → notification_deliveries). Не вызывать с фронта.
+ * Заглушка: очередь уведомлений обрабатывается на бэкенде (notification hub).
+ * С фронта не используйте — доставка идёт через события API.
  */
 export const notificationQueueEndpoint = {
   add: async (_task: { type: string; userId: string; message: string; chatId: string; metadata?: Record<string, unknown> }) =>
