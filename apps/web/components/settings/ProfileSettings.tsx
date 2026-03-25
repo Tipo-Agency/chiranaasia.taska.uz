@@ -1,10 +1,10 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { User, Role } from '../../types';
-import { Camera, Save, AtSign, Mail, Phone, Send, KeyRound, Trash2, Lock, Upload, User as UserIcon } from 'lucide-react';
-import { ModuleCreateIconButton } from '../ui/ModuleCreateIconButton';
+import { Save, KeyRound, Trash2, Upload, User as UserIcon, Phone, AtSign, Mail, Send } from 'lucide-react';
+import { Button, Input, StandardModal } from '../ui';
 import { uploadAvatar } from '../../services/localStorageService';
-import { DEFAULT_AVATARS, getDefaultAvatarForId, getRandomDefaultAvatar } from '../../constants/avatars';
+import { getDefaultAvatarForId, getRandomDefaultAvatar } from '../../constants/avatars';
 
 interface ProfileSettingsProps {
   currentUser: User;
@@ -24,17 +24,11 @@ export const ProfileSettings: React.FC<ProfileSettingsProps> = ({ currentUser, u
   const [profileTelegram, setProfileTelegram] = useState(currentUser.telegram || '');
   const [profileAvatar, setProfileAvatar] = useState(currentUser.avatar || '');
   
-  // Password Change State
+  const [passwordModalOpen, setPasswordModalOpen] = useState(false);
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
   const avatarInputRef = useRef<HTMLInputElement>(null);
-
-  // User Mgmt State
-  const [newUserName, setNewUserName] = useState('');
-  const [newUserLogin, setNewUserLogin] = useState('');
-  const [newUserEmail, setNewUserEmail] = useState('');
-  const [newUserPassword, setNewUserPassword] = useState('123'); // Default password
 
   useEffect(() => {
       setProfileName(currentUser.name);
@@ -58,18 +52,7 @@ export const ProfileSettings: React.FC<ProfileSettingsProps> = ({ currentUser, u
           avatar: profileAvatar
       };
 
-      if (newPassword) {
-        if (newPassword !== confirmPassword) {
-          alert('Пароли не совпадают!');
-          return;
-        }
-        // Передаём пароль в открытом виде — бэкенд сам захеширует
-        updates.password = newPassword;
-      }
-
       onUpdateProfile(updates);
-      setNewPassword('');
-      setConfirmPassword('');
   };
 
   const handleChangeAvatar = () => {
@@ -114,29 +97,6 @@ export const ProfileSettings: React.FC<ProfileSettingsProps> = ({ currentUser, u
       }
   };
 
-  const handleAddUser = async (e: React.FormEvent) => {
-      e.preventDefault();
-      if (!newUserName.trim() || !newUserLogin.trim()) return alert('Имя и Логин обязательны');
-      
-      // Ensure password is set
-      const passwordToSet = newUserPassword.trim() || '123';
-
-      const newUser: User = {
-          id: `u-${Date.now()}`,
-          name: newUserName,
-          login: newUserLogin,
-          email: newUserEmail,
-          // Передаём пароль в открытом виде — бэкенд сам захеширует
-          password: passwordToSet,
-          role: Role.EMPLOYEE,
-          avatar: getRandomDefaultAvatar(),
-          mustChangePassword: true
-      };
-      onUpdateUsers([...users, newUser]);
-      setNewUserName(''); setNewUserLogin(''); setNewUserEmail(''); setNewUserPassword('123');
-      alert(`Пользователь создан. Пароль: ${passwordToSet}`);
-  };
-
   const handleDeleteUser = async (id: string) => {
       if (id === currentUser.id) {
           alert('Нельзя удалить текущего пользователя');
@@ -158,6 +118,24 @@ export const ProfileSettings: React.FC<ProfileSettingsProps> = ({ currentUser, u
           onUpdateUsers(users.map(u => u.id === id ? { ...u, password: '123', mustChangePassword: true } : u));
           alert('Пароль сброшен.');
       }
+  };
+
+  const handleToggleMustChange = (id: string, next: boolean) => {
+    onUpdateUsers(users.map((u) => (u.id === id ? { ...u, mustChangePassword: next } : u)));
+  };
+
+  const submitPasswordChange = () => {
+    const p1 = newPassword.trim();
+    const p2 = confirmPassword.trim();
+    if (!p1) return;
+    if (p1 !== p2) {
+      alert('Пароли не совпадают!');
+      return;
+    }
+    onUpdateProfile({ ...currentUser, password: p1, mustChangePassword: false });
+    setPasswordModalOpen(false);
+    setNewPassword('');
+    setConfirmPassword('');
   };
 
   if (activeTab === 'profile') {
@@ -297,6 +275,51 @@ export const ProfileSettings: React.FC<ProfileSettingsProps> = ({ currentUser, u
                     <Save size={18}/> Сохранить профиль
                 </button>
             </form>
+
+            <div className="bg-gray-50 dark:bg-[#202020] p-5 rounded-xl border border-gray-200 dark:border-[#333]">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <div className="text-sm font-bold text-gray-900 dark:text-white">Пароль</div>
+                  <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                    Смена пароля отдельной операцией — профиль можно сохранять без этого.
+                  </div>
+                </div>
+                <Button onClick={() => setPasswordModalOpen(true)} variant="secondary">
+                  <KeyRound size={16} /> Изменить пароль
+                </Button>
+              </div>
+            </div>
+
+            <StandardModal
+              isOpen={passwordModalOpen}
+              onClose={() => {
+                setPasswordModalOpen(false);
+                setNewPassword('');
+                setConfirmPassword('');
+              }}
+              title="Изменить пароль"
+              size="sm"
+              footer={
+                <div className="flex items-center justify-end gap-2">
+                  <Button variant="secondary" onClick={() => setPasswordModalOpen(false)}>
+                    Отмена
+                  </Button>
+                  <Button onClick={submitPasswordChange} disabled={!newPassword.trim() || newPassword.trim() !== confirmPassword.trim()}>
+                    Сохранить
+                  </Button>
+                </div>
+              }
+            >
+              <div className="space-y-3">
+                <Input label="Новый пароль" type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} />
+                <Input
+                  label="Повторите пароль"
+                  type="password"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                />
+              </div>
+            </StandardModal>
         </div>
       );
   }
@@ -304,25 +327,6 @@ export const ProfileSettings: React.FC<ProfileSettingsProps> = ({ currentUser, u
   if (activeTab === 'users') {
       return (
         <div className="space-y-8 w-full max-w-none">
-            {/* Функция заполнения тестовыми данными полностью удалена */}
-            <div className="bg-gray-50 dark:bg-[#202020] p-6 rounded-xl border border-gray-200 dark:border-[#333]">
-                <h3 className="text-base font-bold text-gray-800 dark:text-white mb-4">Добавить сотрудника</h3>
-                <form onSubmit={handleAddUser} className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
-                    <div>
-                        <label className="block text-xs font-bold text-gray-500 mb-1">Имя</label>
-                        <input value={newUserName} onChange={e => setNewUserName(e.target.value)} placeholder="Имя Фамилия" className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-4 py-2 text-sm bg-white dark:bg-[#252525] text-gray-900 dark:text-gray-100" />
-                    </div>
-                    <div>
-                        <label className="block text-xs font-bold text-gray-500 mb-1">Логин</label>
-                        <input value={newUserLogin} onChange={e => setNewUserLogin(e.target.value)} placeholder="ivan" className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-4 py-2 text-sm bg-white dark:bg-[#252525] text-gray-900 dark:text-gray-100" />
-                    </div>
-                    <div>
-                        <label className="block text-xs font-bold text-gray-500 mb-1">Пароль</label>
-                        <input value={newUserPassword} onChange={e => setNewUserPassword(e.target.value)} placeholder="123" className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-4 py-2 text-sm bg-white dark:bg-[#252525] text-gray-900 dark:text-gray-100" />
-                    </div>
-                    <ModuleCreateIconButton type="submit" accent="indigo" label="Создать пользователя" />
-                </form>
-            </div>
             <div className="space-y-3">
                 {users.filter(user => !user.isArchived).map(user => (
                     <div key={user.id} className="flex items-center justify-between p-4 bg-white dark:bg-[#252525] border border-gray-200 dark:border-[#333] rounded-xl hover:shadow-sm transition-shadow">
@@ -338,6 +342,14 @@ export const ProfileSettings: React.FC<ProfileSettingsProps> = ({ currentUser, u
                             </div>
                         </div>
                         <div className="flex items-center gap-2">
+                            <label className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400 mr-2 select-none">
+                              <input
+                                type="checkbox"
+                                checked={!!user.mustChangePassword}
+                                onChange={(e) => handleToggleMustChange(user.id, e.target.checked)}
+                              />
+                              Запросить смену пароля
+                            </label>
                             <button onClick={() => handleResetPassword(user.id)} className="p-2 text-gray-400 hover:text-orange-500 rounded-lg bg-gray-50 dark:bg-[#303030]" title="Сбросить пароль"><KeyRound size={18}/></button>
                             <button onClick={() => handleDeleteUser(user.id)} className="p-2 text-gray-400 hover:text-red-500 rounded-lg bg-gray-50 dark:bg-[#303030]" title="Удалить"><Trash2 size={18}/></button>
                         </div>

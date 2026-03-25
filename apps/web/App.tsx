@@ -18,6 +18,7 @@ import { MessageCircle } from 'lucide-react';
 import { useAppLogic } from './frontend/hooks/useAppLogic';
 import { NotificationCenterProvider, useNotificationCenter } from './frontend/contexts/NotificationCenterContext';
 import type { AppHeaderProps } from './components/AppHeader';
+import { StandardModal, Input, Button } from './components/ui';
 
 /** Синхронно из pathname — чтобы не монтировать useAppLogic на публичной странице (избегаем React #310). */
 function getPublicContentPlanIdFromPath(): string | null {
@@ -51,6 +52,9 @@ function MainApp() {
   const [chatPanelOpen, setChatPanelOpen] = useState(false);
   const [chatOpenToSystemFeed, setChatOpenToSystemFeed] = useState(false);
   const deepLinkHandledRef = useRef(false);
+  const [mustChangePwdOpen, setMustChangePwdOpen] = useState(false);
+  const [mustChangePwdDraft, setMustChangePwdDraft] = useState('');
+  const [mustChangePwdConfirm, setMustChangePwdConfirm] = useState('');
 
   // Важно: useEffect должен вызываться безусловно, до любых ранних return,
   // иначе React бросает ошибку "Rendered fewer/more hooks than expected" (#310).
@@ -88,6 +92,21 @@ function MainApp() {
       return;
     }
   }, [state.currentUser, state.tasks, actions, state.meetings]);
+
+  // Prompt password setup once per login/session if required.
+  useEffect(() => {
+    const u = state.currentUser;
+    if (!u) return;
+    if (!u.mustChangePassword) return;
+    try {
+      const key = `must_change_password_prompt_shown:${u.id}`;
+      if (sessionStorage.getItem(key) === '1') return;
+      sessionStorage.setItem(key, '1');
+    } catch {
+      // ignore
+    }
+    setMustChangePwdOpen(true);
+  }, [state.currentUser?.id, state.currentUser?.mustChangePassword]);
 
   if (state.isLoading) return <div className="h-screen flex items-center justify-center bg-gray-50 dark:bg-[#121212] dark:text-white">Загрузка...</div>;
 
@@ -565,6 +584,59 @@ function MainApp() {
              </div>
         )}
     </div>
+
+    <StandardModal
+      isOpen={mustChangePwdOpen}
+      onClose={() => setMustChangePwdOpen(false)}
+      title="Установите пароль"
+      size="sm"
+      footer={
+        <div className="flex items-center justify-end gap-2">
+          <Button
+            variant="secondary"
+            onClick={() => {
+              setMustChangePwdOpen(false);
+              setMustChangePwdDraft('');
+              setMustChangePwdConfirm('');
+            }}
+          >
+            Позже
+          </Button>
+          <Button
+            onClick={() => {
+              const p1 = mustChangePwdDraft.trim();
+              const p2 = mustChangePwdConfirm.trim();
+              if (!p1 || p1 !== p2) return;
+              actions.updateProfile({ ...state.currentUser!, password: p1, mustChangePassword: false } as any);
+              setMustChangePwdOpen(false);
+              setMustChangePwdDraft('');
+              setMustChangePwdConfirm('');
+            }}
+            disabled={!mustChangePwdDraft.trim() || mustChangePwdDraft.trim() !== mustChangePwdConfirm.trim()}
+          >
+            Сохранить
+          </Button>
+        </div>
+      }
+    >
+      <div className="space-y-3">
+        <div className="text-sm text-gray-700 dark:text-gray-200">
+          Для безопасности установите пароль. Можно закрыть и сделать позже — окно не будет повторяться до следующего входа.
+        </div>
+        <Input
+          label="Новый пароль"
+          type="password"
+          value={mustChangePwdDraft}
+          onChange={(e) => setMustChangePwdDraft(e.target.value)}
+        />
+        <Input
+          label="Повторите пароль"
+          type="password"
+          value={mustChangePwdConfirm}
+          onChange={(e) => setMustChangePwdConfirm(e.target.value)}
+        />
+      </div>
+    </StandardModal>
     </NotificationCenterProvider>
   );
 }

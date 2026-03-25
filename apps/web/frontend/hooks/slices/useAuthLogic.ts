@@ -32,6 +32,11 @@ export const useAuthLogic = (showNotification: (msg: string) => void) => {
   const login = (user: User) => {
     setCurrentUser(withAvatarFallback(user));
     storageService.setActiveUserId(user.id);
+    try {
+      sessionStorage.removeItem(`must_change_password_prompt_shown:${user.id}`);
+    } catch {
+      // ignore
+    }
     showNotification(`Добро пожаловать, ${user.name}`);
   };
 

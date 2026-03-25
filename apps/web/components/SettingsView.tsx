@@ -1,8 +1,8 @@
 
 import React, { useState, useEffect } from 'react';
 import { Project, Role, Task, User, StatusOption, PriorityOption, NotificationPreferences, AutomationRule, TableCollection, Deal, Department, FinanceCategory, Fund, SalesFunnel, Doc, ContentPost, EmployeeInfo, Client, Contract, BusinessProcess, Meeting, Warehouse } from '../types';
-import { User as UserIcon, Briefcase, Archive, Users, Building2, Wallet, TrendingUp, PiggyBank, PlugZap, ShieldAlert, Settings, BellRing, Zap, Package, ArrowLeft } from 'lucide-react';
-import { Input, ModuleFilterIconButton, ModulePageHeader, ModulePageShell, ModuleSegmentedControl, MODULE_PAGE_GUTTER } from './ui';
+import { User as UserIcon, Briefcase, Archive, Users, Building2, Wallet, TrendingUp, PiggyBank, PlugZap, ShieldAlert, Settings, BellRing, Zap, Package, ArrowLeft, Plus } from 'lucide-react';
+import { Button, Input, ModuleFilterIconButton, ModulePageHeader, ModulePageShell, ModuleSegmentedControl, MODULE_PAGE_GUTTER, StandardModal } from './ui';
 import { ProfileSettings } from './settings/ProfileSettings';
 import { SystemLogsSettings } from './settings/SystemLogsSettings';
 import { SpaceSettings } from './settings/SpaceSettings';
@@ -125,6 +125,11 @@ const SettingsView: React.FC<SettingsViewProps> = ({
   const [archiveShowFilters, setArchiveShowFilters] = useState(false);
   const [archiveQuery, setArchiveQuery] = useState('');
 
+  const [createUserOpen, setCreateUserOpen] = useState(false);
+  const [createUserName, setCreateUserName] = useState('');
+  const [createUserLogin, setCreateUserLogin] = useState('');
+  const [createUserPassword, setCreateUserPassword] = useState('');
+
   return (
     <ModulePageShell>
       <div className={`${MODULE_PAGE_GUTTER} pt-6 md:pt-8 flex-shrink-0`}>
@@ -180,15 +185,31 @@ const SettingsView: React.FC<SettingsViewProps> = ({
                   </button>
                 </>
               ) : (
-                <button
-                  type="button"
-                  onClick={() => setShowArchiveScreen(true)}
-                  className="inline-flex items-center justify-center w-11 h-11 rounded-xl border border-gray-200 dark:border-[#333] bg-white dark:bg-[#1a1a1a] text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-[#252525]"
-                  title="Архив"
-                  aria-label="Архив"
-                >
-                  <Archive size={18} />
-                </button>
+                <>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (activeTab === 'users') setCreateUserOpen(true);
+                    }}
+                    className={`inline-flex items-center justify-center w-11 h-11 rounded-xl border border-gray-200 dark:border-[#333] bg-white dark:bg-[#1a1a1a] text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-[#252525] ${
+                      activeTab === 'users' ? '' : 'opacity-50 cursor-not-allowed'
+                    }`}
+                    title={activeTab === 'users' ? 'Создать' : 'Создание доступно не во всех вкладках'}
+                    aria-label="Создать"
+                    disabled={activeTab !== 'users'}
+                  >
+                    <Plus size={18} />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowArchiveScreen(true)}
+                    className="inline-flex items-center justify-center w-11 h-11 rounded-xl border border-gray-200 dark:border-[#333] bg-white dark:bg-[#1a1a1a] text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-[#252525]"
+                    title="Архив"
+                    aria-label="Архив"
+                  >
+                    <Archive size={18} />
+                  </button>
+                </>
               )
             }
           />
@@ -293,6 +314,64 @@ const SettingsView: React.FC<SettingsViewProps> = ({
           )}
         </div>
       </div>
+
+      <StandardModal
+        isOpen={createUserOpen}
+        onClose={() => {
+          setCreateUserOpen(false);
+          setCreateUserName('');
+          setCreateUserLogin('');
+          setCreateUserPassword('');
+        }}
+        title="Новый пользователь"
+        size="sm"
+        footer={
+          <div className="flex items-center justify-end gap-2">
+            <Button variant="secondary" onClick={() => setCreateUserOpen(false)}>
+              Отмена
+            </Button>
+            <Button
+              onClick={() => {
+                const name = createUserName.trim();
+                const login = createUserLogin.trim();
+                const password = createUserPassword.trim() || '123';
+                if (!name || !login) return;
+                const newUser: User = {
+                  id: `u-${Date.now()}`,
+                  name,
+                  login,
+                  password,
+                  role: Role.EMPLOYEE,
+                  mustChangePassword: true,
+                } as any;
+                onUpdateUsers([...(users || []), newUser]);
+                setCreateUserOpen(false);
+                setCreateUserName('');
+                setCreateUserLogin('');
+                setCreateUserPassword('');
+              }}
+              disabled={!createUserName.trim() || !createUserLogin.trim()}
+            >
+              Создать
+            </Button>
+          </div>
+        }
+      >
+        <div className="space-y-3">
+          <Input label="Имя" value={createUserName} onChange={(e) => setCreateUserName(e.target.value)} />
+          <Input label="Логин" value={createUserLogin} onChange={(e) => setCreateUserLogin(e.target.value)} placeholder="ivan" />
+          <Input
+            label="Пароль (можно пусто — будет 123)"
+            value={createUserPassword}
+            onChange={(e) => setCreateUserPassword(e.target.value)}
+            type="password"
+            placeholder="••••••"
+          />
+          <div className="text-xs text-gray-500 dark:text-gray-400">
+            После первого входа пользователю покажется запрос на установку пароля.
+          </div>
+        </div>
+      </StandardModal>
     </ModulePageShell>
   );
 };
