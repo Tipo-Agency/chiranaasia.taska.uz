@@ -67,8 +67,6 @@ const FinanceView: React.FC<FinanceViewProps> = ({
   const [isRequestModalOpen, setIsRequestModalOpen] = useState(false);
   const [editingRequest, setEditingRequest] = useState<PurchaseRequest | null>(null);
   const [alertText, setAlertText] = useState<string | null>(null);
-  // Создание финансового планирования — без промежуточного full-screen экрана
-  const [isPlanningCreateModalOpen, setIsPlanningCreateModalOpen] = useState(false);
   const bankStatementsRef = useRef<BankStatementsViewHandle>(null);
 
   // Формы
@@ -84,20 +82,7 @@ const FinanceView: React.FC<FinanceViewProps> = ({
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
   }, []);
   
-  // Формы для создания плана
-  const [newPlanDepartment, setNewPlanDepartment] = useState('');
-  const [newPlanPeriod, setNewPlanPeriod] = useState('');
-  
-  // Формы для создания планирования
-  const [newPlanningDepartment, setNewPlanningDepartment] = useState('');
-  const [newPlanningPeriod, setNewPlanningPeriod] = useState('');
-  const [newPlanningIncome, setNewPlanningIncome] = useState<number>(0);
-  
-  // Инициализируем периоды после вычисления currentPeriod
-  useEffect(() => {
-    if (!newPlanPeriod) setNewPlanPeriod(currentPeriod);
-    if (!newPlanningPeriod) setNewPlanningPeriod(currentPeriod);
-  }, [currentPeriod, newPlanPeriod, newPlanningPeriod]);
+  // Инициализируем текущий период (используем как дефолт при создании)
 
   useEffect(() => {
     if (planningSubView === 'detail' && !selectedPlanning) setPlanningSubView('list');
@@ -115,9 +100,13 @@ const FinanceView: React.FC<FinanceViewProps> = ({
     requestIds: string[];
     notes?: string;
     income?: number;
+    departmentId?: string;
+    period?: string;
     fundAllocations?: Record<string, number>;
     requestFundIds?: Record<string, string>;
   } | null>(null);
+  const [planningDetailDepartmentId, setPlanningDetailDepartmentId] = useState('');
+  const [planningDetailPeriod, setPlanningDetailPeriod] = useState('');
   const [planningDetailRequestIds, setPlanningDetailRequestIds] = useState<string[]>([]);
   const [planningDetailNotes, setPlanningDetailNotes] = useState('');
   const [planningDetailIncome, setPlanningDetailIncome] = useState<number>(0);
@@ -129,7 +118,11 @@ const FinanceView: React.FC<FinanceViewProps> = ({
     income: number;
     expenses: Record<string, number>;
     selectedCategories: string[];
+    departmentId?: string;
+    period?: string;
   } | null>(null);
+  const [planDetailDepartmentId, setPlanDetailDepartmentId] = useState('');
+  const [planDetailPeriod, setPlanDetailPeriod] = useState('');
   const [planDetailIncome, setPlanDetailIncome] = useState(0);
   const [planDetailExpenses, setPlanDetailExpenses] = useState<Record<string, number>>({});
   const [planDetailSelectedCategories, setPlanDetailSelectedCategories] = useState<string[]>([]);
@@ -144,9 +137,13 @@ const FinanceView: React.FC<FinanceViewProps> = ({
         requestIds: selectedPlanning.requestIds,
         notes: selectedPlanning.notes,
         income: selectedPlanning.income ?? 0,
+        departmentId: selectedPlanning.departmentId,
+        period: selectedPlanning.period,
         fundAllocations: selectedPlanning.fundAllocations ?? {},
         requestFundIds: selectedPlanning.requestFundIds ?? {}
       };
+      setPlanningDetailDepartmentId(selectedPlanning.departmentId || '');
+      setPlanningDetailPeriod(selectedPlanning.period || '');
       setPlanningDetailRequestIds(selectedPlanning.requestIds);
       setPlanningDetailNotes(selectedPlanning.notes || '');
       setPlanningDetailIncome(selectedPlanning.income ?? 0);
@@ -154,6 +151,8 @@ const FinanceView: React.FC<FinanceViewProps> = ({
       setPlanningDetailRequestFundIds(selectedPlanning.requestFundIds ?? {});
     } else {
       planningDetailInitialValuesRef.current = null;
+      setPlanningDetailDepartmentId('');
+      setPlanningDetailPeriod('');
       setPlanningDetailRequestIds([]);
       setPlanningDetailNotes('');
       setPlanningDetailIncome(0);
@@ -168,14 +167,20 @@ const FinanceView: React.FC<FinanceViewProps> = ({
       planDetailInitialValuesRef.current = {
         income: selectedPlanDoc.income || 0,
         expenses: selectedPlanDoc.expenses || {},
-        selectedCategories: selectedCats
+        selectedCategories: selectedCats,
+        departmentId: selectedPlanDoc.departmentId,
+        period: selectedPlanDoc.period,
       };
+      setPlanDetailDepartmentId(selectedPlanDoc.departmentId || '');
+      setPlanDetailPeriod(selectedPlanDoc.period || '');
       setPlanDetailIncome(selectedPlanDoc.income || 0);
       setPlanDetailExpenses(selectedPlanDoc.expenses || {});
       setPlanDetailSelectedCategories(selectedCats);
     } else {
       // Сбрасываем значения, если план не выбран
       planDetailInitialValuesRef.current = null;
+      setPlanDetailDepartmentId('');
+      setPlanDetailPeriod('');
       setPlanDetailIncome(0);
       setPlanDetailExpenses({});
       setPlanDetailSelectedCategories([]);
@@ -574,8 +579,8 @@ const FinanceView: React.FC<FinanceViewProps> = ({
   const renderPlanningDetail = () => {
     if (!selectedPlanning) return null;
     
-    const dep = departments.find(d => d.id === selectedPlanning.departmentId);
-    const periodDate = new Date(selectedPlanning.period + '-01');
+    const dep = departments.find(d => d.id === planningDetailDepartmentId);
+    const periodDate = new Date((planningDetailPeriod || currentPeriod) + '-01');
     const periodLabel = periodDate.toLocaleDateString('ru-RU', { month: 'long', year: 'numeric' });
     const planningRequests = requests.filter(r => selectedPlanning.requestIds.includes(r.id));
     
@@ -586,6 +591,8 @@ const FinanceView: React.FC<FinanceViewProps> = ({
         JSON.stringify([...planningDetailRequestIds].sort()) !== JSON.stringify([...ref.requestIds].sort()) ||
         planningDetailNotes !== (ref.notes || '') ||
         planningDetailIncome !== (ref.income || 0) ||
+        planningDetailDepartmentId !== (ref.departmentId || '') ||
+        planningDetailPeriod !== (ref.period || '') ||
         JSON.stringify(planningDetailFundAllocations) !== JSON.stringify(ref.fundAllocations || {}) ||
         JSON.stringify(planningDetailRequestFundIds) !== JSON.stringify(ref.requestFundIds || {})
       );
@@ -610,6 +617,8 @@ const FinanceView: React.FC<FinanceViewProps> = ({
       if (!onSaveFinancialPlanning) return;
       const updated: FinancialPlanning = {
         ...selectedPlanning,
+        departmentId: planningDetailDepartmentId || selectedPlanning.departmentId,
+        period: planningDetailPeriod || selectedPlanning.period,
         requestIds: planningDetailRequestIds,
         notes: planningDetailNotes,
         income: planningDetailIncome,
@@ -622,6 +631,8 @@ const FinanceView: React.FC<FinanceViewProps> = ({
         requestIds: planningDetailRequestIds,
         notes: planningDetailNotes,
         income: planningDetailIncome,
+        departmentId: planningDetailDepartmentId,
+        period: planningDetailPeriod,
         fundAllocations: planningDetailFundAllocations,
         requestFundIds: planningDetailRequestFundIds
       };
@@ -629,7 +640,7 @@ const FinanceView: React.FC<FinanceViewProps> = ({
     
     const handleRefreshRequests = () => {
       if (!selectedPlanning) return;
-      const periodDate = new Date(selectedPlanning.period + '-01');
+      const periodDate = new Date((planningDetailPeriod || selectedPlanning.period) + '-01');
       const periodStart = new Date(periodDate.getFullYear(), periodDate.getMonth(), 1);
       const periodEnd = new Date(periodDate.getFullYear(), periodDate.getMonth() + 1, 0, 23, 59, 59);
       
@@ -640,7 +651,7 @@ const FinanceView: React.FC<FinanceViewProps> = ({
         // Проверяем, что дата заявки попадает в период планирования
         const isInPeriod = reqDate >= periodStart && reqDate <= periodEnd;
         // Проверяем подразделение
-        const isSameDepartment = req.departmentId === selectedPlanning.departmentId;
+        const isSameDepartment = req.departmentId === (planningDetailDepartmentId || selectedPlanning.departmentId);
         // Проверяем статус (берем все, кроме отклоненных)
         const isValidStatus = req.status !== 'rejected';
         
@@ -733,6 +744,32 @@ const FinanceView: React.FC<FinanceViewProps> = ({
           </div>
         </div>
         <div className="flex-1 overflow-y-auto custom-scrollbar min-h-0 px-4 md:px-6 py-6 space-y-6 max-w-5xl w-full mx-auto">
+
+        {/* Период + подразделение */}
+        <div className="bg-white dark:bg-[#252525] border border-gray-200 dark:border-[#333] rounded-xl p-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 uppercase mb-2">
+                Подразделение
+              </label>
+              <TaskSelect
+                value={planningDetailDepartmentId}
+                onChange={setPlanningDetailDepartmentId}
+                options={departments.map((d) => ({ value: d.id, label: d.name }))}
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 uppercase mb-2">
+                Период (месяц)
+              </label>
+              <DateInput
+                value={planningDetailPeriod ? `${planningDetailPeriod}-01` : ''}
+                onChange={(v) => setPlanningDetailPeriod(v ? v.slice(0, 7) : '')}
+                placeholder="Выберите месяц"
+              />
+            </div>
+          </div>
+        </div>
         
         {/* Доход */}
         <div className="bg-white dark:bg-[#252525] border border-gray-200 dark:border-[#333] rounded-xl p-6">
@@ -1004,8 +1041,8 @@ const FinanceView: React.FC<FinanceViewProps> = ({
   const renderPlanDetail = () => {
     if (!selectedPlanDoc) return null;
     
-    const dep = departments.find(d => d.id === selectedPlanDoc.departmentId);
-    const periodDate = new Date(selectedPlanDoc.period + '-01');
+    const dep = departments.find(d => d.id === planDetailDepartmentId);
+    const periodDate = new Date((planDetailPeriod || currentPeriod) + '-01');
     const periodLabel = periodDate.toLocaleDateString('ru-RU', { month: 'long', year: 'numeric' });
     
     const hasChanges = (): boolean => {
@@ -1013,7 +1050,9 @@ const FinanceView: React.FC<FinanceViewProps> = ({
       return (
         planDetailIncome !== planDetailInitialValuesRef.current.income ||
         JSON.stringify(planDetailExpenses) !== JSON.stringify(planDetailInitialValuesRef.current.expenses) ||
-        JSON.stringify([...planDetailSelectedCategories].sort()) !== JSON.stringify([...planDetailInitialValuesRef.current.selectedCategories].sort())
+        JSON.stringify([...planDetailSelectedCategories].sort()) !== JSON.stringify([...planDetailInitialValuesRef.current.selectedCategories].sort()) ||
+        planDetailDepartmentId !== (planDetailInitialValuesRef.current.departmentId || '') ||
+        planDetailPeriod !== (planDetailInitialValuesRef.current.period || '')
       );
     };
     
@@ -1043,6 +1082,8 @@ const FinanceView: React.FC<FinanceViewProps> = ({
       });
       const updated: FinancialPlanDocument = {
         ...selectedPlanDoc,
+        departmentId: planDetailDepartmentId || selectedPlanDoc.departmentId,
+        period: planDetailPeriod || selectedPlanDoc.period,
         income: planDetailIncome,
         expenses: filteredExpenses,
         updatedAt: new Date().toISOString()
@@ -1051,7 +1092,9 @@ const FinanceView: React.FC<FinanceViewProps> = ({
       planDetailInitialValuesRef.current = {
         income: planDetailIncome,
         expenses: filteredExpenses,
-        selectedCategories: planDetailSelectedCategories
+        selectedCategories: planDetailSelectedCategories,
+        departmentId: planDetailDepartmentId,
+        period: planDetailPeriod,
       };
     };
     
@@ -1158,6 +1201,32 @@ const FinanceView: React.FC<FinanceViewProps> = ({
           </div>
         </div>
         <div className="flex-1 overflow-y-auto custom-scrollbar min-h-0 px-4 md:px-6 py-6 space-y-6 max-w-5xl w-full mx-auto">
+
+        {/* Период + подразделение */}
+        <div className="bg-white dark:bg-[#252525] border border-gray-200 dark:border-[#333] rounded-xl p-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 uppercase mb-2">
+                Подразделение
+              </label>
+              <TaskSelect
+                value={planDetailDepartmentId}
+                onChange={setPlanDetailDepartmentId}
+                options={departments.map((d) => ({ value: d.id, label: d.name }))}
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 uppercase mb-2">
+                Период (месяц)
+              </label>
+              <DateInput
+                value={planDetailPeriod ? `${planDetailPeriod}-01` : ''}
+                onChange={(v) => setPlanDetailPeriod(v ? v.slice(0, 7) : '')}
+                placeholder="Выберите месяц"
+              />
+            </div>
+          </div>
+        </div>
         
         {/* Доход */}
         <div className="bg-white dark:bg-[#252525] border border-gray-200 dark:border-[#333] rounded-xl p-6">
@@ -1429,201 +1498,53 @@ const FinanceView: React.FC<FinanceViewProps> = ({
   );
   };
 
-  useEffect(() => {
-    if (planSubView === 'create' && activeTab === 'plan' && departments.length > 0) {
-      setNewPlanDepartment(departments[0].id);
-      setNewPlanPeriod(currentPeriod);
-    }
-  }, [planSubView, activeTab, departments.length, currentPeriod]);
-
-  const handlePlanSubmit = (e?: React.FormEvent) => {
-    if (e) e.preventDefault();
+  const handleQuickCreatePlan = () => {
     if (!onSaveFinancialPlanDocument) {
       setAlertText('Функция сохранения недоступна');
       return;
     }
-    if (!newPlanDepartment || newPlanDepartment === '' || newPlanDepartment === 'undefined') {
-      setAlertText('Выберите подразделение');
+    if (departments.length === 0) {
+      setAlertText('Сначала создайте подразделение в настройках');
       return;
     }
-    
-    if (!newPlanPeriod || newPlanPeriod === '') {
-      setAlertText('Выберите период');
-      return;
-    }
-    
     const planDoc: FinancialPlanDocument = {
       id: `fpd-${Date.now()}`,
-      departmentId: newPlanDepartment,
-      period: newPlanPeriod,
+      departmentId: departments[0].id,
+      period: currentPeriod,
       income: 0,
       expenses: {},
       status: 'created',
-      createdAt: new Date().toISOString()
+      createdAt: new Date().toISOString(),
     };
-    
-    try {
-      onSaveFinancialPlanDocument(planDoc);
-      setPlanSubView('detail');
-      setNewPlanDepartment('');
-      setNewPlanPeriod(currentPeriod);
-      setActiveTab('plan');
-      setSelectedPlanDoc(planDoc);
-    } catch (error) {
-      console.error('Ошибка при создании финансового плана:', error);
-      setAlertText('Ошибка при создании финансового плана');
-    }
+    onSaveFinancialPlanDocument(planDoc);
+    setActiveTab('plan');
+    setSelectedPlanDoc(planDoc);
+    setPlanSubView('detail');
   };
 
-  useEffect(() => {
-    if (isPlanningCreateModalOpen && activeTab === 'planning' && departments.length > 0) {
-      setNewPlanningDepartment(departments[0].id);
-      setNewPlanningPeriod(currentPeriod);
-      setNewPlanningIncome(0);
-    }
-  }, [isPlanningCreateModalOpen, activeTab, departments.length, currentPeriod]);
-
-  const handlePlanningSubmit = (e?: React.FormEvent) => {
-    if (e) e.preventDefault();
+  const handleQuickCreatePlanning = () => {
     if (!onSaveFinancialPlanning) {
       setAlertText('Функция сохранения недоступна');
       return;
     }
-    if (!newPlanningDepartment || newPlanningDepartment === '') {
-      setAlertText('Выберите подразделение');
+    if (departments.length === 0) {
+      setAlertText('Сначала создайте подразделение в настройках');
       return;
     }
-    const income = Number(newPlanningIncome) || 0;
-    if (income <= 0) {
-      setAlertText('Введите сумму дохода за период (по кассовому методу)');
-      return;
-    }
-
-    const periodStart = new Date(newPlanningPeriod + '-01');
-    const periodEnd = new Date(periodStart.getFullYear(), periodStart.getMonth() + 1, 0);
-
-    const relevantRequests = requests.filter(req => {
-      if (req.departmentId !== newPlanningDepartment) return false;
-      const reqDate = new Date(req.date);
-      return reqDate >= periodStart && reqDate <= periodEnd;
-    });
-
     const planning: FinancialPlanning = {
       id: `fp-${Date.now()}`,
-      departmentId: newPlanningDepartment,
-      period: newPlanningPeriod,
-      income,
-      requestIds: relevantRequests.map(r => r.id),
+      departmentId: departments[0].id,
+      period: currentPeriod,
+      income: 0,
+      requestIds: [],
       status: 'created',
-      createdAt: new Date().toISOString()
+      createdAt: new Date().toISOString(),
     };
-
     onSaveFinancialPlanning(planning);
-    setPlanningSubView('detail');
     setActiveTab('planning');
     setSelectedPlanning(planning);
-    setIsPlanningCreateModalOpen(false);
+    setPlanningSubView('detail');
   };
-
-  const renderPlanningCreate = () => (
-    <div className="flex flex-col flex-1 min-h-0 -mx-4 md:-mx-6">
-      <div className="sticky top-0 z-20 flex flex-wrap items-center gap-3 px-4 py-3 border-b border-gray-200 dark:border-[#333] bg-white/95 dark:bg-[#191919]/95 backdrop-blur-md">
-        <button
-          type="button"
-          onClick={() => setPlanningSubView('list')}
-          className="p-2 rounded-xl border border-gray-200 dark:border-[#333] hover:bg-gray-50 dark:hover:bg-[#252525] transition-colors"
-        >
-          <ArrowLeft size={20} className="text-gray-600 dark:text-gray-400" />
-        </button>
-        <div className="flex-1 min-w-0">
-          <h2 className="text-lg font-bold text-gray-900 dark:text-white">Новое финансовое планирование</h2>
-          <p className="text-xs text-gray-500 dark:text-gray-400">Подразделение, период и доход за месяц</p>
-        </div>
-      </div>
-      <form
-        onSubmit={handlePlanningSubmit}
-        className="flex-1 overflow-y-auto custom-scrollbar min-h-0 px-4 md:px-6 py-6 max-w-xl w-full mx-auto space-y-5"
-      >
-        <div>
-          <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 mb-1 uppercase">Подразделение</label>
-          <TaskSelect
-            value={newPlanningDepartment}
-            onChange={setNewPlanningDepartment}
-            options={[
-              { value: '', label: 'Выберите подразделение' },
-              ...departments.map(d => ({ value: d.id, label: d.name })),
-            ]}
-          />
-        </div>
-        <div>
-          <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 mb-1 uppercase">Период (месяц)</label>
-          <DateInput value={newPlanningPeriod ? `${newPlanningPeriod}-01` : ''} onChange={(v) => setNewPlanningPeriod(v ? v.slice(0, 7) : '')} placeholder="Выберите месяц" />
-        </div>
-        <div>
-          <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 mb-1 uppercase">Доход за период (UZS)</label>
-          <input
-            type="number"
-            min={1}
-            value={newPlanningIncome || ''}
-            onChange={(e) => setNewPlanningIncome(parseFloat(e.target.value) || 0)}
-            className="w-full bg-white dark:bg-[#333] border border-gray-200 dark:border-[#444] rounded-xl px-4 py-3 text-sm text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-emerald-500/40 outline-none [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-            placeholder="0"
-          />
-        </div>
-        <div className="flex flex-wrap justify-end gap-2 pt-4 border-t border-gray-200 dark:border-[#333]">
-          <Button type="button" variant="secondary" onClick={() => setPlanningSubView('list')} size="md">
-            Отмена
-          </Button>
-          <Button type="submit" size="md">
-            Создать
-          </Button>
-        </div>
-      </form>
-    </div>
-  );
-
-  const renderPlanCreate = () => (
-    <div className="flex flex-col flex-1 min-h-0 -mx-4 md:-mx-6">
-      <div className="sticky top-0 z-20 flex flex-wrap items-center gap-3 px-4 py-3 border-b border-gray-200 dark:border-[#333] bg-white/95 dark:bg-[#191919]/95 backdrop-blur-md">
-        <button
-          type="button"
-          onClick={() => setPlanSubView('list')}
-          className="p-2 rounded-xl border border-gray-200 dark:border-[#333] hover:bg-gray-50 dark:hover:bg-[#252525] transition-colors"
-        >
-          <ArrowLeft size={20} className="text-gray-600 dark:text-gray-400" />
-        </button>
-        <div className="flex-1 min-w-0">
-          <h2 className="text-lg font-bold text-gray-900 dark:text-white">Новый финансовый план</h2>
-          <p className="text-xs text-gray-500 dark:text-gray-400">Документ на месяц по подразделению</p>
-        </div>
-      </div>
-      <form onSubmit={handlePlanSubmit} className="flex-1 overflow-y-auto custom-scrollbar min-h-0 px-4 md:px-6 py-6 max-w-xl w-full mx-auto space-y-5">
-        <div>
-          <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 mb-1 uppercase">Подразделение</label>
-          <TaskSelect
-            value={newPlanDepartment}
-            onChange={setNewPlanDepartment}
-            options={[
-              { value: '', label: 'Выберите подразделение' },
-              ...departments.map(d => ({ value: d.id, label: d.name })),
-            ]}
-          />
-        </div>
-        <div>
-          <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 mb-1 uppercase">Период (месяц)</label>
-          <DateInput value={newPlanPeriod ? `${newPlanPeriod}-01` : ''} onChange={(v) => setNewPlanPeriod(v ? v.slice(0, 7) : '')} placeholder="Выберите месяц" />
-        </div>
-        <div className="flex flex-wrap justify-end gap-2 pt-4 border-t border-gray-200 dark:border-[#333]">
-          <Button type="button" variant="secondary" onClick={() => setPlanSubView('list')} size="md">
-            Отмена
-          </Button>
-          <Button type="submit" size="md">
-            Создать
-          </Button>
-        </div>
-      </form>
-    </div>
-  );
 
   const financeTabOptions = useMemo(
     () => [
@@ -1723,13 +1644,7 @@ const FinanceView: React.FC<FinanceViewProps> = ({
                           label: 'Финансовый план',
                           icon: FileText,
                           onClick: () => {
-                            if (departments.length === 0) {
-                              setAlertText('Сначала создайте подразделение в настройках');
-                              return;
-                            }
-                            setActiveTab('plan');
-                            setSelectedPlanDoc(null);
-                            setPlanSubView('create');
+                            handleQuickCreatePlan();
                           },
                         },
                         {
@@ -1737,14 +1652,7 @@ const FinanceView: React.FC<FinanceViewProps> = ({
                           label: 'Финансовое планирование',
                           icon: PieChart,
                           onClick: () => {
-                            if (departments.length === 0) {
-                              setAlertText('Сначала создайте подразделение в настройках');
-                              return;
-                            }
-                            setActiveTab('planning');
-                            setSelectedPlanning(null);
-                            setPlanningSubView('list');
-                            setIsPlanningCreateModalOpen(true);
+                            handleQuickCreatePlanning();
                           },
                         },
                       ]}
@@ -1826,7 +1734,6 @@ const FinanceView: React.FC<FinanceViewProps> = ({
            {activeTab === 'requests' && renderRequestsTab()}
            {activeTab === 'statements' && <BankStatementsView ref={bankStatementsRef} />}
            {activeTab === 'plan' && planSubView === 'list' && renderPlanList()}
-           {activeTab === 'plan' && planSubView === 'create' && renderPlanCreate()}
            {activeTab === 'plan' && planSubView === 'detail' && selectedPlanDoc && renderPlanDetail()}
          </div>
        </div>
@@ -1891,77 +1798,7 @@ const FinanceView: React.FC<FinanceViewProps> = ({
         </div>
        )}
 
-      {/* Create Financial Planning Modal */}
-      {isPlanningCreateModalOpen && (
-        <div
-          className="fixed inset-0 bg-black/35 backdrop-blur-sm flex items-end md:items-center justify-center z-[220] animate-in fade-in duration-200"
-          onClick={(e) => {
-            if (e.target === e.currentTarget) setIsPlanningCreateModalOpen(false);
-          }}
-        >
-          <div className="bg-white dark:bg-[#252525] rounded-t-2xl md:rounded-xl shadow-2xl w-full max-w-lg max-h-[95vh] md:max-h-[90vh] overflow-hidden border border-gray-200 dark:border-[#333]">
-            <div className="p-4 border-b border-gray-100 dark:border-[#333] flex justify-between items-center bg-white dark:bg-[#252525]">
-              <h3 className="font-bold text-gray-800 dark:text-white">Новое финансовое планирование</h3>
-              <button
-                onClick={() => setIsPlanningCreateModalOpen(false)}
-                className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 p-1 rounded-full hover:bg-gray-100 dark:hover:bg-[#333]"
-              >
-                <X size={18} />
-              </button>
-            </div>
-
-            <form onSubmit={handlePlanningSubmit} className="p-6 space-y-4">
-              <div>
-                <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 mb-1 uppercase">
-                  Подразделение
-                </label>
-                <TaskSelect
-                  value={newPlanningDepartment}
-                  onChange={setNewPlanningDepartment}
-                  options={[
-                    { value: '', label: 'Выберите подразделение' },
-                    ...departments.map(d => ({ value: d.id, label: d.name }))
-                  ]}
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 mb-1 uppercase">
-                  Период (месяц)
-                </label>
-                <DateInput
-                  value={newPlanningPeriod ? `${newPlanningPeriod}-01` : ''}
-                  onChange={(v) => setNewPlanningPeriod(v ? v.slice(0, 7) : '')}
-                  placeholder="Выберите месяц"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 mb-1 uppercase">
-                  Доход за период (UZS)
-                </label>
-                <input
-                  type="number"
-                  min={1}
-                  value={newPlanningIncome || ''}
-                  onChange={(e) => setNewPlanningIncome(parseFloat(e.target.value) || 0)}
-                  className="w-full bg-white dark:bg-[#333] border border-gray-200 dark:border-[#444] rounded-xl px-4 py-3 text-sm text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-emerald-500/40 outline-none [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                  placeholder="0"
-                />
-              </div>
-
-              <div className="flex justify-end gap-2 pt-2">
-                <Button type="button" variant="secondary" onClick={() => setIsPlanningCreateModalOpen(false)} size="md">
-                  Отмена
-                </Button>
-                <Button type="submit" size="md">
-                  Создать
-                </Button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+      {/* Creation: instant -> opens detail */}
 
        <SystemAlertDialog
          open={!!alertText}
