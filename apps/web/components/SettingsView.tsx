@@ -270,7 +270,7 @@ const SettingsView: React.FC<SettingsViewProps> = ({
             accent="slate"
             icon={<Settings size={24} strokeWidth={2} />}
             title="Настройки системы"
-            description="Пересобранный центр настроек: пользователи, склад, воронки, уведомления, события, интеграции."
+            description=""
             className="mb-0 flex-1"
           />
         </div>
@@ -279,30 +279,26 @@ const SettingsView: React.FC<SettingsViewProps> = ({
       <div className="flex-1 min-h-0 overflow-y-auto custom-scrollbar">
         <div className={`${MODULE_PAGE_GUTTER} max-w-5xl py-6 pb-24 space-y-6`}>
           {!showArchiveScreen && (
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-              <div className="w-full sm:w-auto">
-                <p className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wide mb-2">
-                  Разделы настроек
-                </p>
-                <ModuleSegmentedControl
-                  variant="neutral"
-                  value={activeTab}
-                  onChange={(v) => setActiveTab(v)}
-                  options={SETTINGS_TABS.map((t) => ({
-                    value: t.id,
-                    label: t.label,
-                    icon: t.icon,
-                  }))}
-                  className="w-full max-w-full justify-start"
-                />
-              </div>
+            <div className="flex items-center justify-between gap-2">
+              <ModuleSegmentedControl
+                variant="neutral"
+                value={activeTab}
+                onChange={(v) => setActiveTab(v)}
+                options={SETTINGS_TABS.map((t) => ({
+                  value: t.id,
+                  label: t.label,
+                  icon: t.icon,
+                }))}
+                className="w-full max-w-full justify-start"
+              />
               <button
                 type="button"
                 onClick={() => setShowArchiveScreen(true)}
-                className="inline-flex items-center justify-center gap-2 px-3 py-2 rounded-xl border border-gray-200 dark:border-[#333] text-sm text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-[#252525] w-full sm:w-auto sm:justify-start shrink-0"
+                className="inline-flex items-center justify-center gap-2 px-3 py-2 rounded-xl border border-gray-200 dark:border-[#333] text-sm text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-[#252525] shrink-0"
+                title="Архив"
               >
                 <Archive size={14} />
-                Архив
+                <span className="hidden sm:inline">Архив</span>
               </button>
             </div>
           )}

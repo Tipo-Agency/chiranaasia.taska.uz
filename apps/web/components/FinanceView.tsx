@@ -486,54 +486,85 @@ const FinanceView: React.FC<FinanceViewProps> = ({
             <p className="text-xs text-gray-400 dark:text-gray-500">Создайте первое планирование через кнопку с плюсом в шапке</p>
           </div>
         ) : (
-          filteredPlannings.map(planning => {
-            const dep = departments.find(d => d.id === planning.departmentId);
-            const periodDate = new Date(planning.period + '-01');
-            const periodLabel = periodDate.toLocaleDateString('ru-RU', { month: 'long', year: 'numeric' });
-            
-            return (
-              <Card
-                key={planning.id}
-                onClick={() => {
-                  setSelectedPlanning(planning);
-                  setPlanningSubView('detail');
-                }}
-                padding="lg"
-                hover
-                className="group"
-              >
-                <div className="flex items-start justify-between">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-3 mb-2">
-                      <div className="bg-blue-100 dark:bg-blue-900/30 p-2 rounded-lg text-blue-600 dark:text-blue-400">
-                        <FileText size={20} />
+          (() => {
+            const groups = new Map<string, typeof filteredPlannings>();
+            filteredPlannings.forEach((p) => {
+              const key = p.departmentId || 'unknown';
+              const arr = groups.get(key) || [];
+              arr.push(p);
+              groups.set(key, arr);
+            });
+            const ordered = Array.from(groups.entries()).sort((a, b) => {
+              const da = departments.find(d => d.id === a[0])?.name || '—';
+              const db = departments.find(d => d.id === b[0])?.name || '—';
+              return da.localeCompare(db);
+            });
+
+            return ordered.map(([depId, items]) => {
+              const dep = departments.find(d => d.id === depId);
+              return (
+                <div key={depId} className="space-y-3">
+                  <div className="flex items-center justify-between gap-3 px-1">
+                    <div className="min-w-0">
+                      <div className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wide truncate">
+                        {dep?.name || 'Без подразделения'}
                       </div>
-                      <div>
-                        <h3 className="font-bold text-gray-900 dark:text-white text-lg">
-                          {dep?.name || 'Неизвестное подразделение'}
-                        </h3>
-                        <p className="text-sm text-gray-500 dark:text-gray-400">
-                          {periodLabel}
-                        </p>
+                      <div className="text-[11px] text-gray-400 dark:text-gray-500">
+                        {items.length} {items.length === 1 ? 'документ' : items.length < 5 ? 'документа' : 'документов'}
                       </div>
-                    </div>
-                    <div className="flex items-center gap-4 mt-3">
-                      <span className={`px-2.5 py-1 rounded-full text-xs font-bold uppercase ${getStatusColor(planning.status)}`}>
-                        {getStatusLabel(planning.status)}
-                      </span>
-                      <span className="text-xs text-gray-500 dark:text-gray-400">
-                        Заявок: {planning.requestIds.length}
-                      </span>
-                      <span className="text-xs text-gray-500 dark:text-gray-400">
-                        Создано: {new Date(planning.createdAt).toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric' }).replace(/\//g, '.')}
-                      </span>
                     </div>
                   </div>
-                  <ArrowRight size={20} className="text-gray-400 group-hover:text-gray-600 dark:group-hover:text-gray-200 shrink-0" />
+
+                  <div className="space-y-3">
+                    {items.map(planning => {
+                      const periodDate = new Date(planning.period + '-01');
+                      const periodLabel = periodDate.toLocaleDateString('ru-RU', { month: 'long', year: 'numeric' });
+
+                      return (
+                        <Card
+                          key={planning.id}
+                          onClick={() => {
+                            setSelectedPlanning(planning);
+                            setPlanningSubView('detail');
+                          }}
+                          padding="lg"
+                          hover
+                          className="group"
+                        >
+                          <div className="flex items-start justify-between">
+                            <div className="flex-1">
+                              <div className="flex items-center gap-3 mb-2">
+                                <div className="bg-blue-100 dark:bg-blue-900/30 p-2 rounded-lg text-blue-600 dark:text-blue-400">
+                                  <FileText size={20} />
+                                </div>
+                                <div>
+                                  <h3 className="font-bold text-gray-900 dark:text-white text-lg">
+                                    {periodLabel}
+                                  </h3>
+                                  <p className="text-xs text-gray-500 dark:text-gray-400">
+                                    Доход: {(planning.income || 0).toLocaleString()} UZS · Заявок: {planning.requestIds.length}
+                                  </p>
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-3 mt-3 flex-wrap">
+                                <span className={`px-2.5 py-1 rounded-full text-xs font-bold uppercase ${getStatusColor(planning.status)}`}>
+                                  {getStatusLabel(planning.status)}
+                                </span>
+                                <span className="text-xs text-gray-500 dark:text-gray-400">
+                                  {new Date(planning.createdAt).toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric' }).replace(/\//g, '.')}
+                                </span>
+                              </div>
+                            </div>
+                            <ArrowRight size={20} className="text-gray-400 group-hover:text-gray-600 dark:group-hover:text-gray-200 shrink-0" />
+                          </div>
+                        </Card>
+                      );
+                    })}
+                  </div>
                 </div>
-              </Card>
-            );
-          })
+              );
+            });
+          })()
         )}
       </div>
     </div>
@@ -887,55 +918,83 @@ const FinanceView: React.FC<FinanceViewProps> = ({
             <p className="text-xs text-gray-400 dark:text-gray-500">Создайте первый план через кнопку с плюсом в шапке</p>
           </div>
         ) : (
-          filteredPlanDocs.map(planDoc => {
-            const dep = departments.find(d => d.id === planDoc.departmentId);
-            const periodDate = new Date(planDoc.period + '-01');
-            const periodLabel = periodDate.toLocaleDateString('ru-RU', { month: 'long', year: 'numeric' });
-            const totalExpenses = (Object.values(planDoc.expenses || {}) as number[]).reduce((sum, val) => sum + val, 0);
-            
-            return (
-              <Card
-                key={planDoc.id}
-                onClick={() => {
-                  setSelectedPlanDoc(planDoc);
-                  setPlanSubView('detail');
-                }}
-                padding="lg"
-                hover
-                className="group"
-              >
-                <div className="flex items-start justify-between">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-3 mb-2">
-                      <div className="bg-green-100 dark:bg-green-900/30 p-2 rounded-lg text-green-600 dark:text-green-400">
-                        <FileText size={20} />
+          (() => {
+            const groups = new Map<string, typeof filteredPlanDocs>();
+            filteredPlanDocs.forEach((p) => {
+              const key = p.departmentId || 'unknown';
+              const arr = groups.get(key) || [];
+              arr.push(p);
+              groups.set(key, arr);
+            });
+            const ordered = Array.from(groups.entries()).sort((a, b) => {
+              const da = departments.find(d => d.id === a[0])?.name || '—';
+              const db = departments.find(d => d.id === b[0])?.name || '—';
+              return da.localeCompare(db);
+            });
+
+            return ordered.map(([depId, items]) => {
+              const dep = departments.find(d => d.id === depId);
+              return (
+                <div key={depId} className="space-y-3">
+                  <div className="flex items-center justify-between gap-3 px-1">
+                    <div className="min-w-0">
+                      <div className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wide truncate">
+                        {dep?.name || 'Без подразделения'}
                       </div>
-                      <div>
-                        <h3 className="font-bold text-gray-900 dark:text-white text-lg">
-                          {dep?.name || 'Неизвестное подразделение'}
-                        </h3>
-                        <p className="text-sm text-gray-500 dark:text-gray-400">
-                          {periodLabel}
-                        </p>
+                      <div className="text-[11px] text-gray-400 dark:text-gray-500">
+                        {items.length} {items.length === 1 ? 'документ' : items.length < 5 ? 'документа' : 'документов'}
                       </div>
-                    </div>
-                    <div className="flex items-center gap-4 mt-3">
-                      <span className={`px-2.5 py-1 rounded-full text-xs font-bold uppercase ${getStatusColor(planDoc.status)}`}>
-                        {getStatusLabel(planDoc.status)}
-                      </span>
-                      <span className="text-xs text-gray-500 dark:text-gray-400">
-                        Доход: {planDoc.income?.toLocaleString() || 0} UZS
-                      </span>
-                      <span className="text-xs text-gray-500 dark:text-gray-400">
-                        Расход: {totalExpenses.toLocaleString()} UZS
-                      </span>
                     </div>
                   </div>
-                  <ArrowRight size={20} className="text-gray-400 group-hover:text-gray-600 dark:group-hover:text-gray-200 shrink-0" />
+
+                  <div className="space-y-3">
+                    {items.map(planDoc => {
+                      const periodDate = new Date(planDoc.period + '-01');
+                      const periodLabel = periodDate.toLocaleDateString('ru-RU', { month: 'long', year: 'numeric' });
+                      const totalExpenses = (Object.values(planDoc.expenses || {}) as number[]).reduce((sum, val) => sum + val, 0);
+
+                      return (
+                        <Card
+                          key={planDoc.id}
+                          onClick={() => {
+                            setSelectedPlanDoc(planDoc);
+                            setPlanSubView('detail');
+                          }}
+                          padding="lg"
+                          hover
+                          className="group"
+                        >
+                          <div className="flex items-start justify-between">
+                            <div className="flex-1">
+                              <div className="flex items-center gap-3 mb-2">
+                                <div className="bg-green-100 dark:bg-green-900/30 p-2 rounded-lg text-green-600 dark:text-green-400">
+                                  <FileText size={20} />
+                                </div>
+                                <div>
+                                  <h3 className="font-bold text-gray-900 dark:text-white text-lg">
+                                    {periodLabel}
+                                  </h3>
+                                  <p className="text-xs text-gray-500 dark:text-gray-400">
+                                    Доход: {planDoc.income?.toLocaleString() || 0} UZS · Расход: {totalExpenses.toLocaleString()} UZS
+                                  </p>
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-3 mt-3 flex-wrap">
+                                <span className={`px-2.5 py-1 rounded-full text-xs font-bold uppercase ${getStatusColor(planDoc.status)}`}>
+                                  {getStatusLabel(planDoc.status)}
+                                </span>
+                              </div>
+                            </div>
+                            <ArrowRight size={20} className="text-gray-400 group-hover:text-gray-600 dark:group-hover:text-gray-200 shrink-0" />
+                          </div>
+                        </Card>
+                      );
+                    })}
+                  </div>
                 </div>
-              </Card>
-            );
-          })
+              );
+            });
+          })()
         )}
       </div>
     </div>

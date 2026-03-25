@@ -1,7 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import type { LucideIcon } from 'lucide-react';
 import { Check, ChevronDown } from 'lucide-react';
-import { Button } from './Button';
 import { MODULE_ACCENTS, type ModuleAccentKey } from './moduleAccent';
 
 export interface ModuleSelectDropdownItem {
@@ -60,17 +58,36 @@ export const ModuleSelectDropdown: React.FC<ModuleSelectDropdownProps> = ({
 
   return (
     <div className={`relative ${className}`} ref={ref}>
-      <Button
-        variant="secondary"
-        size="sm"
+      <button
+        type="button"
         disabled={disabled}
-        icon={ChevronDown as unknown as LucideIcon}
-        iconPosition="right"
         onClick={() => setOpen((o) => !o)}
-        className="max-w-[220px] sm:max-w-[260px]"
+        className={`
+          relative
+          inline-flex items-center
+          w-auto
+          max-w-[220px] sm:max-w-[260px]
+          rounded-lg
+          border border-gray-300 dark:border-gray-600
+          bg-gray-100 dark:bg-[#252525]
+          text-gray-900 dark:text-white
+          hover:bg-gray-200 dark:hover:bg-[#303030]
+          px-3 pr-10 py-2
+          text-sm font-medium
+          min-h-[44px]
+          transition-colors
+          focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500
+          disabled:opacity-50 disabled:cursor-not-allowed
+        `.trim()}
       >
-        <span className="truncate">{buttonText as any}</span>
-      </Button>
+        <span className="truncate">
+          {buttonText as any}
+        </span>
+        <ChevronDown
+          size={16}
+          className={`absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none transition-transform ${open ? 'rotate-180' : ''}`}
+        />
+      </button>
 
       {open && (
         <>
