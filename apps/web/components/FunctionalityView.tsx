@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { Task, User, StatusOption, Project } from '../types';
 import { CheckCircle2, Trash2, Edit2, Play, Layers, Folder, ChevronDown } from 'lucide-react';
 import { TaskSelect } from './TaskSelect';
-import { ModulePageShell, ModulePageHeader, ModuleSegmentedControl, MODULE_PAGE_GUTTER, ModuleCreateDropdown, ModuleFilterIconButton } from './ui';
+import { ModulePageShell, ModulePageHeader, ModuleSegmentedControl, MODULE_PAGE_GUTTER, ModuleCreateDropdown, ModuleCreateIconButton, ModuleFilterIconButton } from './ui';
 
 interface FunctionalityViewProps {
   features: Task[]; // Все функции из всех functionality таблиц

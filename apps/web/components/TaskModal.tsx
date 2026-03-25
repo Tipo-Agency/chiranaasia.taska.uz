@@ -4,6 +4,7 @@ import { Project, Task, User, StatusOption, PriorityOption, TableCollection, Tas
 import { X, Calendar as CalendarIcon, Users, Tag, Plus, CheckCircle2, Archive, AlignLeft, Paperclip, Send, File as FileIcon, Image as ImageIcon, MessageSquare, Download, Flag, Link as LinkIcon, Check, ChevronDown, Folder, ExternalLink, FileText, User as UserIcon, ListTree } from 'lucide-react';
 import { DynamicIcon } from './AppIcons';
 import { STANDARD_CATEGORIES } from './FunctionalityView';
+import { TaskSelect } from './TaskSelect';
 import { FilePreviewModal } from './FilePreviewModal';
 import { getTodayLocalDate, getDateDaysFromNow, normalizeDateForInput } from '../utils/dateUtils';
 import { DateRangeInput } from './ui/DateInput';
