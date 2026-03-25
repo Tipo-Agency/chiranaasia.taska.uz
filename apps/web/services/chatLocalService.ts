@@ -43,6 +43,17 @@ function writeAll(messages: ChatMessageLocal[]): void {
 }
 
 export const chatLocalService = {
+  upsertMessages(next: ChatMessageLocal[]): void {
+    const all = readAll();
+    const byId = new Map<string, ChatMessageLocal>();
+    for (const m of all) byId.set(m.id, m);
+    for (const m of next) {
+      const prev = byId.get(m.id);
+      byId.set(m.id, prev ? { ...prev, ...m } : m);
+    }
+    writeAll(Array.from(byId.values()));
+  },
+
   getMessagesForUser(userId: string): ChatMessageLocal[] {
     return readAll().filter(
       (m) =>

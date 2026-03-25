@@ -111,10 +111,45 @@ export const MiniMessenger: React.FC<MiniMessengerProps> = ({
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  const refresh = () => setMessages(chatLocalService.getMessagesForUser(currentUser.id));
+  const refreshLocal = () => setMessages(chatLocalService.getMessagesForUser(currentUser.id));
+
+  const syncFromBackend = async () => {
+    try {
+      const [inbox, outbox] = await Promise.all([
+        api.messages.getInbox(currentUser.id),
+        api.messages.getOutbox(currentUser.id),
+      ]);
+
+      const mapped: ChatMessageLocal[] = [...(inbox as any[]), ...(outbox as any[])]
+        .filter(Boolean)
+        .map((m: any) => {
+          const toId = m.recipientId == null ? TO_ALL_ID : String(m.recipientId);
+          return {
+            id: String(m.id),
+            fromId: String(m.senderId || ''),
+            toId,
+            text: String(m.text || ''),
+            createdAt: String(m.createdAt || new Date().toISOString()),
+          };
+        });
+
+      chatLocalService.upsertMessages(mapped);
+    } catch {
+      // ignore network/backend issues; local chat still works
+    } finally {
+      refreshLocal();
+    }
+  };
 
   useEffect(() => {
-    refresh();
+    void syncFromBackend();
+  }, [currentUser.id]);
+
+  useEffect(() => {
+    const t = window.setInterval(() => {
+      void syncFromBackend();
+    }, 5000);
+    return () => window.clearInterval(t);
   }, [currentUser.id]);
 
   useEffect(() => {
@@ -215,7 +250,7 @@ export const MiniMessenger: React.FC<MiniMessengerProps> = ({
         text,
       })
       .catch(() => {});
-    refresh();
+    refreshLocal();
     setInput('');
     if (textareaRef.current) {
       textareaRef.current.style.height = 'auto';
@@ -231,7 +266,7 @@ export const MiniMessenger: React.FC<MiniMessengerProps> = ({
       entityType,
       entityId: id,
     });
-    refresh();
+    refreshLocal();
     setActivePanel(null);
     setEntitySearch('');
   };
@@ -252,7 +287,7 @@ export const MiniMessenger: React.FC<MiniMessengerProps> = ({
       entityType: createEntityType,
       entityId,
     });
-    refresh();
+    refreshLocal();
     setActivePanel(null);
     setCreateEntityTitle('');
   };
@@ -267,7 +302,7 @@ export const MiniMessenger: React.FC<MiniMessengerProps> = ({
       entityType: 'task',
       entityId: started?.id || `proc-${processId}-${Date.now()}`,
     });
-    refresh();
+    refreshLocal();
     setActivePanel(null);
     setProcessSearch('');
   };
@@ -284,7 +319,7 @@ export const MiniMessenger: React.FC<MiniMessengerProps> = ({
         text: `📎 ${file.name} — файл слишком большой для чата (макс. ${Math.round(MAX_FILE_BYTES / 1024)} КБ). Загрузите в «Документы».`,
         entityType: 'file',
       });
-      refresh();
+      refreshLocal();
       return;
     }
 
@@ -301,7 +336,7 @@ export const MiniMessenger: React.FC<MiniMessengerProps> = ({
         fileMime: file.type || undefined,
         fileDataUrl: dataUrl,
       });
-      refresh();
+      refreshLocal();
     };
     reader.readAsDataURL(file);
   };
