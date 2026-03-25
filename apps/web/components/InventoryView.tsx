@@ -17,7 +17,9 @@ import {
   ModuleSegmentedControl,
   MODULE_PAGE_GUTTER,
   SystemAlertDialog,
+  SystemConfirmDialog,
 } from './ui';
+import { StandardModal } from './ui/StandardModal';
 
 interface InventoryViewProps {
   departments: Department[];
@@ -74,6 +76,7 @@ const InventoryView: React.FC<InventoryViewProps> = ({
   const [isCreateMovementOpen, setIsCreateMovementOpen] = useState(false);
   const [isCreateRevisionOpen, setIsCreateRevisionOpen] = useState(false);
   const [isCreateWarehouseOpen, setIsCreateWarehouseOpen] = useState(false);
+  const [confirmDeleteItemOpen, setConfirmDeleteItemOpen] = useState(false);
   const importInputRef = useRef<HTMLInputElement>(null);
 
   // Form state: new item
@@ -235,7 +238,13 @@ const InventoryView: React.FC<InventoryViewProps> = ({
 
   const handleDeleteEditedItem = () => {
     if (!editingItemId) return;
+    setConfirmDeleteItemOpen(true);
+  };
+
+  const confirmDeleteItem = () => {
+    if (!editingItemId) return;
     onDeleteItem(editingItemId);
+    setConfirmDeleteItemOpen(false);
     setIsEditItemOpen(false);
     setEditingItemId(null);
   };
@@ -839,79 +848,166 @@ const InventoryView: React.FC<InventoryViewProps> = ({
             }}
           />
 
-          {isCreateItemOpen && (
-            <div className="fixed inset-0 z-[220] bg-black/35 flex items-center justify-center p-4" onClick={() => setIsCreateItemOpen(false)}>
-              <div className="w-full max-w-2xl rounded-xl border border-gray-200 dark:border-[#444] bg-white dark:bg-[#252525] shadow-2xl" onClick={(e) => e.stopPropagation()}>
-                <div className="px-4 py-3 border-b border-gray-100 dark:border-[#333] flex items-center justify-between">
-                  <h4 className="text-sm font-semibold text-gray-900 dark:text-white">Новая номенклатура</h4>
-                  <button type="button" onClick={() => setIsCreateItemOpen(false)} className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-[#333] text-gray-500"><X size={16} /></button>
-                </div>
-                <div className="p-4 grid grid-cols-1 md:grid-cols-2 gap-3">
-                  <input value={newItemSku} onChange={e => setNewItemSku(e.target.value)} placeholder="Код" className="rounded-xl border border-gray-200 dark:border-[#333] px-3 py-2.5 text-sm bg-white dark:bg-[#252525]" />
-                  <input value={newItemName} onChange={e => setNewItemName(e.target.value)} placeholder="Название *" className="rounded-xl border border-gray-200 dark:border-[#333] px-3 py-2.5 text-sm bg-white dark:bg-[#252525]" />
-                  <input value={newItemUnit} onChange={e => setNewItemUnit(e.target.value)} placeholder="Ед. изм. (шт, кг...)" className="rounded-xl border border-gray-200 dark:border-[#333] px-3 py-2.5 text-sm bg-white dark:bg-[#252525]" />
-                  <input value={newItemCategory} onChange={e => setNewItemCategory(e.target.value)} placeholder="Категория" className="rounded-xl border border-gray-200 dark:border-[#333] px-3 py-2.5 text-sm bg-white dark:bg-[#252525]" />
-                  <input value={newItemNotes} onChange={e => setNewItemNotes(e.target.value)} placeholder="Комментарий" className="rounded-xl border border-gray-200 dark:border-[#333] px-3 py-2.5 text-sm bg-white dark:bg-[#252525] md:col-span-2" />
-                </div>
-                <div className="px-4 pb-4 flex justify-end gap-2">
-                  <button type="button" onClick={() => setIsCreateItemOpen(false)} className="px-3 py-2 rounded-lg border border-gray-200 dark:border-[#444] text-sm">Отмена</button>
-                  <button type="button" onClick={handleCreateItem} className="px-3 py-2 rounded-lg text-sm text-white bg-emerald-600 hover:bg-emerald-700">Создать</button>
-                </div>
+          <StandardModal
+            isOpen={isCreateItemOpen}
+            onClose={() => setIsCreateItemOpen(false)}
+            title="Новая номенклатура"
+            size="md"
+            footer={
+              <div className="flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setIsCreateItemOpen(false)}
+                  className="px-3 py-2 rounded-lg border border-gray-200 dark:border-[#444] text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-[#2e2e2e]"
+                >
+                  Отмена
+                </button>
+                <button
+                  type="button"
+                  onClick={handleCreateItem}
+                  className="px-3 py-2 rounded-lg text-sm text-white bg-emerald-600 hover:bg-emerald-700"
+                >
+                  Создать
+                </button>
               </div>
+            }
+          >
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <label className="flex flex-col gap-1.5">
+                <span className="text-xs font-medium text-gray-600 dark:text-gray-300">Код</span>
+                <input value={newItemSku} onChange={e => setNewItemSku(e.target.value)} placeholder="Например: 123" className="rounded-xl border border-gray-200 dark:border-[#333] px-3 py-2.5 text-sm bg-gray-50 dark:bg-[#252525]" />
+              </label>
+              <label className="flex flex-col gap-1.5">
+                <span className="text-xs font-medium text-gray-600 dark:text-gray-300">Название *</span>
+                <input value={newItemName} onChange={e => setNewItemName(e.target.value)} placeholder="Номенклатура" className="rounded-xl border border-gray-200 dark:border-[#333] px-3 py-2.5 text-sm bg-gray-50 dark:bg-[#252525]" />
+              </label>
+              <label className="flex flex-col gap-1.5">
+                <span className="text-xs font-medium text-gray-600 dark:text-gray-300">Ед. изм.</span>
+                <input value={newItemUnit} onChange={e => setNewItemUnit(e.target.value)} placeholder="шт, кг..." className="rounded-xl border border-gray-200 dark:border-[#333] px-3 py-2.5 text-sm bg-gray-50 dark:bg-[#252525]" />
+              </label>
+              <label className="flex flex-col gap-1.5">
+                <span className="text-xs font-medium text-gray-600 dark:text-gray-300">Категория</span>
+                <input value={newItemCategory} onChange={e => setNewItemCategory(e.target.value)} placeholder="Опционально" className="rounded-xl border border-gray-200 dark:border-[#333] px-3 py-2.5 text-sm bg-gray-50 dark:bg-[#252525]" />
+              </label>
+              <label className="flex flex-col gap-1.5 md:col-span-2">
+                <span className="text-xs font-medium text-gray-600 dark:text-gray-300">Комментарий</span>
+                <input value={newItemNotes} onChange={e => setNewItemNotes(e.target.value)} placeholder="Опционально" className="rounded-xl border border-gray-200 dark:border-[#333] px-3 py-2.5 text-sm bg-gray-50 dark:bg-[#252525]" />
+              </label>
             </div>
-          )}
+          </StandardModal>
 
-          {isEditItemOpen && (
-            <div className="fixed inset-0 z-[220] bg-black/35 flex items-center justify-center p-4" onClick={() => setIsEditItemOpen(false)}>
-              <div className="w-full max-w-2xl rounded-xl border border-gray-200 dark:border-[#444] bg-white dark:bg-[#252525] shadow-2xl" onClick={(e) => e.stopPropagation()}>
-                <div className="px-4 py-3 border-b border-gray-100 dark:border-[#333] flex items-center justify-between">
-                  <h4 className="text-sm font-semibold text-gray-900 dark:text-white">Редактировать номенклатуру</h4>
-                  <button type="button" onClick={() => setIsEditItemOpen(false)} className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-[#333] text-gray-500"><X size={16} /></button>
-                </div>
-                <div className="p-4 grid grid-cols-1 md:grid-cols-2 gap-3">
-                  <input value={editItemSku} onChange={e => setEditItemSku(e.target.value)} placeholder="Код" className="rounded-xl border border-gray-200 dark:border-[#333] px-3 py-2.5 text-sm bg-white dark:bg-[#252525]" />
-                  <input value={editItemName} onChange={e => setEditItemName(e.target.value)} placeholder="Название *" className="rounded-xl border border-gray-200 dark:border-[#333] px-3 py-2.5 text-sm bg-white dark:bg-[#252525]" />
-                  <input value={editItemUnit} onChange={e => setEditItemUnit(e.target.value)} placeholder="Ед. изм. (шт, кг...)" className="rounded-xl border border-gray-200 dark:border-[#333] px-3 py-2.5 text-sm bg-white dark:bg-[#252525]" />
-                  <input value={editItemCategory} onChange={e => setEditItemCategory(e.target.value)} placeholder="Категория" className="rounded-xl border border-gray-200 dark:border-[#333] px-3 py-2.5 text-sm bg-white dark:bg-[#252525]" />
-                  <input value={editItemNotes} onChange={e => setEditItemNotes(e.target.value)} placeholder="Комментарий" className="rounded-xl border border-gray-200 dark:border-[#333] px-3 py-2.5 text-sm bg-white dark:bg-[#252525] md:col-span-2" />
-                </div>
-                <div className="px-4 pb-4 flex justify-between gap-2">
-                  <button type="button" onClick={handleDeleteEditedItem} className="px-3 py-2 rounded-lg text-sm text-white bg-red-600 hover:bg-red-700">
-                    Удалить
+          <StandardModal
+            isOpen={isEditItemOpen}
+            onClose={() => setIsEditItemOpen(false)}
+            title="Редактировать номенклатуру"
+            size="md"
+            footer={
+              <div className="flex items-center justify-between gap-2">
+                <button
+                  type="button"
+                  onClick={handleDeleteEditedItem}
+                  className="px-3 py-2 rounded-lg text-sm text-white bg-red-600 hover:bg-red-700"
+                >
+                  Удалить
+                </button>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setIsEditItemOpen(false)}
+                    className="px-3 py-2 rounded-lg border border-gray-200 dark:border-[#444] text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-[#2e2e2e]"
+                  >
+                    Отмена
                   </button>
-                  <div className="flex gap-2">
-                    <button type="button" onClick={() => setIsEditItemOpen(false)} className="px-3 py-2 rounded-lg border border-gray-200 dark:border-[#444] text-sm">Отмена</button>
-                    <button type="button" onClick={handleSaveEditedItem} className="px-3 py-2 rounded-lg text-sm text-white bg-emerald-600 hover:bg-emerald-700">Сохранить</button>
-                  </div>
+                  <button
+                    type="button"
+                    onClick={handleSaveEditedItem}
+                    className="px-3 py-2 rounded-lg text-sm text-white bg-emerald-600 hover:bg-emerald-700"
+                  >
+                    Сохранить
+                  </button>
                 </div>
               </div>
+            }
+          >
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <label className="flex flex-col gap-1.5">
+                <span className="text-xs font-medium text-gray-600 dark:text-gray-300">Код</span>
+                <input value={editItemSku} onChange={e => setEditItemSku(e.target.value)} placeholder="Например: 123" className="rounded-xl border border-gray-200 dark:border-[#333] px-3 py-2.5 text-sm bg-gray-50 dark:bg-[#252525]" />
+              </label>
+              <label className="flex flex-col gap-1.5">
+                <span className="text-xs font-medium text-gray-600 dark:text-gray-300">Название *</span>
+                <input value={editItemName} onChange={e => setEditItemName(e.target.value)} placeholder="Номенклатура" className="rounded-xl border border-gray-200 dark:border-[#333] px-3 py-2.5 text-sm bg-gray-50 dark:bg-[#252525]" />
+              </label>
+              <label className="flex flex-col gap-1.5">
+                <span className="text-xs font-medium text-gray-600 dark:text-gray-300">Ед. изм.</span>
+                <input value={editItemUnit} onChange={e => setEditItemUnit(e.target.value)} placeholder="шт, кг..." className="rounded-xl border border-gray-200 dark:border-[#333] px-3 py-2.5 text-sm bg-gray-50 dark:bg-[#252525]" />
+              </label>
+              <label className="flex flex-col gap-1.5">
+                <span className="text-xs font-medium text-gray-600 dark:text-gray-300">Категория</span>
+                <input value={editItemCategory} onChange={e => setEditItemCategory(e.target.value)} placeholder="Опционально" className="rounded-xl border border-gray-200 dark:border-[#333] px-3 py-2.5 text-sm bg-gray-50 dark:bg-[#252525]" />
+              </label>
+              <label className="flex flex-col gap-1.5 md:col-span-2">
+                <span className="text-xs font-medium text-gray-600 dark:text-gray-300">Комментарий</span>
+                <input value={editItemNotes} onChange={e => setEditItemNotes(e.target.value)} placeholder="Опционально" className="rounded-xl border border-gray-200 dark:border-[#333] px-3 py-2.5 text-sm bg-gray-50 dark:bg-[#252525]" />
+              </label>
             </div>
-          )}
+          </StandardModal>
 
-          {isCreateWarehouseOpen && (
-            <div className="fixed inset-0 z-[220] bg-black/35 flex items-center justify-center p-4" onClick={() => setIsCreateWarehouseOpen(false)}>
-              <div className="w-full max-w-2xl rounded-xl border border-gray-200 dark:border-[#444] bg-white dark:bg-[#252525] shadow-2xl" onClick={(e) => e.stopPropagation()}>
-                <div className="px-4 py-3 border-b border-gray-100 dark:border-[#333] flex items-center justify-between">
-                  <h4 className="text-sm font-semibold text-gray-900 dark:text-white">Новый склад</h4>
-                  <button type="button" onClick={() => setIsCreateWarehouseOpen(false)} className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-[#333] text-gray-500"><X size={16} /></button>
-                </div>
-                <div className="p-4 grid grid-cols-1 md:grid-cols-2 gap-3">
-                  <input value={newWarehouseName} onChange={e => setNewWarehouseName(e.target.value)} placeholder="Название склада *" className="rounded-xl border border-gray-200 dark:border-[#333] px-3 py-2.5 text-sm bg-white dark:bg-[#252525] md:col-span-2" />
-                  <input value={newWarehouseLocation} onChange={e => setNewWarehouseLocation(e.target.value)} placeholder="Локация" className="rounded-xl border border-gray-200 dark:border-[#333] px-3 py-2.5 text-sm bg-white dark:bg-[#252525] md:col-span-2" />
-                  <select value={newWarehouseDepartmentId} onChange={(e) => setNewWarehouseDepartmentId(e.target.value)} className="rounded-xl border border-gray-200 dark:border-[#333] px-3 py-2.5 text-sm bg-white dark:bg-[#252525] md:col-span-2">
-                    <option value="">Без подразделения</option>
-                    {departments.filter((d) => !d.isArchived).map((d) => (
-                      <option key={d.id} value={d.id}>{d.name}</option>
-                    ))}
-                  </select>
-                </div>
-                <div className="px-4 pb-4 flex justify-end gap-2">
-                  <button type="button" onClick={() => setIsCreateWarehouseOpen(false)} className="px-3 py-2 rounded-lg border border-gray-200 dark:border-[#444] text-sm">Отмена</button>
-                  <button type="button" onClick={handleCreateWarehouse} className="px-3 py-2 rounded-lg text-sm text-white bg-emerald-600 hover:bg-emerald-700">Создать</button>
-                </div>
+          <StandardModal
+            isOpen={isCreateWarehouseOpen}
+            onClose={() => setIsCreateWarehouseOpen(false)}
+            title="Новый склад"
+            size="md"
+            footer={
+              <div className="flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setIsCreateWarehouseOpen(false)}
+                  className="px-3 py-2 rounded-lg border border-gray-200 dark:border-[#444] text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-[#2e2e2e]"
+                >
+                  Отмена
+                </button>
+                <button
+                  type="button"
+                  onClick={handleCreateWarehouse}
+                  className="px-3 py-2 rounded-lg text-sm text-white bg-emerald-600 hover:bg-emerald-700"
+                >
+                  Создать
+                </button>
               </div>
+            }
+          >
+            <div className="grid grid-cols-1 gap-3">
+              <label className="flex flex-col gap-1.5">
+                <span className="text-xs font-medium text-gray-600 dark:text-gray-300">Название склада *</span>
+                <input value={newWarehouseName} onChange={e => setNewWarehouseName(e.target.value)} placeholder="Например: Основной" className="rounded-xl border border-gray-200 dark:border-[#333] px-3 py-2.5 text-sm bg-gray-50 dark:bg-[#252525]" />
+              </label>
+              <label className="flex flex-col gap-1.5">
+                <span className="text-xs font-medium text-gray-600 dark:text-gray-300">Локация</span>
+                <input value={newWarehouseLocation} onChange={e => setNewWarehouseLocation(e.target.value)} placeholder="Опционально" className="rounded-xl border border-gray-200 dark:border-[#333] px-3 py-2.5 text-sm bg-gray-50 dark:bg-[#252525]" />
+              </label>
+              <label className="flex flex-col gap-1.5">
+                <span className="text-xs font-medium text-gray-600 dark:text-gray-300">Подразделение</span>
+                <select value={newWarehouseDepartmentId} onChange={(e) => setNewWarehouseDepartmentId(e.target.value)} className="rounded-xl border border-gray-200 dark:border-[#333] px-3 py-2.5 text-sm bg-gray-50 dark:bg-[#252525]">
+                  <option value="">Без подразделения</option>
+                  {departments.filter((d) => !d.isArchived).map((d) => (
+                    <option key={d.id} value={d.id}>{d.name}</option>
+                  ))}
+                </select>
+              </label>
             </div>
-          )}
+          </StandardModal>
+
+          <SystemConfirmDialog
+            open={confirmDeleteItemOpen}
+            title="Удалить номенклатуру?"
+            message="Номенклатура будет удалена. Операции и остатки останутся в истории, но элемент пропадёт из списков."
+            onCancel={() => setConfirmDeleteItemOpen(false)}
+            onConfirm={confirmDeleteItem}
+            cancelText="Отмена"
+            confirmText="Удалить"
+            danger
+          />
 
           {isCreateMovementOpen && (
             <div className="fixed inset-0 z-[220] bg-black/35 flex items-center justify-center p-4" onClick={() => setIsCreateMovementOpen(false)}>
