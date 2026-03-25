@@ -5,6 +5,7 @@ import logging
 
 import pytz
 from telegram import Update
+from telegram import BotCommand, BotCommandScopeAllGroupChats, BotCommandScopeAllPrivateChats
 from telegram.ext import Application
 
 from taska_bot.api.client import ApiClient
@@ -24,6 +25,27 @@ def build_application(settings: Settings | None = None) -> Application:
         app.bot_data["api"] = api
         tz = pytz.timezone(s.timezone)
         schedule_jobs(app, tz)
+        # Telegram подсказки по вводу "/" (особенно важно для групп).
+        # Без этого Telegram часто не показывает список команд.
+        try:
+            await app.bot.set_my_commands(
+                [
+                    BotCommand("task", "Создать задачу из сообщения"),
+                    BotCommand("bindgroup", "Привязать группу для уведомлений (ADMIN)"),
+                    BotCommand("groupstatus", "Показать статус групповых уведомлений"),
+                ],
+                scope=BotCommandScopeAllGroupChats(),
+            )
+            await app.bot.set_my_commands(
+                [
+                    BotCommand("start", "Вход в CRM"),
+                    BotCommand("tasks", "Мои задачи"),
+                    BotCommand("help", "Помощь"),
+                ],
+                scope=BotCommandScopeAllPrivateChats(),
+            )
+        except Exception as e:
+            logger.warning("set_my_commands failed: %s", e)
         logger.info("Bot post_init: API client and jobs ready (timezone=%s)", s.timezone)
 
     async def post_shutdown(app: Application) -> None:
