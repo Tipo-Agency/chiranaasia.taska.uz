@@ -4,6 +4,7 @@ import { Project, Role, Task, User, StatusOption, PriorityOption, NotificationPr
 import { User as UserIcon, Briefcase, Archive, Users, Building2, Wallet, TrendingUp, PiggyBank, PlugZap, ShieldAlert, Settings, BellRing, Zap, Package, ArrowLeft, Plus } from 'lucide-react';
 import { Button, Input, ModuleFilterIconButton, ModulePageHeader, ModulePageShell, ModuleSegmentedControl, MODULE_PAGE_GUTTER, StandardModal } from './ui';
 import { ProfileSettings } from './settings/ProfileSettings';
+import { StructureSettings } from './settings/StructureSettings';
 import { SystemLogsSettings } from './settings/SystemLogsSettings';
 import { SpaceSettings } from './settings/SpaceSettings';
 import { AutomationSettings } from './settings/AutomationSettings';
@@ -89,9 +90,7 @@ interface SettingsViewProps {
 const SETTINGS_TABS: { id: string; label: string; icon: React.ReactNode }[] = [
   { id: 'profile', label: 'Профиль', icon: <UserIcon size={14} /> },
   { id: 'users', label: 'Пользователи', icon: <Users size={14} /> },
-  { id: 'spaces', label: 'Проекты / модули', icon: <Briefcase size={14} /> },
-  { id: 'departments', label: 'Подразделения', icon: <Building2 size={14} /> },
-  { id: 'warehouses', label: 'Склад', icon: <Package size={14} /> },
+  { id: 'structure', label: 'Структура', icon: <Building2 size={14} /> },
   { id: 'finance-categories', label: 'Статьи расходов', icon: <Wallet size={14} /> },
   { id: 'funds', label: 'Фонды', icon: <PiggyBank size={14} /> },
   { id: 'sales-funnels', label: 'Воронки продаж', icon: <TrendingUp size={14} /> },
@@ -119,7 +118,11 @@ const SettingsView: React.FC<SettingsViewProps> = ({
   employeeInfos = [], deals = [], clients = [], contracts = [], meetings = [], businessProcesses = [],
   notificationPrefs, onClose: _onClose
 }) => {
-  const [activeTab, setActiveTab] = useState<string>(initialTab);
+  const normalizeTab = (t: string) => {
+    if (t === 'spaces' || t === 'departments' || t === 'warehouses') return 'structure';
+    return t;
+  };
+  const [activeTab, setActiveTab] = useState<string>(normalizeTab(initialTab));
   const [showArchiveScreen, setShowArchiveScreen] = useState(false);
   const [archiveTab, setArchiveTab] = useState<ArchiveTabId>('tasks');
   const [archiveShowFilters, setArchiveShowFilters] = useState(false);
@@ -129,6 +132,14 @@ const SettingsView: React.FC<SettingsViewProps> = ({
   const [createUserName, setCreateUserName] = useState('');
   const [createUserLogin, setCreateUserLogin] = useState('');
   const [createUserPassword, setCreateUserPassword] = useState('');
+  const [structureCreatePickerOpen, setStructureCreatePickerOpen] = useState(false);
+  const [structureCreateKind, setStructureCreateKind] = useState<null | 'project' | 'department' | 'warehouse'>(null);
+
+  useEffect(() => {
+    // When Settings opened with legacy tab ids, map them to new unified tab.
+    setActiveTab((prev) => normalizeTab(prev));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
     <ModulePageShell>
@@ -190,13 +201,14 @@ const SettingsView: React.FC<SettingsViewProps> = ({
                     type="button"
                     onClick={() => {
                       if (activeTab === 'users') setCreateUserOpen(true);
+                      if (activeTab === 'structure') setStructureCreatePickerOpen(true);
                     }}
                     className={`inline-flex items-center justify-center w-11 h-11 rounded-xl border border-gray-200 dark:border-[#333] bg-white dark:bg-[#1a1a1a] text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-[#252525] ${
-                      activeTab === 'users' ? '' : 'opacity-50 cursor-not-allowed'
+                      activeTab === 'users' || activeTab === 'structure' ? '' : 'opacity-50 cursor-not-allowed'
                     }`}
                     title={activeTab === 'users' ? 'Создать' : 'Создание доступно не во всех вкладках'}
                     aria-label="Создать"
-                    disabled={activeTab !== 'users'}
+                    disabled={!(activeTab === 'users' || activeTab === 'structure')}
                   >
                     <Plus size={18} />
                   </button>
@@ -274,9 +286,21 @@ const SettingsView: React.FC<SettingsViewProps> = ({
             <>
               {activeTab === 'profile' && currentUser && <ProfileSettings activeTab="profile" currentUser={currentUser} users={users} onUpdateProfile={onUpdateProfile!} onUpdateUsers={onUpdateUsers} />}
               {activeTab === 'users' && <ProfileSettings activeTab="users" currentUser={currentUser!} users={users} onUpdateProfile={onUpdateProfile!} onUpdateUsers={onUpdateUsers} />}
-              {activeTab === 'spaces' && <SpaceSettings activeTab="projects" tables={tables} projects={projects} statuses={statuses} priorities={priorities} onUpdateTable={onUpdateTable!} onCreateTable={onCreateTable!} onDeleteTable={onDeleteTable!} onUpdateProjects={onUpdateProjects} onUpdateStatuses={onUpdateStatuses} onUpdatePriorities={onUpdatePriorities} />}
-              {activeTab === 'departments' && <DepartmentsView departments={departments} users={users} onSave={onSaveDepartment!} onDelete={onDeleteDepartment!} />}
-              {activeTab === 'warehouses' && <WarehouseSettings warehouses={warehouses} departments={departments} onSave={onSaveWarehouse!} onDelete={onDeleteWarehouse!} />}
+              {activeTab === 'structure' && (
+                <StructureSettings
+                  projects={projects}
+                  departments={departments}
+                  warehouses={warehouses}
+                  users={users}
+                  onUpdateProjects={onUpdateProjects}
+                  onSaveDepartment={onSaveDepartment!}
+                  onDeleteDepartment={onDeleteDepartment!}
+                  onSaveWarehouse={onSaveWarehouse!}
+                  onDeleteWarehouse={onDeleteWarehouse!}
+                  createKind={structureCreateKind}
+                  onConsumedCreateKind={() => setStructureCreateKind(null)}
+                />
+              )}
               {activeTab === 'finance-categories' && <FinanceCategoriesSettings categories={financeCategories} onSave={onSaveFinanceCategory!} onDelete={onDeleteFinanceCategory!} />}
               {activeTab === 'funds' && <FundsSettings funds={funds} onSave={onSaveFund!} onDelete={onDeleteFund!} />}
               {activeTab === 'sales-funnels' && <SalesFunnelsSettings funnels={salesFunnels} users={users} onSave={onSaveSalesFunnel!} onDelete={onDeleteSalesFunnel!} notificationPrefs={notificationPrefs} onUpdatePrefs={onUpdateNotificationPrefs} />}
@@ -370,6 +394,49 @@ const SettingsView: React.FC<SettingsViewProps> = ({
           <div className="text-xs text-gray-500 dark:text-gray-400">
             После первого входа пользователю покажется запрос на установку пароля.
           </div>
+        </div>
+      </StandardModal>
+
+      <StandardModal
+        isOpen={structureCreatePickerOpen}
+        onClose={() => setStructureCreatePickerOpen(false)}
+        title="Создать"
+        size="sm"
+      >
+        <div className="grid grid-cols-1 gap-2">
+          <button
+            type="button"
+            onClick={() => {
+              setStructureCreatePickerOpen(false);
+              setStructureCreateKind('project');
+            }}
+            className="w-full text-left px-4 py-3 rounded-xl border border-gray-200 dark:border-[#333] bg-white dark:bg-[#252525] hover:bg-gray-50 dark:hover:bg-[#303030]"
+          >
+            <div className="font-semibold text-gray-900 dark:text-white">Проект / модуль</div>
+            <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Иконка + цвет</div>
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setStructureCreatePickerOpen(false);
+              setStructureCreateKind('department');
+            }}
+            className="w-full text-left px-4 py-3 rounded-xl border border-gray-200 dark:border-[#333] bg-white dark:bg-[#252525] hover:bg-gray-50 dark:hover:bg-[#303030]"
+          >
+            <div className="font-semibold text-gray-900 dark:text-white">Подразделение</div>
+            <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Название, руководитель</div>
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setStructureCreatePickerOpen(false);
+              setStructureCreateKind('warehouse');
+            }}
+            className="w-full text-left px-4 py-3 rounded-xl border border-gray-200 dark:border-[#333] bg-white dark:bg-[#252525] hover:bg-gray-50 dark:hover:bg-[#303030]"
+          >
+            <div className="font-semibold text-gray-900 dark:text-white">Склад</div>
+            <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Название, локация</div>
+          </button>
         </div>
       </StandardModal>
     </ModulePageShell>
