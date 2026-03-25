@@ -61,6 +61,7 @@ export function NotificationCenterProvider({
     let ws: WebSocket | null = null;
     const wsDisableKey = `notifications_ws_disabled:${userId}`;
     try {
+      const WS: any = (globalThis as any).WebSocket;
       try {
         if (sessionStorage.getItem(wsDisableKey) === '1') {
           ws = null;
@@ -69,8 +70,13 @@ export function NotificationCenterProvider({
         // ignore
       }
       // In some environments (CSP/sandbox/old embedded webviews) WebSocket constructor may throw.
-      if (typeof WebSocket === 'function') {
-        ws = new WebSocket(api.notifications.wsUrl(userId));
+      if (
+        typeof WS === 'function' &&
+        WS.prototype &&
+        typeof WS.prototype.send === 'function' &&
+        typeof WS.prototype.close === 'function'
+      ) {
+        ws = new WS(api.notifications.wsUrl(userId));
         ws.onerror = () => {
           // If WS is not supported by server/proxy (common in prod without upgrade headers),
           // disable reconnect attempts for this session to avoid console spam.
@@ -80,7 +86,8 @@ export function NotificationCenterProvider({
             // ignore
           }
           try {
-            if (ws && ws.readyState === WebSocket.OPEN) ws.close();
+            // readyState: 1 === OPEN
+            if (ws && (ws as any).readyState === 1) ws.close();
           } catch {
             // ignore
           }
@@ -131,7 +138,8 @@ export function NotificationCenterProvider({
       try {
         // In React StrictMode dev cycle cleanup can run while CONNECTING.
         // Avoid explicit close in CONNECTING state to prevent noisy browser warning.
-        if (ws && ws.readyState === WebSocket.OPEN) ws.close();
+        // readyState: 1 === OPEN
+        if (ws && (ws as any).readyState === 1) ws.close();
       } catch {
         /* ignore */
       }
