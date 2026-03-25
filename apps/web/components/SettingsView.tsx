@@ -5,18 +5,15 @@ import { User as UserIcon, Briefcase, Archive, Users, Building2, Wallet, Trendin
 import { Button, Input, ModuleFilterIconButton, ModulePageHeader, ModulePageShell, ModuleSegmentedControl, MODULE_PAGE_GUTTER, StandardModal } from './ui';
 import { ProfileSettings } from './settings/ProfileSettings';
 import { StructureSettings } from './settings/StructureSettings';
-import { SystemLogsSettings } from './settings/SystemLogsSettings';
 import { SpaceSettings } from './settings/SpaceSettings';
 import { AutomationSettings } from './settings/AutomationSettings';
 import DepartmentsView from './DepartmentsView';
 import { storageService } from '../services/storageService';
-import FinanceCategoriesSettings from './settings/FinanceCategoriesSettings';
-import FundsSettings from './settings/FundsSettings';
 import SalesFunnelsSettings from './settings/SalesFunnelsSettings';
 import { DEFAULT_NOTIFICATION_PREFS } from '../constants';
 import { IntegrationSettings } from './settings/IntegrationSettings';
-import { WarehouseSettings } from './settings/WarehouseSettings';
 import { ArchiveView, ARCHIVE_TAB_OPTIONS, type ArchiveTabId } from './settings/ArchiveView';
+import { FinanceSetupSettings } from './settings/FinanceSetupSettings';
 
 interface SettingsViewProps {
   // Data
@@ -91,13 +88,11 @@ const SETTINGS_TABS: { id: string; label: string; icon: React.ReactNode }[] = [
   { id: 'profile', label: 'Профиль', icon: <UserIcon size={14} /> },
   { id: 'users', label: 'Пользователи', icon: <Users size={14} /> },
   { id: 'structure', label: 'Структура', icon: <Building2 size={14} /> },
-  { id: 'finance-categories', label: 'Статьи расходов', icon: <Wallet size={14} /> },
-  { id: 'funds', label: 'Фонды', icon: <PiggyBank size={14} /> },
+  { id: 'finance-setup', label: 'Финансы', icon: <Wallet size={14} /> },
   { id: 'sales-funnels', label: 'Воронки продаж', icon: <TrendingUp size={14} /> },
   { id: 'notifications', label: 'Уведомления', icon: <BellRing size={14} /> },
   { id: 'events', label: 'События и роботы', icon: <Zap size={14} /> },
   { id: 'integrations', label: 'Интеграции', icon: <PlugZap size={14} /> },
-  { id: 'system', label: 'Система / Логи', icon: <ShieldAlert size={14} /> },
 ];
 
 const SettingsView: React.FC<SettingsViewProps> = ({ 
@@ -120,6 +115,8 @@ const SettingsView: React.FC<SettingsViewProps> = ({
 }) => {
   const normalizeTab = (t: string) => {
     if (t === 'spaces' || t === 'departments' || t === 'warehouses') return 'structure';
+    if (t === 'finance-categories' || t === 'funds') return 'finance-setup';
+    if (t === 'system') return 'integrations';
     return t;
   };
   const [activeTab, setActiveTab] = useState<string>(normalizeTab(initialTab));
@@ -134,6 +131,9 @@ const SettingsView: React.FC<SettingsViewProps> = ({
   const [createUserPassword, setCreateUserPassword] = useState('');
   const [structureCreatePickerOpen, setStructureCreatePickerOpen] = useState(false);
   const [structureCreateKind, setStructureCreateKind] = useState<null | 'project' | 'department' | 'warehouse'>(null);
+  const [financeCreatePickerOpen, setFinanceCreatePickerOpen] = useState(false);
+  const [financeCreateKind, setFinanceCreateKind] = useState<null | 'category' | 'fund'>(null);
+  const [salesFunnelsCreateRequested, setSalesFunnelsCreateRequested] = useState(0);
 
   useEffect(() => {
     // When Settings opened with legacy tab ids, map them to new unified tab.
@@ -202,13 +202,17 @@ const SettingsView: React.FC<SettingsViewProps> = ({
                     onClick={() => {
                       if (activeTab === 'users') setCreateUserOpen(true);
                       if (activeTab === 'structure') setStructureCreatePickerOpen(true);
+                      if (activeTab === 'finance-setup') setFinanceCreatePickerOpen(true);
+                      if (activeTab === 'sales-funnels') setSalesFunnelsCreateRequested((x) => x + 1);
                     }}
                     className={`inline-flex items-center justify-center w-11 h-11 rounded-xl border border-gray-200 dark:border-[#333] bg-white dark:bg-[#1a1a1a] text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-[#252525] ${
-                      activeTab === 'users' || activeTab === 'structure' ? '' : 'opacity-50 cursor-not-allowed'
+                      activeTab === 'users' || activeTab === 'structure' || activeTab === 'finance-setup' || activeTab === 'sales-funnels'
+                        ? ''
+                        : 'opacity-50 cursor-not-allowed'
                     }`}
                     title={activeTab === 'users' ? 'Создать' : 'Создание доступно не во всех вкладках'}
                     aria-label="Создать"
-                    disabled={!(activeTab === 'users' || activeTab === 'structure')}
+                    disabled={!(activeTab === 'users' || activeTab === 'structure' || activeTab === 'finance-setup' || activeTab === 'sales-funnels')}
                   >
                     <Plus size={18} />
                   </button>
@@ -301,9 +305,29 @@ const SettingsView: React.FC<SettingsViewProps> = ({
                   onConsumedCreateKind={() => setStructureCreateKind(null)}
                 />
               )}
-              {activeTab === 'finance-categories' && <FinanceCategoriesSettings categories={financeCategories} onSave={onSaveFinanceCategory!} onDelete={onDeleteFinanceCategory!} />}
-              {activeTab === 'funds' && <FundsSettings funds={funds} onSave={onSaveFund!} onDelete={onDeleteFund!} />}
-              {activeTab === 'sales-funnels' && <SalesFunnelsSettings funnels={salesFunnels} users={users} onSave={onSaveSalesFunnel!} onDelete={onDeleteSalesFunnel!} notificationPrefs={notificationPrefs} onUpdatePrefs={onUpdateNotificationPrefs} />}
+              {activeTab === 'finance-setup' && (
+                <FinanceSetupSettings
+                  categories={financeCategories}
+                  funds={funds}
+                  onSaveCategory={onSaveFinanceCategory!}
+                  onDeleteCategory={onDeleteFinanceCategory!}
+                  onSaveFund={onSaveFund!}
+                  onDeleteFund={onDeleteFund!}
+                  createKind={financeCreateKind}
+                  onConsumedCreateKind={() => setFinanceCreateKind(null)}
+                />
+              )}
+              {activeTab === 'sales-funnels' && (
+                <SalesFunnelsSettings
+                  funnels={salesFunnels}
+                  users={users}
+                  onSave={onSaveSalesFunnel!}
+                  onDelete={onDeleteSalesFunnel!}
+                  notificationPrefs={notificationPrefs}
+                  onUpdatePrefs={onUpdateNotificationPrefs}
+                  createRequested={salesFunnelsCreateRequested}
+                />
+              )}
               {activeTab === 'notifications' && (
                 <AutomationSettings
                   activeTab="notifications"
@@ -333,7 +357,6 @@ const SettingsView: React.FC<SettingsViewProps> = ({
                   onSaveDeal={onSaveDeal}
                 />
               )}
-              {activeTab === 'system' && <SystemLogsSettings />}
             </>
           )}
         </div>
@@ -436,6 +459,38 @@ const SettingsView: React.FC<SettingsViewProps> = ({
           >
             <div className="font-semibold text-gray-900 dark:text-white">Склад</div>
             <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Название, локация</div>
+          </button>
+        </div>
+      </StandardModal>
+
+      <StandardModal
+        isOpen={financeCreatePickerOpen}
+        onClose={() => setFinanceCreatePickerOpen(false)}
+        title="Создать"
+        size="sm"
+      >
+        <div className="grid grid-cols-1 gap-2">
+          <button
+            type="button"
+            onClick={() => {
+              setFinanceCreatePickerOpen(false);
+              setFinanceCreateKind('category');
+            }}
+            className="w-full text-left px-4 py-3 rounded-xl border border-gray-200 dark:border-[#333] bg-white dark:bg-[#252525] hover:bg-gray-50 dark:hover:bg-[#303030]"
+          >
+            <div className="font-semibold text-gray-900 dark:text-white">Статья расходов</div>
+            <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Фикс / процент</div>
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setFinanceCreatePickerOpen(false);
+              setFinanceCreateKind('fund');
+            }}
+            className="w-full text-left px-4 py-3 rounded-xl border border-gray-200 dark:border-[#333] bg-white dark:bg-[#252525] hover:bg-gray-50 dark:hover:bg-[#303030]"
+          >
+            <div className="font-semibold text-gray-900 dark:text-white">Фонд</div>
+            <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Название и порядок</div>
           </button>
         </div>
       </StandardModal>

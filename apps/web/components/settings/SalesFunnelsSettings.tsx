@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { SalesFunnel, FunnelStage, NotificationPreferences, FunnelSourceConfig, User } from '../../types';
 import { Plus, X, Edit2, Trash2, GripVertical, Settings, Instagram, MessageSquare, Star } from 'lucide-react';
-import { ModuleCreateIconButton } from '../ui/ModuleCreateIconButton';
 
 interface SalesFunnelsSettingsProps {
     funnels: SalesFunnel[];
@@ -10,6 +9,8 @@ interface SalesFunnelsSettingsProps {
     onDelete: (id: string) => void;
     notificationPrefs?: NotificationPreferences;
     onUpdatePrefs?: (prefs: NotificationPreferences) => void;
+    /** External header "+" trigger */
+    createRequested?: number;
 }
 
 const DEFAULT_STAGE_COLORS = [
@@ -35,7 +36,7 @@ const STAGE_COLOR_OPTIONS = [
     { name: 'Amber', class: 'bg-amber-200 dark:bg-amber-900' },
 ];
 
-const SalesFunnelsSettings: React.FC<SalesFunnelsSettingsProps> = ({ funnels, users = [], onSave, onDelete, notificationPrefs, onUpdatePrefs }) => {
+const SalesFunnelsSettings: React.FC<SalesFunnelsSettingsProps> = ({ funnels, users = [], onSave, onDelete, notificationPrefs, onUpdatePrefs, createRequested }) => {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingFunnel, setEditingFunnel] = useState<SalesFunnel | null>(null);
     const [funnelName, setFunnelName] = useState('');
@@ -69,6 +70,12 @@ const SalesFunnelsSettings: React.FC<SalesFunnelsSettingsProps> = ({ funnels, us
         setTelegramBotToken('');
         setIsModalOpen(true);
     };
+
+    React.useEffect(() => {
+        if (!createRequested) return;
+        handleOpenCreate();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [createRequested]);
 
     const handleOpenEdit = (funnel: SalesFunnel) => {
         setEditingFunnel(funnel);
@@ -211,14 +218,11 @@ const SalesFunnelsSettings: React.FC<SalesFunnelsSettingsProps> = ({ funnels, us
 
     return (
         <div className="space-y-6">
-            <div className="flex justify-between items-center">
-                <div>
-                    <h3 className="text-2xl font-bold text-gray-800 dark:text-white">Воронки продаж</h3>
-                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                        Управление воронками продаж для разных направлений бизнеса
-                    </p>
-                </div>
-                <ModuleCreateIconButton accent="violet" label="Добавить воронку" onClick={handleOpenCreate} />
+            <div>
+                <h3 className="text-sm font-bold text-gray-900 dark:text-white">Воронки продаж</h3>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                    Настройка направлений продаж, этапов и источников лидов.
+                </p>
             </div>
 
             {/* Настройка основной воронки */}
