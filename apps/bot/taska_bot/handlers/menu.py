@@ -6,6 +6,7 @@ from datetime import datetime
 
 import pytz
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
+from telegram import ReplyKeyboardRemove
 from telegram.ext import ContextTypes, MessageHandler, filters
 
 from taska_bot.handlers.commands import cmd_help, cmd_tasks
@@ -16,12 +17,15 @@ from taska_bot.ui.keyboards import (
     BTN_DEALS,
     BTN_FINANCE,
     BTN_HELP,
+    BTN_HIDE_MENU,
     BTN_MEETINGS,
     BTN_PROFILE,
+    BTN_SHOW_MENU,
     BTN_TASKS,
     BTN_WEBAPP,
     main_reply_keyboard,
     open_site_inline_markup,
+    show_menu_reply_keyboard,
 )
 
 _ALIASES = {
@@ -34,6 +38,8 @@ _ALIASES = {
     "Профиль": BTN_PROFILE,
     "Помощь": BTN_HELP,
     "Система": BTN_WEBAPP,
+    "Скрыть меню": BTN_HIDE_MENU,
+    "Показать меню": BTN_SHOW_MENU,
 }
 
 _KEYWORDS = [
@@ -46,6 +52,8 @@ _KEYWORDS = [
     ("профил", BTN_PROFILE),
     ("помощ", BTN_HELP),
     ("систем", BTN_WEBAPP),
+    ("скры", BTN_HIDE_MENU),
+    ("показ", BTN_SHOW_MENU),
 ]
 
 
@@ -73,6 +81,8 @@ MENU_TEXTS = frozenset(
         BTN_PROFILE,
         BTN_HELP,
         BTN_WEBAPP,
+        BTN_HIDE_MENU,
+        BTN_SHOW_MENU,
         *_ALIASES.keys(),
     }
 )
@@ -307,6 +317,16 @@ async def on_menu_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         await _send_profile(update, context)
     elif text == BTN_HELP:
         await cmd_help(update, context)
+    elif text == BTN_HIDE_MENU:
+        await update.message.reply_text(
+            "Меню скрыто. Нажмите «Показать меню», чтобы вернуть кнопки.",
+            reply_markup=ReplyKeyboardRemove(),
+        )
+        await update.message.reply_text("⬇️", reply_markup=show_menu_reply_keyboard())
+    elif text == BTN_SHOW_MENU:
+        settings = context.application.bot_data["settings"]
+        kb = main_reply_keyboard(settings.web_app_url)
+        await update.message.reply_text("Меню показано.", reply_markup=kb)
 
 
 def register(application) -> None:

@@ -13,6 +13,8 @@ BTN_CLIENTS = "👥 Клиенты"
 BTN_PROFILE = "👤 Профиль"
 BTN_HELP = "❓ Помощь"
 BTN_WEBAPP = "🌐 Система"
+BTN_HIDE_MENU = "🙈 Скрыть меню"
+BTN_SHOW_MENU = "📋 Показать меню"
 
 
 def main_reply_keyboard(web_app_url: str) -> ReplyKeyboardMarkup:
@@ -28,11 +30,23 @@ def main_reply_keyboard(web_app_url: str) -> ReplyKeyboardMarkup:
     ]
     if web_app_url.startswith("https://"):
         rows.append([KeyboardButton(BTN_WEBAPP, web_app=WebAppInfo(url=web_app_url))])
+    rows.append([KeyboardButton(BTN_HIDE_MENU)])
     return ReplyKeyboardMarkup(
         rows,
         resize_keyboard=True,
         is_persistent=True,
         selective=False,
+    )
+
+
+def show_menu_reply_keyboard() -> ReplyKeyboardMarkup:
+    """Мини-клавиатура, чтобы вернуть основное меню после скрытия."""
+    return ReplyKeyboardMarkup(
+        [[KeyboardButton(BTN_SHOW_MENU)]],
+        resize_keyboard=True,
+        is_persistent=False,
+        selective=False,
+        one_time_keyboard=True,
     )
 
 
