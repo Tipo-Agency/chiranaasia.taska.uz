@@ -36,6 +36,32 @@ _ALIASES = {
     "Система": BTN_WEBAPP,
 }
 
+_KEYWORDS = [
+    ("задач", BTN_TASKS),
+    ("сделк", BTN_DEALS),
+    ("встреч", BTN_MEETINGS),
+    ("чат", BTN_CHAT),
+    ("заявк", BTN_FINANCE),
+    ("клиент", BTN_CLIENTS),
+    ("профил", BTN_PROFILE),
+    ("помощ", BTN_HELP),
+    ("систем", BTN_WEBAPP),
+]
+
+
+def _coerce_menu_text(text: str) -> str | None:
+    """Пытается сопоставить текст кнопки меню, даже если Telegram изменил/урезал подпись."""
+    t = (text or "").strip()
+    if not t:
+        return None
+    if t in MENU_TEXTS:
+        return _ALIASES.get(t, t)
+    low = t.lower()
+    for kw, btn in _KEYWORDS:
+        if kw in low:
+            return btn
+    return None
+
 MENU_TEXTS = frozenset(
     {
         BTN_TASKS,
@@ -260,10 +286,10 @@ async def on_menu_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         return
     if update.effective_chat.type != "private":
         return
-    text = (update.message.text or "").strip()
-    if text not in MENU_TEXTS:
+    coerced = _coerce_menu_text(update.message.text or "")
+    if not coerced:
         return
-    text = _ALIASES.get(text, text)
+    text = coerced
 
     if text == BTN_TASKS:
         await cmd_tasks(update, context)

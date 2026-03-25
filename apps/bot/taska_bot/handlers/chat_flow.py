@@ -43,6 +43,8 @@ _MENU_TEXTS = {
     "Система",
 }
 
+_MENU_KEYWORDS = ("задач", "сделк", "встреч", "чат", "заявк", "клиент", "профил", "помощ", "систем")
+
 
 async def handle_chat_text_extras(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if not update.message or not update.effective_chat or update.effective_chat.type != "private":
@@ -51,7 +53,8 @@ async def handle_chat_text_extras(update: Update, context: ContextTypes.DEFAULT_
     # Важно: reply-меню в личке — это тоже TEXT.
     # Если у нас "завис" какой-то сценарий ожидания текста (поиск/ответ/комментарий),
     # то нажатие кнопок меню должно проходить в menu.py, а не потребляться здесь.
-    if text in _MENU_TEXTS:
+    low = text.lower()
+    if text in _MENU_TEXTS or any(k in low for k in _MENU_KEYWORDS):
         return
 
     if text == "/cancel_reply":
