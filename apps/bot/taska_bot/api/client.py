@@ -31,6 +31,79 @@ class ApiClient:
         r = await self._http.put("/auth/users", json=users)
         return r.status_code == 200
 
+    async def get_statuses(self) -> list[dict]:
+        r = await self._http.get("/statuses")
+        if r.status_code != 200:
+            return []
+        data = r.json()
+        return data if isinstance(data, list) else []
+
+    async def get_priorities(self) -> list[dict]:
+        r = await self._http.get("/priorities")
+        if r.status_code != 200:
+            return []
+        data = r.json()
+        return data if isinstance(data, list) else []
+
+    async def get_departments(self) -> list[dict]:
+        r = await self._http.get("/departments")
+        if r.status_code != 200:
+            return []
+        data = r.json()
+        return data if isinstance(data, list) else []
+
+    async def get_finance_categories(self) -> list[dict]:
+        r = await self._http.get("/finance/categories")
+        if r.status_code != 200:
+            return []
+        data = r.json()
+        return data if isinstance(data, list) else []
+
+    async def get_finance_requests(self) -> list[dict]:
+        r = await self._http.get("/finance/requests")
+        if r.status_code != 200:
+            return []
+        data = r.json()
+        return data if isinstance(data, list) else []
+
+    async def put_finance_requests(self, requests: list[dict]) -> bool:
+        r = await self._http.put("/finance/requests", json=requests)
+        return r.status_code == 200
+
+    async def put_tasks(self, tasks: list[dict]) -> bool:
+        r = await self._http.put("/tasks", json=tasks)
+        return r.status_code == 200
+
+    async def put_deals(self, deals: list[dict]) -> bool:
+        r = await self._http.put("/deals", json=deals)
+        return r.status_code == 200
+
+    async def put_meetings(self, meetings: list[dict]) -> bool:
+        r = await self._http.put("/meetings", json=meetings)
+        return r.status_code == 200
+
+    async def get_messages(self, *, folder: str, user_id: str) -> list[dict]:
+        r = await self._http.get("/messages", params={"folder": folder, "user_id": user_id})
+        if r.status_code != 200:
+            return []
+        data = r.json()
+        return data if isinstance(data, list) else []
+
+    async def post_message(self, body: dict) -> bool:
+        r = await self._http.post("/messages", json=body)
+        return r.status_code == 200
+
+    async def patch_message_read(self, message_id: str, read: bool = True) -> bool:
+        r = await self._http.patch(f"/messages/{message_id}", json={"read": read})
+        return r.status_code == 200
+
+    async def run_notification_deliveries(self, limit: int = 200) -> dict:
+        r = await self._http.post("/notifications/deliveries/run", params={"limit": limit})
+        if r.status_code != 200:
+            return {}
+        data = r.json()
+        return data if isinstance(data, dict) else {}
+
     async def get_tasks(self) -> list[dict]:
         r = await self._http.get("/tasks")
         if r.status_code != 200:
@@ -40,6 +113,13 @@ class ApiClient:
 
     async def get_deals(self) -> list[dict]:
         r = await self._http.get("/deals")
+        if r.status_code != 200:
+            return []
+        data = r.json()
+        return data if isinstance(data, list) else []
+
+    async def get_meetings(self) -> list[dict]:
+        r = await self._http.get("/meetings")
         if r.status_code != 200:
             return []
         data = r.json()

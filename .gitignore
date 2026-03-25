@@ -28,6 +28,7 @@ dist-ssr
 .env.local
 .env.*.local
 apps/bot/.env
+apps/bot/taska_bot/data/
 
 # Python
 __pycache__/

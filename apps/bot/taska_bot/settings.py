@@ -14,6 +14,8 @@ class Settings:
     telegram_token: str
     backend_url: str
     timezone: str = "Asia/Tashkent"
+    # Публичный URL веб-интерфейса (HTTPS) — для кнопки Web App в Telegram
+    web_app_url: str = ""
 
 
 def load_settings() -> Settings:
@@ -24,4 +26,7 @@ def load_settings() -> Settings:
     if not backend:
         raise ValueError("BACKEND_URL обязателен (например http://127.0.0.1:8003)")
     tz = (os.getenv("DEFAULT_TIMEZONE") or "Asia/Tashkent").strip()
-    return Settings(telegram_token=token, backend_url=backend, timezone=tz)
+    # Если переменные не заданы на сервере (apps/bot/.env), используем домен по умолчанию,
+    # чтобы кнопки Web App работали "из коробки".
+    web = (os.getenv("WEB_APP_URL") or os.getenv("PUBLIC_APP_URL") or "https://tipa.taska.uz").strip().rstrip("/")
+    return Settings(telegram_token=token, backend_url=backend, timezone=tz, web_app_url=web)
