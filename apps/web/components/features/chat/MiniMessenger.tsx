@@ -130,6 +130,7 @@ export const MiniMessenger: React.FC<MiniMessengerProps> = ({
             toId,
             text: String(m.text || ''),
             createdAt: String(m.createdAt || new Date().toISOString()),
+            read: typeof m.read === 'boolean' ? m.read : undefined,
           };
         });
 
@@ -151,6 +152,30 @@ export const MiniMessenger: React.FC<MiniMessengerProps> = ({
     }, 5000);
     return () => window.clearInterval(t);
   }, [currentUser.id]);
+
+  const markThreadRead = async (threadUserId: string) => {
+    const all = chatLocalService.getMessagesForUser(currentUser.id);
+    const incomingUnread = all.filter(
+      (m) =>
+        m.fromId === threadUserId &&
+        m.toId === currentUser.id &&
+        m.read === false
+    );
+    if (!incomingUnread.length) return;
+    await Promise.all(
+      incomingUnread.map((m) => api.messages.markRead(m.id, true).catch(() => {}))
+    );
+    chatLocalService.upsertMessages(incomingUnread.map((m) => ({ ...m, read: true })));
+    refreshLocal();
+  };
+
+  useEffect(() => {
+    if (!activeId) return;
+    if (activeId === SYSTEM_FEED_UI) return;
+    if (activeId === TO_ALL_ID) return;
+    void markThreadRead(activeId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeId]);
 
   useEffect(() => {
     if (initialOpenSystemFeed) {
@@ -236,15 +261,18 @@ export const MiniMessenger: React.FC<MiniMessengerProps> = ({
     const text = input.trim();
     if (!text || !activeId || activeId === SYSTEM_FEED_UI) return;
     const toId = activeId === TO_ALL_ID ? TO_ALL_ID : activeId;
-    chatLocalService.addMessage({
+    const localMsg = chatLocalService.addMessage({
       fromId: currentUser.id,
       toId,
       text,
+      read: true,
     });
     // Persist to backend so Telegram bot can mirror messages.
     // "__all__" becomes recipientId=null (broadcast); otherwise recipientId=userId.
     api.messages
       .add({
+        id: localMsg.id,
+        createdAt: localMsg.createdAt,
         senderId: currentUser.id,
         recipientId: toId === TO_ALL_ID ? null : toId,
         text,
@@ -256,6 +284,17 @@ export const MiniMessenger: React.FC<MiniMessengerProps> = ({
       textareaRef.current.style.height = 'auto';
     }
   };
+
+  const unreadByUserId = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const msg of messages) {
+      if (msg.toId !== currentUser.id) continue;
+      if (msg.read !== false) continue;
+      if (!msg.fromId) continue;
+      m.set(msg.fromId, (m.get(msg.fromId) || 0) + 1);
+    }
+    return m;
+  }, [messages, currentUser.id]);
 
   const attachEntity = (id: string, label: string) => {
     if (!activeId) return;
@@ -510,7 +549,22 @@ export const MiniMessenger: React.FC<MiniMessengerProps> = ({
                     {(u.name || '?').trim().charAt(0).toUpperCase() || '?'}
                   </div>
                 )}
-                <span className="truncate font-medium">{u.name}</span>
+                <span className="truncate font-medium flex-1 min-w-0">{u.name}</span>
+                {(() => {
+                  const cnt = unreadByUserId.get(u.id) || 0;
+                  if (!cnt) return null;
+                  return (
+                    <span
+                      className={`ml-auto shrink-0 min-w-[20px] h-5 px-1.5 rounded-full text-[11px] font-bold flex items-center justify-center ${
+                        activeId === u.id ? 'bg-white/20 text-white' : 'bg-[#3337AD] text-white'
+                      }`}
+                      aria-label={`Новых сообщений: ${cnt}`}
+                      title={`Новых сообщений: ${cnt}`}
+                    >
+                      {cnt > 99 ? '99+' : cnt}
+                    </span>
+                  );
+                })()}
               </button>
             ))}
           </div>

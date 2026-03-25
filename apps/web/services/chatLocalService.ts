@@ -6,6 +6,8 @@ export interface ChatMessageLocal {
   toId: string;
   text: string;
   createdAt: string;
+  /** For backend-synced messages: read flag for recipient */
+  read?: boolean;
   isSystem?: boolean;
   entityType?: ChatEntityType;
   entityId?: string;
@@ -65,9 +67,12 @@ export const chatLocalService = {
   },
 
   addMessage(input: {
+    id?: string;
     fromId: string;
     toId: string;
     text: string;
+    createdAt?: string;
+    read?: boolean;
     isSystem?: boolean;
     entityType?: ChatEntityType;
     entityId?: string;
@@ -80,8 +85,8 @@ export const chatLocalService = {
   }): ChatMessageLocal {
     const all = readAll();
     const msg: ChatMessageLocal = {
-      id: `msg-${Date.now()}-${Math.random().toString(16).slice(2)}`,
-      createdAt: new Date().toISOString(),
+      id: input.id || `msg-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+      createdAt: input.createdAt || new Date().toISOString(),
       ...input,
     };
     all.push(msg);

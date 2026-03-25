@@ -165,7 +165,7 @@ export const activityEndpoint = {
 export const messagesEndpoint = {
   getInbox: (userId: string) => get<unknown[]>(`/messages?folder=inbox&user_id=${encodeURIComponent(userId)}`),
   getOutbox: (userId: string) => get<unknown[]>(`/messages?folder=outbox&user_id=${encodeURIComponent(userId)}`),
-  add: (body: { senderId: string; recipientId?: string | null; text: string; attachments?: unknown[] }) =>
+  add: (body: { id?: string; createdAt?: string; senderId: string; recipientId?: string | null; text: string; attachments?: unknown[] }) =>
     post<{ ok: boolean; id: string }>('/messages', body),
   markRead: (messageId: string, read: boolean) => patch<{ ok: boolean }>(`/messages/${messageId}`, { read }),
 };
