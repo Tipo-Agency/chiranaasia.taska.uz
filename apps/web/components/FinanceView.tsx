@@ -81,6 +81,37 @@ const FinanceView: React.FC<FinanceViewProps> = ({
     const now = new Date();
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
   }, []);
+
+  const getDefaultRangeForMonth = useCallback((yyyyMm: string) => {
+    const d = new Date(`${yyyyMm}-01T00:00:00`);
+    const start = new Date(d.getFullYear(), d.getMonth(), 1);
+    const end = new Date(d.getFullYear(), d.getMonth() + 1, 0);
+    const toIso = (x: Date) => x.toISOString().slice(0, 10);
+    return { start: toIso(start), end: toIso(end) };
+  }, []);
+
+  const formatRangeLabel = useCallback((startIso?: string, endIso?: string, fallbackPeriod?: string) => {
+    try {
+      if (startIso && endIso) {
+        const s = new Date(`${startIso}T00:00:00`);
+        const e = new Date(`${endIso}T00:00:00`);
+        const fmt = (x: Date) =>
+          x.toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric' }).replace(/\//g, '.');
+        return `${fmt(s)} — ${fmt(e)}`;
+      }
+    } catch {
+      // ignore
+    }
+    if (fallbackPeriod) {
+      try {
+        const periodDate = new Date(`${fallbackPeriod}-01T00:00:00`);
+        return periodDate.toLocaleDateString('ru-RU', { month: 'long', year: 'numeric' });
+      } catch {
+        // ignore
+      }
+    }
+    return '—';
+  }, []);
   
   // Инициализируем текущий период (используем как дефолт при создании)
 
@@ -101,12 +132,14 @@ const FinanceView: React.FC<FinanceViewProps> = ({
     notes?: string;
     income?: number;
     departmentId?: string;
-    period?: string;
+    periodStart?: string;
+    periodEnd?: string;
     fundAllocations?: Record<string, number>;
     requestFundIds?: Record<string, string>;
   } | null>(null);
   const [planningDetailDepartmentId, setPlanningDetailDepartmentId] = useState('');
-  const [planningDetailPeriod, setPlanningDetailPeriod] = useState('');
+  const [planningDetailPeriodStart, setPlanningDetailPeriodStart] = useState('');
+  const [planningDetailPeriodEnd, setPlanningDetailPeriodEnd] = useState('');
   const [planningDetailRequestIds, setPlanningDetailRequestIds] = useState<string[]>([]);
   const [planningDetailNotes, setPlanningDetailNotes] = useState('');
   const [planningDetailIncome, setPlanningDetailIncome] = useState<number>(0);
@@ -119,10 +152,12 @@ const FinanceView: React.FC<FinanceViewProps> = ({
     expenses: Record<string, number>;
     selectedCategories: string[];
     departmentId?: string;
-    period?: string;
+    periodStart?: string;
+    periodEnd?: string;
   } | null>(null);
   const [planDetailDepartmentId, setPlanDetailDepartmentId] = useState('');
-  const [planDetailPeriod, setPlanDetailPeriod] = useState('');
+  const [planDetailPeriodStart, setPlanDetailPeriodStart] = useState('');
+  const [planDetailPeriodEnd, setPlanDetailPeriodEnd] = useState('');
   const [planDetailIncome, setPlanDetailIncome] = useState(0);
   const [planDetailExpenses, setPlanDetailExpenses] = useState<Record<string, number>>({});
   const [planDetailSelectedCategories, setPlanDetailSelectedCategories] = useState<string[]>([]);
@@ -133,17 +168,20 @@ const FinanceView: React.FC<FinanceViewProps> = ({
   // Синхронизация состояний детальных страниц при изменении выбранных элементов
   useEffect(() => {
     if (selectedPlanning) {
+      const fallback = getDefaultRangeForMonth(selectedPlanning.period || currentPeriod);
       planningDetailInitialValuesRef.current = {
         requestIds: selectedPlanning.requestIds,
         notes: selectedPlanning.notes,
         income: selectedPlanning.income ?? 0,
         departmentId: selectedPlanning.departmentId,
-        period: selectedPlanning.period,
+        periodStart: selectedPlanning.periodStart || fallback.start,
+        periodEnd: selectedPlanning.periodEnd || fallback.end,
         fundAllocations: selectedPlanning.fundAllocations ?? {},
         requestFundIds: selectedPlanning.requestFundIds ?? {}
       };
       setPlanningDetailDepartmentId(selectedPlanning.departmentId || '');
-      setPlanningDetailPeriod(selectedPlanning.period || '');
+      setPlanningDetailPeriodStart(selectedPlanning.periodStart || fallback.start);
+      setPlanningDetailPeriodEnd(selectedPlanning.periodEnd || fallback.end);
       setPlanningDetailRequestIds(selectedPlanning.requestIds);
       setPlanningDetailNotes(selectedPlanning.notes || '');
       setPlanningDetailIncome(selectedPlanning.income ?? 0);
@@ -152,7 +190,8 @@ const FinanceView: React.FC<FinanceViewProps> = ({
     } else {
       planningDetailInitialValuesRef.current = null;
       setPlanningDetailDepartmentId('');
-      setPlanningDetailPeriod('');
+      setPlanningDetailPeriodStart('');
+      setPlanningDetailPeriodEnd('');
       setPlanningDetailRequestIds([]);
       setPlanningDetailNotes('');
       setPlanningDetailIncome(0);
@@ -163,16 +202,19 @@ const FinanceView: React.FC<FinanceViewProps> = ({
   
   useEffect(() => {
     if (selectedPlanDoc) {
+      const fallback = getDefaultRangeForMonth(selectedPlanDoc.period || currentPeriod);
       const selectedCats = Object.keys(selectedPlanDoc.expenses || {});
       planDetailInitialValuesRef.current = {
         income: selectedPlanDoc.income || 0,
         expenses: selectedPlanDoc.expenses || {},
         selectedCategories: selectedCats,
         departmentId: selectedPlanDoc.departmentId,
-        period: selectedPlanDoc.period,
+        periodStart: selectedPlanDoc.periodStart || fallback.start,
+        periodEnd: selectedPlanDoc.periodEnd || fallback.end,
       };
       setPlanDetailDepartmentId(selectedPlanDoc.departmentId || '');
-      setPlanDetailPeriod(selectedPlanDoc.period || '');
+      setPlanDetailPeriodStart(selectedPlanDoc.periodStart || fallback.start);
+      setPlanDetailPeriodEnd(selectedPlanDoc.periodEnd || fallback.end);
       setPlanDetailIncome(selectedPlanDoc.income || 0);
       setPlanDetailExpenses(selectedPlanDoc.expenses || {});
       setPlanDetailSelectedCategories(selectedCats);
@@ -180,7 +222,8 @@ const FinanceView: React.FC<FinanceViewProps> = ({
       // Сбрасываем значения, если план не выбран
       planDetailInitialValuesRef.current = null;
       setPlanDetailDepartmentId('');
-      setPlanDetailPeriod('');
+      setPlanDetailPeriodStart('');
+      setPlanDetailPeriodEnd('');
       setPlanDetailIncome(0);
       setPlanDetailExpenses({});
       setPlanDetailSelectedCategories([]);
@@ -522,8 +565,7 @@ const FinanceView: React.FC<FinanceViewProps> = ({
 
                   <div className="space-y-3">
                     {items.map(planning => {
-                      const periodDate = new Date(planning.period + '-01');
-                      const periodLabel = periodDate.toLocaleDateString('ru-RU', { month: 'long', year: 'numeric' });
+                    const periodLabel = formatRangeLabel(planning.periodStart, planning.periodEnd, planning.period);
 
                       return (
                         <Card
@@ -580,8 +622,7 @@ const FinanceView: React.FC<FinanceViewProps> = ({
     if (!selectedPlanning) return null;
     
     const dep = departments.find(d => d.id === planningDetailDepartmentId);
-    const periodDate = new Date((planningDetailPeriod || currentPeriod) + '-01');
-    const periodLabel = periodDate.toLocaleDateString('ru-RU', { month: 'long', year: 'numeric' });
+    const periodLabel = formatRangeLabel(planningDetailPeriodStart, planningDetailPeriodEnd, selectedPlanning.period);
     const planningRequests = requests.filter(r => selectedPlanning.requestIds.includes(r.id));
     
     const hasChanges = (): boolean => {
@@ -592,7 +633,8 @@ const FinanceView: React.FC<FinanceViewProps> = ({
         planningDetailNotes !== (ref.notes || '') ||
         planningDetailIncome !== (ref.income || 0) ||
         planningDetailDepartmentId !== (ref.departmentId || '') ||
-        planningDetailPeriod !== (ref.period || '') ||
+        planningDetailPeriodStart !== (ref.periodStart || '') ||
+        planningDetailPeriodEnd !== (ref.periodEnd || '') ||
         JSON.stringify(planningDetailFundAllocations) !== JSON.stringify(ref.fundAllocations || {}) ||
         JSON.stringify(planningDetailRequestFundIds) !== JSON.stringify(ref.requestFundIds || {})
       );
@@ -618,7 +660,9 @@ const FinanceView: React.FC<FinanceViewProps> = ({
       const updated: FinancialPlanning = {
         ...selectedPlanning,
         departmentId: planningDetailDepartmentId || selectedPlanning.departmentId,
-        period: planningDetailPeriod || selectedPlanning.period,
+        period: (planningDetailPeriodStart || selectedPlanning.periodStart || '') ? (planningDetailPeriodStart || '').slice(0, 7) : selectedPlanning.period,
+        periodStart: planningDetailPeriodStart || undefined,
+        periodEnd: planningDetailPeriodEnd || undefined,
         requestIds: planningDetailRequestIds,
         notes: planningDetailNotes,
         income: planningDetailIncome,
@@ -632,7 +676,8 @@ const FinanceView: React.FC<FinanceViewProps> = ({
         notes: planningDetailNotes,
         income: planningDetailIncome,
         departmentId: planningDetailDepartmentId,
-        period: planningDetailPeriod,
+        periodStart: planningDetailPeriodStart,
+        periodEnd: planningDetailPeriodEnd,
         fundAllocations: planningDetailFundAllocations,
         requestFundIds: planningDetailRequestFundIds
       };
@@ -640,9 +685,11 @@ const FinanceView: React.FC<FinanceViewProps> = ({
     
     const handleRefreshRequests = () => {
       if (!selectedPlanning) return;
-      const periodDate = new Date((planningDetailPeriod || selectedPlanning.period) + '-01');
-      const periodStart = new Date(periodDate.getFullYear(), periodDate.getMonth(), 1);
-      const periodEnd = new Date(periodDate.getFullYear(), periodDate.getMonth() + 1, 0, 23, 59, 59);
+      const startIso = planningDetailPeriodStart || selectedPlanning.periodStart;
+      const endIso = planningDetailPeriodEnd || selectedPlanning.periodEnd;
+      const fallback = getDefaultRangeForMonth(selectedPlanning.period || currentPeriod);
+      const periodStart = new Date(`${(startIso || fallback.start)}T00:00:00`);
+      const periodEnd = new Date(`${(endIso || fallback.end)}T23:59:59`);
       
       // Находим заявки, которые подходят под период и подразделение
       const matchingRequests = requests.filter(req => {
@@ -762,11 +809,10 @@ const FinanceView: React.FC<FinanceViewProps> = ({
               <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 uppercase mb-2">
                 Период (месяц)
               </label>
-              <DateInput
-                value={planningDetailPeriod ? `${planningDetailPeriod}-01` : ''}
-                onChange={(v) => setPlanningDetailPeriod(v ? v.slice(0, 7) : '')}
-                placeholder="Выберите месяц"
-              />
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <DateInput value={planningDetailPeriodStart} onChange={setPlanningDetailPeriodStart} placeholder="Дата начала" />
+                <DateInput value={planningDetailPeriodEnd} onChange={setPlanningDetailPeriodEnd} placeholder="Дата конца" />
+              </div>
             </div>
           </div>
         </div>
@@ -986,8 +1032,7 @@ const FinanceView: React.FC<FinanceViewProps> = ({
 
                   <div className="space-y-3">
                     {items.map(planDoc => {
-                      const periodDate = new Date(planDoc.period + '-01');
-                      const periodLabel = periodDate.toLocaleDateString('ru-RU', { month: 'long', year: 'numeric' });
+                      const periodLabel = formatRangeLabel(planDoc.periodStart, planDoc.periodEnd, planDoc.period);
                       const totalExpenses = (Object.values(planDoc.expenses || {}) as number[]).reduce((sum, val) => sum + val, 0);
 
                       return (
@@ -1042,8 +1087,7 @@ const FinanceView: React.FC<FinanceViewProps> = ({
     if (!selectedPlanDoc) return null;
     
     const dep = departments.find(d => d.id === planDetailDepartmentId);
-    const periodDate = new Date((planDetailPeriod || currentPeriod) + '-01');
-    const periodLabel = periodDate.toLocaleDateString('ru-RU', { month: 'long', year: 'numeric' });
+    const periodLabel = formatRangeLabel(planDetailPeriodStart, planDetailPeriodEnd, selectedPlanDoc.period);
     
     const hasChanges = (): boolean => {
       if (!planDetailInitialValuesRef.current) return false;
@@ -1052,7 +1096,8 @@ const FinanceView: React.FC<FinanceViewProps> = ({
         JSON.stringify(planDetailExpenses) !== JSON.stringify(planDetailInitialValuesRef.current.expenses) ||
         JSON.stringify([...planDetailSelectedCategories].sort()) !== JSON.stringify([...planDetailInitialValuesRef.current.selectedCategories].sort()) ||
         planDetailDepartmentId !== (planDetailInitialValuesRef.current.departmentId || '') ||
-        planDetailPeriod !== (planDetailInitialValuesRef.current.period || '')
+        planDetailPeriodStart !== (planDetailInitialValuesRef.current.periodStart || '') ||
+        planDetailPeriodEnd !== (planDetailInitialValuesRef.current.periodEnd || '')
       );
     };
     
@@ -1083,7 +1128,9 @@ const FinanceView: React.FC<FinanceViewProps> = ({
       const updated: FinancialPlanDocument = {
         ...selectedPlanDoc,
         departmentId: planDetailDepartmentId || selectedPlanDoc.departmentId,
-        period: planDetailPeriod || selectedPlanDoc.period,
+        period: (planDetailPeriodStart || selectedPlanDoc.periodStart || '') ? (planDetailPeriodStart || '').slice(0, 7) : selectedPlanDoc.period,
+        periodStart: planDetailPeriodStart || undefined,
+        periodEnd: planDetailPeriodEnd || undefined,
         income: planDetailIncome,
         expenses: filteredExpenses,
         updatedAt: new Date().toISOString()
@@ -1094,7 +1141,8 @@ const FinanceView: React.FC<FinanceViewProps> = ({
         expenses: filteredExpenses,
         selectedCategories: planDetailSelectedCategories,
         departmentId: planDetailDepartmentId,
-        period: planDetailPeriod,
+        periodStart: planDetailPeriodStart,
+        periodEnd: planDetailPeriodEnd,
       };
     };
     
@@ -1219,11 +1267,10 @@ const FinanceView: React.FC<FinanceViewProps> = ({
               <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 uppercase mb-2">
                 Период (месяц)
               </label>
-              <DateInput
-                value={planDetailPeriod ? `${planDetailPeriod}-01` : ''}
-                onChange={(v) => setPlanDetailPeriod(v ? v.slice(0, 7) : '')}
-                placeholder="Выберите месяц"
-              />
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <DateInput value={planDetailPeriodStart} onChange={setPlanDetailPeriodStart} placeholder="Дата начала" />
+                <DateInput value={planDetailPeriodEnd} onChange={setPlanDetailPeriodEnd} placeholder="Дата конца" />
+              </div>
             </div>
           </div>
         </div>
@@ -1507,10 +1554,13 @@ const FinanceView: React.FC<FinanceViewProps> = ({
       setAlertText('Сначала создайте подразделение в настройках');
       return;
     }
+    const { start, end } = getDefaultRangeForMonth(currentPeriod);
     const planDoc: FinancialPlanDocument = {
       id: `fpd-${Date.now()}`,
       departmentId: departments[0].id,
       period: currentPeriod,
+      periodStart: start,
+      periodEnd: end,
       income: 0,
       expenses: {},
       status: 'created',
@@ -1531,10 +1581,13 @@ const FinanceView: React.FC<FinanceViewProps> = ({
       setAlertText('Сначала создайте подразделение в настройках');
       return;
     }
+    const { start, end } = getDefaultRangeForMonth(currentPeriod);
     const planning: FinancialPlanning = {
       id: `fp-${Date.now()}`,
       departmentId: departments[0].id,
       period: currentPeriod,
+      periodStart: start,
+      periodEnd: end,
       income: 0,
       requestIds: [],
       status: 'created',

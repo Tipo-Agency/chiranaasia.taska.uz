@@ -585,6 +585,10 @@ export interface FinancialPlanDocument {
     id: string;
     departmentId: string;
     period: string; // YYYY-MM формат месяца
+    /** Диапазон периода (ISO YYYY-MM-DD). Если задан — используется вместо month-only period в UI. */
+    periodStart?: string;
+    /** Диапазон периода (ISO YYYY-MM-DD). Если задан — используется вместо month-only period в UI. */
+    periodEnd?: string;
     income: number; // Доход
     expenses: Record<string, number>; // Расходы по статьям: { categoryId: amount }
     status: 'created' | 'conducted' | 'approved'; // создан, проведен, утвержден
@@ -608,6 +612,10 @@ export interface FinancialPlanning {
     id: string;
     departmentId: string;
     period: string; // YYYY-MM формат месяца
+    /** Диапазон периода (ISO YYYY-MM-DD). Если задан — используется вместо month-only period в UI. */
+    periodStart?: string;
+    /** Диапазон периода (ISO YYYY-MM-DD). Если задан — используется вместо month-only period в UI. */
+    periodEnd?: string;
     planDocumentId?: string; // Ссылка на FinancialPlanDocument (опционально)
     /** Доход за период (по кассовому методу) — вносится при создании/редактировании */
     income?: number;
