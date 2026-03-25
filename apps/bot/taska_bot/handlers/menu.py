@@ -310,11 +310,23 @@ async def on_menu_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
 
 
 def register(application) -> None:
+    # Основной хендлер меню.
     application.add_handler(
         MessageHandler(
             filters.TEXT & ~filters.COMMAND & filters.ChatType.PRIVATE,
             on_menu_text,
-        )
+        ),
+        group=0,
+    )
+    # Fallback: если какой-то хендлер в group=0 "съел" апдейт странным образом,
+    # попробуем ещё раз в следующей группе.
+    application.add_handler(
+        MessageHandler(
+            filters.TEXT & ~filters.COMMAND & filters.ChatType.PRIVATE,
+            on_menu_text,
+            block=False,
+        ),
+        group=1,
     )
 
 
