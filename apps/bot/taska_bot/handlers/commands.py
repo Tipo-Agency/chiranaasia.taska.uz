@@ -14,8 +14,31 @@ from telegram.ext import (
 
 from taska_bot.domain.task_filters import overdue_tasks_for_user, today_tasks_for_user
 from taska_bot.handlers.crm_context import is_admin, resolve_crm_user
+from taska_bot.ui.keyboards import (
+    BTN_CHAT,
+    BTN_CLIENTS,
+    BTN_DEALS,
+    BTN_FINANCE,
+    BTN_HELP,
+    BTN_MEETINGS,
+    BTN_PROFILE,
+    BTN_TASKS,
+    BTN_WEBAPP,
+)
 
 (LOGIN_NAME, LOGIN_PASS) = range(2)
+
+_MENU_TEXTS = {
+    BTN_TASKS,
+    BTN_DEALS,
+    BTN_MEETINGS,
+    BTN_CHAT,
+    BTN_FINANCE,
+    BTN_CLIENTS,
+    BTN_PROFILE,
+    BTN_HELP,
+    BTN_WEBAPP,
+}
 
 
 async def cmd_help(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -78,7 +101,14 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
 async def login_name(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     if not update.message:
         return ConversationHandler.END
-    context.user_data["login_name"] = (update.message.text or "").strip()
+    text = (update.message.text or "").strip()
+    if text in _MENU_TEXTS:
+        # Пользователь нажал кнопку меню, но находится в сценарии авторизации.
+        # Завершаем сценарий, чтобы меню снова работало предсказуемо.
+        context.user_data.pop("login_name", None)
+        await update.message.reply_text("Вы сейчас в авторизации. Нажмите /start чтобы войти, или /cancel чтобы выйти.")
+        return ConversationHandler.END
+    context.user_data["login_name"] = text
     await update.message.reply_text("Введите пароль:")
     return LOGIN_PASS
 
@@ -87,7 +117,11 @@ async def login_password(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     if not update.message or not update.effective_user:
         return ConversationHandler.END
     api = context.application.bot_data["api"]
-    password = update.message.text or ""
+    password = (update.message.text or "").strip()
+    if password in _MENU_TEXTS:
+        context.user_data.pop("login_name", None)
+        await update.message.reply_text("Авторизация отменена. Нажмите /start чтобы войти.")
+        return ConversationHandler.END
     login_name = (context.user_data.get("login_name") or "").strip()
     chat_id = update.effective_chat.id
     try:

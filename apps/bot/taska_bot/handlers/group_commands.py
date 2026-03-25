@@ -463,20 +463,34 @@ async def on_group_weekly_send(update: Update, context: ContextTypes.DEFAULT_TYP
         await query.message.reply_text("Список планов устарел. Повторите /weekly.")
         return
 
+    api = context.application.bot_data["api"]
     plan = plans[idx]
     week_start = str(plan.get("weekStart") or "")
     notes = str(plan.get("notes") or "")
     task_ids = plan.get("taskIds") or []
     task_count = len(task_ids)
-    sample_tasks = [str(x) for x in task_ids[:5] if x]
+    all_tasks = await api.get_tasks()
+    by_id = {str(t.get("id") or ""): t for t in all_tasks if t.get("id")}
+
+    task_lines: list[str] = []
+    for tid in [str(x) for x in task_ids if x][:30]:
+        t = by_id.get(tid)
+        if not t:
+            task_lines.append(f"• <i>не найдено</i> — <code>{html.escape(tid)}</code>")
+            continue
+        title = html.escape(str(t.get("title") or "—"))
+        status = html.escape(str(t.get("status") or "—"))
+        task_lines.append(f"• <b>{status}</b> — {title}")
 
     text = (
         f"📌 Недельный план: <b>{html.escape(week_start)}</b>\n"
         f"Заметки: {html.escape(notes[:600]) or '—'}\n"
-        f"Задач: <b>{task_count}</b>"
+        f"Задач: <b>{task_count}</b>\n"
     )
-    if sample_tasks:
-        text += "\nПримеры taskIds: <code>" + html.escape(", ".join(sample_tasks)) + "</code>"
+    if task_lines:
+        text += "\n".join(task_lines)
+        if task_count > len(task_lines):
+            text += f"\n… и ещё {task_count - len(task_lines)}"
 
     await query.message.reply_text(text, parse_mode="HTML")
     await query.answer()
@@ -633,7 +647,7 @@ async def gm_meet_pick_cb(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
 
 def build_group_meeting_conversation() -> ConversationHandler:
     return ConversationHandler(
-        entry_points=[CommandHandler("meeting", gm_meet_entry)],
+        entry_points=[CommandHandler("meeting", gm_meet_entry, filters=filters.ChatType.GROUPS)],
         states={
             GM_TITLE: [MessageHandler(filters.TEXT & ~filters.COMMAND, gm_meet_title)],
             GM_DATE: [MessageHandler(filters.TEXT & ~filters.COMMAND, gm_meet_date)],
