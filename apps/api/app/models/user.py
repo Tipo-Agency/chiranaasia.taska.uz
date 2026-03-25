@@ -1,7 +1,9 @@
 """User model."""
-from sqlalchemy import Column, String, Boolean
-from app.database import Base
 import uuid
+
+from sqlalchemy import Boolean, Column, String
+
+from app.database import Base
 
 
 def gen_id():

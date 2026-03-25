@@ -4,7 +4,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
-from app.models.bpm import OrgPosition, BusinessProcess
+from app.models.bpm import BusinessProcess, OrgPosition
 from app.services.domain_events import log_entity_mutation
 
 router = APIRouter(prefix="/bpm", tags=["bpm"])

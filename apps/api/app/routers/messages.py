@@ -1,8 +1,9 @@
 """Inbox/Outbox messages router."""
 import uuid
 from datetime import datetime
+
 from fastapi import APIRouter, Depends, Query
-from sqlalchemy import select, or_
+from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db

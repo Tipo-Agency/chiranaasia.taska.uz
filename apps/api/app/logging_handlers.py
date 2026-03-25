@@ -2,12 +2,13 @@
 import json
 import logging
 import urllib.request
-from typing import Any, Optional
+from typing import Any
 
 from sqlalchemy import create_engine, text
-from sqlalchemy.orm import sessionmaker, Session
+from sqlalchemy.orm import Session, sessionmaker
 
 from app.config import get_settings
+
 
 # Sync URL for logging (same DB, sync driver)
 def _get_sync_url() -> str:
@@ -18,7 +19,7 @@ def _get_sync_url() -> str:
 
 
 _engine = None
-_Session: Optional[type] = None
+_Session: type | None = None
 
 
 def _get_session() -> Session:
@@ -32,10 +33,10 @@ def _get_session() -> Session:
 def write_system_log(
     level: str,
     message: str,
-    logger_name: Optional[str] = None,
-    path: Optional[str] = None,
-    request_id: Optional[str] = None,
-    payload: Optional[Any] = None,
+    logger_name: str | None = None,
+    path: str | None = None,
+    request_id: str | None = None,
+    payload: Any | None = None,
 ) -> None:
     """Write a log row to system_logs (sync)."""
     try:

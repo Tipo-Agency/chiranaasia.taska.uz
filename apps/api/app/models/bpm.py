@@ -1,8 +1,10 @@
 """BPM models: OrgPosition, BusinessProcess."""
-from sqlalchemy import Column, String, Boolean
-from sqlalchemy.dialects.postgresql import JSONB
-from app.database import Base
 import uuid
+
+from sqlalchemy import Boolean, Column, String
+from sqlalchemy.dialects.postgresql import JSONB
+
+from app.database import Base
 
 
 def gen_id():

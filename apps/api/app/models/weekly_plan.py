@@ -1,8 +1,10 @@
 """Weekly plan (недельный план сотрудника) and Protocol (протокол по планам)."""
-from sqlalchemy import Column, String, Text, Numeric
-from sqlalchemy.dialects.postgresql import JSONB
-from app.database import Base
 import uuid
+
+from sqlalchemy import Column, Numeric, String, Text
+from sqlalchemy.dialects.postgresql import JSONB
+
+from app.database import Base
 
 
 def gen_id():

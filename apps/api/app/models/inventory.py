@@ -1,8 +1,10 @@
 """Inventory models."""
+import uuid
+
 from sqlalchemy import Column, String, Text
 from sqlalchemy.dialects.postgresql import JSONB
+
 from app.database import Base
-import uuid
 
 
 def gen_id():

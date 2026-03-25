@@ -5,8 +5,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
 from app.models.task import Project
-from app.utils import row_to_project
 from app.services.domain_events import log_entity_mutation
+from app.utils import row_to_project
 
 router = APIRouter(prefix="/projects", tags=["projects"])
 

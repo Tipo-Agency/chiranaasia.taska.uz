@@ -1,11 +1,12 @@
 """Weekly plans and protocols router."""
 from __future__ import annotations
+
 from fastapi import APIRouter, Depends, Query
-from sqlalchemy import select, delete
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
-from app.models.weekly_plan import WeeklyPlan, Protocol
+from app.models.weekly_plan import Protocol, WeeklyPlan
 from app.services.domain_events import log_entity_mutation
 
 router = APIRouter(prefix="/weekly-plans", tags=["weekly-plans"])

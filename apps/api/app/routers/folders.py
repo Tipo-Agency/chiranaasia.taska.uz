@@ -22,7 +22,7 @@ def row_to_folder(row):
 
 @router.get("")
 async def get_folders(db: AsyncSession = Depends(get_db)):
-    result = await db.execute(select(Folder).where(Folder.is_archived == False))
+    result = await db.execute(select(Folder).where(Folder.is_archived.is_(False)))
     return [row_to_folder(f) for f in result.scalars().all()]
 
 

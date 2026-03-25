@@ -68,7 +68,6 @@ async def update_funnels(funnels: list[dict], db: AsyncSession = Depends(get_db)
 
 @router.post("")
 async def create_funnel(funnel: dict, db: AsyncSession = Depends(get_db)):
-    import uuid
     from datetime import datetime
     fid = funnel.get("id") or f"funnel-{int(datetime.utcnow().timestamp() * 1000)}"
     now = datetime.utcnow().isoformat()

@@ -5,8 +5,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
 from app.models.settings import StatusOption
-from app.utils import row_to_status
 from app.services.domain_events import log_entity_mutation
+from app.utils import row_to_status
 
 router = APIRouter(prefix="/statuses", tags=["statuses"])
 

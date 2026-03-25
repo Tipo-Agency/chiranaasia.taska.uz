@@ -1,5 +1,6 @@
 """Deals router."""
 import uuid
+
 from fastapi import APIRouter, Depends
 from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert
@@ -7,8 +8,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
 from app.models.client import Deal
-from app.utils import row_to_deal
 from app.services.domain_events import emit_domain_event, log_entity_mutation
+from app.utils import row_to_deal
 
 router = APIRouter(prefix="/deals", tags=["deals"])
 

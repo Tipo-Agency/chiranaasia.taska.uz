@@ -29,7 +29,7 @@ def row_to_meeting(row):
 
 @router.get("")
 async def get_meetings(db: AsyncSession = Depends(get_db)):
-    result = await db.execute(select(Meeting).where(Meeting.is_archived == False))
+    result = await db.execute(select(Meeting).where(Meeting.is_archived.is_(False)))
     return [row_to_meeting(m) for m in result.scalars().all()]
 
 

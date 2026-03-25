@@ -1,6 +1,7 @@
 """System log model for storing errors and audit events."""
-from sqlalchemy import String, Text, DateTime, Integer, Column
+from sqlalchemy import Column, DateTime, Integer, String, Text
 from sqlalchemy.sql import func
+
 from app.database import Base
 
 

@@ -2,21 +2,20 @@
 import asyncio
 import os
 import subprocess
-import urllib.request
 import urllib.parse
-from typing import Any, List, Optional
+import urllib.request
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
-from sqlalchemy import select, text, func, or_
+from sqlalchemy import func, or_, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth import get_current_user_admin
 from app.config import get_settings
-from app.database import get_db, AsyncSessionLocal
+from app.database import AsyncSessionLocal, get_db
 from app.models import Base
+from app.models.notification import Notification, NotificationDelivery
 from app.models.notification import NotificationPreferences as NPrefModel
-from app.models.notification import NotificationDelivery, Notification
 from app.models.user import User
 from app.services.event_bus import _get_redis
 from app.services.notification_delivery import run_pending_deliveries
@@ -52,7 +51,7 @@ def _send_telegram(chat_id: str, text: str, parse_mode: str = "HTML") -> tuple[b
         return False, str(e)
 
 
-def _allowed_tables() -> List[str]:
+def _allowed_tables() -> list[str]:
     """Table names from ORM (whitelist for read-only browser)."""
     return list(Base.metadata.tables.keys())
 
@@ -62,14 +61,14 @@ def _allowed_tables() -> List[str]:
 
 class TableInfo(BaseModel):
     name: str
-    row_count: Optional[int] = None
+    row_count: int | None = None
 
 
 class TableRowsResponse(BaseModel):
     table: str
-    columns: List[str]
-    rows: List[dict]
-    total: Optional[int] = None
+    columns: list[str]
+    rows: list[dict]
+    total: int | None = None
     offset: int
     limit: int
 
@@ -78,7 +77,7 @@ class HealthResponse(BaseModel):
     status: str
     version: str
     db: str
-    db_error: Optional[str] = None
+    db_error: str | None = None
 
 
 class TableStatsRow(BaseModel):
@@ -87,8 +86,8 @@ class TableStatsRow(BaseModel):
 
 
 class AdminStatsResponse(BaseModel):
-    tables: List[TableStatsRow]
-    db_size_mb: Optional[float] = None
+    tables: list[TableStatsRow]
+    db_size_mb: float | None = None
 
 
 class TestRunResponse(BaseModel):
@@ -99,29 +98,29 @@ class TestRunResponse(BaseModel):
 
 class BotStatusResponse(BaseModel):
     telegram_configured: bool
-    group_chat_id: Optional[str] = None
+    group_chat_id: str | None = None
     group_chat_id_set: bool
 
 
 class BotSendTestResponse(BaseModel):
     ok: bool
-    error: Optional[str] = None
+    error: str | None = None
 
 
 class RedisMonitorResponse(BaseModel):
     redis_ok: bool
-    redis_error: Optional[str] = None
+    redis_error: str | None = None
     redis_url: str
     stream_name: str
-    stream_length: Optional[int] = None
-    stream_last_generated_id: Optional[str] = None
-    stream_groups: Optional[int] = None
+    stream_length: int | None = None
+    stream_last_generated_id: str | None = None
+    stream_groups: int | None = None
     events_total: int
     events_published: int
     deliveries_pending: int
     deliveries_failed: int
     deliveries_sent: int
-    stream_group_details: Optional[List[dict]] = None
+    stream_group_details: list[dict] | None = None
 
 
 class DeliveryRunResponse(BaseModel):
@@ -145,10 +144,10 @@ class FailedDeliveryRow(BaseModel):
     notification_id: str
     channel: str
     attempts: str
-    last_error: Optional[str] = None
-    updated_at: Optional[str] = None
-    notification_title: Optional[str] = None
-    recipient_id: Optional[str] = None
+    last_error: str | None = None
+    updated_at: str | None = None
+    notification_title: str | None = None
+    recipient_id: str | None = None
 
 
 class RequeueFailedResponse(BaseModel):
@@ -159,7 +158,7 @@ class RequeueFailedResponse(BaseModel):
 # --- Endpoints ---
 
 
-@router.get("/tables", response_model=List[TableInfo])
+@router.get("/tables", response_model=list[TableInfo])
 async def list_tables(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user_admin),
@@ -471,7 +470,7 @@ async def admin_run_retention(
     return RetentionRunResponse(ok=True, days=retention_days, **result)
 
 
-@router.get("/notifications/failed-deliveries", response_model=List[FailedDeliveryRow])
+@router.get("/notifications/failed-deliveries", response_model=list[FailedDeliveryRow])
 async def admin_failed_deliveries(
     limit: int = Query(default=20, ge=1, le=500),
     channel: str = Query(default="", description="Filter by channel"),
@@ -495,7 +494,7 @@ async def admin_failed_deliveries(
             )
         )
     rows = (await db.execute(stmt.order_by(NotificationDelivery.updated_at.desc()).limit(limit))).all()
-    result: List[FailedDeliveryRow] = []
+    result: list[FailedDeliveryRow] = []
     for d, n in rows:
         result.append(
             FailedDeliveryRow(

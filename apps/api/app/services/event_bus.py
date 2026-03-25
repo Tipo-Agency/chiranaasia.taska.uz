@@ -1,5 +1,6 @@
 """Redis-backed event bus helpers for domain events."""
 from __future__ import annotations
+
 import json
 import logging
 from datetime import datetime
@@ -32,7 +33,7 @@ def _serialize_event(event: dict[str, Any]) -> dict[str, str]:
     """Serialize event fields for Redis stream payload."""
     payload: dict[str, str] = {}
     for key, value in event.items():
-        if isinstance(value, (dict, list)):
+        if isinstance(value, dict | list):
             payload[key] = json.dumps(value, ensure_ascii=False)
         elif isinstance(value, datetime):
             payload[key] = value.isoformat()

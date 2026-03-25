@@ -1,6 +1,6 @@
 """Domain notification events router (Phase 1 foundation)."""
 from fastapi import APIRouter, Depends, Query
-from sqlalchemy import select, desc
+from sqlalchemy import desc, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db

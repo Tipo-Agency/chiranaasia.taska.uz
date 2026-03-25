@@ -4,7 +4,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
-from app.models.inventory import Warehouse, InventoryItem, StockMovement, InventoryRevision
+from app.models.inventory import InventoryItem, InventoryRevision, StockMovement, Warehouse
 from app.services.domain_events import log_entity_mutation
 
 router = APIRouter(prefix="/inventory", tags=["inventory"])

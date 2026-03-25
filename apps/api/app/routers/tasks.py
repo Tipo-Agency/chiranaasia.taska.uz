@@ -5,8 +5,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
 from app.models.task import Task
-from app.utils import row_to_task
 from app.services.domain_events import emit_domain_event
+from app.utils import row_to_task
 
 router = APIRouter(prefix="/tasks", tags=["tasks"])
 

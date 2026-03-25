@@ -1,5 +1,6 @@
 """Accounts receivable router."""
 import uuid
+
 from fastapi import APIRouter, Depends
 from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert
@@ -7,8 +8,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
 from app.models.client import AccountsReceivable
-from app.utils import row_to_accounts_receivable
 from app.services.domain_events import log_entity_mutation
+from app.utils import row_to_accounts_receivable
 
 router = APIRouter(prefix="/accounts-receivable", tags=["accounts-receivable"])
 

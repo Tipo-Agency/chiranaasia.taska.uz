@@ -1,26 +1,36 @@
 """SQLAlchemy models."""
 from app.database import Base
-from app.models.user import User
-from app.models.task import Task, Project
-from app.models.settings import TableCollection, StatusOption, PriorityOption, ActivityLog, InboxMessage
-from app.models.notification import (
-    NotificationPreferences,
-    AutomationRule,
-    NotificationEvent,
-    Notification,
-    NotificationDelivery,
-    NotificationArchive,
+from app.models.bpm import BusinessProcess, OrgPosition
+from app.models.client import AccountsReceivable, Client, Deal, EmployeeInfo
+from app.models.content import ContentPost, Doc, Folder, Meeting
+from app.models.finance import (
+    BankStatement,
+    BankStatementLine,
+    Bdr,
+    Department,
+    FinanceCategory,
+    FinancePlan,
+    FinancialPlanDocument,
+    FinancialPlanning,
+    Fund,
+    IncomeReport,
+    PurchaseRequest,
 )
-from app.models.client import Client, Deal, EmployeeInfo, AccountsReceivable
-from app.models.content import Doc, Folder, Meeting, ContentPost
-from app.models.finance import Department, FinanceCategory, Fund, FinancePlan, PurchaseRequest
-from app.models.finance import FinancialPlanDocument, FinancialPlanning
-from app.models.finance import BankStatement, BankStatementLine, IncomeReport, Bdr
-from app.models.bpm import OrgPosition, BusinessProcess
-from app.models.inventory import Warehouse, InventoryItem, StockMovement, InventoryRevision
 from app.models.funnel import SalesFunnel
+from app.models.inventory import InventoryItem, InventoryRevision, StockMovement, Warehouse
+from app.models.notification import (
+    AutomationRule,
+    Notification,
+    NotificationArchive,
+    NotificationDelivery,
+    NotificationEvent,
+    NotificationPreferences,
+)
+from app.models.settings import ActivityLog, InboxMessage, PriorityOption, StatusOption, TableCollection
 from app.models.system_log import SystemLog
-from app.models.weekly_plan import WeeklyPlan, Protocol
+from app.models.task import Project, Task
+from app.models.user import User
+from app.models.weekly_plan import Protocol, WeeklyPlan
 
 __all__ = [
     "Base",

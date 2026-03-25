@@ -1,11 +1,10 @@
 """JWT auth and password hashing."""
 from datetime import datetime, timedelta
-from typing import Optional
 
-from jose import JWTError, jwt
 import bcrypt
-from fastapi import HTTPException, status, Depends
+from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
+from jose import JWTError, jwt
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -24,7 +23,7 @@ def get_password_hash(password: str) -> str:
     return bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
 
 
-def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
+def create_access_token(data: dict, expires_delta: timedelta | None = None) -> str:
     settings = get_settings()
     to_encode = data.copy()
     expire = datetime.utcnow() + (expires_delta or timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES))
@@ -32,7 +31,7 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -
     return jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
 
 
-def decode_token(token: str) -> Optional[dict]:
+def decode_token(token: str) -> dict | None:
     settings = get_settings()
     try:
         return jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
@@ -40,7 +39,7 @@ def decode_token(token: str) -> Optional[dict]:
         return None
 
 
-async def get_current_user_optional(token: Optional[str] = Depends(oauth2_scheme)) -> Optional[str]:
+async def get_current_user_optional(token: str | None = Depends(oauth2_scheme)) -> str | None:
     """Get current user id from token, or None if no token (for demo mode)."""
     if not token:
         return None
@@ -50,7 +49,7 @@ async def get_current_user_optional(token: Optional[str] = Depends(oauth2_scheme
     return payload.get("sub")
 
 
-def _require_token(token: Optional[str] = Depends(oauth2_scheme)) -> str:
+def _require_token(token: str | None = Depends(oauth2_scheme)) -> str:
     """Require valid token, return user id or raise 401."""
     if not token:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
@@ -68,7 +67,7 @@ async def get_current_user(
     db: AsyncSession = Depends(get_db),
 ) -> User:
     """Load current user from DB by token. Raises 401 if not found."""
-    result = await db.execute(select(User).where(User.id == user_id, User.is_archived == False))
+    result = await db.execute(select(User).where(User.id == user_id, User.is_archived.is_(False)))
     user = result.scalar_one_or_none()
     if not user:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found")

@@ -1,6 +1,7 @@
 """Schemas for centralized notification events."""
 from __future__ import annotations
-from datetime import datetime, timezone
+
+from datetime import UTC, datetime
 from typing import Any
 from uuid import uuid4
 
@@ -12,7 +13,7 @@ class DomainEventIn(BaseModel):
 
     id: str = Field(default_factory=lambda: str(uuid4()))
     type: str = Field(..., min_length=3, max_length=120)
-    occurredAt: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    occurredAt: datetime = Field(default_factory=lambda: datetime.now(UTC))
     actorId: str | None = None
     orgId: str = Field(..., min_length=1, max_length=36)
     entityType: str = Field(..., min_length=1, max_length=60)
@@ -25,7 +26,7 @@ class DomainEventIn(BaseModel):
     @classmethod
     def ensure_tz(cls, value: datetime) -> datetime:
         if value.tzinfo is None:
-            return value.replace(tzinfo=timezone.utc)
+            return value.replace(tzinfo=UTC)
         return value
 
 

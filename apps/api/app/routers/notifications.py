@@ -1,15 +1,17 @@
 """User notifications center + realtime websocket."""
+from datetime import UTC
+
 from fastapi import APIRouter, Depends, Query, WebSocket, WebSocketDisconnect
-from sqlalchemy import select, desc, func
+from sqlalchemy import desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.config import get_settings
 from app.database import get_db
 from app.models.notification import Notification
 from app.services.domain_events import log_entity_mutation
-from app.services.notifications_realtime import realtime_hub
 from app.services.notification_delivery import run_pending_deliveries
 from app.services.notification_retention import run_notification_retention
-from app.config import get_settings
+from app.services.notifications_realtime import realtime_hub
 
 router = APIRouter(prefix="/notifications", tags=["notifications"])
 
@@ -74,9 +76,9 @@ async def mark_notification_read(
     is_read = bool(body.get("isRead", True))
     row.is_read = is_read
     if is_read:
-        from datetime import datetime, timezone
+        from datetime import datetime
 
-        row.read_at = datetime.now(timezone.utc)
+        row.read_at = datetime.now(UTC)
     else:
         row.read_at = None
     await db.flush()

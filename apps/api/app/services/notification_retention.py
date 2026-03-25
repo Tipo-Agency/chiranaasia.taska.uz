@@ -1,16 +1,16 @@
 """Retention jobs for notification-related data."""
 from __future__ import annotations
 
-from datetime import datetime, timezone, timedelta
+from datetime import UTC, datetime, timedelta
 
-from sqlalchemy import select, delete
+from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.notification import (
     Notification,
     NotificationArchive,
-    NotificationEvent,
     NotificationDelivery,
+    NotificationEvent,
 )
 
 
@@ -20,7 +20,7 @@ async def run_notification_retention(db: AsyncSession, days: int = 90, batch_siz
     - Technical logs (`notification_events`, `notification_deliveries`) are deleted after N days.
     - User notifications are moved to `notifications_archive` then deleted from hot table.
     """
-    cutoff = datetime.now(timezone.utc) - timedelta(days=days)
+    cutoff = datetime.now(UTC) - timedelta(days=days)
 
     old_notifications = (
         await db.execute(

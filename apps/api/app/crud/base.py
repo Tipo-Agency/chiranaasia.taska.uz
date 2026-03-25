@@ -1,7 +1,5 @@
 """Generic CRUD helpers."""
-from typing import TypeVar, Type, List, Optional, Any
-from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
+from typing import TypeVar
 
 from app.database import Base
 
@@ -21,7 +19,7 @@ def model_to_dict(model: Base, mapping: dict) -> dict:
     return result
 
 
-def dict_to_model(model_class: Type[ModelT], data: dict, mapping: dict) -> ModelT:
+def dict_to_model(model_class: type[ModelT], data: dict, mapping: dict) -> ModelT:
     """Create or update model from dict using mapping."""
     instance = model_class()
     for col_name, in_key in mapping.items():

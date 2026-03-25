@@ -5,8 +5,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
 from app.models.settings import PriorityOption
-from app.utils import row_to_priority
 from app.services.domain_events import log_entity_mutation
+from app.utils import row_to_priority
 
 router = APIRouter(prefix="/priorities", tags=["priorities"])
 

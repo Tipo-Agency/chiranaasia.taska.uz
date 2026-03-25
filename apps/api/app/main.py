@@ -8,43 +8,42 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from fastapi.staticfiles import StaticFiles
 
 from app.config import get_settings
-from app.database import engine, Base, AsyncSessionLocal
+from app.database import AsyncSessionLocal
 from app.logging_handlers import SystemLogHandler
-from app.services.notification_delivery import run_pending_deliveries
-from app.services.notification_retention import run_notification_retention
 from app.routers import (
+    accounts_receivable,
+    activity,
     admin,
     auth,
+    automation,
+    bpm,
+    clients,
+    content_posts,
+    deals,
+    departments,
+    docs,
+    employees,
+    finance,
+    folders,
+    funnels,
+    inventory,
+    meetings,
+    messages,
+    notification_events,
+    notification_prefs,
+    notifications,
+    priorities,
+    projects,
+    statuses,
     system,
+    tables,
     tasks,
     weekly_plans,
-    projects,
-    tables,
-    activity,
-    messages,
-    statuses,
-    priorities,
-    notification_prefs,
-    notification_events,
-    notifications,
-    automation,
-    clients,
-    deals,
-    employees,
-    accounts_receivable,
-    docs,
-    folders,
-    meetings,
-    content_posts,
-    departments,
-    finance,
-    bpm,
-    inventory,
-    funnels,
 )
+from app.services.notification_delivery import run_pending_deliveries
+from app.services.notification_retention import run_notification_retention
 
 settings = get_settings()
 
@@ -58,8 +57,8 @@ _root_logger.addHandler(_handler)
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Run migrations on startup."""
-    from alembic.config import Config
     from alembic import command
+    from alembic.config import Config
 
     server_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     alembic_cfg = Config(os.path.join(server_dir, "alembic.ini"))

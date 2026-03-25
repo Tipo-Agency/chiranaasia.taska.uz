@@ -1,12 +1,12 @@
 """Notification hub: route domain events to user notifications/channels."""
 from __future__ import annotations
 
-from datetime import datetime, timezone
-from typing import Any
 import uuid
+from datetime import UTC, datetime
+from typing import Any
 
-from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.notification import Notification, NotificationDelivery, NotificationPreferences
 from app.models.settings import InboxMessage
@@ -43,7 +43,7 @@ def _mk_notification(
 
 
 def _delivery(notification_id: str, channel: str, status: str = "pending", attempts: int = 0, error: str | None = None) -> NotificationDelivery:
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     return NotificationDelivery(
         id=str(uuid.uuid4()),
         notification_id=notification_id,

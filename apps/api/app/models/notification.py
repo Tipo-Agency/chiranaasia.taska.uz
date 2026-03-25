@@ -1,9 +1,11 @@
 """Notification models."""
-from sqlalchemy import Column, String, DateTime, Boolean
+import uuid
+
+from sqlalchemy import Boolean, Column, DateTime, String
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.sql import func
+
 from app.database import Base
-import uuid
 
 
 def gen_id():

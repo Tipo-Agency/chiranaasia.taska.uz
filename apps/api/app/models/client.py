@@ -1,8 +1,10 @@
 """Client, Deal, EmployeeInfo, AccountsReceivable models."""
-from sqlalchemy import Column, String, Boolean, Text
-from sqlalchemy.dialects.postgresql import JSONB
-from app.database import Base
 import uuid
+
+from sqlalchemy import Boolean, Column, String, Text
+from sqlalchemy.dialects.postgresql import JSONB
+
+from app.database import Base
 
 
 def gen_id():

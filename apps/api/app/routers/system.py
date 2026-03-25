@@ -1,12 +1,11 @@
 """System endpoints: health, logs for admin."""
-from typing import List, Optional
 
 from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel
-from sqlalchemy import select, desc
-from app.database import get_db
+from sqlalchemy import desc, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.database import get_db
 from app.models.system_log import SystemLog
 
 router = APIRouter(tags=["system"])
@@ -17,19 +16,19 @@ class SystemLogEntry(BaseModel):
     created_at: str
     level: str
     message: str
-    logger_name: Optional[str] = None
-    path: Optional[str] = None
-    request_id: Optional[str] = None
-    payload: Optional[str] = None
+    logger_name: str | None = None
+    path: str | None = None
+    request_id: str | None = None
+    payload: str | None = None
 
     class Config:
         from_attributes = True
 
 
-@router.get("/system/logs", response_model=List[SystemLogEntry])
+@router.get("/system/logs", response_model=list[SystemLogEntry])
 async def get_system_logs(
     limit: int = Query(50, ge=1, le=200),
-    level: Optional[str] = Query(None, description="Filter by level: ERROR, CRITICAL, WARNING"),
+    level: str | None = Query(None, description="Filter by level: ERROR, CRITICAL, WARNING"),
     db: AsyncSession = Depends(get_db),
 ):
     """Return recent system log entries (errors/audit) for admin UI."""

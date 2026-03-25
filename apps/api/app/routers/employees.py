@@ -5,8 +5,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
 from app.models.client import EmployeeInfo
-from app.utils import row_to_employee
 from app.services.domain_events import log_entity_mutation
+from app.utils import row_to_employee
 
 router = APIRouter(prefix="/employees", tags=["employees"])
 

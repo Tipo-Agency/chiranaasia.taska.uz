@@ -1,16 +1,16 @@
 """Best-effort delivery worker helpers (telegram/email placeholders)."""
 from __future__ import annotations
 
-from datetime import datetime, timezone, timedelta
 import json
 import smtplib
+from datetime import UTC, datetime, timedelta
 from email.message import EmailMessage
 
-from sqlalchemy import select, or_
+from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import get_settings
-from app.models.notification import NotificationDelivery, Notification, NotificationPreferences
+from app.models.notification import Notification, NotificationDelivery, NotificationPreferences
 from app.models.user import User
 
 
@@ -31,8 +31,8 @@ def _next_backoff_seconds(attempt: int) -> int:
 
 def _send_telegram(token: str, chat_id: str, text: str) -> tuple[bool, str | None]:
     try:
-        import urllib.request
         import urllib.parse
+        import urllib.request
 
         payload = urllib.parse.urlencode({"chat_id": chat_id, "text": text}).encode()
         req = urllib.request.Request(
@@ -82,7 +82,7 @@ def _send_email(
 
 
 async def run_pending_deliveries(db: AsyncSession, limit: int = 100) -> dict:
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     rows = (
         await db.execute(
             select(NotificationDelivery)

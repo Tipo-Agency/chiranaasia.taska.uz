@@ -1,15 +1,22 @@
 """Finance router - categories, funds, plan, requests, bank statements, income reports."""
 from __future__ import annotations
+
 from fastapi import APIRouter, Depends
-from sqlalchemy import select, delete
+from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
 from app.models.finance import (
-    FinanceCategory, Fund, FinancePlan, PurchaseRequest,
-    FinancialPlanDocument, FinancialPlanning,
-    BankStatement, BankStatementLine, IncomeReport,
+    BankStatement,
+    BankStatementLine,
     Bdr,
+    FinanceCategory,
+    FinancePlan,
+    FinancialPlanDocument,
+    FinancialPlanning,
+    Fund,
+    IncomeReport,
+    PurchaseRequest,
 )
 from app.services.domain_events import log_entity_mutation
 
@@ -141,7 +148,7 @@ async def update_categories(categories: list[dict], db: AsyncSession = Depends(g
 
 @router.get("/funds")
 async def get_funds(db: AsyncSession = Depends(get_db)):
-    result = await db.execute(select(Fund).where(Fund.is_archived == False))
+    result = await db.execute(select(Fund).where(Fund.is_archived.is_(False)))
     rows = result.scalars().all()
     if not rows:
         from app.seed_data import DEFAULT_FUNDS
@@ -451,7 +458,7 @@ async def get_bank_statements(db: AsyncSession = Depends(get_db)):
     out = []
     for st in statements:
         lines_r = await db.execute(select(BankStatementLine).where(BankStatementLine.statement_id == st.id))
-        lines = [_row_to_statement_line(l) for l in lines_r.scalars().all()]
+        lines = [_row_to_statement_line(line) for line in lines_r.scalars().all()]
         out.append(_row_to_statement(st, lines))
     return out
 

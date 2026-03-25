@@ -1,12 +1,12 @@
 """Auth router - login, users."""
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy import select, func
-from sqlalchemy.ext.asyncio import AsyncSession
 from pydantic import BaseModel
+from sqlalchemy import func, select
+from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.auth import create_access_token, get_password_hash, verify_password
 from app.database import get_db
 from app.models.user import User
-from app.auth import verify_password, get_password_hash, create_access_token
 from app.services.domain_events import log_entity_mutation
 from app.utils import row_to_user
 
@@ -29,7 +29,7 @@ async def login(req: LoginRequest, db: AsyncSession = Depends(get_db)):
     result = await db.execute(
         select(User).where(
             ((func.lower(User.login) == func.lower(req.login)) | (User.name == req.login)),
-            User.is_archived == False
+            User.is_archived.is_(False)
         )
     )
     user = result.scalar_one_or_none()
@@ -55,7 +55,6 @@ async def get_users(db: AsyncSession = Depends(get_db)):
 
 @router.put("/users")
 async def update_users(users: list[dict], db: AsyncSession = Depends(get_db)):
-    from app.auth import get_password_hash
     from sqlalchemy import select
 
     for u in users:
