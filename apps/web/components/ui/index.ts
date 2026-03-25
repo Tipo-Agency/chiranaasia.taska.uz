@@ -19,6 +19,8 @@ export { CreateButton } from './CreateButton';
 export type { CreateOption } from './CreateButton';
 export { ModuleCreateDropdown } from './ModuleCreateDropdown';
 export type { ModuleCreateMenuItem } from './ModuleCreateDropdown';
+export { ModuleSelectDropdown } from './ModuleSelectDropdown';
+export type { ModuleSelectDropdownItem } from './ModuleSelectDropdown';
 export { SafeArea, SafeAreaTop, SafeAreaBottom, SafeAreaAll } from './SafeArea';
 export { Container } from './Container';
 export { PageLayout } from './PageLayout';

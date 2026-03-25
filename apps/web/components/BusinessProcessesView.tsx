@@ -28,6 +28,7 @@ const BusinessProcessesView: React.FC<BusinessProcessesViewProps> = ({
   const [selectedProcessId, setSelectedProcessId] = useState<string | null>(null);
   /** Шаблоны = описания процессов; В работе = active + paused; Завершённые = completed */
   const [activeTab, setActiveTab] = useState<'templates' | 'running' | 'completed'>('templates');
+  const [templatesViewMode, setTemplatesViewMode] = useState<'grid' | 'list'>('grid');
   const [startPickerOpen, setStartPickerOpen] = useState(false);
   const [selectedInstanceId, setSelectedInstanceId] = useState<string | null>(null);
   
@@ -1171,25 +1172,39 @@ const BusinessProcessesView: React.FC<BusinessProcessesViewProps> = ({
               />
             }
             controls={
-              <ModuleCreateDropdown
-                accent="indigo"
-                items={[
-                  {
-                    id: 'template',
-                    label: 'Шаблон процесса',
-                    icon: Layers3,
-                    onClick: handleOpenCreate,
-                    iconClassName: 'text-indigo-600 dark:text-indigo-400',
-                  },
-                  {
-                    id: 'start-process',
-                    label: 'Запустить процесс…',
-                    icon: Play,
-                    onClick: () => setStartPickerOpen(true),
-                    iconClassName: 'text-emerald-600 dark:text-emerald-400',
-                  },
-                ]}
-              />
+              <>
+                {activeTab === 'templates' && (
+                  <ModuleSegmentedControl
+                    variant="accent"
+                    accent="indigo"
+                    value={templatesViewMode}
+                    onChange={(v) => setTemplatesViewMode(v as 'grid' | 'list')}
+                    options={[
+                      { value: 'grid', label: 'Плитка' },
+                      { value: 'list', label: 'Список' },
+                    ]}
+                  />
+                )}
+                <ModuleCreateDropdown
+                  accent="indigo"
+                  items={[
+                    {
+                      id: 'template',
+                      label: 'Шаблон процесса',
+                      icon: Layers3,
+                      onClick: handleOpenCreate,
+                      iconClassName: 'text-indigo-600 dark:text-indigo-400',
+                    },
+                    {
+                      id: 'start-process',
+                      label: 'Запустить процесс…',
+                      icon: Play,
+                      onClick: () => setStartPickerOpen(true),
+                      iconClassName: 'text-emerald-600 dark:text-emerald-400',
+                    },
+                  ]}
+                />
+              </>
             }
           />
         </div>
@@ -1224,11 +1239,28 @@ const BusinessProcessesView: React.FC<BusinessProcessesViewProps> = ({
                 ]}
               />
             </div>
-          ) : (
+          ) : templatesViewMode === 'grid' ? (
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-2 gap-4">
               {userTemplates.map(process => {
                 const instances = getProcessInstances(process.id);
-                
+                return (
+                  <ProcessCard
+                    key={process.id}
+                    process={process}
+                    instances={instances}
+                    onClick={() => setSelectedProcessId(process.id)}
+                    onEdit={(e) => {
+                      e.stopPropagation();
+                      handleOpenEdit(process);
+                    }}
+                  />
+                );
+              })}
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {userTemplates.map(process => {
+                const instances = getProcessInstances(process.id);
                 return (
                   <ProcessCard
                     key={process.id}

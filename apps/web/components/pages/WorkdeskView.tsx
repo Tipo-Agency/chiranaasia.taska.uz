@@ -6,7 +6,7 @@ import { StatsCards } from '../features/home/StatsCards';
 import { Calendar, CheckSquare, Briefcase, FileText, Network, X, Save } from 'lucide-react';
 import { Deal, FinancePlan, Meeting, Task, User, Doc, BusinessProcess } from '../../types';
 import { ModuleCreateDropdown } from '../ui/ModuleCreateDropdown';
-import { ModulePageShell, MODULE_PAGE_GUTTER } from '../ui';
+import { ModulePageHeader, ModulePageShell, MODULE_PAGE_GUTTER } from '../ui';
 import { DateInput } from '../ui/DateInput';
 
 type WorkdeskTab = 'chat' | 'weekly' | 'tasks' | 'deals' | 'meetings' | 'analytics';
@@ -153,12 +153,16 @@ export const WorkdeskView: React.FC<WorkdeskViewProps> = ({
     <ModulePageShell>
       <div className={`${MODULE_PAGE_GUTTER} pt-6 md:pt-8 flex-shrink-0`}>
         <div className="mb-6">
-            <div className="flex flex-wrap items-center justify-between gap-2">
+          <ModulePageHeader
+            accent="indigo"
+            icon={<div />}
+            title="Рабочий стол"
+            tabs={
               <Tabs
                 tabs={[
                   // Чат скрываем на мобилке
                   { id: 'chat', label: 'Чат', className: 'hidden md:flex' },
-                  { id: 'weekly', label: 'Недельные планы' },
+                  { id: 'weekly', label: 'Планы' },
                   { id: 'tasks', label: 'Задачи' },
                   { id: 'deals', label: 'Сделки' },
                   { id: 'meetings', label: 'Встречи' },
@@ -167,56 +171,57 @@ export const WorkdeskView: React.FC<WorkdeskViewProps> = ({
                 activeTab={activeTab}
                 onChange={(id) => setActiveTab(id as WorkdeskTab)}
               />
-              <div className="flex items-center gap-2">
-                <ModuleCreateDropdown
-                  accent="indigo"
-                  label="Создать"
-                  items={[
-                    {
-                      id: 'create-task',
-                      label: 'Новая задача',
-                      icon: CheckSquare,
-                      onClick: () => { void onCreateEntity?.('task', `Задача ${new Date().toLocaleTimeString('ru-RU')}`); },
+            }
+            controls={
+              <ModuleCreateDropdown
+                accent="indigo"
+                label="Создать"
+                items={[
+                  {
+                    id: 'create-task',
+                    label: 'Новая задача',
+                    icon: CheckSquare,
+                    onClick: () => { void onCreateEntity?.('task', `Задача ${new Date().toLocaleTimeString('ru-RU')}`); },
+                  },
+                  {
+                    id: 'create-deal',
+                    label: 'Новая сделка',
+                    icon: Briefcase,
+                    onClick: () => { void onCreateEntity?.('deal', `Сделка ${new Date().toLocaleTimeString('ru-RU')}`); },
+                  },
+                  {
+                    id: 'create-weekly-plan',
+                    label: 'Недельный план',
+                    icon: Calendar,
+                    onClick: () => {
+                      setActiveTab('weekly');
+                      window.setTimeout(() => weeklyPlansRef.current?.openCreateModal(), 0);
                     },
-                    {
-                      id: 'create-deal',
-                      label: 'Новая сделка',
-                      icon: Briefcase,
-                      onClick: () => { void onCreateEntity?.('deal', `Сделка ${new Date().toLocaleTimeString('ru-RU')}`); },
-                    },
-                    {
-                      id: 'create-weekly-plan',
-                      label: 'Недельный план',
-                      icon: Calendar,
-                      onClick: () => {
-                        setActiveTab('weekly');
-                        window.setTimeout(() => weeklyPlansRef.current?.openCreateModal(), 0);
-                      },
-                    },
-                    {
-                      id: 'create-meeting',
-                      label: 'Новая встреча',
-                      icon: Calendar,
-                      onClick: () => { void onCreateEntity?.('meeting', `Встреча ${new Date().toLocaleTimeString('ru-RU')}`); },
-                    },
-                    {
-                      id: 'create-doc',
-                      label: 'Новый документ',
-                      icon: FileText,
-                      onClick: () => { void onCreateEntity?.('doc', `Документ ${new Date().toLocaleTimeString('ru-RU')}`); },
-                    },
-                    ...(availableProcessTemplates.length
-                      ? [{
-                          id: 'start-process',
-                          label: 'Запустить бизнес-процесс',
-                          icon: Network,
-                          onClick: () => setProcessPickerOpen(true),
-                        }]
-                      : []),
-                  ]}
-                />
-              </div>
-            </div>
+                  },
+                  {
+                    id: 'create-meeting',
+                    label: 'Новая встреча',
+                    icon: Calendar,
+                    onClick: () => { void onCreateEntity?.('meeting', `Встреча ${new Date().toLocaleTimeString('ru-RU')}`); },
+                  },
+                  {
+                    id: 'create-doc',
+                    label: 'Новый документ',
+                    icon: FileText,
+                    onClick: () => { void onCreateEntity?.('doc', `Документ ${new Date().toLocaleTimeString('ru-RU')}`); },
+                  },
+                  ...(availableProcessTemplates.length
+                    ? [{
+                        id: 'start-process',
+                        label: 'Запустить бизнес-процесс',
+                        icon: Network,
+                        onClick: () => setProcessPickerOpen(true),
+                      }]
+                    : []),
+                ]}
+              />
+            }
+          />
           </div>
       </div>
 

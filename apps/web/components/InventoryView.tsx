@@ -1036,7 +1036,7 @@ const InventoryView: React.FC<InventoryViewProps> = ({
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <label className="flex flex-col gap-1.5">
                 <span className="text-xs font-medium text-gray-600 dark:text-gray-300">Тип операции</span>
-                <select value={movementType} onChange={e => setMovementType(e.target.value as 'receipt' | 'transfer' | 'writeoff' | 'adjustment')} className="rounded-xl border border-gray-200 dark:border-[#333] px-3 py-2.5 text-sm bg-gray-50 dark:bg-[#252525]">
+                <select value={movementType} onChange={e => setMovementType(e.target.value as 'receipt' | 'transfer' | 'writeoff' | 'adjustment')} className="rounded-xl border border-gray-200 dark:border-[#333] px-3 pr-10 py-2.5 text-sm bg-gray-50 dark:bg-[#252525]">
                   <option value="receipt">Оприходование</option>
                   <option value="transfer">Перемещение</option>
                   <option value="writeoff">Списание</option>
@@ -1045,7 +1045,7 @@ const InventoryView: React.FC<InventoryViewProps> = ({
               </label>
               <label className="flex flex-col gap-1.5">
                 <span className="text-xs font-medium text-gray-600 dark:text-gray-300">Склад (быстрый выбор)</span>
-                <select value={movementWarehouseId} onChange={e => setMovementWarehouseId(e.target.value)} className="rounded-xl border border-gray-200 dark:border-[#333] px-3 py-2.5 text-sm bg-gray-50 dark:bg-[#252525]">
+                <select value={movementWarehouseId} onChange={e => setMovementWarehouseId(e.target.value)} className="rounded-xl border border-gray-200 dark:border-[#333] px-3 pr-10 py-2.5 text-sm bg-gray-50 dark:bg-[#252525]">
                   <option value="">—</option>
                   {warehouses.filter(w => !w.isArchived).map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
                 </select>
@@ -1053,7 +1053,7 @@ const InventoryView: React.FC<InventoryViewProps> = ({
               {movementType !== 'receipt' && movementType !== 'adjustment' && (
                 <label className="flex flex-col gap-1.5">
                   <span className="text-xs font-medium text-gray-600 dark:text-gray-300">Со склада</span>
-                  <select value={fromWarehouseId} onChange={e => setFromWarehouseId(e.target.value)} className="rounded-xl border border-gray-200 dark:border-[#333] px-3 py-2.5 text-sm bg-gray-50 dark:bg-[#252525]">
+                  <select value={fromWarehouseId} onChange={e => setFromWarehouseId(e.target.value)} className="rounded-xl border border-gray-200 dark:border-[#333] px-3 pr-10 py-2.5 text-sm bg-gray-50 dark:bg-[#252525]">
                     <option value="">—</option>
                     {warehouses.filter(w => !w.isArchived).map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
                   </select>
@@ -1062,7 +1062,7 @@ const InventoryView: React.FC<InventoryViewProps> = ({
               {movementType !== 'writeoff' && (
                 <label className="flex flex-col gap-1.5">
                   <span className="text-xs font-medium text-gray-600 dark:text-gray-300">На склад</span>
-                  <select value={toWarehouseId} onChange={e => setToWarehouseId(e.target.value)} className="rounded-xl border border-gray-200 dark:border-[#333] px-3 py-2.5 text-sm bg-gray-50 dark:bg-[#252525]">
+                  <select value={toWarehouseId} onChange={e => setToWarehouseId(e.target.value)} className="rounded-xl border border-gray-200 dark:border-[#333] px-3 pr-10 py-2.5 text-sm bg-gray-50 dark:bg-[#252525]">
                     <option value="">—</option>
                     {warehouses.filter(w => !w.isArchived).map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
                   </select>
@@ -1070,7 +1070,7 @@ const InventoryView: React.FC<InventoryViewProps> = ({
               )}
               <label className="flex flex-col gap-1.5 md:col-span-2">
                 <span className="text-xs font-medium text-gray-600 dark:text-gray-300">Номенклатура</span>
-                <select value={movementItemId} onChange={e => setMovementItemId(e.target.value)} className="rounded-xl border border-gray-200 dark:border-[#333] px-3 py-2.5 text-sm bg-gray-50 dark:bg-[#252525]">
+                <select value={movementItemId} onChange={e => setMovementItemId(e.target.value)} className="rounded-xl border border-gray-200 dark:border-[#333] px-3 pr-10 py-2.5 text-sm bg-gray-50 dark:bg-[#252525]">
                   <option value="">Выберите номенклатуру</option>
                   {items.filter(i => !i.isArchived).map(i => <option key={i.id} value={i.id}>{i.name}</option>)}
                 </select>
@@ -1128,7 +1128,7 @@ const InventoryView: React.FC<InventoryViewProps> = ({
               </p>
               <label className="flex flex-col gap-1.5">
                 <span className="text-xs font-medium text-gray-600 dark:text-gray-300">Склад</span>
-                <select value={selectedWarehouseId} onChange={(e) => setSelectedWarehouseId(e.target.value)} className="w-full rounded-xl border border-gray-200 dark:border-[#333] px-3 py-2.5 text-sm bg-gray-50 dark:bg-[#252525]">
+                <select value={selectedWarehouseId} onChange={(e) => setSelectedWarehouseId(e.target.value)} className="w-full rounded-xl border border-gray-200 dark:border-[#333] px-3 pr-10 py-2.5 text-sm bg-gray-50 dark:bg-[#252525]">
                   <option value="">{defaultWarehouseId ? 'Основной склад (по умолчанию)' : 'Выберите склад'}</option>
                   {filteredWarehouses.map((w) => (
                     <option key={w.id} value={w.id}>{w.name}</option>

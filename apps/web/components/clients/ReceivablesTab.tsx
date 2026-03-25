@@ -5,12 +5,14 @@ import { Trash2 } from 'lucide-react';
 interface ReceivablesTabProps {
   receivables: AccountsReceivable[];
   clients: Client[];
+  onOpenReceivable?: (receivable: AccountsReceivable) => void;
   onDeleteReceivable?: (id: string) => void;
 }
 
 export const ReceivablesTab: React.FC<ReceivablesTabProps> = ({
   receivables,
   clients,
+  onOpenReceivable,
   onDeleteReceivable,
 }) => {
   return (
@@ -42,7 +44,12 @@ export const ReceivablesTab: React.FC<ReceivablesTabProps> = ({
               paid: 'Оплачена'
             };
             return (
-              <tr key={receivable.id} className="border-b border-gray-100 dark:border-[#333] hover:bg-gray-50 dark:hover:bg-[#2a2a2a] group">
+              <tr
+                key={receivable.id}
+                className={`border-b border-gray-100 dark:border-[#333] hover:bg-gray-50 dark:hover:bg-[#2a2a2a] group ${onOpenReceivable ? 'cursor-pointer' : ''}`}
+                onClick={() => onOpenReceivable?.(receivable)}
+                title={onOpenReceivable ? 'Открыть задолженность' : undefined}
+              >
                 <td className="px-4 py-3 text-gray-800 dark:text-gray-200 font-medium">
                   {client?.name || '—'}
                 </td>
@@ -63,7 +70,7 @@ export const ReceivablesTab: React.FC<ReceivablesTabProps> = ({
                 <td className="px-4 py-3 text-right">
                   {onDeleteReceivable && (
                     <button 
-                      onClick={() => onDeleteReceivable(receivable.id)} 
+                      onClick={(e) => { e.stopPropagation(); onDeleteReceivable(receivable.id); }}
                       className="text-gray-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity p-1"
                     >
                       <Trash2 size={14}/>

@@ -67,6 +67,8 @@ const FinanceView: React.FC<FinanceViewProps> = ({
   const [isRequestModalOpen, setIsRequestModalOpen] = useState(false);
   const [editingRequest, setEditingRequest] = useState<PurchaseRequest | null>(null);
   const [alertText, setAlertText] = useState<string | null>(null);
+  // Создание финансового планирования — без промежуточного full-screen экрана
+  const [isPlanningCreateModalOpen, setIsPlanningCreateModalOpen] = useState(false);
   const bankStatementsRef = useRef<BankStatementsViewHandle>(null);
 
   // Формы
@@ -180,6 +182,23 @@ const FinanceView: React.FC<FinanceViewProps> = ({
     }
     setPlanDetailCategoryDropdownOpen(false);
   }, [selectedPlanDoc]);
+
+  // Держим выбранные сущности синхронизированными с props после сохранения статуса/данных.
+  useEffect(() => {
+    if (!selectedPlanDoc) return;
+    const fresh = financialPlanDocuments.find(d => d.id === selectedPlanDoc.id);
+    if (fresh && fresh.updatedAt !== selectedPlanDoc.updatedAt) {
+      setSelectedPlanDoc(fresh);
+    }
+  }, [financialPlanDocuments, selectedPlanDoc]);
+
+  useEffect(() => {
+    if (!selectedPlanning) return;
+    const fresh = financialPlannings.find(p => p.id === selectedPlanning.id);
+    if (fresh && fresh.updatedAt !== selectedPlanning.updatedAt) {
+      setSelectedPlanning(fresh);
+    }
+  }, [financialPlannings, selectedPlanning]);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -611,6 +630,7 @@ const FinanceView: React.FC<FinanceViewProps> = ({
           approvedAt: new Date().toISOString(),
           updatedAt: new Date().toISOString()
         };
+        setSelectedPlanning(updated);
         onSaveFinancialPlanning(updated);
       }
     };
@@ -622,6 +642,7 @@ const FinanceView: React.FC<FinanceViewProps> = ({
         status: 'conducted',
         updatedAt: new Date().toISOString()
       };
+      setSelectedPlanning(updated);
       onSaveFinancialPlanning(updated);
     };
     
@@ -644,24 +665,32 @@ const FinanceView: React.FC<FinanceViewProps> = ({
             </p>
           </div>
           <div className="flex items-center gap-2 flex-wrap justify-end">
-            {selectedPlanning.status === 'created' && (
-              <button
-                type="button"
-                onClick={handleConduct}
-                className="px-3 py-2 bg-emerald-600 text-white text-sm font-medium hover:bg-emerald-700 rounded-xl"
-              >
-                Провести
-              </button>
-            )}
-            {selectedPlanning.status === 'conducted' && currentUser.role === Role.ADMIN && (
-              <button
-                type="button"
-                onClick={handleApprove}
-                className="px-3 py-2 bg-emerald-700 text-white text-sm font-medium hover:bg-emerald-800 rounded-xl"
-              >
-                Одобрить
-              </button>
-            )}
+            <button
+              type="button"
+              onClick={() => {
+                if (selectedPlanning.status === 'created') return handleConduct();
+                if (selectedPlanning.status === 'conducted' && currentUser.role === Role.ADMIN) return handleApprove();
+              }}
+              disabled={!(selectedPlanning.status === 'created' || (selectedPlanning.status === 'conducted' && currentUser.role === Role.ADMIN))}
+              className={`px-3 py-2 rounded-xl text-sm font-bold uppercase border transition-colors ${
+                (selectedPlanning.status === 'created' || (selectedPlanning.status === 'conducted' && currentUser.role === Role.ADMIN))
+                  ? 'cursor-pointer hover:opacity-90'
+                  : 'cursor-default opacity-70'
+              } ${getStatusColor(selectedPlanning.status)} border-transparent`}
+              title={
+                selectedPlanning.status === 'created'
+                  ? 'Нажмите, чтобы провести'
+                  : selectedPlanning.status === 'conducted' && currentUser.role === Role.ADMIN
+                  ? 'Нажмите, чтобы одобрить'
+                  : 'Статус'
+              }
+            >
+              {selectedPlanning.status === 'created'
+                ? 'Провести'
+                : selectedPlanning.status === 'conducted' && currentUser.role === Role.ADMIN
+                ? 'Утвердить'
+                : getStatusLabel(selectedPlanning.status)}
+            </button>
             <button
               type="button"
               onClick={handleSave}
@@ -724,7 +753,7 @@ const FinanceView: React.FC<FinanceViewProps> = ({
 
         {/* Info */}
         <div className="bg-white dark:bg-[#252525] border border-gray-200 dark:border-[#333] rounded-xl p-6">
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-2 gap-4">
             <div>
               <div className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase mb-1">Статус</div>
               <span className={`px-2.5 py-1 rounded-full text-xs font-bold uppercase ${getStatusColor(selectedPlanning.status)}`}>
@@ -734,12 +763,6 @@ const FinanceView: React.FC<FinanceViewProps> = ({
             <div>
               <div className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase mb-1">Заявок</div>
               <div className="text-lg font-bold text-gray-900 dark:text-white">{planningRequests.length}</div>
-            </div>
-            <div>
-              <div className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase mb-1">Создано</div>
-              <div className="text-sm text-gray-700 dark:text-gray-300">
-                {new Date(selectedPlanning.createdAt).toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric' }).replace(/\//g, '.')}
-              </div>
             </div>
           </div>
         </div>
@@ -1002,6 +1025,7 @@ const FinanceView: React.FC<FinanceViewProps> = ({
           approvedAt: new Date().toISOString(),
           updatedAt: new Date().toISOString()
         };
+        setSelectedPlanDoc(updated);
         onSaveFinancialPlanDocument(updated);
       }
     };
@@ -1013,6 +1037,7 @@ const FinanceView: React.FC<FinanceViewProps> = ({
         status: 'conducted',
         updatedAt: new Date().toISOString()
       };
+      setSelectedPlanDoc(updated);
       onSaveFinancialPlanDocument(updated);
     };
     
@@ -1037,24 +1062,32 @@ const FinanceView: React.FC<FinanceViewProps> = ({
             </p>
           </div>
           <div className="flex items-center gap-2 flex-wrap justify-end">
-            {selectedPlanDoc.status === 'created' && (
-              <button
-                type="button"
-                onClick={handleConduct}
-                className="px-3 py-2 bg-emerald-600 text-white text-sm font-medium hover:bg-emerald-700 rounded-xl"
-              >
-                Провести
-              </button>
-            )}
-            {selectedPlanDoc.status === 'conducted' && currentUser.role === Role.ADMIN && (
-              <button
-                type="button"
-                onClick={handleApprove}
-                className="px-3 py-2 bg-emerald-700 text-white text-sm font-medium hover:bg-emerald-800 rounded-xl"
-              >
-                Утвердить
-              </button>
-            )}
+            <button
+              type="button"
+              onClick={() => {
+                if (selectedPlanDoc.status === 'created') return handleConduct();
+                if (selectedPlanDoc.status === 'conducted' && currentUser.role === Role.ADMIN) return handleApprove();
+              }}
+              disabled={!(selectedPlanDoc.status === 'created' || (selectedPlanDoc.status === 'conducted' && currentUser.role === Role.ADMIN))}
+              className={`px-3 py-2 rounded-xl text-sm font-bold uppercase border transition-colors ${
+                (selectedPlanDoc.status === 'created' || (selectedPlanDoc.status === 'conducted' && currentUser.role === Role.ADMIN))
+                  ? 'cursor-pointer hover:opacity-90'
+                  : 'cursor-default opacity-70'
+              } ${getStatusColor(selectedPlanDoc.status)} border-transparent`}
+              title={
+                selectedPlanDoc.status === 'created'
+                  ? 'Нажмите, чтобы провести'
+                  : selectedPlanDoc.status === 'conducted' && currentUser.role === Role.ADMIN
+                  ? 'Нажмите, чтобы утвердить'
+                  : 'Статус'
+              }
+            >
+              {selectedPlanDoc.status === 'created'
+                ? 'Провести'
+                : selectedPlanDoc.status === 'conducted' && currentUser.role === Role.ADMIN
+                ? 'Утвердить'
+                : getStatusLabel(selectedPlanDoc.status)}
+            </button>
             <button
               type="button"
               onClick={handleSave}
@@ -1241,19 +1274,11 @@ const FinanceView: React.FC<FinanceViewProps> = ({
         
         {/* Статус */}
         <div className="bg-white dark:bg-[#252525] border border-gray-200 dark:border-[#333] rounded-xl p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <div className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase mb-1">Статус</div>
-              <span className={`px-2.5 py-1 rounded-full text-xs font-bold uppercase ${getStatusColor(selectedPlanDoc.status)}`}>
-                {getStatusLabel(selectedPlanDoc.status)}
-              </span>
-            </div>
-            <div className="text-right">
-              <div className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase mb-1">Создано</div>
-              <div className="text-sm text-gray-700 dark:text-gray-300">
-                {new Date(selectedPlanDoc.createdAt).toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric' }).replace(/\//g, '.')}
-              </div>
-            </div>
+          <div>
+            <div className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase mb-1">Статус</div>
+            <span className={`px-2.5 py-1 rounded-full text-xs font-bold uppercase ${getStatusColor(selectedPlanDoc.status)}`}>
+              {getStatusLabel(selectedPlanDoc.status)}
+            </span>
           </div>
         </div>
         </div>
@@ -1392,12 +1417,12 @@ const FinanceView: React.FC<FinanceViewProps> = ({
   };
 
   useEffect(() => {
-    if (planningSubView === 'create' && activeTab === 'planning' && departments.length > 0) {
+    if (isPlanningCreateModalOpen && activeTab === 'planning' && departments.length > 0) {
       setNewPlanningDepartment(departments[0].id);
       setNewPlanningPeriod(currentPeriod);
       setNewPlanningIncome(0);
     }
-  }, [planningSubView, activeTab, departments.length, currentPeriod]);
+  }, [isPlanningCreateModalOpen, activeTab, departments.length, currentPeriod]);
 
   const handlePlanningSubmit = (e?: React.FormEvent) => {
     if (e) e.preventDefault();
@@ -1438,6 +1463,7 @@ const FinanceView: React.FC<FinanceViewProps> = ({
     setPlanningSubView('detail');
     setActiveTab('planning');
     setSelectedPlanning(planning);
+    setIsPlanningCreateModalOpen(false);
   };
 
   const renderPlanningCreate = () => (
@@ -1658,7 +1684,8 @@ const FinanceView: React.FC<FinanceViewProps> = ({
                             }
                             setActiveTab('planning');
                             setSelectedPlanning(null);
-                            setPlanningSubView('create');
+                            setPlanningSubView('list');
+                            setIsPlanningCreateModalOpen(true);
                           },
                         },
                       ]}
@@ -1732,7 +1759,7 @@ const FinanceView: React.FC<FinanceViewProps> = ({
        <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
          <div className={`${MODULE_PAGE_GUTTER} pb-20 h-full overflow-y-auto custom-scrollbar flex-1 flex flex-col min-h-0`}>
            {activeTab === 'planning' && planningSubView === 'list' && renderPlanningList()}
-           {activeTab === 'planning' && planningSubView === 'create' && renderPlanningCreate()}
+           {/* creation planning moved to modal */}
            {activeTab === 'planning' && planningSubView === 'detail' && selectedPlanning && renderPlanningDetail()}
            {activeTab === 'bdr' && onLoadBdr && onSaveBdr && (
              <BdrView bdr={bdr ?? null} onLoadBdr={onLoadBdr} onSaveBdr={onSaveBdr} />
@@ -1804,6 +1831,78 @@ const FinanceView: React.FC<FinanceViewProps> = ({
             </div>
         </div>
        )}
+
+      {/* Create Financial Planning Modal */}
+      {isPlanningCreateModalOpen && (
+        <div
+          className="fixed inset-0 bg-black/35 backdrop-blur-sm flex items-end md:items-center justify-center z-[220] animate-in fade-in duration-200"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setIsPlanningCreateModalOpen(false);
+          }}
+        >
+          <div className="bg-white dark:bg-[#252525] rounded-t-2xl md:rounded-xl shadow-2xl w-full max-w-lg max-h-[95vh] md:max-h-[90vh] overflow-hidden border border-gray-200 dark:border-[#333]">
+            <div className="p-4 border-b border-gray-100 dark:border-[#333] flex justify-between items-center bg-white dark:bg-[#252525]">
+              <h3 className="font-bold text-gray-800 dark:text-white">Новое финансовое планирование</h3>
+              <button
+                onClick={() => setIsPlanningCreateModalOpen(false)}
+                className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 p-1 rounded-full hover:bg-gray-100 dark:hover:bg-[#333]"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <form onSubmit={handlePlanningSubmit} className="p-6 space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 mb-1 uppercase">
+                  Подразделение
+                </label>
+                <TaskSelect
+                  value={newPlanningDepartment}
+                  onChange={setNewPlanningDepartment}
+                  options={[
+                    { value: '', label: 'Выберите подразделение' },
+                    ...departments.map(d => ({ value: d.id, label: d.name }))
+                  ]}
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 mb-1 uppercase">
+                  Период (месяц)
+                </label>
+                <DateInput
+                  value={newPlanningPeriod ? `${newPlanningPeriod}-01` : ''}
+                  onChange={(v) => setNewPlanningPeriod(v ? v.slice(0, 7) : '')}
+                  placeholder="Выберите месяц"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 mb-1 uppercase">
+                  Доход за период (UZS)
+                </label>
+                <input
+                  type="number"
+                  min={1}
+                  value={newPlanningIncome || ''}
+                  onChange={(e) => setNewPlanningIncome(parseFloat(e.target.value) || 0)}
+                  className="w-full bg-white dark:bg-[#333] border border-gray-200 dark:border-[#444] rounded-xl px-4 py-3 text-sm text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-emerald-500/40 outline-none [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                  placeholder="0"
+                />
+              </div>
+
+              <div className="flex justify-end gap-2 pt-2">
+                <Button type="button" variant="secondary" onClick={() => setIsPlanningCreateModalOpen(false)} size="md">
+                  Отмена
+                </Button>
+                <Button type="submit" size="md">
+                  Создать
+                </Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
        <SystemAlertDialog
          open={!!alertText}

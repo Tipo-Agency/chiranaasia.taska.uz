@@ -243,7 +243,7 @@ export const ClientsPage: React.FC<ClientsPageProps> = ({
           <ReceivablesTab
             receivables={accountsReceivable || []}
             clients={clients}
-            onEditReceivable={handleEditReceivable}
+            onOpenReceivable={handleEditReceivable}
             onDeleteReceivable={onDeleteAccountsReceivable}
           />
         )}

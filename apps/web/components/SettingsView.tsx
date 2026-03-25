@@ -15,9 +15,10 @@ import SalesFunnelsSettings from './settings/SalesFunnelsSettings';
 import { DEFAULT_NOTIFICATION_PREFS } from '../constants';
 import { IntegrationSettings } from './settings/IntegrationSettings';
 import { WarehouseSettings } from './settings/WarehouseSettings';
+import { ArchiveView } from './settings/ArchiveView';
 
 // Компонент для отображения архива с вкладками
-const ArchiveView: React.FC<{ 
+const LegacyArchiveView: React.FC<{
     tasks: Task[];
     users?: User[];
     employees?: EmployeeInfo[];
@@ -263,8 +264,8 @@ const SettingsView: React.FC<SettingsViewProps> = ({
 
   return (
     <ModulePageShell>
-      <div className={`${MODULE_PAGE_GUTTER} max-w-5xl pt-6 pb-4 flex-shrink-0`}>
-        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 pb-4 border-b border-gray-200 dark:border-[#333]">
+        <div className={`${MODULE_PAGE_GUTTER} max-w-5xl pt-6 pb-4 flex-shrink-0`}>
+        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 pb-4">
           <ModulePageHeader
             accent="slate"
             icon={<Settings size={24} strokeWidth={2} />}
@@ -277,32 +278,34 @@ const SettingsView: React.FC<SettingsViewProps> = ({
 
       <div className="flex-1 min-h-0 overflow-y-auto custom-scrollbar">
         <div className={`${MODULE_PAGE_GUTTER} max-w-5xl py-6 pb-24 space-y-6`}>
-          <div className="flex items-start justify-between gap-3">
-          <div>
-            <p className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wide mb-2">
-              Разделы настроек
-            </p>
-            <ModuleSegmentedControl
-              variant="neutral"
-              value={activeTab}
-              onChange={(v) => setActiveTab(v)}
-              options={SETTINGS_TABS.map((t) => ({
-                value: t.id,
-                label: t.label,
-                icon: t.icon,
-              }))}
-              className="w-full max-w-full justify-start"
-            />
-          </div>
-          <button
-            type="button"
-            onClick={() => setShowArchiveScreen(true)}
-            className="inline-flex items-center gap-2 px-3 py-2 rounded-xl border border-gray-200 dark:border-[#333] text-sm text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-[#252525] shrink-0"
-          >
-            <Archive size={14} />
-            Архив
-          </button>
-          </div>
+          {!showArchiveScreen && (
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+              <div className="w-full sm:w-auto">
+                <p className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wide mb-2">
+                  Разделы настроек
+                </p>
+                <ModuleSegmentedControl
+                  variant="neutral"
+                  value={activeTab}
+                  onChange={(v) => setActiveTab(v)}
+                  options={SETTINGS_TABS.map((t) => ({
+                    value: t.id,
+                    label: t.label,
+                    icon: t.icon,
+                  }))}
+                  className="w-full max-w-full justify-start"
+                />
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowArchiveScreen(true)}
+                className="inline-flex items-center justify-center gap-2 px-3 py-2 rounded-xl border border-gray-200 dark:border-[#333] text-sm text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-[#252525] w-full sm:w-auto sm:justify-start shrink-0"
+              >
+                <Archive size={14} />
+                Архив
+              </button>
+            </div>
+          )}
 
           <div className="space-y-6">
           {showArchiveScreen ? (

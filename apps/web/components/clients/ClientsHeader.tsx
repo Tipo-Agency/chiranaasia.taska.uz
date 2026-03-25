@@ -2,10 +2,10 @@ import React from 'react';
 import { AlertCircle, Briefcase, Building2, FileText, Filter, Users } from 'lucide-react';
 import { Button } from '../ui/Button';
 import { ModuleCreateDropdown } from '../ui/ModuleCreateDropdown';
-import { TaskSelect } from '../TaskSelect';
 import { SalesFunnel } from '../../types';
 import { ModulePageHeader } from '../ui/ModulePageHeader';
 import { MODULE_ACCENTS } from '../ui/moduleAccent';
+import { ModuleSelectDropdown } from '../ui/ModuleSelectDropdown';
 
 interface ClientsHeaderProps {
   salesFunnels?: SalesFunnel[];
@@ -53,17 +53,27 @@ export const ClientsHeader: React.FC<ClientsHeaderProps> = ({
         controls={
           <div className="flex items-center gap-2">
             {showFunnelFilter && salesFunnels.length > 0 && (
-              <div className="min-w-[180px] max-w-[220px]">
-                <TaskSelect
-                  value={selectedFunnelId}
-                  onChange={onFunnelChange}
-                  options={[
-                    { value: '', label: 'Все воронки' },
-                    ...salesFunnels.map((f) => ({ value: f.id, label: f.name })),
-                  ]}
-                  className="bg-white dark:bg-[#333] border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100"
-                />
-              </div>
+              <ModuleSelectDropdown
+                accent="violet"
+                prefixLabel="Воронка"
+                valueLabel={
+                  selectedFunnelId
+                    ? (salesFunnels.find((f) => f.id === selectedFunnelId)?.name || '—')
+                    : 'Все'
+                }
+                items={[
+                  {
+                    id: 'all',
+                    label: 'Все',
+                    onClick: () => onFunnelChange(''),
+                  },
+                  ...salesFunnels.map((f) => ({
+                    id: f.id,
+                    label: f.name,
+                    onClick: () => onFunnelChange(f.id),
+                  })),
+                ]}
+              />
             )}
             {activeTab === 'contracts' && onFiltersClick && (
               <Button

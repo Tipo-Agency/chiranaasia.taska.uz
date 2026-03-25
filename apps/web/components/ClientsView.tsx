@@ -233,6 +233,7 @@ const ClientsView: React.FC<ClientsViewProps> = ({
             <ReceivablesTab
               receivables={filteredReceivables}
               clients={clients}
+              onOpenReceivable={handleOpenReceivableEdit}
               onDeleteReceivable={onDeleteAccountsReceivable}
             />
                     )}

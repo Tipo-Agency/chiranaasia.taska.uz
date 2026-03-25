@@ -6,8 +6,7 @@ import { Plus, KanbanSquare, List as ListIcon, X, Send, MessageSquare, Instagram
 // import { sendClientMessage } from '../services/telegramService';
 // import { instagramService } from '../services/instagramService';
 import { DynamicIcon } from './AppIcons';
-import { TaskSelect } from './TaskSelect';
-import { Button, ModulePageShell, ModulePageHeader, ModuleSegmentedControl, MODULE_PAGE_GUTTER, ModuleCreateIconButton, SystemAlertDialog, SystemConfirmDialog } from './ui';
+import { Button, ModulePageShell, ModulePageHeader, ModuleSegmentedControl, MODULE_PAGE_GUTTER, ModuleCreateIconButton, ModuleSelectDropdown, SystemAlertDialog, SystemConfirmDialog } from './ui';
 import { DateInput } from './ui/DateInput';
 import { api } from '../backend/api';
 import { isFunnelDeal } from '../utils/dealModel';
@@ -527,14 +526,16 @@ const SalesFunnelView: React.FC<SalesFunnelViewProps> = ({ deals, clients, users
             }
             controls={
               <>
-                <div className="min-w-[160px] sm:min-w-[180px]">
-                  <TaskSelect
-                    value={selectedFunnelId}
-                    onChange={setSelectedFunnelId}
-                    options={salesFunnels.map((f) => ({ value: f.id, label: f.name }))}
-                    className="bg-white dark:bg-[#333] border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100"
-                  />
-                </div>
+                <ModuleSelectDropdown
+                  accent="violet"
+                  prefixLabel="Воронка"
+                  valueLabel={salesFunnels.find((f) => f.id === selectedFunnelId)?.name || '—'}
+                  items={salesFunnels.map((f) => ({
+                    id: f.id,
+                    label: f.name,
+                    onClick: () => setSelectedFunnelId(f.id),
+                  }))}
+                />
                 <ModuleCreateIconButton accent="violet" label="Новая сделка" onClick={handleOpenCreate} />
               </>
             }
