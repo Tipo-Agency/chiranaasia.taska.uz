@@ -28,7 +28,7 @@ const BusinessProcessesView: React.FC<BusinessProcessesViewProps> = ({
   const [selectedProcessId, setSelectedProcessId] = useState<string | null>(null);
   /** Шаблоны = описания процессов; В работе = active + paused; Завершённые = completed */
   const [activeTab, setActiveTab] = useState<'templates' | 'running' | 'completed'>('templates');
-  const [templatesViewMode, setTemplatesViewMode] = useState<'grid' | 'list'>('grid');
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [startPickerOpen, setStartPickerOpen] = useState(false);
   const [selectedInstanceId, setSelectedInstanceId] = useState<string | null>(null);
   
@@ -362,6 +362,146 @@ const BusinessProcessesView: React.FC<BusinessProcessesViewProps> = ({
       : activeTab === 'running'
         ? runningInstances
         : completedInstancesList;
+
+  const renderStatusPill = (status: ProcessInstance['status']) => (
+    <span
+      className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium ${
+        status === 'completed'
+          ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+          : status === 'paused'
+            ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400'
+            : 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
+      }`}
+    >
+      {status === 'active' && 'Активен'}
+      {status === 'completed' && 'Завершён'}
+      {status === 'paused' && 'Приостановлен'}
+    </span>
+  );
+
+  const renderInstancesTable = (items: Array<{ process: BusinessProcess; instance: ProcessInstance; tasks: Task[] }>) => {
+    return (
+      <div className="bg-white dark:bg-[#252525] border border-gray-200 dark:border-[#333] rounded-2xl overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="min-w-full text-sm">
+            <thead className="bg-gray-50 dark:bg-[#202020]">
+              <tr className="text-[11px] uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                <th className="text-left font-bold px-4 py-3">Процесс</th>
+                <th className="text-left font-bold px-4 py-3">Статус</th>
+                <th className="text-left font-bold px-4 py-3">Текущий шаг</th>
+                <th className="text-left font-bold px-4 py-3">Задачи</th>
+                <th className="text-left font-bold px-4 py-3">Запущен</th>
+                <th className="text-left font-bold px-4 py-3">Завершён</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100 dark:divide-[#333]">
+              {items.map(({ process, instance, tasks: instanceTasks }) => {
+                const steps = getStepsForInstance(process, instance);
+                const currentStep = steps.find((s) => s.id === instance.currentStepId);
+                const done = instanceTasks.filter((t) => t.status === 'Выполнено' || t.status === 'Done').length;
+                const total = instanceTasks.length;
+                return (
+                  <tr
+                    key={instance.id}
+                    onClick={() => setSelectedInstanceId(instance.id)}
+                    className="cursor-pointer hover:bg-gray-50 dark:hover:bg-[#2a2a2a] transition-colors"
+                  >
+                    <td className="px-4 py-3">
+                      <div className="font-semibold text-gray-900 dark:text-white">{process.title}</div>
+                      <div className="text-xs text-gray-500 dark:text-gray-400">v{instance.processVersion || process.version || 1}</div>
+                    </td>
+                    <td className="px-4 py-3">{renderStatusPill(instance.status)}</td>
+                    <td className="px-4 py-3">
+                      {instance.status === 'completed' ? (
+                        <span className="text-xs text-gray-400 dark:text-gray-500">—</span>
+                      ) : (
+                        <span className="text-gray-700 dark:text-gray-300">{currentStep?.title || '—'}</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3">
+                      {total > 0 ? (
+                        <span className="text-gray-700 dark:text-gray-300">{done}/{total}</span>
+                      ) : (
+                        <span className="text-xs text-gray-400 dark:text-gray-500">—</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3 text-gray-600 dark:text-gray-300">
+                      {instance.startedAt ? new Date(instance.startedAt).toLocaleString('ru-RU') : '—'}
+                    </td>
+                    <td className="px-4 py-3 text-gray-600 dark:text-gray-300">
+                      {instance.completedAt ? new Date(instance.completedAt).toLocaleString('ru-RU') : '—'}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    );
+  };
+
+  const renderTemplatesTable = () => {
+    return (
+      <div className="bg-white dark:bg-[#252525] border border-gray-200 dark:border-[#333] rounded-2xl overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="min-w-full text-sm">
+            <thead className="bg-gray-50 dark:bg-[#202020]">
+              <tr className="text-[11px] uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                <th className="text-left font-bold px-4 py-3">Шаблон</th>
+                <th className="text-left font-bold px-4 py-3">Шаги</th>
+                <th className="text-left font-bold px-4 py-3">В работе</th>
+                <th className="text-left font-bold px-4 py-3">Завершено</th>
+                <th className="text-right font-bold px-4 py-3">Действия</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100 dark:divide-[#333]">
+              {userTemplates.map((process) => {
+                const instances = getProcessInstances(process.id);
+                const running = instances.filter((i) => i.status === 'active' || i.status === 'paused').length;
+                const completed = instances.filter((i) => i.status === 'completed').length;
+                return (
+                  <tr
+                    key={process.id}
+                    onClick={() => setSelectedProcessId(process.id)}
+                    className="cursor-pointer hover:bg-gray-50 dark:hover:bg-[#2a2a2a] transition-colors"
+                  >
+                    <td className="px-4 py-3">
+                      <div className="font-semibold text-gray-900 dark:text-white">{process.title}</div>
+                      {process.description ? (
+                        <div className="text-xs text-gray-500 dark:text-gray-400 line-clamp-1">{process.description}</div>
+                      ) : (
+                        <div className="text-xs text-gray-400 dark:text-gray-500">—</div>
+                      )}
+                    </td>
+                    <td className="px-4 py-3 text-gray-700 dark:text-gray-300">{process.steps?.length || 0}</td>
+                    <td className="px-4 py-3 text-gray-700 dark:text-gray-300">{running}</td>
+                    <td className="px-4 py-3 text-gray-700 dark:text-gray-300">{completed}</td>
+                    <td className="px-4 py-3">
+                      <div className="flex items-center justify-end gap-2">
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleOpenEdit(process);
+                          }}
+                          className="p-2 text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400 rounded-lg bg-gray-50 dark:bg-[#303030]"
+                          title="Редактировать"
+                          aria-label="Редактировать"
+                        >
+                          <Edit2 size={16} />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    );
+  };
 
   // Если выбран экземпляр — показываем его детали (приоритет над страницей процесса)
   if (selectedInstanceId) {
@@ -1173,18 +1313,16 @@ const BusinessProcessesView: React.FC<BusinessProcessesViewProps> = ({
             }
             controls={
               <>
-                {activeTab === 'templates' && (
-                  <ModuleSegmentedControl
-                    variant="accent"
-                    accent="indigo"
-                    value={templatesViewMode}
-                    onChange={(v) => setTemplatesViewMode(v as 'grid' | 'list')}
-                    options={[
-                      { value: 'grid', label: 'Плитка' },
-                      { value: 'list', label: 'Список' },
-                    ]}
-                  />
-                )}
+                <ModuleSegmentedControl
+                  variant="accent"
+                  accent="indigo"
+                  value={viewMode}
+                  onChange={(v) => setViewMode(v as 'grid' | 'list')}
+                  options={[
+                    { value: 'grid', label: 'Плитка' },
+                    { value: 'list', label: 'Список' },
+                  ]}
+                />
                 <ModuleCreateDropdown
                   accent="indigo"
                   items={[
@@ -1239,7 +1377,7 @@ const BusinessProcessesView: React.FC<BusinessProcessesViewProps> = ({
                 ]}
               />
             </div>
-          ) : templatesViewMode === 'grid' ? (
+          ) : viewMode === 'grid' ? (
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-2 gap-4">
               {userTemplates.map(process => {
                 const instances = getProcessInstances(process.id);
@@ -1258,23 +1396,7 @@ const BusinessProcessesView: React.FC<BusinessProcessesViewProps> = ({
               })}
             </div>
           ) : (
-            <div className="space-y-3">
-              {userTemplates.map(process => {
-                const instances = getProcessInstances(process.id);
-                return (
-                  <ProcessCard
-                    key={process.id}
-                    process={process}
-                    instances={instances}
-                    onClick={() => setSelectedProcessId(process.id)}
-                    onEdit={(e) => {
-                      e.stopPropagation();
-                      handleOpenEdit(process);
-                    }}
-                  />
-                );
-              })}
-            </div>
+            renderTemplatesTable()
           )
           ) : (
             <div>
@@ -1307,7 +1429,7 @@ const BusinessProcessesView: React.FC<BusinessProcessesViewProps> = ({
                       : 'После прохождения всех шагов экземпляр появится здесь.'}
                   </p>
                 </div>
-              ) : (
+              ) : viewMode === 'grid' ? (
                 <div className="space-y-3">
                   {tabInstanceList.map(({ process, instance, tasks }) => {
                     const currentStep = getStepsForInstance(process, instance).find((s) => s.id === instance.currentStepId);
@@ -1329,17 +1451,7 @@ const BusinessProcessesView: React.FC<BusinessProcessesViewProps> = ({
                               <span className="text-xs text-gray-500 dark:text-gray-400">
                                 v{instance.processVersion || process.version || 1}
                               </span>
-                              <span className={`px-2 py-0.5 rounded-full text-[10px] font-medium ${
-                                instance.status === 'completed'
-                                  ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
-                                  : instance.status === 'paused'
-                                    ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400'
-                                    : 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
-                              }`}>
-                                {instance.status === 'active' && 'Активен'}
-                                {instance.status === 'completed' && 'Завершён'}
-                                {instance.status === 'paused' && 'Приостановлен'}
-                              </span>
+                              {renderStatusPill(instance.status)}
                             </div>
                             {currentStep && instance.status !== 'completed' && (
                               <p className="text-sm text-gray-600 dark:text-gray-400">
@@ -1404,6 +1516,8 @@ const BusinessProcessesView: React.FC<BusinessProcessesViewProps> = ({
                     );
                   })}
                 </div>
+              ) : (
+                renderInstancesTable(tabInstanceList)
               )}
             </div>
           )}
