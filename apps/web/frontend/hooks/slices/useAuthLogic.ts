@@ -3,11 +3,17 @@ import { useState, useEffect } from 'react';
 import { User } from '../../../types';
 import { api } from '../../../backend/api';
 import { storageService } from '../../../services/storageService';
+import { getDefaultAvatarForId } from '../../../constants/avatars';
 
 export const useAuthLogic = (showNotification: (msg: string) => void) => {
   const [users, setUsers] = useState<User[]>([]);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
+
+  const withAvatarFallback = (u: User): User => ({
+    ...u,
+    avatar: u.avatar || getDefaultAvatarForId(u.id),
+  });
 
   // Restore session on load (or when users are loaded)
   useEffect(() => {
@@ -24,7 +30,7 @@ export const useAuthLogic = (showNotification: (msg: string) => void) => {
   }, [users, currentUser]);
 
   const login = (user: User) => {
-    setCurrentUser(user);
+    setCurrentUser(withAvatarFallback(user));
     storageService.setActiveUserId(user.id);
     showNotification(`Добро пожаловать, ${user.name}`);
   };
@@ -49,7 +55,7 @@ export const useAuthLogic = (showNotification: (msg: string) => void) => {
     }));
     // Фильтруем архивных пользователей перед установкой в state
     const activeUsers = usersWithTimestamp.filter(u => !u.isArchived);
-    setUsers(activeUsers);
+    setUsers(activeUsers.map(withAvatarFallback));
     // Сохраняем через API в локальное хранилище (всех, включая архивных)
     api.users.updateAll(usersWithTimestamp);
     // Refresh current user if data changed
@@ -57,7 +63,7 @@ export const useAuthLogic = (showNotification: (msg: string) => void) => {
         const u = usersWithTimestamp.find(curr => curr.id === currentUser.id);
         // Если текущий пользователь был архивирован или удален, выходим
         if (u && !u.isArchived) {
-          setCurrentUser(u);
+          setCurrentUser(withAvatarFallback(u as User));
         } else {
           setCurrentUser(null);
           storageService.clearActiveUserId();
@@ -67,9 +73,9 @@ export const useAuthLogic = (showNotification: (msg: string) => void) => {
 
   const updateProfile = (updatedUser: User) => {
     const updatedUsers = users.map(u => u.id === updatedUser.id ? updatedUser : u);
-    setUsers(updatedUsers);
+    setUsers(updatedUsers.map(withAvatarFallback));
     api.users.updateAll(updatedUsers);
-    setCurrentUser(updatedUser);
+    setCurrentUser(withAvatarFallback(updatedUser));
     setIsProfileOpen(false);
     showNotification('Профиль обновлен');
   };
