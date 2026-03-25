@@ -4,7 +4,7 @@ import { User, Role } from '../../types';
 import { Save, KeyRound, Trash2, Upload, User as UserIcon, Phone, AtSign, Mail, Send } from 'lucide-react';
 import { Button, Input, StandardModal } from '../ui';
 import { uploadAvatar } from '../../services/localStorageService';
-import { getDefaultAvatarForId, getRandomDefaultAvatar } from '../../constants/avatars';
+import { getDefaultAvatarForId } from '../../constants/avatars';
 
 interface ProfileSettingsProps {
   currentUser: User;
@@ -245,29 +245,6 @@ export const ProfileSettings: React.FC<ProfileSettingsProps> = ({ currentUser, u
                                 placeholder="@username"
                             />
                         </div>
-                    </div>
-                </div>
-
-                {/* Password Change Section */}
-                <div className="pt-6 border-t border-gray-100 dark:border-[#333]">
-                    <h4 className="text-sm font-bold text-gray-800 dark:text-white mb-4 uppercase flex items-center gap-2">
-                        <Lock size={16}/> Смена пароля
-                    </h4>
-                    <div className="grid grid-cols-2 gap-6">
-                        <input 
-                            type="password" 
-                            value={newPassword} 
-                            onChange={e => setNewPassword(e.target.value)} 
-                            className="w-full bg-white dark:bg-[#252525] border border-gray-300 dark:border-[#333] rounded-lg px-4 py-2.5 text-sm text-gray-900 dark:text-gray-100" 
-                            placeholder="Новый пароль" 
-                        />
-                        <input 
-                            type="password" 
-                            value={confirmPassword} 
-                            onChange={e => setConfirmPassword(e.target.value)} 
-                            className="w-full bg-white dark:bg-[#252525] border border-gray-300 dark:border-[#333] rounded-lg px-4 py-2.5 text-sm text-gray-900 dark:text-gray-100" 
-                            placeholder="Повторите пароль" 
-                        />
                     </div>
                 </div>
 
