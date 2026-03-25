@@ -71,7 +71,7 @@ npm run build:web
 
 ## Telegram-бот локально
 
-В `docker-compose.yml` сервис бота закомментирован. Обычно бот ставится на сервере через **systemd** (`apps/bot/deploy.sh`, см. `development/BOT.md`).
+В `docker-compose.yml` сервис бота закомментирован. На сервере бот обычно ставится через **systemd** (`apps/bot/deploy.sh`; см. [`docs/operations/DEPLOY.md`](./operations/DEPLOY.md)).
 
 ## Тесты API (smoke)
 

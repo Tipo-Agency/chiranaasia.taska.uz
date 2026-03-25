@@ -3,7 +3,7 @@
  *
  * In-app центр и Telegram/Email доставляются бэкендом:
  * - доменные события → `notification_hub` → `notifications` + `notification_deliveries`
- * - см. docs/architecture/NOTIFICATIONS_ARCHITECTURE.md
+ * - см. код в `apps/api` (notification hub, модели доставок)
  *
  * Не дублируем очередь Telegram с фронта — иначе двойные сообщения и обход prefs.
  */
