@@ -37,11 +37,28 @@ export const ModuleTabsScroller: React.FC<{
     update();
 
     el.addEventListener('scroll', update, { passive: true });
-    const ro = new ResizeObserver(update);
-    ro.observe(el);
+    const RO: any = (globalThis as any).ResizeObserver;
+    let ro: ResizeObserver | null = null;
+    const onWindowResize = () => update();
+    try {
+      if (typeof RO === 'function') {
+        ro = new RO(update);
+        ro.observe(el);
+      } else {
+        window.addEventListener('resize', onWindowResize, { passive: true });
+      }
+    } catch {
+      ro = null;
+      window.addEventListener('resize', onWindowResize, { passive: true });
+    }
     return () => {
       el.removeEventListener('scroll', update);
-      ro.disconnect();
+      try {
+        ro?.disconnect();
+      } catch {
+        // ignore
+      }
+      window.removeEventListener('resize', onWindowResize as any);
     };
   }, []);
 
