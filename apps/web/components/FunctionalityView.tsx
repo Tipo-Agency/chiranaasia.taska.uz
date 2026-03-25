@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { Task, User, StatusOption, Project } from '../types';
 import { CheckCircle2, Trash2, Edit2, Play, Layers, Folder, ChevronDown } from 'lucide-react';
 import { TaskSelect } from './TaskSelect';
-import { ModulePageShell, ModulePageHeader, ModuleSegmentedControl, MODULE_PAGE_GUTTER, ModuleCreateIconButton, ModuleFilterIconButton } from './ui';
+import { ModulePageShell, ModulePageHeader, ModuleSegmentedControl, MODULE_PAGE_GUTTER, ModuleCreateDropdown, ModuleFilterIconButton } from './ui';
 
 interface FunctionalityViewProps {
   features: Task[]; // Все функции из всех functionality таблиц
@@ -13,6 +13,7 @@ interface FunctionalityViewProps {
   onDeleteFeature: (id: string) => void;
   onOpenFeature: (feature: Task) => void;
   onCreateFeature: (projectId?: string, category?: string) => void; // Добавляем projectId и category
+  onCreateProject?: (name: string) => void;
   onTakeToWork?: (feature: Task) => void;
 }
 
@@ -53,6 +54,7 @@ const FunctionalityView: React.FC<FunctionalityViewProps> = ({
     onDeleteFeature, 
     onOpenFeature,
     onCreateFeature,
+    onCreateProject,
     onTakeToWork
 }) => {
   const [selectedProjectId, setSelectedProjectId] = useState<string>('all'); // 'all' или конкретный projectId
@@ -171,10 +173,29 @@ const FunctionalityView: React.FC<FunctionalityViewProps> = ({
                     activeCount={(selectedProjectId !== 'all' ? 1 : 0) + (selectedCategory !== 'all' ? 1 : 0)}
                     onClick={() => setShowFilters((v) => !v)}
                   />
-                  <ModuleCreateIconButton
+                  <ModuleCreateDropdown
                     accent="sky"
-                    label="Добавить функцию"
-                    onClick={() => onCreateFeature(selectedProjectId !== 'all' ? selectedProjectId : undefined, selectedCategory !== 'all' ? selectedCategory : undefined)}
+                    label="Создать"
+                    items={[
+                      {
+                        id: 'create-feature',
+                        label: 'Функция',
+                        onClick: () =>
+                          onCreateFeature(
+                            selectedProjectId !== 'all' ? selectedProjectId : undefined,
+                            selectedCategory !== 'all' ? selectedCategory : undefined
+                          ),
+                      },
+                      {
+                        id: 'create-project',
+                        label: 'Проект',
+                        onClick: () => {
+                          const name = window.prompt('Название проекта');
+                          if (!name?.trim()) return;
+                          onCreateProject?.(name.trim());
+                        },
+                      },
+                    ]}
                   />
                 </div>
             }

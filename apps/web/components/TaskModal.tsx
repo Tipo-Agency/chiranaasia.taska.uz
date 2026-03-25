@@ -811,18 +811,15 @@ const TaskModal: React.FC<TaskModalProps> = ({
                     {taskType === 'feature' && (
                         <div className="flex items-center gap-3 md:gap-4 min-h-8">
                             <div className="w-28 min-w-[7rem] shrink-0 pr-2 text-[10px] font-semibold text-gray-500 dark:text-gray-400 uppercase flex items-center gap-2"><Folder size={14} className="shrink-0 text-gray-400" strokeWidth={2} /> Категория</div>
-                            <div className="flex-1 relative min-w-0">
-                            <select
-                                value={category}
-                                onChange={e => setCategory(e.target.value)}
-                                className="w-full px-2.5 pr-8 h-8 min-h-8 text-sm leading-tight bg-gray-50 dark:bg-[#252525] border border-gray-200 dark:border-gray-700 rounded-md text-gray-800 dark:text-gray-200 focus:ring-2 focus:ring-blue-500/50 appearance-none"
-                            >
-                                <option value="">Не выбрана</option>
-                                {STANDARD_CATEGORIES.map(cat => (
-                                    <option key={cat.id} value={cat.id}>{cat.name}</option>
-                                ))}
-                            </select>
-                            <ChevronDown size={14} className="absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400" />
+                            <div className="flex-1 min-w-0">
+                              <TaskSelect
+                                value={category || ''}
+                                onChange={setCategory}
+                                options={[
+                                  { value: '', label: 'Не выбрана' },
+                                  ...STANDARD_CATEGORIES.map((cat) => ({ value: cat.id, label: cat.name })),
+                                ]}
+                              />
                             </div>
                         </div>
                     )}

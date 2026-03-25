@@ -363,6 +363,7 @@ export const SpaceModule: React.FC<SpaceModuleProps> = ({
                     onUpdateFeature={(id, u) => actions.saveTask({id, ...u})} 
                     onDeleteFeature={actions.deleteTask} 
                     onOpenFeature={actions.openTaskModal} 
+                    onCreateProject={(name) => actions.quickCreateProject(name)}
                     onCreateFeature={(projectId, category) => {
                         // При создании функции в функционале, находим подходящую functionality таблицу
                         // Если указан projectId, ищем таблицу для этого проекта, иначе используем activeTable
