@@ -8,6 +8,7 @@ import { Plus, KanbanSquare, List as ListIcon, X, Send, MessageSquare, Instagram
 import { DynamicIcon } from './AppIcons';
 import { Button, ModulePageShell, ModulePageHeader, ModuleSegmentedControl, MODULE_PAGE_GUTTER, ModuleCreateIconButton, ModuleSelectDropdown, SystemAlertDialog, SystemConfirmDialog } from './ui';
 import { DateInput } from './ui/DateInput';
+import { TaskSelect } from './TaskSelect';
 import { api } from '../backend/api';
 import { isFunnelDeal } from '../utils/dealModel';
 

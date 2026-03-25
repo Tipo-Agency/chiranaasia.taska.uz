@@ -1,5 +1,6 @@
 import React from 'react';
 import type { ModuleAccentKey } from './moduleAccent';
+import { ModuleTabsScroller } from './ModuleTabsScroller';
 
 export interface ModulePageHeaderProps {
   /** Иконка Lucide (оставлено для обратной совместимости) */
@@ -39,7 +40,11 @@ export const ModulePageHeader: React.FC<ModulePageHeaderProps> = ({
 
   return hasNewLayout ? (
     <div className={`flex flex-row items-center justify-between gap-2 ${className}`}>
-      <div className="flex items-center gap-2 min-w-0 flex-1 overflow-x-auto custom-scrollbar">{tabs}</div>
+      <div className="min-w-0 flex-1">
+        <ModuleTabsScroller contentClassName="flex items-center gap-2">
+          {tabs}
+        </ModuleTabsScroller>
+      </div>
       <div className="flex items-center gap-2 justify-end shrink-0">{controls}</div>
     </div>
   ) : (

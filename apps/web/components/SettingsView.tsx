@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { Project, Role, Task, User, StatusOption, PriorityOption, NotificationPreferences, AutomationRule, TableCollection, Deal, Department, FinanceCategory, Fund, SalesFunnel, Doc, ContentPost, EmployeeInfo, Client, Contract, BusinessProcess, Meeting, Warehouse } from '../types';
 import { User as UserIcon, Briefcase, Archive, Users, Building2, Wallet, TrendingUp, PiggyBank, PlugZap, ShieldAlert, Settings, BellRing, Zap, Package, ArrowLeft } from 'lucide-react';
-import { ModuleFilterIconButton, ModulePageHeader, ModulePageShell, ModuleSegmentedControl, MODULE_PAGE_GUTTER } from './ui';
+import { Input, ModuleFilterIconButton, ModulePageHeader, ModulePageShell, ModuleSegmentedControl, MODULE_PAGE_GUTTER } from './ui';
 import { ProfileSettings } from './settings/ProfileSettings';
 import { SystemLogsSettings } from './settings/SystemLogsSettings';
 import { SpaceSettings } from './settings/SpaceSettings';
@@ -15,7 +15,7 @@ import SalesFunnelsSettings from './settings/SalesFunnelsSettings';
 import { DEFAULT_NOTIFICATION_PREFS } from '../constants';
 import { IntegrationSettings } from './settings/IntegrationSettings';
 import { WarehouseSettings } from './settings/WarehouseSettings';
-import { ArchiveView } from './settings/ArchiveView';
+import { ArchiveView, ARCHIVE_TAB_OPTIONS, type ArchiveTabId } from './settings/ArchiveView';
 
 interface SettingsViewProps {
   // Data
@@ -121,6 +121,9 @@ const SettingsView: React.FC<SettingsViewProps> = ({
 }) => {
   const [activeTab, setActiveTab] = useState<string>(initialTab);
   const [showArchiveScreen, setShowArchiveScreen] = useState(false);
+  const [archiveTab, setArchiveTab] = useState<ArchiveTabId>('tasks');
+  const [archiveShowFilters, setArchiveShowFilters] = useState(false);
+  const [archiveQuery, setArchiveQuery] = useState('');
 
   return (
     <ModulePageShell>
@@ -132,7 +135,14 @@ const SettingsView: React.FC<SettingsViewProps> = ({
             title="Настройки"
             description=" "
             tabs={
-              !showArchiveScreen ? (
+              showArchiveScreen ? (
+                <ModuleSegmentedControl
+                  variant="neutral"
+                  value={archiveTab}
+                  onChange={(v) => setArchiveTab(v as ArchiveTabId)}
+                  options={ARCHIVE_TAB_OPTIONS.map((t) => ({ value: t.id, label: t.label }))}
+                />
+              ) : (
                 <ModuleSegmentedControl
                   variant="neutral"
                   value={activeTab}
@@ -143,19 +153,32 @@ const SettingsView: React.FC<SettingsViewProps> = ({
                     icon: t.icon,
                   }))}
                 />
-              ) : null
+              )
             }
             controls={
               showArchiveScreen ? (
-                <button
-                  type="button"
-                  onClick={() => setShowArchiveScreen(false)}
-                  className="inline-flex items-center justify-center w-11 h-11 rounded-xl border border-gray-200 dark:border-[#333] bg-white dark:bg-[#1a1a1a] text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-[#252525]"
-                  title="Назад"
-                  aria-label="Назад"
-                >
-                  <ArrowLeft size={18} />
-                </button>
+                <>
+                  <ModuleFilterIconButton
+                    accent="slate"
+                    active={archiveShowFilters || !!archiveQuery.trim()}
+                    activeCount={archiveQuery.trim() ? 1 : 0}
+                    onClick={() => setArchiveShowFilters((v) => !v)}
+                    label="Фильтры"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowArchiveScreen(false);
+                      setArchiveShowFilters(false);
+                      setArchiveQuery('');
+                    }}
+                    className="inline-flex items-center justify-center w-11 h-11 rounded-xl border border-gray-200 dark:border-[#333] bg-white dark:bg-[#1a1a1a] text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-[#252525]"
+                    title="Назад"
+                    aria-label="Назад"
+                  >
+                    <ArrowLeft size={18} />
+                  </button>
+                </>
               ) : (
                 <button
                   type="button"
@@ -175,40 +198,56 @@ const SettingsView: React.FC<SettingsViewProps> = ({
       <div className="flex-1 min-h-0 overflow-hidden">
         <div className={`${MODULE_PAGE_GUTTER} mt-3 pb-24 md:pb-32 h-full overflow-y-auto overflow-x-hidden custom-scrollbar`}>
           {showArchiveScreen ? (
-            <div className="bg-white dark:bg-[#252525] border border-gray-200 dark:border-[#333] rounded-2xl p-4 md:p-6">
-              <ArchiveView 
-                tasks={tasks.filter(t => t.isArchived)}
-                users={users.filter(u => u.isArchived)}
-                employees={employeeInfos.filter(e => e.isArchived)}
-                docs={docs.filter(d => d.isArchived)}
-                posts={contentPosts.filter(p => p.isArchived)}
-                projects={projects.filter(p => p.isArchived)}
-                departments={departments.filter(d => d.isArchived)}
-                financeCategories={financeCategories.filter(f => f.isArchived)}
-                salesFunnels={salesFunnels.filter(s => s.isArchived)}
-                tables={tables.filter(t => t.isArchived)}
-                businessProcesses={businessProcesses.filter(b => b.isArchived)}
-                deals={deals.filter(d => d.isArchived)}
-                clients={clients.filter(c => c.isArchived)}
-                contracts={contracts.filter(c => c.isArchived)}
-                meetings={meetings.filter(m => m.isArchived)}
-                onRestoreTask={onRestoreTask}
-                onPermanentDelete={onPermanentDelete}
-                onRestoreUser={onRestoreUser}
-                onRestoreEmployee={onRestoreEmployee}
-                onRestoreDoc={onRestoreDoc}
-                onRestorePost={onRestorePost}
-                onRestoreProject={onRestoreProject}
-                onRestoreDepartment={onRestoreDepartment}
-                onRestoreFinanceCategory={onRestoreFinanceCategory}
-                onRestoreSalesFunnel={onRestoreSalesFunnel}
-                onRestoreTable={onRestoreTable}
-                onRestoreBusinessProcess={onRestoreBusinessProcess}
-                onRestoreDeal={onRestoreDeal}
-                onRestoreClient={onRestoreClient}
-                onRestoreContract={onRestoreContract}
-                onRestoreMeeting={onRestoreMeeting}
-              />
+            <div className="space-y-3">
+              {archiveShowFilters && (
+                <div className="bg-white dark:bg-[#252525] border border-gray-200 dark:border-[#333] rounded-2xl p-4">
+                  <Input
+                    value={archiveQuery}
+                    onChange={(e) => setArchiveQuery(e.target.value)}
+                    placeholder="Поиск в архиве…"
+                    fullWidth
+                  />
+                </div>
+              )}
+              <div className="bg-white dark:bg-[#252525] border border-gray-200 dark:border-[#333] rounded-2xl p-4 md:p-6">
+                <ArchiveView
+                  layout="embedded"
+                  activeTab={archiveTab}
+                  onTabChange={setArchiveTab}
+                  query={archiveQuery}
+                  tasks={tasks.filter(t => t.isArchived)}
+                  users={users.filter(u => u.isArchived)}
+                  employees={employeeInfos.filter(e => e.isArchived)}
+                  docs={docs.filter(d => d.isArchived)}
+                  posts={contentPosts.filter(p => p.isArchived)}
+                  projects={projects.filter(p => p.isArchived)}
+                  departments={departments.filter(d => d.isArchived)}
+                  financeCategories={financeCategories.filter(f => f.isArchived)}
+                  salesFunnels={salesFunnels.filter(s => s.isArchived)}
+                  tables={tables.filter(t => t.isArchived)}
+                  businessProcesses={businessProcesses.filter(b => b.isArchived)}
+                  deals={deals.filter(d => d.isArchived)}
+                  clients={clients.filter(c => c.isArchived)}
+                  contracts={contracts.filter(c => c.isArchived)}
+                  meetings={meetings.filter(m => m.isArchived)}
+                  onRestoreTask={onRestoreTask}
+                  onPermanentDelete={onPermanentDelete}
+                  onRestoreUser={onRestoreUser}
+                  onRestoreEmployee={onRestoreEmployee}
+                  onRestoreDoc={onRestoreDoc}
+                  onRestorePost={onRestorePost}
+                  onRestoreProject={onRestoreProject}
+                  onRestoreDepartment={onRestoreDepartment}
+                  onRestoreFinanceCategory={onRestoreFinanceCategory}
+                  onRestoreSalesFunnel={onRestoreSalesFunnel}
+                  onRestoreTable={onRestoreTable}
+                  onRestoreBusinessProcess={onRestoreBusinessProcess}
+                  onRestoreDeal={onRestoreDeal}
+                  onRestoreClient={onRestoreClient}
+                  onRestoreContract={onRestoreContract}
+                  onRestoreMeeting={onRestoreMeeting}
+                />
+              </div>
             </div>
           ) : (
             <>

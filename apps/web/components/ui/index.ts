@@ -2,6 +2,7 @@ export { StandardModal } from './StandardModal';
 export { ModuleHeader } from './ModuleHeader';
 export { ModulePageShell } from './ModulePageShell';
 export { ModulePageHeader } from './ModulePageHeader';
+export { ModuleTabsScroller } from './ModuleTabsScroller';
 export { ModuleSegmentedControl } from './ModuleSegmentedControl';
 export type { ModuleSegmentOption } from './ModuleSegmentedControl';
 export { MODULE_PAGE_GUTTER } from './moduleAccent';

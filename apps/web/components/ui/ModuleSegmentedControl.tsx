@@ -1,5 +1,6 @@
 import React from 'react';
 import { MODULE_ACCENTS, type ModuleAccentKey } from './moduleAccent';
+import { ModuleTabsScroller } from './ModuleTabsScroller';
 
 export interface ModuleSegmentOption<T extends string = string> {
   value: T;
@@ -18,7 +19,7 @@ interface ModuleSegmentedControlProps<T extends string> {
 }
 
 const shell =
-  'inline-flex flex-nowrap items-center gap-1.5 rounded-2xl bg-white dark:bg-[#1a1a1a] border border-gray-200 dark:border-[#333] p-1 shadow-sm max-w-full overflow-x-auto custom-scrollbar';
+  'inline-flex flex-nowrap items-center gap-1.5 rounded-2xl bg-white dark:bg-[#1a1a1a] border border-gray-200 dark:border-[#333] p-1 shadow-sm max-w-full';
 
 const baseBtn =
   'inline-flex items-center justify-center gap-2 px-3 py-2 rounded-xl text-sm font-medium transition-colors shrink-0';
@@ -38,26 +39,28 @@ export function ModuleSegmentedControl<T extends string>({
 }: ModuleSegmentedControlProps<T>) {
   const activeAccent = MODULE_ACCENTS[accent].segmentActive;
   return (
-    <div className={`${shell} ${className}`} role="tablist">
-      {options.map((opt) => {
-        const isActive = opt.value === value;
-        const activeClass =
-          variant === 'accent'
-            ? activeAccent
-            : 'bg-gray-900 dark:bg-white text-white dark:text-gray-900 shadow-sm';
-        return (
-          <button
-            key={String(opt.value)}
-            type="button"
-            role="tab"
-            aria-selected={isActive}
-            onClick={() => onChange(opt.value)}
-            className={`${baseBtn} ${isActive ? activeClass : inactive}`}
-          >
-            {opt.label}
-          </button>
-        );
-      })}
-    </div>
+    <ModuleTabsScroller contentClassName={`${shell} ${className}`} shadows>
+      <div role="tablist" className="inline-flex items-center gap-1.5">
+        {options.map((opt) => {
+          const isActive = opt.value === value;
+          const activeClass =
+            variant === 'accent'
+              ? activeAccent
+              : 'bg-gray-900 dark:bg-white text-white dark:text-gray-900 shadow-sm';
+          return (
+            <button
+              key={String(opt.value)}
+              type="button"
+              role="tab"
+              aria-selected={isActive}
+              onClick={() => onChange(opt.value)}
+              className={`${baseBtn} ${isActive ? activeClass : inactive}`}
+            >
+              {opt.label}
+            </button>
+          );
+        })}
+      </div>
+    </ModuleTabsScroller>
   );
 }

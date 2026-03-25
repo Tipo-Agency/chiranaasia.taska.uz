@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   BusinessProcess,
   Client,
@@ -17,6 +17,41 @@ import {
   ContentPost
 } from '../../types';
 import { ModuleSegmentedControl } from '../ui/ModuleSegmentedControl';
+
+export type ArchiveTabId =
+  | 'tasks'
+  | 'users'
+  | 'employees'
+  | 'docs'
+  | 'posts'
+  | 'projects'
+  | 'departments'
+  | 'financeCategories'
+  | 'salesFunnels'
+  | 'tables'
+  | 'businessProcesses'
+  | 'deals'
+  | 'clients'
+  | 'contracts'
+  | 'meetings';
+
+export const ARCHIVE_TAB_OPTIONS: Array<{ id: ArchiveTabId; label: string }> = [
+  { id: 'tasks', label: 'Задачи' },
+  { id: 'users', label: 'Пользователи' },
+  { id: 'employees', label: 'Сотрудники' },
+  { id: 'projects', label: 'Проекты' },
+  { id: 'departments', label: 'Подразделения' },
+  { id: 'financeCategories', label: 'Статьи расходов' },
+  { id: 'salesFunnels', label: 'Воронки' },
+  { id: 'tables', label: 'Таблицы' },
+  { id: 'businessProcesses', label: 'Бизнес-процессы' },
+  { id: 'deals', label: 'Сделки' },
+  { id: 'clients', label: 'Клиенты' },
+  { id: 'contracts', label: 'Договоры' },
+  { id: 'docs', label: 'Документы' },
+  { id: 'posts', label: 'Посты' },
+  { id: 'meetings', label: 'Встречи' },
+];
 
 /**
  * Архив со вкладками: внутри разные сущности.
@@ -54,6 +89,11 @@ export const ArchiveView: React.FC<{
   onRestoreClient?: (clientId: string) => void;
   onRestoreContract?: (contractId: string) => void;
   onRestoreMeeting?: (meetingId: string) => void;
+  /** embedded — вкладки/хедер рисуются снаружи (в шапке модуля) */
+  layout?: 'standalone' | 'embedded';
+  activeTab?: ArchiveTabId;
+  onTabChange?: (tab: ArchiveTabId) => void;
+  query?: string;
 }> = ({
   tasks,
   users: initialUsers = [],
@@ -86,24 +126,15 @@ export const ArchiveView: React.FC<{
   onRestoreClient,
   onRestoreContract,
   onRestoreMeeting
+  ,
+  layout = 'standalone',
+  activeTab,
+  onTabChange,
+  query = ''
 }) => {
-  const [archiveTab, setArchiveTab] = useState<
-    | 'tasks'
-    | 'users'
-    | 'employees'
-    | 'docs'
-    | 'posts'
-    | 'projects'
-    | 'departments'
-    | 'financeCategories'
-    | 'salesFunnels'
-    | 'tables'
-    | 'businessProcesses'
-    | 'deals'
-    | 'clients'
-    | 'contracts'
-    | 'meetings'
-  >('tasks');
+  const [localTab, setLocalTab] = useState<ArchiveTabId>('tasks');
+  const archiveTab = activeTab ?? localTab;
+  const setArchiveTab = onTabChange ?? setLocalTab;
 
   const [allUsers, setAllUsers] = useState<User[]>(initialUsers);
   const [allEmployees, setAllEmployees] = useState<EmployeeInfo[]>(initialEmployees);
@@ -139,7 +170,15 @@ export const ArchiveView: React.FC<{
     onRestore?: (id: string) => void,
     emptyMessage: string = 'Архив пуст'
   ) => {
-    const archived = items.filter(item => item.isArchived);
+    const q = String(query || '').trim().toLowerCase();
+    const archived = items
+      .filter(item => item.isArchived)
+      .filter(item => {
+        if (!q) return true;
+        const label = String(getLabel(item) || '').toLowerCase();
+        return label.includes(q);
+      });
+
     if (archived.length === 0) {
       return <p className="text-gray-500 dark:text-gray-400">{emptyMessage}</p>;
     }
@@ -161,88 +200,94 @@ export const ArchiveView: React.FC<{
     ));
   };
 
-  const archiveTabOptions = [
-    { id: 'tasks' as const, label: 'Задачи' },
-    { id: 'users' as const, label: 'Пользователи' },
-    { id: 'employees' as const, label: 'Сотрудники' },
-    { id: 'projects' as const, label: 'Проекты' },
-    { id: 'departments' as const, label: 'Подразделения' },
-    { id: 'financeCategories' as const, label: 'Статьи расходов' },
-    { id: 'salesFunnels' as const, label: 'Воронки' },
-    { id: 'tables' as const, label: 'Таблицы' },
-    { id: 'businessProcesses' as const, label: 'Бизнес-процессы' },
-    { id: 'deals' as const, label: 'Сделки' },
-    { id: 'clients' as const, label: 'Клиенты' },
-    { id: 'contracts' as const, label: 'Договоры' },
-    { id: 'docs' as const, label: 'Документы' },
-    { id: 'posts' as const, label: 'Посты' },
-    { id: 'meetings' as const, label: 'Встречи' }
-  ];
+  const emptyMessageByTab = useMemo(() => {
+    switch (archiveTab) {
+      case 'tasks': return 'Архив задач пуст';
+      case 'users': return 'Архив пользователей пуст';
+      case 'employees': return 'Архив сотрудников пуст';
+      case 'projects': return 'Архив проектов пуст';
+      case 'departments': return 'Архив подразделений пуст';
+      case 'financeCategories': return 'Архив статей расходов пуст';
+      case 'salesFunnels': return 'Архив воронок пуст';
+      case 'tables': return 'Архив таблиц пуст';
+      case 'businessProcesses': return 'Архив бизнес-процессов пуст';
+      case 'deals': return 'Архив сделок пуст';
+      case 'clients': return 'Архив клиентов пуст';
+      case 'contracts': return 'Архив договоров пуст';
+      case 'docs': return 'Архив документов пуст';
+      case 'posts': return 'Архив постов пуст';
+      case 'meetings': return 'Архив встреч пуст';
+      default: return 'Архив пуст';
+    }
+  }, [archiveTab]);
 
-  return (
-    <div className="space-y-4">
-      <h3 className="font-bold text-lg text-gray-800 dark:text-white tracking-tight">Архив</h3>
-
-      <ModuleSegmentedControl
-        variant="neutral"
-        value={archiveTab}
-        onChange={v => setArchiveTab(v as typeof archiveTab)}
-        options={archiveTabOptions.map(t => ({ value: t.id, label: t.label }))}
-        className="w-full max-w-full justify-start"
-      />
-
-      {/* Контент вкладок */}
-      <div className="space-y-2 max-h-[60vh] overflow-y-auto">
+  const content = (
+    <div className="space-y-2">
         {archiveTab === 'tasks' &&
-          renderArchiveList<Task>(tasks, t => t.title, onRestoreTask, 'Архив задач пуст')}
+          renderArchiveList<Task>(tasks, t => t.title, onRestoreTask, emptyMessageByTab)}
         {archiveTab === 'users' &&
-          renderArchiveList<User>(allUsers, u => u.name, onRestoreUser, 'Архив пользователей пуст')}
+          renderArchiveList<User>(allUsers, u => u.name, onRestoreUser, emptyMessageByTab)}
         {archiveTab === 'employees' &&
           renderArchiveList<EmployeeInfo>(
             allEmployees,
             e => getEmployeeName(e),
             onRestoreEmployee,
-            'Архив сотрудников пуст'
+            emptyMessageByTab
           )}
         {archiveTab === 'projects' &&
-          renderArchiveList<Project>(projects, p => p.name, onRestoreProject, 'Архив проектов пуст')}
+          renderArchiveList<Project>(projects, p => p.name, onRestoreProject, emptyMessageByTab)}
         {archiveTab === 'departments' &&
-          renderArchiveList<Department>(departments, d => d.name, onRestoreDepartment, 'Архив подразделений пуст')}
+          renderArchiveList<Department>(departments, d => d.name, onRestoreDepartment, emptyMessageByTab)}
         {archiveTab === 'financeCategories' &&
           renderArchiveList<FinanceCategory>(
             financeCategories,
             f => f.name,
             onRestoreFinanceCategory,
-            'Архив статей расходов пуст'
+            emptyMessageByTab
           )}
         {archiveTab === 'salesFunnels' &&
           renderArchiveList<SalesFunnel>(
             salesFunnels,
             s => s.name,
             onRestoreSalesFunnel,
-            'Архив воронок пуст'
+            emptyMessageByTab
           )}
         {archiveTab === 'tables' &&
-          renderArchiveList<TableCollection>(tables, t => t.name, onRestoreTable, 'Архив таблиц пуст')}
+          renderArchiveList<TableCollection>(tables, t => t.name, onRestoreTable, emptyMessageByTab)}
         {archiveTab === 'businessProcesses' &&
           renderArchiveList<BusinessProcess>(
             businessProcesses,
             b => b.title,
             onRestoreBusinessProcess,
-            'Архив бизнес-процессов пуст'
+            emptyMessageByTab
           )}
         {archiveTab === 'deals' &&
-          renderArchiveList<Deal>(deals, d => d.title || d.id, onRestoreDeal, 'Архив сделок пуст')}
+          renderArchiveList<Deal>(deals, d => d.title || d.id, onRestoreDeal, emptyMessageByTab)}
         {archiveTab === 'clients' &&
-          renderArchiveList<Client>(clients, c => c.name, onRestoreClient, 'Архив клиентов пуст')}
+          renderArchiveList<Client>(clients, c => c.name, onRestoreClient, emptyMessageByTab)}
         {archiveTab === 'contracts' &&
-          renderArchiveList<Contract>(contracts, c => c.number || c.id, onRestoreContract, 'Архив договоров пуст')}
-        {archiveTab === 'docs' && renderArchiveList<Doc>(docs, d => d.title, onRestoreDoc, 'Архив документов пуст')}
+          renderArchiveList<Contract>(contracts, c => c.number || c.id, onRestoreContract, emptyMessageByTab)}
+        {archiveTab === 'docs' && renderArchiveList<Doc>(docs, d => d.title, onRestoreDoc, emptyMessageByTab)}
         {archiveTab === 'posts' &&
-          renderArchiveList<ContentPost>(posts, p => p.topic, onRestorePost, 'Архив постов пуст')}
+          renderArchiveList<ContentPost>(posts, p => p.topic, onRestorePost, emptyMessageByTab)}
         {archiveTab === 'meetings' &&
-          renderArchiveList<Meeting>(meetings, m => m.title, onRestoreMeeting, 'Архив встреч пуст')}
-      </div>
+          renderArchiveList<Meeting>(meetings, m => m.title, onRestoreMeeting, emptyMessageByTab)}
+    </div>
+  );
+
+  if (layout === 'embedded') return content;
+
+  return (
+    <div className="space-y-4">
+      <h3 className="font-bold text-lg text-gray-800 dark:text-white tracking-tight">Архив</h3>
+      <ModuleSegmentedControl
+        variant="neutral"
+        value={archiveTab}
+        onChange={v => setArchiveTab(v as ArchiveTabId)}
+        options={ARCHIVE_TAB_OPTIONS.map(t => ({ value: t.id, label: t.label }))}
+        className="w-full max-w-full justify-start"
+      />
+      <div className="max-h-[60vh] overflow-y-auto">{content}</div>
     </div>
   );
 };

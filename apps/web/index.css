@@ -122,3 +122,12 @@ input[type='date']::-webkit-calendar-picker-indicator {
   height: 100%;
   border-radius: 0.5rem;
 }
+
+/* Hide scrollbars for tabs scrollers (we use edge shadows instead) */
+.tabs-scrollbar-hidden {
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE/Edge */
+}
+.tabs-scrollbar-hidden::-webkit-scrollbar {
+  display: none; /* Chrome/Safari */
+}
