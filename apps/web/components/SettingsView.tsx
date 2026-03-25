@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Project, Role, Task, User, StatusOption, PriorityOption, NotificationPreferences, AutomationRule, TableCollection, Deal, Department, FinanceCategory, Fund, SalesFunnel, Doc, ContentPost, EmployeeInfo, Client, Contract, BusinessProcess, Meeting, Warehouse } from '../types';
-import { User as UserIcon, Briefcase, Archive, Users, Building2, Wallet, TrendingUp, PiggyBank, PlugZap, ShieldAlert, Settings, BellRing, Zap, Package, ArrowLeft, Plus } from 'lucide-react';
+import { User as UserIcon, Briefcase, Archive, Users, Building2, Wallet, TrendingUp, PiggyBank, ShieldAlert, Settings, BellRing, Zap, Package, ArrowLeft, Plus } from 'lucide-react';
 import { Button, Input, ModuleFilterIconButton, ModulePageHeader, ModulePageShell, ModuleSegmentedControl, MODULE_PAGE_GUTTER, StandardModal } from './ui';
 import { ProfileSettings } from './settings/ProfileSettings';
 import { StructureSettings } from './settings/StructureSettings';
@@ -11,7 +11,7 @@ import DepartmentsView from './DepartmentsView';
 import { storageService } from '../services/storageService';
 import SalesFunnelsSettings from './settings/SalesFunnelsSettings';
 import { DEFAULT_NOTIFICATION_PREFS } from '../constants';
-import { IntegrationSettings } from './settings/IntegrationSettings';
+// Integrations are managed outside Settings now.
 import { ArchiveView, ARCHIVE_TAB_OPTIONS, type ArchiveTabId } from './settings/ArchiveView';
 import { FinanceSetupSettings } from './settings/FinanceSetupSettings';
 
@@ -91,8 +91,7 @@ const SETTINGS_TABS: { id: string; label: string; icon: React.ReactNode }[] = [
   { id: 'finance-setup', label: 'Финансы', icon: <Wallet size={14} /> },
   { id: 'sales-funnels', label: 'Воронки продаж', icon: <TrendingUp size={14} /> },
   { id: 'notifications', label: 'Уведомления', icon: <BellRing size={14} /> },
-  { id: 'events', label: 'События и роботы', icon: <Zap size={14} /> },
-  { id: 'integrations', label: 'Интеграции', icon: <PlugZap size={14} /> },
+  { id: 'events', label: 'Триггеры', icon: <Zap size={14} /> },
 ];
 
 const SettingsView: React.FC<SettingsViewProps> = ({ 
@@ -116,7 +115,7 @@ const SettingsView: React.FC<SettingsViewProps> = ({
   const normalizeTab = (t: string) => {
     if (t === 'spaces' || t === 'departments' || t === 'warehouses') return 'structure';
     if (t === 'finance-categories' || t === 'funds') return 'finance-setup';
-    if (t === 'system') return 'integrations';
+    if (t === 'integrations' || t === 'system') return 'notifications';
     return t;
   };
   const [activeTab, setActiveTab] = useState<string>(normalizeTab(initialTab));
@@ -348,13 +347,6 @@ const SettingsView: React.FC<SettingsViewProps> = ({
                   onSaveRule={onSaveAutomationRule!}
                   onDeleteRule={onDeleteAutomationRule!}
                   onUpdatePrefs={onUpdateNotificationPrefs}
-                />
-              )}
-              {activeTab === 'integrations' && (
-                <IntegrationSettings
-                  activeTab="integrations"
-                  currentUser={currentUser}
-                  onSaveDeal={onSaveDeal}
                 />
               )}
             </>

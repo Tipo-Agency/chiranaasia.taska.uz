@@ -48,9 +48,9 @@ export const ModuleTabsScroller: React.FC<{
   const edgeClass = useMemo(
     () => ({
       left:
-        'absolute left-0 top-0 bottom-0 w-6 pointer-events-none bg-gradient-to-r from-black/10 to-transparent dark:from-white/12',
+        'absolute left-0 top-0 bottom-0 w-6 pointer-events-none rounded-l-2xl bg-gradient-to-r from-black/10 to-transparent dark:from-white/12',
       right:
-        'absolute right-0 top-0 bottom-0 w-6 pointer-events-none bg-gradient-to-l from-black/10 to-transparent dark:from-white/12',
+        'absolute right-0 top-0 bottom-0 w-6 pointer-events-none rounded-r-2xl bg-gradient-to-l from-black/10 to-transparent dark:from-white/12',
     }),
     []
   );

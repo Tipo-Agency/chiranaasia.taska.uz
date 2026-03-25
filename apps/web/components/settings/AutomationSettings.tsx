@@ -1,7 +1,7 @@
 
-import React, { useState, useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { AutomationRule, NotificationPreferences, StatusOption } from '../../types';
-import { Zap, MessageSquare, Trash2, CheckSquare, FileText, Calendar, DollarSign, Users, Briefcase, Settings } from 'lucide-react';
+import { MessageSquare, Trash2, Zap } from 'lucide-react';
 import { TaskSelect } from '../TaskSelect';
 import { Button } from '../ui';
 
@@ -19,7 +19,7 @@ export const AutomationSettings: React.FC<AutomationSettingsProps> = ({
     activeTab, automationRules, notificationPrefs, statuses,
     onSaveRule, onDeleteRule, onUpdatePrefs
 }) => {
-    const [automationModule, setAutomationModule] = useState<'tasks' | 'docs' | 'meetings' | 'content' | 'finance' | 'crm' | 'employees' | 'bpm'>('tasks');
+    const [automationModule, setAutomationModule] = useState<AutomationRule['module']>('tasks');
     
     // Защита от undefined - используем значения по умолчанию
     const safePrefs = useMemo(() => {
@@ -240,86 +240,95 @@ export const AutomationSettings: React.FC<AutomationSettingsProps> = ({
     };
 
     if (activeTab === 'notifications' || activeTab === 'events') {
+        const isTriggers = activeTab === 'events';
+
         return (
-            <div className="space-y-6 max-w-5xl">
-                {/* Вкладки по модулям */}
-                <div className="flex items-center gap-2 bg-gray-100 dark:bg-[#252525] rounded-full p-1 text-xs overflow-x-auto">
-                    <button 
-                        onClick={() => setAutomationModule('tasks')} 
-                        className={`px-3 py-1.5 rounded-full flex items-center gap-1 whitespace-nowrap ${automationModule === 'tasks' ? 'bg-white dark:bg-[#191919] text-gray-900 dark:text-white shadow-sm' : 'text-gray-600 dark:text-gray-300'}`}
-                    >
-                        <CheckSquare size={14}/> Задачи
-                    </button>
-                    <button 
-                        onClick={() => setAutomationModule('docs')} 
-                        className={`px-3 py-1.5 rounded-full flex items-center gap-1 whitespace-nowrap ${automationModule === 'docs' ? 'bg-white dark:bg-[#191919] text-gray-900 dark:text-white shadow-sm' : 'text-gray-600 dark:text-gray-300'}`}
-                    >
-                        <FileText size={14}/> Документы
-                    </button>
-                    <button 
-                        onClick={() => setAutomationModule('meetings')} 
-                        className={`px-3 py-1.5 rounded-full flex items-center gap-1 whitespace-nowrap ${automationModule === 'meetings' ? 'bg-white dark:bg-[#191919] text-gray-900 dark:text-white shadow-sm' : 'text-gray-600 dark:text-gray-300'}`}
-                    >
-                        <Calendar size={14}/> Встречи
-                    </button>
-                    <button 
-                        onClick={() => setAutomationModule('content')} 
-                        className={`px-3 py-1.5 rounded-full flex items-center gap-1 whitespace-nowrap ${automationModule === 'content' ? 'bg-white dark:bg-[#191919] text-gray-900 dark:text-white shadow-sm' : 'text-gray-600 dark:text-gray-300'}`}
-                    >
-                        <FileText size={14}/> Контент-план
-                    </button>
-                    <button 
-                        onClick={() => setAutomationModule('finance')} 
-                        className={`px-3 py-1.5 rounded-full flex items-center gap-1 whitespace-nowrap ${automationModule === 'finance' ? 'bg-white dark:bg-[#191919] text-gray-900 dark:text-white shadow-sm' : 'text-gray-600 dark:text-gray-300'}`}
-                    >
-                        <DollarSign size={14}/> Финансы
-                    </button>
-                    <button 
-                        onClick={() => setAutomationModule('crm')} 
-                        className={`px-3 py-1.5 rounded-full flex items-center gap-1 whitespace-nowrap ${automationModule === 'crm' ? 'bg-white dark:bg-[#191919] text-gray-900 dark:text-white shadow-sm' : 'text-gray-600 dark:text-gray-300'}`}
-                    >
-                        <Briefcase size={14}/> CRM
-                    </button>
-                    <button 
-                        onClick={() => setAutomationModule('employees')} 
-                        className={`px-3 py-1.5 rounded-full flex items-center gap-1 whitespace-nowrap ${automationModule === 'employees' ? 'bg-white dark:bg-[#191919] text-gray-900 dark:text-white shadow-sm' : 'text-gray-600 dark:text-gray-300'}`}
-                    >
-                        <Users size={14}/> Сотрудники
-                    </button>
-                    <button 
-                        onClick={() => setAutomationModule('bpm')} 
-                        className={`px-3 py-1.5 rounded-full flex items-center gap-1 whitespace-nowrap ${automationModule === 'bpm' ? 'bg-white dark:bg-[#191919] text-gray-900 dark:text-white shadow-sm' : 'text-gray-600 dark:text-gray-300'}`}
-                    >
-                        <Settings size={14}/> Бизнес-процессы
-                    </button>
+            <div className="space-y-6 w-full max-w-none">
+                <div className="bg-white dark:bg-[#252525] border border-gray-200 dark:border-[#333] rounded-2xl p-4 sm:p-6">
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                        <div className="min-w-0">
+                            <div className="text-sm font-bold text-gray-900 dark:text-white">
+                                {isTriggers ? 'Триггеры' : 'Уведомления'}
+                            </div>
+                            <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                                {isTriggers
+                                    ? 'Автоматические правила: событие → действие.'
+                                    : 'Каналы доставки и Telegram-настройки.'}
+                            </div>
+                        </div>
+
+                        <div className="w-full sm:w-[320px]">
+                            <div className="text-[11px] font-bold text-gray-500 dark:text-gray-400 mb-1">
+                                Модуль
+                            </div>
+                            <TaskSelect
+                                value={automationModule}
+                                onChange={(val) => setAutomationModule(val as AutomationRule['module'])}
+                                options={[
+                                    { value: 'tasks', label: 'Задачи' },
+                                    { value: 'docs', label: 'Документы' },
+                                    { value: 'meetings', label: 'Встречи' },
+                                    { value: 'content', label: 'Контент-план' },
+                                    { value: 'finance', label: 'Финансы' },
+                                    { value: 'crm', label: 'CRM' },
+                                    { value: 'employees', label: 'Сотрудники' },
+                                    { value: 'bpm', label: 'Бизнес-процессы' },
+                                ]}
+                            />
+                        </div>
+                    </div>
                 </div>
 
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                    {activeTab === 'notifications' && (
-                    <div className="lg:col-span-2 bg-white dark:bg-[#252525] p-6 rounded-xl border border-gray-200 dark:border-[#333]">
-                        <h3 className="font-bold text-gray-800 dark:text-white mb-4">Глобальные каналы доставки</h3>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-                            {[
-                                { key: 'in_app', label: 'В системе' },
-                                { key: 'chat', label: 'В чате' },
-                                { key: 'telegram', label: 'Telegram' },
-                                { key: 'email', label: 'Email' },
-                            ].map((channel) => (
-                                <label key={channel.key} className="flex items-center justify-between rounded-lg border border-gray-200 dark:border-[#333] px-3 py-2 text-sm cursor-pointer">
-                                    <span className="text-gray-700 dark:text-gray-300">{channel.label}</span>
-                                    <input
-                                        type="checkbox"
-                                        checked={Boolean(safeChannels[channel.key as keyof typeof safeChannels])}
-                                        onChange={() => handleToggleGlobalChannel(channel.key as 'in_app' | 'chat' | 'telegram' | 'email')}
-                                        className="rounded text-blue-600 focus:ring-0"
-                                    />
-                                </label>
-                            ))}
+                {!isTriggers && (
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        <div className="bg-white dark:bg-[#252525] border border-gray-200 dark:border-[#333] rounded-2xl p-4 sm:p-6">
+                            <div className="text-sm font-bold text-gray-900 dark:text-white">
+                                Каналы доставки
+                            </div>
+                            <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                                Что именно включено у пользователя — зависит от его настроек и прав.
+                            </div>
+
+                            <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                {[
+                                    { key: 'in_app', label: 'В системе' },
+                                    { key: 'chat', label: 'В чате' },
+                                    { key: 'telegram', label: 'Telegram' },
+                                    { key: 'email', label: 'Email' },
+                                ].map((channel) => (
+                                    <label
+                                        key={channel.key}
+                                        className="flex items-center justify-between rounded-xl border border-gray-200 dark:border-[#333] px-3 py-2 text-sm cursor-pointer hover:bg-gray-50 dark:hover:bg-[#303030]"
+                                    >
+                                        <span className="text-gray-800 dark:text-gray-200 font-semibold">
+                                            {channel.label}
+                                        </span>
+                                        <input
+                                            type="checkbox"
+                                            checked={Boolean(safeChannels[channel.key as keyof typeof safeChannels])}
+                                            onChange={() =>
+                                                handleToggleGlobalChannel(
+                                                    channel.key as 'in_app' | 'chat' | 'telegram' | 'email'
+                                                )
+                                            }
+                                            className="rounded text-blue-600 focus:ring-0"
+                                        />
+                                    </label>
+                                ))}
+                            </div>
                         </div>
-                        <div className="mt-5">
-                            <div className="flex items-center justify-between">
-                                <h4 className="font-semibold text-sm text-gray-800 dark:text-white">Тихие часы</h4>
-                                <label className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400 cursor-pointer">
+
+                        <div className="bg-white dark:bg-[#252525] border border-gray-200 dark:border-[#333] rounded-2xl p-4 sm:p-6">
+                            <div className="flex items-center justify-between gap-3">
+                                <div>
+                                    <div className="text-sm font-bold text-gray-900 dark:text-white">
+                                        Тихие часы
+                                    </div>
+                                    <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                                        Не отправлять уведомления в выбранное время.
+                                    </div>
+                                </div>
+                                <label className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400 cursor-pointer select-none">
                                     <input
                                         type="checkbox"
                                         checked={Boolean(safeQuietHours.enabled)}
@@ -329,197 +338,259 @@ export const AutomationSettings: React.FC<AutomationSettingsProps> = ({
                                     Включить
                                 </label>
                             </div>
-                            <div className="mt-3 grid grid-cols-1 sm:grid-cols-3 gap-3">
+
+                            <div className="mt-4 grid grid-cols-1 sm:grid-cols-3 gap-3">
                                 <input
                                     type="time"
                                     value={safeQuietHours.start || '22:00'}
                                     onChange={(e) => handleQuietHoursChange({ start: e.target.value })}
-                                    className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-[#252525] text-gray-900 dark:text-gray-100"
+                                    className="w-full border border-gray-300 dark:border-gray-600 rounded-xl px-3 py-2 text-sm bg-white dark:bg-[#252525] text-gray-900 dark:text-gray-100"
                                 />
                                 <input
                                     type="time"
                                     value={safeQuietHours.end || '08:00'}
                                     onChange={(e) => handleQuietHoursChange({ end: e.target.value })}
-                                    className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-[#252525] text-gray-900 dark:text-gray-100"
+                                    className="w-full border border-gray-300 dark:border-gray-600 rounded-xl px-3 py-2 text-sm bg-white dark:bg-[#252525] text-gray-900 dark:text-gray-100"
                                 />
                                 <input
                                     type="text"
                                     value={safeQuietHours.timezone || 'Asia/Tashkent'}
                                     onChange={(e) => handleQuietHoursChange({ timezone: e.target.value })}
-                                    placeholder="Timezone"
-                                    className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-[#252525] text-gray-900 dark:text-gray-100"
+                                    placeholder="Asia/Tashkent"
+                                    className="w-full border border-gray-300 dark:border-gray-600 rounded-xl px-3 py-2 text-sm bg-white dark:bg-[#252525] text-gray-900 dark:text-gray-100"
                                 />
                             </div>
                         </div>
-                    </div>
-                    )}
 
-                    {/* Настройки уведомлений для модуля */}
-                    {activeTab === 'notifications' && (
-                    <div className="bg-white dark:bg-[#252525] p-6 rounded-xl border border-gray-200 dark:border-[#333]">
-                        <h3 className="font-bold text-gray-800 dark:text-white mb-2">Настройки уведомлений</h3>
-                        <p className="text-xs text-gray-500 dark:text-gray-400 mb-4">
-                            Уведомления в системе всегда включены для всех пользователей. Здесь настраиваются только Telegram уведомления.
-                        </p>
-                        <div className="space-y-4">
-                            {getModuleNotificationPrefs(automationModule).map(pref => (
-                                <div key={pref.key} className="flex items-center justify-between py-2 border-b border-gray-100 dark:border-[#333]">
-                                    <div className="flex-1">
-                                        <div className="font-bold text-gray-900 dark:text-white text-sm">{pref.label}</div>
-                                        <div className="text-xs text-gray-500 dark:text-gray-400">{pref.description}</div>
+                        <div className="lg:col-span-2 bg-white dark:bg-[#252525] border border-gray-200 dark:border-[#333] rounded-2xl overflow-hidden">
+                            <div className="px-4 py-3 border-b border-gray-100 dark:border-[#333]">
+                                <div className="text-sm font-bold text-gray-900 dark:text-white">
+                                    Telegram уведомления по событиям
+                                </div>
+                                <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                                    Для выбранного модуля: {getModuleNotificationPrefs(automationModule).length} вариантов.
+                                </div>
+                            </div>
+
+                            <div className="divide-y divide-gray-100 dark:divide-[#333]">
+                                {getModuleNotificationPrefs(automationModule).map((pref) => (
+                                    <div key={pref.key} className="px-4 py-3 flex flex-col sm:flex-row sm:items-center gap-3">
+                                        <div className="flex-1 min-w-0">
+                                            <div className="text-sm font-semibold text-gray-900 dark:text-white">
+                                                {pref.label}
+                                            </div>
+                                            <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                                                {pref.description}
+                                            </div>
+                                        </div>
+
+                                        <div className="flex items-center gap-4 shrink-0">
+                                            <label className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400 cursor-pointer select-none">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={safePrefs[pref.key].telegramPersonal}
+                                                    onChange={() => handleTogglePref(pref.key, 'telegramPersonal')}
+                                                    className="rounded text-blue-600 focus:ring-0"
+                                                />
+                                                Личное
+                                            </label>
+                                            <label className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400 cursor-pointer select-none">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={safePrefs[pref.key].telegramGroup}
+                                                    onChange={() => handleTogglePref(pref.key, 'telegramGroup')}
+                                                    className="rounded text-blue-600 focus:ring-0"
+                                                />
+                                                Группа
+                                            </label>
+                                        </div>
                                     </div>
-                                    <div className="flex gap-4">
-                                        <label className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400 cursor-pointer">
-                                            <input 
-                                                type="checkbox" 
-                                                checked={safePrefs[pref.key].telegramPersonal} 
-                                                onChange={() => handleTogglePref(pref.key, 'telegramPersonal')} 
-                                                className="rounded text-blue-600 focus:ring-0"
-                                            /> 
-                                            Личный чат
-                                        </label>
-                                        <label className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400 cursor-pointer">
-                                            <input 
-                                                type="checkbox" 
-                                                checked={safePrefs[pref.key].telegramGroup} 
-                                                onChange={() => handleTogglePref(pref.key, 'telegramGroup')} 
-                                                className="rounded text-blue-600 focus:ring-0"
-                                            /> 
-                                            Группа
-                                        </label>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {isTriggers && (
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        <div className="bg-white dark:bg-[#252525] border border-gray-200 dark:border-[#333] rounded-2xl overflow-hidden">
+                            <div className="px-4 py-3 border-b border-gray-100 dark:border-[#333]">
+                                <div className="text-sm font-bold text-gray-900 dark:text-white">
+                                    Создать триггер
+                                </div>
+                                <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                                    Событие → условия → действие.
+                                </div>
+                            </div>
+
+                            <form onSubmit={handleAutomationSubmit} className="p-4 sm:p-6 space-y-4">
+                                <div>
+                                    <div className="text-[11px] font-bold text-gray-500 dark:text-gray-400 mb-1">
+                                        Название
+                                    </div>
+                                    <input
+                                        required
+                                        value={autoName}
+                                        onChange={(e) => setAutoName(e.target.value)}
+                                        placeholder="Например: Напомнить о дедлайне"
+                                        className="w-full border border-gray-300 dark:border-gray-600 rounded-xl px-3 py-2 text-sm bg-white dark:bg-[#252525] text-gray-900 dark:text-gray-100"
+                                    />
+                                </div>
+
+                                <div>
+                                    <div className="text-[11px] font-bold text-gray-500 dark:text-gray-400 mb-1">
+                                        Событие
+                                    </div>
+                                    <TaskSelect
+                                        value={autoTrigger}
+                                        onChange={(val) => setAutoTrigger(val as AutomationRule['trigger'])}
+                                        options={getModuleTriggers(automationModule).map((t) => ({
+                                            value: t.value,
+                                            label: t.label,
+                                        }))}
+                                    />
+                                </div>
+
+                                {autoTrigger.includes('status') && (
+                                    <div>
+                                        <div className="text-[11px] font-bold text-gray-500 dark:text-gray-400 mb-1">
+                                            Условие: статус стал
+                                        </div>
+                                        <TaskSelect
+                                            value={autoStatusTo}
+                                            onChange={setAutoStatusTo}
+                                            options={statuses.map((s) => ({ value: s.name, label: s.name }))}
+                                        />
+                                    </div>
+                                )}
+
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                    <div>
+                                        <div className="text-[11px] font-bold text-gray-500 dark:text-gray-400 mb-1">
+                                            Действие
+                                        </div>
+                                        <TaskSelect
+                                            value={autoActionType}
+                                            onChange={(val) =>
+                                                setAutoActionType(val as 'telegram_message' | 'approval_request')
+                                            }
+                                            options={[
+                                                { value: 'telegram_message', label: 'Сообщение' },
+                                                { value: 'approval_request', label: 'Согласование' },
+                                            ]}
+                                        />
+                                    </div>
+
+                                    <div>
+                                        <div className="text-[11px] font-bold text-gray-500 dark:text-gray-400 mb-1">
+                                            Получатель
+                                        </div>
+                                        <TaskSelect
+                                            value={autoTarget}
+                                            onChange={(val) => setAutoTarget(val as any)}
+                                            options={[
+                                                { value: 'assignee', label: 'Исполнитель' },
+                                                { value: 'creator', label: 'Создатель' },
+                                                { value: 'manager', label: 'Руководитель' },
+                                                { value: 'admin', label: 'Администратор' },
+                                                { value: 'specific', label: 'Пользователь' },
+                                            ]}
+                                        />
                                     </div>
                                 </div>
-                            ))}
+
+                                {autoActionType === 'approval_request' && (
+                                    <div>
+                                        <div className="text-[11px] font-bold text-gray-500 dark:text-gray-400 mb-1">
+                                            Тип согласования
+                                        </div>
+                                        <TaskSelect
+                                            value={autoApprovalType}
+                                            onChange={(val) => setAutoApprovalType(val as any)}
+                                            options={[
+                                                { value: 'purchase_request', label: 'Заявка на приобретение' },
+                                                { value: 'process_step', label: 'Этап бизнес‑процесса' },
+                                                { value: 'document', label: 'Документ' },
+                                                { value: 'deal', label: 'Сделка' },
+                                            ]}
+                                        />
+                                    </div>
+                                )}
+
+                                {autoActionType === 'telegram_message' && (
+                                    <div>
+                                        <div className="text-[11px] font-bold text-gray-500 dark:text-gray-400 mb-1">
+                                            Текст сообщения
+                                        </div>
+                                        <textarea
+                                            value={autoTemplate}
+                                            onChange={(e) => setAutoTemplate(e.target.value)}
+                                            className="w-full border border-gray-300 dark:border-gray-600 rounded-xl px-3 py-2 text-sm bg-white dark:bg-[#252525] text-gray-900 dark:text-gray-100"
+                                            rows={3}
+                                        />
+                                        <div className="text-[11px] text-gray-400 mt-1">
+                                            Переменные: {'{task_title}'}, {'{status}'}, {'{priority}'},{' '}
+                                            {'{user_name}'}
+                                        </div>
+                                    </div>
+                                )}
+
+                                <Button type="submit" size="md" fullWidth>
+                                    Создать
+                                </Button>
+                            </form>
+                        </div>
+
+                        <div className="bg-white dark:bg-[#252525] border border-gray-200 dark:border-[#333] rounded-2xl overflow-hidden">
+                            <div className="px-4 py-3 border-b border-gray-100 dark:border-[#333]">
+                                <div className="text-sm font-bold text-gray-900 dark:text-white">
+                                    Активные триггеры
+                                </div>
+                                <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                                    Для выбранного модуля.
+                                </div>
+                            </div>
+
+                            <div className="divide-y divide-gray-100 dark:divide-[#333]">
+                                {automationRules.filter((r) => r.module === automationModule).map((rule) => (
+                                    <div key={rule.id} className="px-4 py-3 flex items-start gap-3">
+                                        <div className="mt-0.5 text-yellow-500 shrink-0">
+                                            <Zap size={16} />
+                                        </div>
+                                        <div className="flex-1 min-w-0">
+                                            <div className="text-sm font-semibold text-gray-900 dark:text-white truncate">
+                                                {rule.name}
+                                            </div>
+                                            <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                                                <span className="font-semibold">Если:</span>{' '}
+                                                {getModuleTriggers(rule.module).find((t) => t.value === rule.trigger)
+                                                    ?.label || rule.trigger}
+                                                {' · '}
+                                                <span className="font-semibold">То:</span>{' '}
+                                                {rule.action.type === 'approval_request'
+                                                    ? 'Согласование'
+                                                    : 'Сообщение'}
+                                            </div>
+                                        </div>
+                                        <button
+                                            onClick={() => onDeleteRule(rule.id)}
+                                            className="text-gray-400 hover:text-red-500 p-1 rounded-lg hover:bg-gray-50 dark:hover:bg-[#303030]"
+                                            title="Удалить"
+                                        >
+                                            <Trash2 size={16} />
+                                        </button>
+                                    </div>
+                                ))}
+
+                                {automationRules.filter((r) => r.module === automationModule).length === 0 && (
+                                    <div className="px-4 py-10 text-center text-sm text-gray-500 dark:text-gray-400">
+                                        Нет триггеров для этого модуля
+                                    </div>
+                                )}
+                            </div>
                         </div>
                     </div>
-                    )}
-
-                    {/* Создание правил автоматизации */}
-                    <div className={`${activeTab === 'events' ? 'lg:col-span-2' : ''} bg-gray-50 dark:bg-[#202020] p-6 rounded-xl border border-gray-200 dark:border-[#333]`}>
-                        <h3 className="font-bold text-gray-800 dark:text-white mb-4">Создать правило</h3>
-                        <form onSubmit={handleAutomationSubmit} className="space-y-4">
-                            <input 
-                                required 
-                                value={autoName} 
-                                onChange={e => setAutoName(e.target.value)} 
-                                placeholder="Название правила" 
-                                className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-4 py-2 text-sm bg-white dark:bg-[#252525] text-gray-900 dark:text-gray-100" 
-                            />
-                            
-                            <div>
-                                <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 mb-1">Когда (Триггер)</label>
-                                <TaskSelect
-                                    value={autoTrigger}
-                                    onChange={(val) => setAutoTrigger(val as AutomationRule['trigger'])}
-                                    options={getModuleTriggers(automationModule).map(t => ({ value: t.value, label: t.label }))}
-                                />
-                            </div>
-
-                            {autoTrigger.includes('status') && (
-                                <div>
-                                    <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 mb-1">Статус стал</label>
-                                    <TaskSelect
-                                        value={autoStatusTo}
-                                        onChange={setAutoStatusTo}
-                                        options={statuses.map(s => ({ value: s.name, label: s.name }))}
-                                    />
-                                </div>
-                            )}
-
-                            <div>
-                                <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 mb-1">Действие</label>
-                                <TaskSelect
-                                    value={autoActionType}
-                                    onChange={(val) => setAutoActionType(val as 'telegram_message' | 'approval_request')}
-                                    options={[
-                                        { value: 'telegram_message', label: 'Отправить сообщение' },
-                                        { value: 'approval_request', label: 'Запрос на согласование' }
-                                    ]}
-                                />
-                            </div>
-
-                            {autoActionType === 'approval_request' && (
-                                <div>
-                                    <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 mb-1">Тип согласования</label>
-                                    <TaskSelect
-                                        value={autoApprovalType}
-                                        onChange={(val) => setAutoApprovalType(val as any)}
-                                        options={[
-                                            { value: 'purchase_request', label: 'Заявка на приобретение' },
-                                            { value: 'process_step', label: 'Этап бизнес-процесса' },
-                                            { value: 'document', label: 'Документ' },
-                                            { value: 'deal', label: 'Сделка' }
-                                        ]}
-                                    />
-                                </div>
-                            )}
-
-                            {autoActionType === 'telegram_message' && (
-                                <div>
-                                    <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 mb-1">Шаблон сообщения</label>
-                                    <textarea 
-                                        value={autoTemplate} 
-                                        onChange={e => setAutoTemplate(e.target.value)} 
-                                        className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-[#252525] text-gray-900 dark:text-gray-100" 
-                                        rows={3} 
-                                    />
-                                    <p className="text-xs text-gray-400 mt-1">Доступные переменные: {'{task_title}'}, {'{status}'}, {'{priority}'}, {'{user_name}'}</p>
-                                </div>
-                            )}
-
-                            <div>
-                                <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 mb-1">Получатель</label>
-                                <TaskSelect
-                                    value={autoTarget}
-                                    onChange={(val) => setAutoTarget(val as any)}
-                                    options={[
-                                        { value: 'assignee', label: 'Исполнитель' },
-                                        { value: 'creator', label: 'Создатель' },
-                                        { value: 'manager', label: 'Руководитель' },
-                                        { value: 'admin', label: 'Администратор' },
-                                        { value: 'specific', label: 'Конкретный пользователь' }
-                                    ]}
-                                />
-                            </div>
-
-                            <Button type="submit" size="md" fullWidth>
-                                Создать правило
-                            </Button>
-                        </form>
-                    </div>
-                </div>
-
-                {/* Список правил */}
-                <div className="space-y-3">
-                    <h3 className="font-bold text-gray-800 dark:text-white">Активные правила</h3>
-                    {automationRules.filter(r => r.module === automationModule).map(rule => (
-                        <div key={rule.id} className="border border-gray-200 dark:border-[#333] rounded-xl p-5 bg-white dark:bg-[#252525] hover:shadow-md transition-all">
-                            <div className="flex justify-between items-start mb-2">
-                                <div className="font-bold text-base text-gray-900 dark:text-white flex items-center gap-2">
-                                    <Zap size={18} className="text-yellow-500"/> {rule.name}
-                                </div>
-                                <button onClick={() => onDeleteRule(rule.id)} className="text-gray-400 hover:text-red-500 p-1"><Trash2 size={16}/></button>
-                            </div>
-                            <div className="text-sm text-gray-600 dark:text-gray-400 space-y-1">
-                                <div className="flex items-center gap-2">
-                                    <Zap size={14} className="text-blue-500"/> 
-                                    <span className="font-semibold">Если:</span> {getModuleTriggers(rule.module).find(t => t.value === rule.trigger)?.label || rule.trigger}
-                                </div>
-                                <div className="flex items-center gap-2">
-                                    <MessageSquare size={14} className="text-green-500"/> 
-                                    <span className="font-semibold">То:</span> {
-                                        rule.action.type === 'approval_request' 
-                                            ? `Запрос на согласование: ${rule.action.approvalType}` 
-                                            : 'Отправить сообщение'
-                                    }
-                                </div>
-                            </div>
-                        </div>
-                    ))}
-                    {automationRules.filter(r => r.module === automationModule).length === 0 && (
-                        <p className="text-gray-500 dark:text-gray-400 text-center py-8">Нет правил для этого модуля</p>
-                    )}
-                </div>
+                )}
             </div>
         );
     }
