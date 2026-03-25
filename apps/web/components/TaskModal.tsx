@@ -51,17 +51,21 @@ const TaskModal: React.FC<TaskModalProps> = ({
     return 'Задача';
   }, [taskType]);
 
+  const activeStatuses = useMemo(() => statuses.filter((s) => !s.isArchived), [statuses]);
+  const activePriorities = useMemo(() => priorities.filter((p) => !p.isArchived), [priorities]);
+  const activeProjects = useMemo(() => projects.filter((p) => !p.isArchived), [projects]);
+
   const hideChat = taskType === 'idea' || taskType === 'feature';
   // Fields
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
-  const [priority, setPriority] = useState<string>(priorities[0]?.name || '');
+  const [priority, setPriority] = useState<string>(activePriorities[0]?.name || '');
   const [projectId, setProjectId] = useState<string>(projects[0]?.id || '');
   const [assigneeId, setAssigneeId] = useState<string>('');
   const [assigneeIds, setAssigneeIds] = useState<string[]>([]);
   const [startDate, setStartDate] = useState(getTodayLocalDate());
   const [endDate, setEndDate] = useState(getTodayLocalDate());
-  const [status, setStatus] = useState<string>(statuses[0]?.name || '');
+  const [status, setStatus] = useState<string>(activeStatuses[0]?.name || '');
   const [contentPostId, setContentPostId] = useState<string | undefined>(undefined);
   const [category, setCategory] = useState<string>('');
   const [parentTaskId, setParentTaskId] = useState<string>('');
@@ -145,13 +149,13 @@ const TaskModal: React.FC<TaskModalProps> = ({
     if (currentTask && currentTask.id && currentTask.id !== prevTaskId) {
         const newTitle = currentTask.title || '';
         const newDescription = currentTask.description || '';
-        const newPriority = currentTask.priority || priorities[0]?.name || '';
+        const newPriority = currentTask.priority || activePriorities[0]?.name || '';
         const newProjectId = currentTask.projectId || '';
         const newAssigneeId = currentTask.assigneeId || '';
         const newAssigneeIds = currentTask.assigneeIds || (currentTask.assigneeId ? [currentTask.assigneeId] : []);
         const newStartDate = normalizeDateForInput(currentTask.startDate) || getTodayLocalDate();
         const newEndDate = normalizeDateForInput(currentTask.endDate) || getTodayLocalDate();
-        const newStatus = currentTask.status || statuses[0]?.name || '';
+        const newStatus = currentTask.status || activeStatuses[0]?.name || '';
         const newCategory = currentTask.category || '';
         const newParent = currentTask.parentTaskId || '';
         
@@ -189,8 +193,8 @@ const TaskModal: React.FC<TaskModalProps> = ({
         const newDescription = currentTask.description || '';
         const newAssigneeId = currentTask.assigneeId || currentUser.id;
         const newAssigneeIds = currentTask.assigneeIds || (currentTask.assigneeId ? [currentTask.assigneeId] : [currentUser.id]);
-        const newStatus = currentTask.status || statuses[0]?.name || '';
-        const newPriority = currentTask.priority || priorities[0]?.name || '';
+        const newStatus = currentTask.status || activeStatuses[0]?.name || '';
+        const newPriority = currentTask.priority || activePriorities[0]?.name || '';
         const newProjectId = currentTask.projectId || '';
         const newStartDate = normalizeDateForInput(currentTask.startDate) || getTodayLocalDate();
         const newEndDate = normalizeDateForInput(currentTask.endDate) || getTodayLocalDate();
@@ -231,7 +235,7 @@ const TaskModal: React.FC<TaskModalProps> = ({
         setDescription('');
         setAssigneeId(currentUser.id);
         setAssigneeIds([currentUser.id]);
-        setStatus(statuses[0]?.name || '');
+        setStatus(activeStatuses[0]?.name || '');
         setContentPostId(undefined);
         setParentTaskId('');
         setPrevTaskId('new');
@@ -240,28 +244,28 @@ const TaskModal: React.FC<TaskModalProps> = ({
         initialValuesRef.current = {
           title: '',
           description: '',
-          priority: priorities[0]?.name || '',
+          priority: activePriorities[0]?.name || '',
           projectId: '',
           assigneeId: currentUser.id,
           assigneeIds: [currentUser.id],
           startDate: getTodayLocalDate(),
           endDate: getTodayLocalDate(),
-          status: statuses[0]?.name || '',
+          status: activeStatuses[0]?.name || '',
           category: '',
           parentTaskId: '',
         };
     }
-  }, [currentTask, currentUser, prevTaskId, priorities, statuses]);
+  }, [currentTask, currentUser, prevTaskId, priorities, statuses, activePriorities, activeStatuses]);
 
   useEffect(() => {
-    if (taskType !== 'idea' && !status && statuses.length > 0) {
-      setStatus(statuses[0].name);
+    if (taskType !== 'idea' && !status && activeStatuses.length > 0) {
+      setStatus(activeStatuses[0].name);
     }
 
-    if (taskType !== 'idea' && taskType !== 'feature' && !priority && priorities.length > 0) {
-      setPriority(priorities[0].name);
+    if (taskType !== 'idea' && taskType !== 'feature' && !priority && activePriorities.length > 0) {
+      setPriority(activePriorities[0].name);
     }
-  }, [taskType, status, priority, statuses, priorities]);
+  }, [taskType, status, priority, activeStatuses, activePriorities]);
 
   const handleSubmit = (e?: React.FormEvent) => {
     if (e) e.preventDefault();
@@ -292,7 +296,7 @@ const TaskModal: React.FC<TaskModalProps> = ({
       assigneeId: assigneeIds[0] || null, 
       assigneeIds,
       // Для функций тоже сохраняем выбранный статус (не форсим "Не начато")
-      status: taskType === 'idea' ? undefined : (status || (statuses[0]?.name || 'Не начато')),
+      status: taskType === 'idea' ? undefined : (status || (activeStatuses[0]?.name || 'Не начато')),
       startDate: finalStartDate,
       endDate: finalEndDate,
       priority: taskType === 'idea' ? undefined : priority,
@@ -711,7 +715,7 @@ const TaskModal: React.FC<TaskModalProps> = ({
                             <div className="w-28 min-w-[7rem] shrink-0 pr-2 text-[10px] font-semibold text-gray-500 dark:text-gray-400 uppercase flex items-center gap-2"><CheckCircle2 size={14} className="shrink-0 text-gray-400" strokeWidth={2} /> Статус</div>
                             <StatusPrioritySelect
                                 value={status}
-                                options={statuses}
+                                options={activeStatuses}
                                 onChange={setStatus}
                                 type="status"
                                 getColor={getStatusColor}
@@ -725,7 +729,7 @@ const TaskModal: React.FC<TaskModalProps> = ({
                             <div className="w-28 min-w-[7rem] shrink-0 pr-2 text-[10px] font-semibold text-gray-500 dark:text-gray-400 uppercase flex items-center gap-2"><Flag size={14} className="shrink-0 text-gray-400" strokeWidth={2} /> Приоритет</div>
                             <StatusPrioritySelect
                                 value={priority}
-                                options={priorities}
+                                options={activePriorities}
                                 onChange={setPriority}
                                 type="priority"
                                 getColor={getPriorityColor}
@@ -788,7 +792,7 @@ const TaskModal: React.FC<TaskModalProps> = ({
                         <div className="w-28 min-w-[7rem] shrink-0 pr-2 text-[10px] font-semibold text-gray-500 dark:text-gray-400 uppercase flex items-center gap-2"><Tag size={14} className="shrink-0 text-gray-400" strokeWidth={2} /> Модуль</div>
                         <ModuleSelect
                             value={projectId}
-                            options={projects}
+                            options={activeProjects}
                             onChange={setProjectId}
                             onCreateProject={onCreateProject}
                         />

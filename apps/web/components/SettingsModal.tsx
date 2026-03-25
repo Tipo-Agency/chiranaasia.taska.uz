@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Project, Role, Task, User, StatusOption, PriorityOption, NotificationPreferences, AutomationRule, TableCollection, Deal } from '../types';
 import { Trash2, Plus, User as UserIcon, Briefcase, Bot, Save, Archive, KeyRound, List, BarChart2, Pencil, CheckSquare, FileText, Users, Zap, Layout, Bell, Play, Mail, Phone, Camera, Send, Link, Server, AtSign, MessageSquare, Instagram, Layers, Settings } from 'lucide-react';
 import { ModulePageHeader } from './ui/ModulePageHeader';
@@ -129,6 +129,10 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
 
   const archivedTasks = tasks.filter(t => t.isArchived);
 
+  const activeProjects = useMemo(() => projects.filter((p) => !p.isArchived), [projects]);
+  const activeStatuses = useMemo(() => statuses.filter((s) => !s.isArchived), [statuses]);
+  const activePriorities = useMemo(() => priorities.filter((p) => !p.isArchived), [priorities]);
+
   // --- Profile ---
   const handleSaveProfile = (e: React.FormEvent) => {
       e.preventDefault();
@@ -251,11 +255,14 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
           onUpdateStatuses(statuses.map(s => s.id === editingId ? { ...s, name: newStatusName, color: newStatusColor } : s));
           setEditingId(null);
       } else {
-          onUpdateStatuses([...statuses, { id: `s-${Date.now()}`, name: newStatusName, color: newStatusColor }]);
+          onUpdateStatuses([...statuses, { id: `s-${Date.now()}`, name: newStatusName, color: newStatusColor, isArchived: false }]);
       }
       setNewStatusName('');
   };
-  const handleDeleteStatus = (id: string) => onUpdateStatuses(statuses.filter(s => s.id !== id));
+  const handleDeleteStatus = (id: string) => {
+      const now = new Date().toISOString();
+      onUpdateStatuses(statuses.map((s) => (s.id === id ? { ...s, isArchived: true, updatedAt: now } : s)));
+  };
   const handleEditStatus = (s: StatusOption) => { setEditingId(s.id); setNewStatusName(s.name); setNewStatusColor(s.color); };
 
   const handleSavePriority = (e: React.FormEvent) => {
@@ -265,16 +272,19 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
           onUpdatePriorities(priorities.map(p => p.id === editingId ? { ...p, name: newPriorityName, color: newPriorityColor } : p));
           setEditingId(null);
       } else {
-          onUpdatePriorities([...priorities, { id: `pr-${Date.now()}`, name: newPriorityName, color: newPriorityColor }]);
+          onUpdatePriorities([...priorities, { id: `pr-${Date.now()}`, name: newPriorityName, color: newPriorityColor, isArchived: false }]);
       }
       setNewPriorityName('');
   };
-  const handleDeletePriority = (id: string) => onUpdatePriorities(priorities.filter(p => p.id !== id));
+  const handleDeletePriority = (id: string) => {
+      const now = new Date().toISOString();
+      onUpdatePriorities(priorities.map((p) => (p.id === id ? { ...p, isArchived: true, updatedAt: now } : p)));
+  };
   const handleEditPriority = (p: PriorityOption) => { setEditingId(p.id); setNewPriorityName(p.name); setNewPriorityColor(p.color); };
 
   // --- Automation ---
   const handleOpenAutomationCreate = () => {
-      setEditingId(null); setAutoName(''); setAutoTrigger('task_status_changed'); setAutoStatus(statuses[0]?.name || '');
+      setEditingId(null); setAutoName(''); setAutoTrigger('task_status_changed'); setAutoStatus(activeStatuses[0]?.name || '');
       setAutoModule(''); setAutoTemplate('Задача "{task_title}" перешла в статус "{status}".'); setAutoTarget('assignee');
   };
   const handleAutomationSubmit = (e: React.FormEvent) => {
@@ -440,7 +450,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                             </div>
                         </form>
                         <div className="grid grid-cols-2 gap-4">
-                            {projects.map(p => (
+                            {activeProjects.map(p => (
                                 <div key={p.id} className="p-4 border border-gray-200 dark:border-[#333] rounded-xl flex justify-between items-center bg-white dark:bg-[#252525] hover:border-blue-300 transition-colors">
                                     <div className="flex items-center gap-3">
                                         <DynamicIcon name={p.icon || 'Briefcase'} className={p.color} size={20} />
@@ -477,7 +487,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                             </div>
                         </form>
                         <div className="space-y-2">
-                            {priorities.map(p => (
+                            {activePriorities.map(p => (
                                 <div key={p.id} className="flex items-center justify-between p-3 border border-gray-100 dark:border-[#333] rounded-lg bg-white dark:bg-[#252525]">
                                     <span className={`px-2.5 py-1 rounded text-xs font-bold border ${p.color}`}>{p.name}</span>
                                     <div className="flex gap-1">
@@ -588,7 +598,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                             <button onClick={handleOpenAutomationCreate} className="px-4 py-2 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 rounded-lg text-sm font-medium flex items-center gap-2 hover:bg-blue-100 dark:hover:bg-blue-900/30"><Plus size={16}/> Добавить правило</button>
                         </div>
                         <div className="grid grid-cols-1 gap-4">
-                            {automationRules.map(rule => (
+                            {automationRules.filter((r) => !r.isArchived).map(rule => (
                                 <div key={rule.id} className="border border-gray-200 dark:border-[#333] rounded-xl p-5 bg-white dark:bg-[#252525] hover:shadow-md transition-all">
                                     <div className="flex justify-between items-start mb-3">
                                         <div className="font-bold text-base text-gray-900 dark:text-white flex items-center gap-2">
@@ -680,7 +690,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                             <button type="submit" className="bg-blue-600 text-white px-6 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 shadow-sm self-end">Добавить</button>
                         </form>
                         <div className="space-y-2">
-                            {statuses.map(s => (
+                            {activeStatuses.map(s => (
                                 <div key={s.id} className="flex items-center justify-between p-3 border border-gray-100 dark:border-[#333] rounded-lg bg-white dark:bg-[#252525]">
                                     <span className={`px-2.5 py-1 rounded text-xs font-bold ${s.color}`}>{s.name}</span>
                                     <button onClick={() => handleDeleteStatus(s.id)} className="p-1.5 text-gray-400 hover:text-red-500"><Trash2 size={14}/></button>

@@ -72,9 +72,9 @@ export const useInventoryLogic = (showNotification: (msg: string) => void) => {
   };
 
   const deleteWarehouse = (id: string) => {
-      const updated = warehouses.filter(w => w.id !== id);
+      const updated = warehouses.map((w) => (w.id === id ? { ...w, isArchived: true } : w));
       saveWarehouses(updated);
-      showNotification('Склад удалён');
+      showNotification('Склад в архиве');
   };
 
   const saveItem = (item: InventoryItem) => {
@@ -86,9 +86,9 @@ export const useInventoryLogic = (showNotification: (msg: string) => void) => {
   };
 
   const deleteItem = (id: string) => {
-      const updated = items.filter(i => i.id !== id);
+      const updated = items.map((i) => (i.id === id ? { ...i, isArchived: true } : i));
       saveItems(updated);
-      showNotification('Номенклатура удалена');
+      showNotification('Номенклатура в архиве');
   };
 
   const createMovement = (payload: {

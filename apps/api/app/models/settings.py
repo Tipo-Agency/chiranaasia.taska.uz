@@ -27,6 +27,7 @@ class StatusOption(Base):
     id = Column(String(36), primary_key=True, default=gen_id)
     name = Column(String(100), nullable=False)
     color = Column(String(200), nullable=False)
+    is_archived = Column(Boolean, default=False)
 
 
 class PriorityOption(Base):
@@ -35,6 +36,7 @@ class PriorityOption(Base):
     id = Column(String(36), primary_key=True, default=gen_id)
     name = Column(String(100), nullable=False)
     color = Column(String(200), nullable=False)
+    is_archived = Column(Boolean, default=False)
 
 
 class ActivityLog(Base):

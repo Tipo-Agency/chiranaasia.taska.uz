@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { EmployeeInfo, User, OrgPosition, Department } from '../types';
 import { UserCheck, Search, Trash2, Edit2, Calendar, FileText, X, Save, User as UserIcon, Phone, Send, Cake, Network, Building2, UserPlus, ChevronDown, ChevronRight, FolderTree } from 'lucide-react';
 import { ModuleCreateDropdown, ModulePageShell, ModulePageHeader, ModuleSegmentedControl, MODULE_PAGE_GUTTER } from './ui';
@@ -50,6 +50,11 @@ const EmployeesView: React.FC<EmployeesViewProps> = ({
   const [posHolder, setPosHolder] = useState('');
   const [posOrder, setPosOrder] = useState<number>(0);
 
+  const activeOrgPositions = useMemo(
+      () => orgPositions.filter((p) => !p.isArchived),
+      [orgPositions]
+  );
+
   const getEmployeeName = (uid: string) => users.find(u => u.id === uid)?.name || 'Неизвестный';
   const getEmployeeUser = (uid: string) => users.find(u => u.id === uid);
 
@@ -75,7 +80,7 @@ const EmployeesView: React.FC<EmployeesViewProps> = ({
 
   const handleSubmit = (e?: React.FormEvent) => {
       if (e) e.preventDefault();
-      const selectedPos = orgPositions.find((p) => p.id === orgPositionId);
+      const selectedPos = activeOrgPositions.find((p) => p.id === orgPositionId);
       const previousPos = orgPositions.find((p) => p.holderUserId === userId);
       onSave({
           id: editingInfo ? editingInfo.id : `emp-${Date.now()}`,
@@ -128,7 +133,8 @@ const EmployeesView: React.FC<EmployeesViewProps> = ({
           departmentId: posDep || undefined,
           managerPositionId: posManager || undefined,
           holderUserId: posHolder || undefined,
-          order: posOrder
+          order: posOrder,
+          isArchived: editingPos?.isArchived ?? false,
       };
       onSavePosition(payload);
       if (posHolder) {
@@ -220,11 +226,11 @@ const EmployeesView: React.FC<EmployeesViewProps> = ({
 
   const renderOrgChart = () => {
       // Create hierarchy
-      const roots = orgPositions.filter(p => !p.managerPositionId || !orgPositions.find(op => op.id === p.managerPositionId));
+      const roots = activeOrgPositions.filter(p => !p.managerPositionId || !activeOrgPositions.find(op => op.id === p.managerPositionId));
       
       const renderNode = (node: OrgPosition, level: number = 0) => {
           // Получаем детей и сортируем по order (меньше = левее)
-          const children = orgPositions
+          const children = activeOrgPositions
               .filter(p => p.managerPositionId === node.id)
               .sort((a, b) => (a.order || 0) - (b.order || 0));
           
@@ -232,7 +238,7 @@ const EmployeesView: React.FC<EmployeesViewProps> = ({
           const dept = departments.find(d => d.id === node.departmentId);
           
           // Проверяем, есть ли родитель
-          const hasParent = node.managerPositionId && orgPositions.find(op => op.id === node.managerPositionId);
+          const hasParent = node.managerPositionId && activeOrgPositions.find(op => op.id === node.managerPositionId);
 
           return (
               <div key={node.id} className="relative flex flex-col items-center">
@@ -328,11 +334,11 @@ const EmployeesView: React.FC<EmployeesViewProps> = ({
   };
 
   const renderStructure = () => {
-      const roots = orgPositions
-          .filter((p) => !p.managerPositionId || !orgPositions.some((x) => x.id === p.managerPositionId))
+      const roots = activeOrgPositions
+          .filter((p) => !p.managerPositionId || !activeOrgPositions.some((x) => x.id === p.managerPositionId))
           .sort((a, b) => (a.order || 0) - (b.order || 0));
       const childrenMap = new Map<string, OrgPosition[]>();
-      orgPositions.forEach((p) => {
+      activeOrgPositions.forEach((p) => {
           if (!p.managerPositionId) return;
           const arr = childrenMap.get(p.managerPositionId) || [];
           arr.push(p);
@@ -408,7 +414,7 @@ const EmployeesView: React.FC<EmployeesViewProps> = ({
           );
       };
 
-      const assignedIds = new Set(orgPositions.map((p) => p.holderUserId).filter(Boolean) as string[]);
+      const assignedIds = new Set(activeOrgPositions.map((p) => p.holderUserId).filter(Boolean) as string[]);
       const freeEmployees = employees
           .filter((info) => !info.isArchived && !!info.userId && !assignedIds.has(info.userId))
           .map((info) => users.find((u) => u.id === info.userId))
@@ -547,12 +553,12 @@ const EmployeesView: React.FC<EmployeesViewProps> = ({
                             value={orgPositionId}
                             onChange={(value) => {
                                 setOrgPositionId(value);
-                                const linked = orgPositions.find((p) => p.id === value);
+                                const linked = activeOrgPositions.find((p) => p.id === value);
                                 if (linked?.title) setPosition(linked.title);
                             }}
                             options={[
                                 { value: '', label: 'Не выбран' },
-                                ...orgPositions.map((p) => ({ value: p.id, label: p.title }))
+                                ...activeOrgPositions.map((p) => ({ value: p.id, label: p.title }))
                             ]}
                         />
                     </div>
@@ -618,7 +624,7 @@ const EmployeesView: React.FC<EmployeesViewProps> = ({
                             onChange={setPosManager}
                             options={[
                                 { value: '', label: 'Нет (Верхний уровень)' },
-                                ...orgPositions.filter(p => p.id !== editingPos?.id).map(p => ({ value: p.id, label: p.title }))
+                                ...activeOrgPositions.filter(p => p.id !== editingPos?.id).map(p => ({ value: p.id, label: p.title }))
                             ]}
                         />
                     </div>

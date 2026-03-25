@@ -142,7 +142,7 @@ export const SpaceModule: React.FC<SpaceModuleProps> = ({
                                         className="border border-gray-200 dark:border-[#333] rounded-lg px-1.5 md:px-2 py-1 bg-white dark:bg-[#252525] text-gray-800 dark:text-gray-100 text-[10px] md:text-xs"
                                     >
                                         <option value="all">Все статусы</option>
-                                        {statuses.map((s) => (
+                                        {statuses.filter((s) => !s.isArchived).map((s) => (
                                             <option key={s.id} value={s.name}>
                                                 {s.name}
                                             </option>

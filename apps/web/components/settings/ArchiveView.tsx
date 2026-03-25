@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
+  AutomationRule,
   BusinessProcess,
   Client,
   Contract,
@@ -9,12 +10,15 @@ import {
   EmployeeInfo,
   FinanceCategory,
   Meeting,
+  OrgPosition,
   Project,
   SalesFunnel,
   TableCollection,
   Task,
   User,
-  ContentPost
+  ContentPost,
+  StatusOption,
+  PriorityOption,
 } from '../../types';
 import { ModuleSegmentedControl } from '../ui/ModuleSegmentedControl';
 
@@ -33,7 +37,11 @@ export type ArchiveTabId =
   | 'deals'
   | 'clients'
   | 'contracts'
-  | 'meetings';
+  | 'meetings'
+  | 'orgPositions'
+  | 'automationRules'
+  | 'statuses'
+  | 'priorities';
 
 export const ARCHIVE_TAB_OPTIONS: Array<{ id: ArchiveTabId; label: string }> = [
   { id: 'tasks', label: 'Задачи' },
@@ -45,6 +53,10 @@ export const ARCHIVE_TAB_OPTIONS: Array<{ id: ArchiveTabId; label: string }> = [
   { id: 'salesFunnels', label: 'Воронки' },
   { id: 'tables', label: 'Таблицы' },
   { id: 'businessProcesses', label: 'Бизнес-процессы' },
+  { id: 'orgPositions', label: 'Должности' },
+  { id: 'automationRules', label: 'Автоматизация' },
+  { id: 'statuses', label: 'Статусы задач' },
+  { id: 'priorities', label: 'Приоритеты' },
   { id: 'deals', label: 'Сделки' },
   { id: 'clients', label: 'Клиенты' },
   { id: 'contracts', label: 'Договоры' },
@@ -73,6 +85,10 @@ export const ArchiveView: React.FC<{
   clients?: Client[];
   contracts?: Contract[];
   meetings?: Meeting[];
+  orgPositions?: OrgPosition[];
+  automationRules?: AutomationRule[];
+  statusOptions?: StatusOption[];
+  priorityOptions?: PriorityOption[];
   onRestoreTask?: (taskId: string) => void;
   onPermanentDelete?: (taskId: string) => void;
   onRestoreUser?: (userId: string) => void;
@@ -89,6 +105,10 @@ export const ArchiveView: React.FC<{
   onRestoreClient?: (clientId: string) => void;
   onRestoreContract?: (contractId: string) => void;
   onRestoreMeeting?: (meetingId: string) => void;
+  onRestoreOrgPosition?: (positionId: string) => void;
+  onRestoreAutomationRule?: (ruleId: string) => void;
+  onRestoreStatus?: (statusId: string) => void;
+  onRestorePriority?: (priorityId: string) => void;
   /** embedded — вкладки/хедер рисуются снаружи (в шапке модуля) */
   layout?: 'standalone' | 'embedded';
   activeTab?: ArchiveTabId;
@@ -110,6 +130,10 @@ export const ArchiveView: React.FC<{
   clients = [],
   contracts = [],
   meetings = [],
+  orgPositions = [],
+  automationRules = [],
+  statusOptions = [],
+  priorityOptions = [],
   onRestoreTask,
   onPermanentDelete,
   onRestoreUser,
@@ -125,8 +149,11 @@ export const ArchiveView: React.FC<{
   onRestoreDeal,
   onRestoreClient,
   onRestoreContract,
-  onRestoreMeeting
-  ,
+  onRestoreMeeting,
+  onRestoreOrgPosition,
+  onRestoreAutomationRule,
+  onRestoreStatus,
+  onRestorePriority,
   layout = 'standalone',
   activeTab,
   onTabChange,
@@ -211,6 +238,10 @@ export const ArchiveView: React.FC<{
       case 'salesFunnels': return 'Архив воронок пуст';
       case 'tables': return 'Архив таблиц пуст';
       case 'businessProcesses': return 'Архив бизнес-процессов пуст';
+      case 'orgPositions': return 'Архив должностей пуст';
+      case 'automationRules': return 'Архив правил автоматизации пуст';
+      case 'statuses': return 'Архив статусов пуст';
+      case 'priorities': return 'Архив приоритетов пуст';
       case 'deals': return 'Архив сделок пуст';
       case 'clients': return 'Архив клиентов пуст';
       case 'contracts': return 'Архив договоров пуст';
@@ -259,6 +290,34 @@ export const ArchiveView: React.FC<{
             businessProcesses,
             b => b.title,
             onRestoreBusinessProcess,
+            emptyMessageByTab
+          )}
+        {archiveTab === 'orgPositions' &&
+          renderArchiveList<OrgPosition>(
+            orgPositions,
+            (p) => p.title,
+            onRestoreOrgPosition,
+            emptyMessageByTab
+          )}
+        {archiveTab === 'automationRules' &&
+          renderArchiveList<AutomationRule>(
+            automationRules,
+            (r) => r.name,
+            onRestoreAutomationRule,
+            emptyMessageByTab
+          )}
+        {archiveTab === 'statuses' &&
+          renderArchiveList<StatusOption>(
+            statusOptions,
+            (s) => s.name,
+            onRestoreStatus,
+            emptyMessageByTab
+          )}
+        {archiveTab === 'priorities' &&
+          renderArchiveList<PriorityOption>(
+            priorityOptions,
+            (p) => p.name,
+            onRestorePriority,
             emptyMessageByTab
           )}
         {archiveTab === 'deals' &&

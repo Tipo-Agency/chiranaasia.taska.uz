@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { Project, Role, Task, User, StatusOption, PriorityOption, NotificationPreferences, AutomationRule, TableCollection, Deal, Department, FinanceCategory, Fund, SalesFunnel, Doc, ContentPost, EmployeeInfo, Client, Contract, BusinessProcess, Meeting, Warehouse } from '../types';
+import { Project, Role, Task, User, StatusOption, PriorityOption, NotificationPreferences, AutomationRule, TableCollection, Deal, Department, FinanceCategory, Fund, SalesFunnel, Doc, ContentPost, EmployeeInfo, Client, Contract, BusinessProcess, Meeting, Warehouse, OrgPosition } from '../types';
 import { User as UserIcon, Briefcase, Archive, Users, Building2, Wallet, TrendingUp, PiggyBank, ShieldAlert, Settings, BellRing, Zap, Package, ArrowLeft, Plus } from 'lucide-react';
 import { Button, Input, ModuleFilterIconButton, ModulePageHeader, ModulePageShell, ModuleSegmentedControl, MODULE_PAGE_GUTTER, StandardModal } from './ui';
 import { ProfileSettings } from './settings/ProfileSettings';
@@ -35,6 +35,7 @@ interface SettingsViewProps {
   contracts?: Contract[];
   meetings?: Meeting[];
   businessProcesses?: BusinessProcess[];
+  orgPositions?: OrgPosition[];
   
   // Actions
   onUpdateTable?: (table: TableCollection) => void;
@@ -60,6 +61,10 @@ interface SettingsViewProps {
   onRestoreClient?: (clientId: string) => void;
   onRestoreContract?: (contractId: string) => void;
   onRestoreMeeting?: (meetingId: string) => void;
+  onRestoreOrgPosition?: (positionId: string) => void;
+  onRestoreAutomationRule?: (ruleId: string) => void;
+  onRestoreStatus?: (statusId: string) => void;
+  onRestorePriority?: (priorityId: string) => void;
   docs?: Doc[];
   contentPosts?: ContentPost[];
   onClose: () => void;
@@ -100,6 +105,10 @@ const SettingsView: React.FC<SettingsViewProps> = ({
   onRestoreProject, onRestoreDepartment, onRestoreFinanceCategory, onRestoreSalesFunnel,
   onRestoreTable, onRestoreBusinessProcess, onRestoreDeal, onRestoreClient, onRestoreContract,
   onRestoreMeeting,
+  onRestoreOrgPosition,
+  onRestoreAutomationRule,
+  onRestoreStatus,
+  onRestorePriority,
   docs = [], contentPosts = [],
   onUpdateNotificationPrefs, onSaveAutomationRule, onDeleteAutomationRule,
   currentUser, onUpdateProfile, initialTab = 'users',
@@ -108,7 +117,7 @@ const SettingsView: React.FC<SettingsViewProps> = ({
   funds = [], onSaveFund, onDeleteFund,
   warehouses = [], onSaveWarehouse, onDeleteWarehouse,
   salesFunnels = [], onSaveSalesFunnel, onDeleteSalesFunnel,
-  employeeInfos = [], deals = [], clients = [], contracts = [], meetings = [], businessProcesses = [],
+  employeeInfos = [], deals = [], clients = [], contracts = [], meetings = [], businessProcesses = [], orgPositions = [],
   notificationPrefs, onClose: _onClose
 }) => {
   const normalizeTab = (t: string) => {
@@ -264,6 +273,10 @@ const SettingsView: React.FC<SettingsViewProps> = ({
                   clients={clients.filter(c => c.isArchived)}
                   contracts={contracts.filter(c => c.isArchived)}
                   meetings={meetings.filter(m => m.isArchived)}
+                  orgPositions={orgPositions.filter(p => p.isArchived)}
+                  automationRules={automationRules.filter(r => r.isArchived)}
+                  statusOptions={statuses.filter(s => s.isArchived)}
+                  priorityOptions={priorities.filter(p => p.isArchived)}
                   onRestoreTask={onRestoreTask}
                   onPermanentDelete={onPermanentDelete}
                   onRestoreUser={onRestoreUser}
@@ -280,6 +293,10 @@ const SettingsView: React.FC<SettingsViewProps> = ({
                   onRestoreClient={onRestoreClient}
                   onRestoreContract={onRestoreContract}
                   onRestoreMeeting={onRestoreMeeting}
+                  onRestoreOrgPosition={onRestoreOrgPosition}
+                  onRestoreAutomationRule={onRestoreAutomationRule}
+                  onRestoreStatus={onRestoreStatus}
+                  onRestorePriority={onRestorePriority}
                 />
               </div>
             </div>

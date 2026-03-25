@@ -25,6 +25,10 @@ interface BusinessProcessesViewProps {
 const BusinessProcessesView: React.FC<BusinessProcessesViewProps> = ({ 
     processes, orgPositions, users, tasks, tables, currentUser, onSaveProcess, onDeleteProcess, onSaveTask, onOpenTask, onCompleteProcessStepWithBranch, autoOpenCreateModal = false
 }) => {
+  const activeOrgPositions = useMemo(
+      () => orgPositions.filter((p) => !p.isArchived),
+      [orgPositions]
+  );
   const [selectedProcessId, setSelectedProcessId] = useState<string | null>(null);
   /** Шаблоны = описания процессов; В работе = active + paused; Завершённые = completed */
   const [activeTab, setActiveTab] = useState<'templates' | 'running' | 'completed'>('templates');
@@ -1034,7 +1038,7 @@ const BusinessProcessesView: React.FC<BusinessProcessesViewProps> = ({
                                                           options={[
                                                               { value: '', label: 'Выберите...' },
                                                               ...(step.assigneeType === 'position' 
-                                                                  ? orgPositions.map(p => ({ value: p.id, label: p.title }))
+                                                                  ? activeOrgPositions.map(p => ({ value: p.id, label: p.title }))
                                                                   : users.map(u => ({ value: u.id, label: u.name }))
                                                               )
                                                           ]}
@@ -1619,7 +1623,7 @@ const BusinessProcessesView: React.FC<BusinessProcessesViewProps> = ({
                               options={[
                                 { value: '', label: 'Выберите...' },
                                 ...(step.assigneeType === 'position'
-                                  ? orgPositions.map(p => ({ value: p.id, label: p.title }))
+                                  ? activeOrgPositions.map(p => ({ value: p.id, label: p.title }))
                                   : users.map(u => ({ value: u.id, label: u.name }))
                                 )
                               ]}

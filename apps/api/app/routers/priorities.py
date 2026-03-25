@@ -28,11 +28,13 @@ async def update_priorities(priorities: list[dict], db: AsyncSession = Depends(g
         if existing:
             existing.name = p.get("name", existing.name)
             existing.color = p.get("color", existing.color)
+            existing.is_archived = bool(p.get("isArchived", False))
         else:
             db.add(PriorityOption(
                 id=pid,
                 name=p.get("name", ""),
                 color=p.get("color", ""),
+                is_archived=bool(p.get("isArchived", False)),
             ))
         await db.flush()
         await log_entity_mutation(

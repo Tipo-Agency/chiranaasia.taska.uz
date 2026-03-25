@@ -14,12 +14,16 @@ export interface StatusOption {
     id: string;
     name: string;
     color: string; // Tailwind class
+    isArchived?: boolean;
+    updatedAt?: string;
 }
 
 export interface PriorityOption {
     id: string;
     name: string;
     color: string; // Tailwind class
+    isArchived?: boolean;
+    updatedAt?: string;
 }
 
 export interface User {
@@ -201,6 +205,8 @@ export interface OrgPosition {
     managerPositionId?: string; 
     holderUserId?: string;
     order?: number; // Порядок для определения позиции слева/справа (меньше = левее)
+    isArchived?: boolean;
+    updatedAt?: string;
 }
 
 /** Вариант перехода для шага типа variant (ветвление) */
@@ -309,6 +315,8 @@ export interface AutomationRule {
         approvalType?: 'purchase_request' | 'process_step' | 'document' | 'deal';
         approvalEntityId?: string;
     };
+    /** Мягкое удаление: хранится в JSON rule на бэкенде */
+    isArchived?: boolean;
 }
 
 // ----------------

@@ -33,14 +33,14 @@ export const useTaskLogic = (showNotification: (msg: string) => void, currentUse
   const updatePriorities = (p: PriorityOption[]) => { setPriorities(p); api.priorities.updateAll(p).catch(() => showNotification('Ошибка сохранения приоритетов')); };
 
   const quickCreateProject = (name: string) => {
-      const newProject: Project = { id: `p-${Date.now()}`, name };
+      const newProject: Project = { id: `p-${Date.now()}`, name, isArchived: false };
       const updated = [...projects, newProject];
       updateProjects(updated);
       showNotification('Модуль создан');
   };
 
   const processAutomation = async (task: Task, trigger: 'task_status_changed' | 'task_created') => {
-      const activeRules = automationRules.filter(r => r.isActive && r.trigger === trigger);
+      const activeRules = automationRules.filter((r) => r.isActive && !r.isArchived && r.trigger === trigger);
       
       for (const rule of activeRules) {
           if (rule.conditions.moduleId && task.projectId !== rule.conditions.moduleId) continue;

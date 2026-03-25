@@ -220,7 +220,7 @@ const FeatureModal: React.FC<FeatureModalProps> = ({
                 onChange={setProjectId}
                 options={[
                   { value: '', label: 'Без проекта' },
-                  ...projects.map(p => ({ value: p.id, label: p.name }))
+                  ...projects.filter((p) => !p.isArchived).map(p => ({ value: p.id, label: p.name }))
                 ]}
               />
             </div>
@@ -233,7 +233,7 @@ const FeatureModal: React.FC<FeatureModalProps> = ({
               <TaskSelect
                 value={status}
                 onChange={setStatus}
-                options={statuses.map(s => ({ value: s.name, label: s.name }))}
+                options={statuses.filter((s) => !s.isArchived).map(s => ({ value: s.name, label: s.name }))}
               />
             </div>
 

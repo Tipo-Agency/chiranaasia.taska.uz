@@ -18,6 +18,7 @@ def row_to_position(row):
         "managerPositionId": row.manager_position_id,
         "holderUserId": row.holder_user_id,
         "order": int(row.order_val) if row.order_val and str(row.order_val).isdigit() else row.order_val,
+        "isArchived": bool(getattr(row, "is_archived", False)),
     }
 
 
@@ -55,6 +56,7 @@ async def update_positions(positions: list[dict], db: AsyncSession = Depends(get
             existing.manager_position_id = p.get("managerPositionId")
             existing.holder_user_id = p.get("holderUserId")
             existing.order_val = str(p.get("order", 0))
+            existing.is_archived = bool(p.get("isArchived", False))
         else:
             db.add(OrgPosition(
                 id=pid,
@@ -63,6 +65,7 @@ async def update_positions(positions: list[dict], db: AsyncSession = Depends(get
                 manager_position_id=p.get("managerPositionId"),
                 holder_user_id=p.get("holderUserId"),
                 order_val=str(p.get("order", 0)),
+                is_archived=bool(p.get("isArchived", False)),
             ))
         await db.flush()
         await log_entity_mutation(

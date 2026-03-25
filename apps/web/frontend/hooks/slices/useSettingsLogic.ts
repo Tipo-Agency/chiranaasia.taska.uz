@@ -91,19 +91,20 @@ export const useSettingsLogic = (showNotification: (msg: string) => void) => {
   };
 
   const saveAutomationRule = (rule: AutomationRule) => {
-      const updated = automationRules.find(r => r.id === rule.id)
-          ? automationRules.map(r => r.id === rule.id ? rule : r)
-          : [...automationRules, rule];
+      const normalized: AutomationRule = { ...rule, isArchived: rule.isArchived ?? false };
+      const updated = automationRules.find(r => r.id === normalized.id)
+          ? automationRules.map(r => r.id === normalized.id ? normalized : r)
+          : [...automationRules, normalized];
       setAutomationRules(updated);
       api.automation.updateRules(updated).catch(() => showNotification('Ошибка сохранения правила'));
       showNotification('Правило сохранено');
   };
 
   const deleteAutomationRule = (id: string) => {
-      const updated = automationRules.filter(r => r.id !== id);
+      const updated = automationRules.map((r) => (r.id === id ? { ...r, isArchived: true } : r));
       setAutomationRules(updated);
       api.automation.updateRules(updated).catch(() => showNotification('Ошибка удаления правила'));
-      showNotification('Правило удалено');
+      showNotification('Правило в архиве');
   };
 
   const markAllRead = () => {

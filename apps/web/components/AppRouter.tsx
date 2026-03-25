@@ -383,7 +383,7 @@ export const AppRouter: React.FC<AppRouterProps> = (props) => {
               departments={props.departments}
               docs={props.docs} contentPosts={props.contentPosts} financeCategories={props.financeCategories} funds={props.funds}
               employeeInfos={props.employeeInfos} deals={props.deals} clients={props.clients} contracts={props.contracts} meetings={props.meetings}
-              salesFunnels={props.salesFunnels} businessProcesses={props.businessProcesses}
+              salesFunnels={props.salesFunnels} businessProcesses={props.businessProcesses} orgPositions={props.orgPositions}
               onUpdateUsers={actions.updateUsers} onUpdateProjects={actions.updateProjects} onUpdateStatuses={actions.updateStatuses} onUpdatePriorities={actions.updatePriorities}
               onUpdateTable={actions.updateTable} onCreateTable={actions.openCreateTable} onDeleteTable={actions.deleteTable}
               onUpdateNotificationPrefs={actions.updateNotificationPrefs} onSaveAutomationRule={actions.saveAutomationRule} onDeleteAutomationRule={actions.deleteAutomationRule}
@@ -409,6 +409,10 @@ export const AppRouter: React.FC<AppRouterProps> = (props) => {
               onRestoreClient={actions.restoreClient}
               onRestoreContract={actions.restoreContract}
               onRestoreMeeting={actions.restoreMeeting}
+              onRestoreOrgPosition={actions.restoreOrgPosition}
+              onRestoreAutomationRule={actions.restoreAutomationRule}
+              onRestoreStatus={actions.restoreStatus}
+              onRestorePriority={actions.restorePriority}
           />
         </Suspense>
       );

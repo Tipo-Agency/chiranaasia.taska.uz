@@ -459,7 +459,7 @@ export const AutomationSettings: React.FC<AutomationSettingsProps> = ({
                                         <TaskSelect
                                             value={autoStatusTo}
                                             onChange={setAutoStatusTo}
-                                            options={statuses.map((s) => ({ value: s.name, label: s.name }))}
+                                            options={statuses.filter((s) => !s.isArchived).map((s) => ({ value: s.name, label: s.name }))}
                                         />
                                     </div>
                                 )}
@@ -552,7 +552,7 @@ export const AutomationSettings: React.FC<AutomationSettingsProps> = ({
                             </div>
 
                             <div className="divide-y divide-gray-100 dark:divide-[#333]">
-                                {automationRules.filter((r) => r.module === automationModule).map((rule) => (
+                                {automationRules.filter((r) => !r.isArchived && r.module === automationModule).map((rule) => (
                                     <div key={rule.id} className="px-4 py-3 flex items-start gap-3">
                                         <div className="mt-0.5 text-yellow-500 shrink-0">
                                             <Zap size={16} />
@@ -582,7 +582,7 @@ export const AutomationSettings: React.FC<AutomationSettingsProps> = ({
                                     </div>
                                 ))}
 
-                                {automationRules.filter((r) => r.module === automationModule).length === 0 && (
+                                {automationRules.filter((r) => !r.isArchived && r.module === automationModule).length === 0 && (
                                     <div className="px-4 py-10 text-center text-sm text-gray-500 dark:text-gray-400">
                                         Нет триггеров для этого модуля
                                     </div>

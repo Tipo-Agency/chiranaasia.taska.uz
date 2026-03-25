@@ -273,7 +273,7 @@ const BacklogView: React.FC<BacklogViewProps> = ({
                   onChange={setStatusFilter}
                   options={[
                     { value: 'all', label: 'Все статусы' },
-                    ...statuses.map((s) => ({ value: s.name, label: s.name })),
+                    ...statuses.filter((s) => !s.isArchived).map((s) => ({ value: s.name, label: s.name })),
                   ]}
                 />
               </div>

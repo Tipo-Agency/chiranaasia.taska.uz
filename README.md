@@ -21,7 +21,7 @@
 
 ## Деплой (автоматический по push в main)
 
-При пуше в `main` срабатывает GitHub Actions: SSH на сервер и выполняется `ops/scripts/deploy.sh`.
+При пуше в `main` GitHub Actions сначала гоняет CI (lint/typecheck/build фронта и ruff для API), затем при успехе — SSH на сервер и `ops/scripts/deploy.sh`. На pull request в `main` выполняется только CI. Ручной перезапуск деплоя: Actions → workflow «CI and Deploy» → Run workflow.
 
 **Что нужно на сервере:** Docker (Postgres — порт 5433, backend — 8003), Node.js (для сборки фронта), nginx. Конфиг — `ops/nginx/nginx.conf`: статика из `/var/www/frontend`, проксирование `/api/` и `/health` на `127.0.0.1:8003`. HTTP (80) и HTTPS (443) с сертификатами Certbot, `server_name tipa.taska.uz`.
 

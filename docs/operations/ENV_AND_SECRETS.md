@@ -2,7 +2,7 @@
 
 ## GitHub Actions (Secrets)
 
-Используются в `.github/workflows/deploy.yml` и передаются в `deploy.sh`:
+Используются в job `deploy` в `.github/workflows/ci.yml` и передаются в `deploy.sh`:
 
 | Secret | Назначение |
 |--------|------------|

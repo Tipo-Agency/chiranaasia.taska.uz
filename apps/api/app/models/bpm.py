@@ -1,5 +1,5 @@
 """BPM models: OrgPosition, BusinessProcess."""
-from sqlalchemy import Column, String
+from sqlalchemy import Column, String, Boolean
 from sqlalchemy.dialects.postgresql import JSONB
 from app.database import Base
 import uuid
@@ -18,6 +18,7 @@ class OrgPosition(Base):
     manager_position_id = Column(String(36), nullable=True)
     holder_user_id = Column(String(36), nullable=True)
     order_val = Column(String(10), default="0")
+    is_archived = Column(Boolean, default=False)
 
 
 class BusinessProcess(Base):

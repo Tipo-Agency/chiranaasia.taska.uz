@@ -109,11 +109,21 @@ def row_to_table(row) -> dict:
 
 
 def row_to_status(row) -> dict:
-    return {"id": row.id, "name": row.name, "color": row.color}
+    return {
+        "id": row.id,
+        "name": row.name,
+        "color": row.color,
+        "isArchived": bool(getattr(row, "is_archived", False)),
+    }
 
 
 def row_to_priority(row) -> dict:
-    return {"id": row.id, "name": row.name, "color": row.color}
+    return {
+        "id": row.id,
+        "name": row.name,
+        "color": row.color,
+        "isArchived": bool(getattr(row, "is_archived", False)),
+    }
 
 
 def row_to_activity(row) -> dict:

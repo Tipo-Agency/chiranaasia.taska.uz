@@ -12,7 +12,7 @@ import {
   notifyPurchaseRequestCreated,
   NotificationContext 
 } from '../../services/notificationService';
-import { Deal, Task, BusinessProcess, ProcessStep, Client, Contract, PurchaseRequest, Doc, Meeting, SalesFunnel, Role, InboxMessage, MessageAttachment, User, ContentPost, Project, TableCollection, Department, FinanceCategory, EmployeeInfo } from '../../types';
+import { Deal, Task, BusinessProcess, ProcessStep, Client, Contract, PurchaseRequest, Doc, Meeting, SalesFunnel, Role, InboxMessage, MessageAttachment, User, ContentPost, Project, TableCollection, Department, FinanceCategory, EmployeeInfo, OrgPosition, AutomationRule, StatusOption, PriorityOption } from '../../types';
 import { getStepsForInstance } from '../../utils/bpmDealFunnel';
 import { chatLocalService } from '../../services/chatLocalService';
 import { isFunnelDeal } from '../../utils/dealModel';
@@ -1336,6 +1336,67 @@ export const useAppLogic = () => {
           } catch (error) {
               console.error('Ошибка восстановления встречи:', error);
               showNotification('Ошибка восстановления встречи');
+          }
+      },
+      restoreOrgPosition: async (positionId: string) => {
+          try {
+              const all = (await api.bpm.getPositions()) as OrgPosition[];
+              const pos = all.find((p) => p.id === positionId);
+              if (!pos) return;
+              const now = new Date().toISOString();
+              const updated = all.map((p) =>
+                  p.id === positionId ? { ...p, isArchived: false, updatedAt: now } : p
+              );
+              await api.bpm.updatePositions(updated);
+              bpmSlice.setters.setOrgPositions(updated);
+              showNotification('Должность восстановлена');
+          } catch (error) {
+              console.error('Ошибка восстановления должности:', error);
+              showNotification('Ошибка восстановления должности');
+          }
+      },
+      restoreAutomationRule: async (ruleId: string) => {
+          try {
+              const all = (await api.automation.getRules()) as AutomationRule[];
+              const rule = all.find((r) => r.id === ruleId);
+              if (!rule) return;
+              const updated = all.map((r) => (r.id === ruleId ? { ...r, isArchived: false } : r));
+              await api.automation.updateRules(updated);
+              settingsSlice.setters.setAutomationRules(updated);
+              showNotification('Правило восстановлено');
+          } catch (error) {
+              console.error('Ошибка восстановления правила:', error);
+              showNotification('Ошибка восстановления правила');
+          }
+      },
+      restoreStatus: async (statusId: string) => {
+          try {
+              const all = (await api.statuses.getAll()) as StatusOption[];
+              const row = all.find((s) => s.id === statusId);
+              if (!row) return;
+              const now = new Date().toISOString();
+              const updated = all.map((s) => (s.id === statusId ? { ...s, isArchived: false, updatedAt: now } : s));
+              await api.statuses.updateAll(updated);
+              taskSlice.setters.setStatuses(updated);
+              showNotification('Статус восстановлен');
+          } catch (error) {
+              console.error('Ошибка восстановления статуса:', error);
+              showNotification('Ошибка восстановления статуса');
+          }
+      },
+      restorePriority: async (priorityId: string) => {
+          try {
+              const all = (await api.priorities.getAll()) as PriorityOption[];
+              const row = all.find((p) => p.id === priorityId);
+              if (!row) return;
+              const now = new Date().toISOString();
+              const updated = all.map((p) => (p.id === priorityId ? { ...p, isArchived: false, updatedAt: now } : p));
+              await api.priorities.updateAll(updated);
+              taskSlice.setters.setPriorities(updated);
+              showNotification('Приоритет восстановлен');
+          } catch (error) {
+              console.error('Ошибка восстановления приоритета:', error);
+              showNotification('Ошибка восстановления приоритета');
           }
       },
       toggleDarkMode: settingsSlice.actions.toggleDarkMode, createTable: createTableWrapper, updateTable: settingsSlice.actions.updateTable, deleteTable: settingsSlice.actions.deleteTable, markAllRead: settingsSlice.actions.markAllRead, navigate: settingsSlice.actions.navigate, openSettings: settingsSlice.actions.openSettings, closeSettings: settingsSlice.actions.closeSettings, openCreateTable: settingsSlice.actions.openCreateTable, closeCreateTable: settingsSlice.actions.closeCreateTable, openEditTable: settingsSlice.actions.openEditTable, closeEditTable: settingsSlice.actions.closeEditTable, updateNotificationPrefs: settingsSlice.actions.updateNotificationPrefs, saveAutomationRule: settingsSlice.actions.saveAutomationRule, deleteAutomationRule: settingsSlice.actions.deleteAutomationRule, setActiveSpaceTab: settingsSlice.actions.setActiveSpaceTab,

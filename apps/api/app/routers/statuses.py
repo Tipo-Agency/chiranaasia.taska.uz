@@ -28,11 +28,13 @@ async def update_statuses(statuses: list[dict], db: AsyncSession = Depends(get_d
         if existing:
             existing.name = s.get("name", existing.name)
             existing.color = s.get("color", existing.color)
+            existing.is_archived = bool(s.get("isArchived", False))
         else:
             db.add(StatusOption(
                 id=sid,
                 name=s.get("name", ""),
                 color=s.get("color", ""),
+                is_archived=bool(s.get("isArchived", False)),
             ))
         await db.flush()
         await log_entity_mutation(

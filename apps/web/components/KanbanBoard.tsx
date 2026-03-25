@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Project, Task, User, StatusOption, TableCollection, BusinessProcess } from '../types';
 import { Plus, Network, TrendingUp, FileText, Archive, Layers, Layout } from 'lucide-react';
 
@@ -28,6 +28,10 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({
   onUpdateStatus,
   onOpenTask
 }) => {
+  const columnStatuses = useMemo(
+      () => (statuses || []).filter((s) => !s.isArchived),
+      [statuses]
+  );
   const [draggedTaskId, setDraggedTaskId] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
 
@@ -151,7 +155,7 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({
       }
   };
 
-  if (!statuses || !Array.isArray(statuses) || statuses.length === 0) {
+  if (!columnStatuses || columnStatuses.length === 0) {
     return (
       <div className="h-full flex items-center justify-center text-gray-500 dark:text-gray-400">
         Нет статусов для отображения
@@ -164,7 +168,7 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({
       <div className="bg-white dark:bg-[#252525] border border-gray-200 dark:border-[#333] rounded-xl shadow-sm overflow-hidden flex-1 flex flex-col min-h-0">
         <div className="flex-1 overflow-x-auto custom-scrollbar min-h-0">
           <div className="flex gap-4 p-4 h-full min-w-max">
-            {statuses.map(status => {
+            {columnStatuses.map(status => {
                 const statusTasks = getTasksByStatus(status.name);
                 return (
                   <div 

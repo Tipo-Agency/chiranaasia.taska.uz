@@ -9,19 +9,23 @@ export const useBPMLogic = (showNotification: (msg: string) => void) => {
 
   // Positions
   const savePosition = (pos: OrgPosition) => {
-      const updated = orgPositions.find(p => p.id === pos.id) 
-          ? orgPositions.map(p => p.id === pos.id ? pos : p) 
-          : [...orgPositions, pos];
+      const normalized: OrgPosition = { ...pos, isArchived: pos.isArchived ?? false };
+      const updated = orgPositions.find(p => p.id === normalized.id)
+          ? orgPositions.map(p => p.id === normalized.id ? normalized : p)
+          : [...orgPositions, normalized];
       setOrgPositions(updated);
       api.bpm.updatePositions(updated);
       showNotification('Должность сохранена');
   };
 
   const deletePosition = (id: string) => {
-      const updated = orgPositions.filter(p => p.id !== id);
+      const now = new Date().toISOString();
+      const updated = orgPositions.map((p) =>
+          p.id === id ? { ...p, isArchived: true, updatedAt: now } : p
+      );
       setOrgPositions(updated);
       api.bpm.updatePositions(updated);
-      showNotification('Должность удалена');
+      showNotification('Должность в архиве');
   };
 
   // Processes
@@ -54,10 +58,13 @@ export const useBPMLogic = (showNotification: (msg: string) => void) => {
   };
 
   const deleteProcess = (id: string) => {
-      const updated = businessProcesses.filter(p => p.id !== id);
+      const now = new Date().toISOString();
+      const updated = businessProcesses.map((p) =>
+          p.id === id ? { ...p, isArchived: true, updatedAt: now } : p
+      );
       setBusinessProcesses(updated);
       api.bpm.updateProcesses(updated);
-      showNotification('Процесс удален');
+      showNotification('Процесс в архиве');
   };
 
   return {

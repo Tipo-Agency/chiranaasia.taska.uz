@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Project, StatusOption, PriorityOption, TableCollection } from '../../types';
 import { Trash2, Pencil, CheckSquare, FileText, Users, Instagram, Archive, Layers } from 'lucide-react';
 import { ModuleCreateIconButton } from '../ui/ModuleCreateIconButton';
@@ -46,6 +46,10 @@ export const SpaceSettings: React.FC<SpaceSettingsProps> = ({
   const [newPageColor, setNewPageColor] = useState('');
   const [newPageType, setNewPageType] = useState('tasks');
 
+  const activeProjects = useMemo(() => projects.filter((p) => !p.isArchived), [projects]);
+  const activeStatuses = useMemo(() => statuses.filter((s) => !s.isArchived), [statuses]);
+  const activePriorities = useMemo(() => priorities.filter((p) => !p.isArchived), [priorities]);
+
   // --- Handlers ---
   
   const handleSaveProject = (e: React.FormEvent) => {
@@ -55,7 +59,8 @@ export const SpaceSettings: React.FC<SpaceSettingsProps> = ({
           onUpdateProjects(projects.map(p => p.id === editingId ? { ...p, name: newProjectName, icon: newProjectIcon, color: newProjectColor } : p));
           setEditingId(null);
       } else {
-          onUpdateProjects([...projects, { id: `p-${Date.now()}`, name: newProjectName, icon: newProjectIcon, color: newProjectColor }]);
+          const now = new Date().toISOString();
+          onUpdateProjects([...projects, { id: `p-${Date.now()}`, name: newProjectName, icon: newProjectIcon, color: newProjectColor, isArchived: false, updatedAt: now }]);
       }
       setNewProjectName('');
   };
@@ -68,7 +73,7 @@ export const SpaceSettings: React.FC<SpaceSettingsProps> = ({
           onUpdateStatuses(statuses.map(s => s.id === editingId ? { ...s, name: newStatusName, color: newStatusColor } : s));
           setEditingId(null);
       } else {
-          onUpdateStatuses([...statuses, { id: `s-${Date.now()}`, name: newStatusName, color: newStatusColor }]);
+          onUpdateStatuses([...statuses, { id: `s-${Date.now()}`, name: newStatusName, color: newStatusColor, isArchived: false }]);
       }
       setNewStatusName('');
   };
@@ -81,7 +86,7 @@ export const SpaceSettings: React.FC<SpaceSettingsProps> = ({
           onUpdatePriorities(priorities.map(p => p.id === editingId ? { ...p, name: newPriorityName, color: newPriorityColor } : p));
           setEditingId(null);
       } else {
-          onUpdatePriorities([...priorities, { id: `pr-${Date.now()}`, name: newPriorityName, color: newPriorityColor }]);
+          onUpdatePriorities([...priorities, { id: `pr-${Date.now()}`, name: newPriorityName, color: newPriorityColor, isArchived: false }]);
       }
       setNewPriorityName('');
   };
@@ -237,14 +242,14 @@ export const SpaceSettings: React.FC<SpaceSettingsProps> = ({
                   </div>
               </form>
               <div className="grid grid-cols-2 gap-4">
-                  {projects.filter(p => !p.isArchived).map(p => (
+                  {activeProjects.map(p => (
                       <div key={p.id} className="p-4 border border-gray-200 dark:border-[#333] rounded-xl flex justify-between items-center gap-3 bg-white dark:bg-[#252525]">
                           <div className="flex items-center gap-3 min-w-0 flex-1">
                             {/* Use resolveColorClass or direct color here if projects have mixed data formats, but for now use DynamicIcon and assume new format */}
                             <DynamicIcon name={p.icon || 'Briefcase'} className={p.color} size={20} />
                             <span className="text-sm font-bold text-gray-800 dark:text-white truncate">{p.name}</span>
                           </div>
-                          <div className="flex gap-1 shrink-0"><button onClick={() => handleEditProject(p)} className="p-1.5 text-gray-400 hover:text-blue-500"><Pencil size={14}/></button><button onClick={() => onUpdateProjects(projects.map(pr => pr.id === p.id ? { ...pr, isArchived: true } : pr))} className="p-1.5 text-gray-400 hover:text-red-500" title="В архив"><Trash2 size={14}/></button></div>
+                          <div className="flex gap-1 shrink-0"><button onClick={() => handleEditProject(p)} className="p-1.5 text-gray-400 hover:text-blue-500"><Pencil size={14}/></button><button onClick={() => { const now = new Date().toISOString(); onUpdateProjects(projects.map(pr => pr.id === p.id ? { ...pr, isArchived: true, updatedAt: now } : pr)); }} className="p-1.5 text-gray-400 hover:text-red-500" title="В архив"><Trash2 size={14}/></button></div>
                       </div>
                   ))}
               </div>
@@ -254,10 +259,9 @@ export const SpaceSettings: React.FC<SpaceSettingsProps> = ({
 
   if (activeTab === 'statuses' || activeTab === 'priorities') {
       const isStatus = activeTab === 'statuses';
-      const items = isStatus ? statuses : priorities;
+      const items = isStatus ? activeStatuses : activePriorities;
       const saveHandler = isStatus ? handleSaveStatus : handleSavePriority;
       const editHandler = isStatus ? handleEditStatus : handleEditPriority;
-      const deleteHandler = isStatus ? onUpdateStatuses : onUpdatePriorities;
       const nameVal = isStatus ? newStatusName : newPriorityName;
       const setName = isStatus ? setNewStatusName : setNewPriorityName;
       const colorVal = isStatus ? newStatusColor : newPriorityColor;
@@ -303,7 +307,21 @@ export const SpaceSettings: React.FC<SpaceSettingsProps> = ({
                             <span className={`px-3 py-1.5 rounded-md text-xs font-bold ${colorClass}`}>{item.name}</span>
                             <div className="flex gap-1">
                                 <button onClick={() => editHandler(item)} className="p-1.5 text-gray-400 hover:text-blue-500"><Pencil size={14}/></button>
-                                <button onClick={() => deleteHandler(items.filter((i: any) => i.id !== item.id) as any)} className="p-1.5 text-gray-400 hover:text-red-500"><Trash2 size={14}/></button>
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        const now = new Date().toISOString();
+                                        if (isStatus) {
+                                            onUpdateStatuses(statuses.map((s) => (s.id === item.id ? { ...s, isArchived: true, updatedAt: now } : s)));
+                                        } else {
+                                            onUpdatePriorities(priorities.map((p) => (p.id === item.id ? { ...p, isArchived: true, updatedAt: now } : p)));
+                                        }
+                                    }}
+                                    className="p-1.5 text-gray-400 hover:text-red-500"
+                                    title="В архив"
+                                >
+                                    <Trash2 size={14}/>
+                                </button>
                             </div>
                         </div>
                       );

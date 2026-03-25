@@ -2,7 +2,7 @@
 
 ## Триггер
 
-Пуш в ветку **`main`** запускает GitHub Actions (`.github/workflows/deploy.yml`): SSH на сервер и выполнение **`ops/scripts/deploy.sh`**.
+Пуш в ветку **`main`** запускает GitHub Actions (`.github/workflows/ci.yml`): сначала CI (web + api), затем при успехе — SSH на сервер и **`ops/scripts/deploy.sh`**. На PR — только CI. Ручной деплой: Actions → «CI and Deploy» → Run workflow.
 
 Локально можно инициировать пуш: `npm run push` (обёртка над `git push origin main`).
 
