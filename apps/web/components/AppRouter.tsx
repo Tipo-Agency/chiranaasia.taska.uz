@@ -12,19 +12,13 @@ import type { AppActions } from '../frontend/hooks/useAppLogic';
 
 import { WorkdeskView } from './pages/WorkdeskView';
 import { TasksPage } from './pages/TasksPage';
-import ClientsView from './ClientsView';
 import { InboxPage } from './pages/InboxPage';
 import TableView from './TableView'; // Needed for Global Search
 import { SpacesTabsView } from './SpacesTabsView';
-import { SpaceModule } from './modules/SpaceModule';
-import { CRMModule } from './modules/CRMModule';
-import { FinanceModule } from './modules/FinanceModule';
-import { HRModule } from './modules/HRModule';
-import { MeetingsModule } from './modules/MeetingsModule';
-import { DocumentsModule } from './modules/DocumentsModule';
 import { MiniMessenger } from './features/chat/MiniMessenger';
 import { PageLayout } from './ui/PageLayout';
 import { Container } from './ui/Container';
+import { RouteFallback } from './ui/RouteFallback';
 
 /** Тяжёлые экраны подгружаются отдельными чанками (меньше initial JS). */
 const AdminViewLazy = lazy(() => import('./admin/AdminView').then((m) => ({ default: m.AdminView })));
@@ -32,12 +26,13 @@ const SettingsViewLazy = lazy(() => import('./SettingsView'));
 const AnalyticsViewLazy = lazy(() => import('./AnalyticsView'));
 const DocEditorLazy = lazy(() => import('./DocEditor'));
 const InventoryViewLazy = lazy(() => import('./InventoryView'));
-
-const RouteFallback = () => (
-  <div className="h-full min-h-[40vh] flex items-center justify-center bg-white dark:bg-[#191919] text-gray-500 dark:text-gray-400 text-sm">
-    Загрузка…
-  </div>
-);
+const ClientsViewLazy = lazy(() => import('./ClientsView'));
+const SpaceModuleLazy = lazy(() => import('./modules/SpaceModule').then((m) => ({ default: m.SpaceModule })));
+const CRMModuleLazy = lazy(() => import('./modules/CRMModule').then((m) => ({ default: m.CRMModule })));
+const FinanceModuleLazy = lazy(() => import('./modules/FinanceModule').then((m) => ({ default: m.FinanceModule })));
+const HRModuleLazy = lazy(() => import('./modules/HRModule').then((m) => ({ default: m.HRModule })));
+const MeetingsModuleLazy = lazy(() => import('./modules/MeetingsModule').then((m) => ({ default: m.MeetingsModule })));
+const DocumentsModuleLazy = lazy(() => import('./modules/DocumentsModule').then((m) => ({ default: m.DocumentsModule })));
 
 interface AppRouterProps {
   currentView: string;
@@ -447,7 +442,9 @@ export const AppRouter: React.FC<AppRouterProps> = (props) => {
       if (!activeTable) {
           return <div className="p-10 text-center text-gray-500">Страница не найдена. Выберите страницу из списка.</div>;
       }
-                        return <SpaceModule
+                        return (
+                        <Suspense fallback={<RouteFallback />}>
+                        <SpaceModuleLazy
                             activeTable={activeTable} viewMode={props.viewMode} tasks={props.filteredTasks}
                             users={props.users} currentUser={props.currentUser} projects={props.projects}
                             statuses={props.statuses} priorities={props.priorities} tables={props.tables}
@@ -455,12 +452,15 @@ export const AppRouter: React.FC<AppRouterProps> = (props) => {
                             contentPosts={props.contentPosts} businessProcesses={props.businessProcesses}
                             clients={props.clients} deals={props.deals}
                             actions={actions}
-                        />;
+                        />
+                        </Suspense>
+                        );
   }
 
   if (view === 'clients') {
       return (
-          <ClientsView
+        <Suspense fallback={<RouteFallback />}>
+          <ClientsViewLazy
               clients={props.clients}
               contracts={props.contracts}
               oneTimeDeals={props.oneTimeDeals}
@@ -475,30 +475,43 @@ export const AppRouter: React.FC<AppRouterProps> = (props) => {
               onSaveAccountsReceivable={actions.saveAccountsReceivable}
               onDeleteAccountsReceivable={actions.deleteAccountsReceivable}
           />
+        </Suspense>
       );
   }
 
   if (view === 'sales-funnel') {
-      return <CRMModule view={view} deals={props.deals} clients={props.clients} contracts={props.contracts} oneTimeDeals={props.oneTimeDeals} accountsReceivable={props.accountsReceivable} users={props.users} salesFunnels={props.salesFunnels} projects={props.projects} tasks={props.allTasks} meetings={props.meetings} currentUser={props.currentUser} actions={actions} />;
+      return (
+        <Suspense fallback={<RouteFallback />}>
+          <CRMModuleLazy view={view} deals={props.deals} clients={props.clients} contracts={props.contracts} oneTimeDeals={props.oneTimeDeals} accountsReceivable={props.accountsReceivable} users={props.users} salesFunnels={props.salesFunnels} projects={props.projects} tasks={props.allTasks} meetings={props.meetings} currentUser={props.currentUser} actions={actions} />
+        </Suspense>
+      );
   }
 
   if (view === 'finance') {
-      return <FinanceModule categories={props.financeCategories} funds={props.funds} plan={props.financePlan} requests={props.purchaseRequests} departments={props.departments} users={props.users} currentUser={props.currentUser} financialPlanDocuments={props.financialPlanDocuments} financialPlannings={props.financialPlannings} bdr={props.bdr} actions={actions} />;
+      return (
+        <Suspense fallback={<RouteFallback />}>
+          <FinanceModuleLazy categories={props.financeCategories} funds={props.funds} plan={props.financePlan} requests={props.purchaseRequests} departments={props.departments} users={props.users} currentUser={props.currentUser} financialPlanDocuments={props.financialPlanDocuments} financialPlannings={props.financialPlannings} bdr={props.bdr} actions={actions} />
+        </Suspense>
+      );
   }
 
   if (view === 'employees' || view === 'business-processes') {
-      return <HRModule 
-          view={view} 
-          employees={props.employeeInfos} 
+      return (
+        <Suspense fallback={<RouteFallback />}>
+          <HRModuleLazy
+          view={view}
+          employees={props.employeeInfos}
           users={props.users}
-          currentUser={props.currentUser} 
-          departments={props.departments} 
-          orgPositions={props.orgPositions} 
+          currentUser={props.currentUser}
+          departments={props.departments}
+          orgPositions={props.orgPositions}
           processes={props.businessProcesses}
           tasks={props.filteredTasks}
           tables={props.tables}
-          actions={actions} 
-      />;
+          actions={actions}
+      />
+        </Suspense>
+      );
   }
 
   // Meetings and Documents as separate modules (хардкодные, работают без создания таблиц)
@@ -519,7 +532,11 @@ export const AppRouter: React.FC<AppRouterProps> = (props) => {
           // Добавляем в таблицы, но не сохраняем (чтобы не показывалась в настройках)
           // Модуль будет работать с этой фиктивной таблицей
       }
-      return <MeetingsModule table={meetingsTable} meetings={props.meetings} users={props.users} clients={props.clients} deals={props.deals} tables={props.tables} actions={actions} />;
+      return (
+        <Suspense fallback={<RouteFallback />}>
+          <MeetingsModuleLazy table={meetingsTable} meetings={props.meetings} users={props.users} clients={props.clients} deals={props.deals} tables={props.tables} actions={actions} />
+        </Suspense>
+      );
   }
 
   if (view === 'docs') {
@@ -539,7 +556,11 @@ export const AppRouter: React.FC<AppRouterProps> = (props) => {
           // Добавляем в таблицы, но не сохраняем (чтобы не показывалась в настройках)
           // Модуль будет работать с этой фиктивной таблицей
       }
-      return <DocumentsModule table={docsTable} docs={props.docs} folders={props.folders} tables={props.tables} tasks={props.allTasks} users={props.users} departments={props.departments} employees={props.employeeInfos} currentUser={props.currentUser} actions={actions} />;
+      return (
+        <Suspense fallback={<RouteFallback />}>
+          <DocumentsModuleLazy table={docsTable} docs={props.docs} folders={props.folders} tables={props.tables} tasks={props.allTasks} users={props.users} departments={props.departments} employees={props.employeeInfos} currentUser={props.currentUser} actions={actions} />
+        </Suspense>
+      );
   }
 
   if (view === 'inventory') {
