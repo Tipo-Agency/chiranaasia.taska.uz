@@ -58,7 +58,7 @@ export const SpaceModule: React.FC<SpaceModuleProps> = ({
   }, [tasks, hideCompleted, statusFilter, assigneeFilter, projectFilter]);
 
   // Получаем идеи для беклога (entityType: 'idea' и tableId совпадает с activeTable.id)
-  const backlogTasks = useMemo(() => {
+  const backlogIdeas = useMemo(() => {
     if (activeTable?.type === 'backlog' && activeTable?.id) {
       return tasks.filter(t => 
         t.entityType === 'idea' && 
@@ -68,6 +68,13 @@ export const SpaceModule: React.FC<SpaceModuleProps> = ({
     }
     return [];
   }, [tasks, activeTable]);
+
+  const backlogLinkedTasks = useMemo(() => {
+    if (activeTable?.type !== 'backlog') return [];
+    return tasks.filter(
+      (t) => t.entityType === 'task' && t.source === 'Беклог' && !!t.linkedIdeaId && !t.isArchived
+    );
+  }, [tasks, activeTable?.type]);
 
   // Получаем все backlog таблицы для фильтрации
   const backlogTableIds = useMemo(() => {
@@ -233,9 +240,13 @@ export const SpaceModule: React.FC<SpaceModuleProps> = ({
     case 'backlog':
         // Функция для переноса идеи из беклога в работу
         const handleTakeToWork = (idea: Task) => {
-            // Удаляем идею
-            actions.deleteTask(idea.id);
-            
+            // Идемпотентность: если задача уже создана — просто открываем её.
+            const existing = tasks.find((t) => t.entityType === 'task' && t.linkedIdeaId === idea.id && !t.isArchived);
+            if (existing) {
+                actions.openTaskModal(existing);
+                return;
+            }
+
             // Создаем новую задачу на основе идеи
             const defaultStatus = statuses.find(s => !['Выполнено', 'Done', 'Завершено'].includes(s.name))?.name || statuses[0]?.name || 'Новая';
             
@@ -252,18 +263,22 @@ export const SpaceModule: React.FC<SpaceModuleProps> = ({
                 startDate: idea.startDate || new Date().toISOString().split('T')[0],
                 endDate: idea.endDate || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
                 source: 'Беклог',
+                linkedIdeaId: idea.id,
                 attachments: idea.attachments,
                 createdAt: new Date().toISOString()
             };
             
             actions.saveTask(newTask);
+            // Идея должна исчезнуть из списка идей
+            actions.saveTask({ id: idea.id, status: defaultStatus, isArchived: true });
         };
 
         return (
             <div className="h-full flex flex-col min-h-0">
                 <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden">
                 <BacklogView 
-                    backlogTasks={backlogTasks}
+                    backlogIdeas={backlogIdeas}
+                    backlogLinkedTasks={backlogLinkedTasks}
                     users={users}
                     statuses={statuses}
                     tables={tables}
@@ -295,6 +310,15 @@ export const SpaceModule: React.FC<SpaceModuleProps> = ({
     case 'functionality':
         // Функция для переноса функции из функционала в работу
         const handleTakeFeatureToWork = (feature: Task) => {
+            // Идемпотентность: если задача уже создана — просто открываем её.
+            const existing = tasks.find((t) => t.entityType === 'task' && t.linkedFeatureId === feature.id && !t.isArchived);
+            if (existing) {
+                actions.openTaskModal(existing);
+                return;
+            }
+
+            const defaultStatus = statuses.find(s => !['Выполнено', 'Done', 'Завершено'].includes(s.name))?.name || statuses[0]?.name || 'Новая';
+
             // Функция НЕ удаляется, остается с entityType: 'feature'
             // Создаем новую задачу на основе функции
             const newTask: Partial<Task> = {
@@ -304,7 +328,7 @@ export const SpaceModule: React.FC<SpaceModuleProps> = ({
                 description: feature.description,
                 projectId: feature.projectId,
                 category: feature.category,
-                status: feature.status,
+                status: defaultStatus,
                 priority: feature.priority,
                 assigneeId: feature.assigneeId,
                 assigneeIds: feature.assigneeIds,
@@ -317,6 +341,8 @@ export const SpaceModule: React.FC<SpaceModuleProps> = ({
             };
             
             actions.saveTask(newTask);
+            // Обновляем статус функции (чтобы было видно, что взяли в работу)
+            actions.saveTask({ id: feature.id, status: defaultStatus });
         };
 
         return (

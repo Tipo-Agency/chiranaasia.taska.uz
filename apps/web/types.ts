@@ -382,6 +382,7 @@ export interface Task {
   decisionDate?: string; // ISO дата решения (для заявок)
   updatedAt?: string;
   linkedFeatureId?: string;
+  linkedIdeaId?: string;
 }
 
 export interface Meeting {
