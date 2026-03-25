@@ -19,9 +19,22 @@ from taska_bot.ui.keyboards import (
     BTN_MEETINGS,
     BTN_PROFILE,
     BTN_TASKS,
+    BTN_WEBAPP,
     main_reply_keyboard,
     open_site_inline_markup,
 )
+
+_ALIASES = {
+    "Задачи": BTN_TASKS,
+    "Сделки": BTN_DEALS,
+    "Встречи": BTN_MEETINGS,
+    "Чат": BTN_CHAT,
+    "Заявки": BTN_FINANCE,
+    "Клиенты": BTN_CLIENTS,
+    "Профиль": BTN_PROFILE,
+    "Помощь": BTN_HELP,
+    "Система": BTN_WEBAPP,
+}
 
 MENU_TEXTS = frozenset(
     {
@@ -33,6 +46,8 @@ MENU_TEXTS = frozenset(
         BTN_CLIENTS,
         BTN_PROFILE,
         BTN_HELP,
+        BTN_WEBAPP,
+        *_ALIASES.keys(),
     }
 )
 
@@ -248,6 +263,7 @@ async def on_menu_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     text = (update.message.text or "").strip()
     if text not in MENU_TEXTS:
         return
+    text = _ALIASES.get(text, text)
 
     if text == BTN_TASKS:
         await cmd_tasks(update, context)

@@ -21,6 +21,7 @@ import {
 } from 'lucide-react';
 import { User, Doc, Task, Deal, Meeting, BusinessProcess } from '../../../types';
 import { chatLocalService, ChatMessageLocal, SYSTEM_CHAT_SENDER_ID } from '../../../services/chatLocalService';
+import { api } from '../../../backend/api';
 
 const TO_ALL_ID = '__all__';
 /** Виртуальный диалог: системные уведомления */
@@ -199,11 +200,21 @@ export const MiniMessenger: React.FC<MiniMessengerProps> = ({
   const sendText = () => {
     const text = input.trim();
     if (!text || !activeId || activeId === SYSTEM_FEED_UI) return;
+    const toId = activeId === TO_ALL_ID ? TO_ALL_ID : activeId;
     chatLocalService.addMessage({
       fromId: currentUser.id,
-      toId: activeId === TO_ALL_ID ? TO_ALL_ID : activeId,
+      toId,
       text,
     });
+    // Persist to backend so Telegram bot can mirror messages.
+    // "__all__" becomes recipientId=null (broadcast); otherwise recipientId=userId.
+    api.messages
+      .add({
+        senderId: currentUser.id,
+        recipientId: toId === TO_ALL_ID ? null : toId,
+        text,
+      })
+      .catch(() => {});
     refresh();
     setInput('');
     if (textareaRef.current) {

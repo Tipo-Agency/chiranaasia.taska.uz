@@ -31,6 +31,16 @@ _MENU_TEXTS = {
     BTN_PROFILE,
     BTN_HELP,
     BTN_WEBAPP,
+    # aliases without emojis (some clients/old keyboards)
+    "Задачи",
+    "Сделки",
+    "Встречи",
+    "Чат",
+    "Заявки",
+    "Клиенты",
+    "Профиль",
+    "Помощь",
+    "Система",
 }
 
 
