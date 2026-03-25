@@ -134,6 +134,9 @@ def register(application) -> None:
         MessageHandler(
             filters.TEXT & filters.ChatType.PRIVATE,
             handle_chat_text_extras,
+            # Важно: этот хендлер должен "пропускать" сообщения, которые он не обрабатывает.
+            # Иначе он блокирует reply-меню (menu.py) и "по кнопкам ничего не происходит".
+            block=False,
         ),
         group=0,
     )
