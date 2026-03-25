@@ -1,7 +1,8 @@
 import React, { useMemo, useState } from 'react';
 import { Task, User, StatusOption, TableCollection } from '../types';
 import { Archive, Trash2, Edit2, Play } from 'lucide-react';
-import { ModulePageShell, ModulePageHeader, ModuleSegmentedControl, MODULE_PAGE_GUTTER, ModuleCreateIconButton } from './ui';
+import { TaskSelect } from './TaskSelect';
+import { ModulePageShell, ModulePageHeader, ModuleSegmentedControl, MODULE_PAGE_GUTTER, ModuleCreateIconButton, ModuleFilterIconButton } from './ui';
 
 interface BacklogViewProps {
   backlogIdeas: Task[]; // Идеи (entityType: 'idea')
@@ -30,6 +31,7 @@ const BacklogView: React.FC<BacklogViewProps> = ({
   const [scope, setScope] = useState<'all' | 'assigned' | 'unassigned'>('all');
   const [tab, setTab] = useState<'ideas' | 'in_work' | 'done'>('ideas');
   const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [showFilters, setShowFilters] = useState(false);
 
   const filteredTasks = useMemo(() => {
     return backlogIdeas.filter((t) => {
@@ -249,24 +251,35 @@ const BacklogView: React.FC<BacklogViewProps> = ({
                     ]}
                   />
                 ) : (
-                  <select
-                    value={statusFilter}
-                    onChange={(e) => setStatusFilter(e.target.value)}
-                    className="border border-gray-200 dark:border-[#333] rounded-xl px-3 py-2 bg-white dark:bg-[#252525] text-gray-800 dark:text-gray-100 text-xs"
-                  >
-                    <option value="all">Все статусы</option>
-                    {statuses.map((s) => (
-                      <option key={s.id} value={s.name}>
-                        {s.name}
-                      </option>
-                    ))}
-                  </select>
+                  <ModuleFilterIconButton
+                    accent="orange"
+                    active={showFilters || statusFilter !== 'all'}
+                    activeCount={statusFilter !== 'all' ? 1 : 0}
+                    onClick={() => setShowFilters((v) => !v)}
+                  />
                 )}
                 <ModuleCreateIconButton accent="orange" label="Новая идея" onClick={onCreateTask} />
               </>
             }
           />
         </div>
+        {tab !== 'ideas' && showFilters && (
+          <div className="mt-4 p-4 bg-gray-50 dark:bg-[#252525] rounded-lg border border-gray-200 dark:border-[#333]">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-semibold text-gray-600 dark:text-gray-400 mb-1">Статус</label>
+                <TaskSelect
+                  value={statusFilter}
+                  onChange={setStatusFilter}
+                  options={[
+                    { value: 'all', label: 'Все статусы' },
+                    ...statuses.map((s) => ({ value: s.name, label: s.name })),
+                  ]}
+                />
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       <div className="flex-1 min-h-0 overflow-hidden">

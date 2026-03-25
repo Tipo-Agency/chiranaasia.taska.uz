@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { Task, User, StatusOption, Project } from '../types';
 import { CheckCircle2, Trash2, Edit2, Play, Layers, Folder, ChevronDown } from 'lucide-react';
+import { TaskSelect } from './TaskSelect';
 import { ModulePageShell, ModulePageHeader, ModuleSegmentedControl, MODULE_PAGE_GUTTER, ModuleCreateIconButton, ModuleFilterIconButton } from './ui';
 
 interface FunctionalityViewProps {
@@ -182,31 +183,27 @@ const FunctionalityView: React.FC<FunctionalityViewProps> = ({
           {showFilters && (
             <div className="mt-4 p-4 bg-gray-50 dark:bg-[#252525] rounded-lg border border-gray-200 dark:border-[#333]">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                <div className="relative">
-                  <select
+                <div>
+                  <label className="block text-xs font-semibold text-gray-600 dark:text-gray-400 mb-1">Проект</label>
+                  <TaskSelect
                     value={selectedProjectId}
-                    onChange={e => setSelectedProjectId(e.target.value)}
-                    className="w-full px-3 pr-8 py-2 bg-white dark:bg-[#252525] border border-gray-200 dark:border-[#333] rounded-lg text-sm text-gray-800 dark:text-gray-200 focus:ring-2 focus:ring-blue-500 outline-none appearance-none"
-                  >
-                    <option value="all">Все проекты</option>
-                    {projectsWithFeatures.map(p => (
-                      <option key={p.id} value={p.id}>{p.name}</option>
-                    ))}
-                  </select>
-                  <ChevronDown size={16} className="absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400" />
+                    onChange={setSelectedProjectId}
+                    options={[
+                      { value: 'all', label: 'Все проекты' },
+                      ...projectsWithFeatures.map((p) => ({ value: p.id, label: p.name })),
+                    ]}
+                  />
                 </div>
-                <div className="relative">
-                  <select
+                <div>
+                  <label className="block text-xs font-semibold text-gray-600 dark:text-gray-400 mb-1">Категория</label>
+                  <TaskSelect
                     value={selectedCategory}
-                    onChange={e => setSelectedCategory(e.target.value)}
-                    className="w-full px-3 pr-8 py-2 bg-white dark:bg-[#252525] border border-gray-200 dark:border-[#333] rounded-lg text-sm text-gray-800 dark:text-gray-200 focus:ring-2 focus:ring-blue-500 outline-none appearance-none"
-                  >
-                    <option value="all">Все категории</option>
-                    {STANDARD_CATEGORIES.map(c => (
-                      <option key={c.id} value={c.id}>{c.name}</option>
-                    ))}
-                  </select>
-                  <ChevronDown size={16} className="absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400" />
+                    onChange={setSelectedCategory}
+                    options={[
+                      { value: 'all', label: 'Все категории' },
+                      ...STANDARD_CATEGORIES.map((c) => ({ value: c.id, label: c.name })),
+                    ]}
+                  />
                 </div>
               </div>
             </div>

@@ -247,8 +247,11 @@ export const SpaceModule: React.FC<SpaceModuleProps> = ({
                 return;
             }
 
-            // Создаем новую задачу на основе идеи
-            const defaultStatus = statuses.find(s => !['Выполнено', 'Done', 'Завершено'].includes(s.name))?.name || statuses[0]?.name || 'Новая';
+            const workStatus =
+                statuses.find(s => ['В работе', 'В работе ✅', 'В процессе', 'In progress', 'In Progress'].includes(s.name))?.name ||
+                statuses.find(s => !['Выполнено', 'Done', 'Завершено'].includes(s.name))?.name ||
+                statuses[0]?.name ||
+                'Новая';
             
             const newTask: Partial<Task> = {
                 entityType: 'task',
@@ -268,9 +271,9 @@ export const SpaceModule: React.FC<SpaceModuleProps> = ({
                 createdAt: new Date().toISOString()
             };
             
-            actions.saveTask(newTask);
+            actions.saveTask({ ...newTask, status: workStatus });
             // Идея должна исчезнуть из списка идей
-            actions.saveTask({ id: idea.id, status: defaultStatus, isArchived: true });
+            actions.saveTask({ id: idea.id, status: workStatus, isArchived: true });
         };
 
         return (
@@ -317,7 +320,11 @@ export const SpaceModule: React.FC<SpaceModuleProps> = ({
                 return;
             }
 
-            const defaultStatus = statuses.find(s => !['Выполнено', 'Done', 'Завершено'].includes(s.name))?.name || statuses[0]?.name || 'Новая';
+            const workStatus =
+                statuses.find(s => ['В работе', 'В работе ✅', 'В процессе', 'In progress', 'In Progress'].includes(s.name))?.name ||
+                statuses.find(s => !['Выполнено', 'Done', 'Завершено'].includes(s.name))?.name ||
+                statuses[0]?.name ||
+                'Новая';
 
             // Функция НЕ удаляется, остается с entityType: 'feature'
             // Создаем новую задачу на основе функции
@@ -328,7 +335,7 @@ export const SpaceModule: React.FC<SpaceModuleProps> = ({
                 description: feature.description,
                 projectId: feature.projectId,
                 category: feature.category,
-                status: defaultStatus,
+                status: workStatus,
                 priority: feature.priority,
                 assigneeId: feature.assigneeId,
                 assigneeIds: feature.assigneeIds,
@@ -342,7 +349,7 @@ export const SpaceModule: React.FC<SpaceModuleProps> = ({
             
             actions.saveTask(newTask);
             // Обновляем статус функции (чтобы было видно, что взяли в работу)
-            actions.saveTask({ id: feature.id, status: defaultStatus });
+            actions.saveTask({ id: feature.id, status: workStatus });
         };
 
         return (

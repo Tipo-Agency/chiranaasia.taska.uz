@@ -290,7 +290,8 @@ const TaskModal: React.FC<TaskModalProps> = ({
       projectId: projectId || null,
       assigneeId: assigneeIds[0] || null, 
       assigneeIds,
-      status: taskType === 'idea' ? undefined : (currentTask?.id ? status : (taskType === 'feature' ? 'Не начато' : (statuses[0]?.name || 'Не начато'))),
+      // Для функций тоже сохраняем выбранный статус (не форсим "Не начато")
+      status: taskType === 'idea' ? undefined : (status || (statuses[0]?.name || 'Не начато')),
       startDate: finalStartDate,
       endDate: finalEndDate,
       priority: taskType === 'idea' ? undefined : priority,
