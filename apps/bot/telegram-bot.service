@@ -5,11 +5,11 @@ After=network.target
 [Service]
 Type=simple
 User=root
-WorkingDirectory=/var/www/tipa.taska.uz/telegram-bot
-Environment="PATH=/var/www/tipa.taska.uz/telegram-bot/venv/bin:/usr/local/bin:/usr/bin:/bin"
-# ВАЖНО: Загружаем переменные окружения из .env файла
-EnvironmentFile=/var/www/tipa.taska.uz/telegram-bot/.env
-ExecStart=/var/www/tipa.taska.uz/telegram-bot/venv/bin/python /var/www/tipa.taska.uz/telegram-bot/bot.py
+WorkingDirectory=/var/www/tipa.taska.uz/apps/bot
+Environment="PATH=/var/www/tipa.taska.uz/apps/bot/venv/bin:/usr/local/bin:/usr/bin:/bin"
+# ВАЖНО: переменные из .env (деплой также перезаписывает unit через apps/bot/deploy.sh)
+EnvironmentFile=/var/www/tipa.taska.uz/apps/bot/.env
+ExecStart=/var/www/tipa.taska.uz/apps/bot/venv/bin/python /var/www/tipa.taska.uz/apps/bot/main.py
 Restart=always
 RestartSec=10
 StandardOutput=journal

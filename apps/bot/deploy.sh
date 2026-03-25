@@ -74,8 +74,11 @@ if systemctl is-active --quiet "$SERVICE_NAME" 2>/dev/null; then
     sleep 3
 fi
 
-# 2. Находим и убиваем все процессы Python с bot.py
-BOT_PIDS=$(pgrep -f "python.*bot.py" 2>/dev/null || echo "")
+# 2. Останавливаем процессы бота (bot.py shim, main.py, -m taska_bot)
+_bot_pgrep() {
+  (pgrep -f "python.*bot.py" 2>/dev/null; pgrep -f "python.*main.py" 2>/dev/null; pgrep -f "python.*-m taska_bot" 2>/dev/null) | sort -u
+}
+BOT_PIDS=$(_bot_pgrep)
 if [ -n "$BOT_PIDS" ]; then
     echo "   Found running bot processes: $BOT_PIDS"
     echo "   Killing all bot processes..."
@@ -89,7 +92,7 @@ else
 fi
 
 # 3. Проверяем, что все остановлено
-REMAINING_PIDS=$(pgrep -f "python.*bot.py" 2>/dev/null || echo "")
+REMAINING_PIDS=$(_bot_pgrep)
 if [ -n "$REMAINING_PIDS" ]; then
     echo "   ⚠️ Some processes still running, force killing: $REMAINING_PIDS"
     for PID in $REMAINING_PIDS; do
@@ -99,7 +102,7 @@ if [ -n "$REMAINING_PIDS" ]; then
 fi
 
 # 4. Финальная проверка
-FINAL_CHECK=$(pgrep -f "python.*bot.py" 2>/dev/null || echo "")
+FINAL_CHECK=$(_bot_pgrep)
 if [ -z "$FINAL_CHECK" ]; then
     echo "   ✅ All bot processes stopped successfully"
 else
@@ -218,12 +221,12 @@ sudo systemctl start "$SERVICE_NAME"
 
 # Проверяем, что запустился только один процесс (важно для избежания ошибки 409)
 sleep 3
-RUNNING_PROCESSES=$(pgrep -f "python.*bot.py" 2>/dev/null | wc -l || echo "0")
-if [ "$RUNNING_PROCESSES" -gt 1 ]; then
+RUNNING_PROCESSES=$(_bot_pgrep | wc -l | tr -d ' ')
+RUNNING_PROCESSES=${RUNNING_PROCESSES:-0}
+if [ "${RUNNING_PROCESSES:-0}" -gt 1 ]; then
     echo "   ⚠️ Warning: Multiple bot processes detected ($RUNNING_PROCESSES)"
     echo "   This may cause 409 Conflict errors! Killing duplicates..."
-    # Оставляем только первый процесс, убиваем остальные
-    ALL_PIDS=$(pgrep -f "python.*bot.py" 2>/dev/null)
+    ALL_PIDS=$(_bot_pgrep)
     FIRST_PID=$(echo "$ALL_PIDS" | head -1)
     for PID in $ALL_PIDS; do
         if [ "$PID" != "$FIRST_PID" ]; then
@@ -258,7 +261,7 @@ if systemctl is-active --quiet "$SERVICE_NAME"; then
         echo "   📋 Version in file: $ACTUAL_VERSION"
         echo "   📊 File size: $(wc -l < "$BOT_DIR/bot.py") lines"
         echo "   🕐 Last modified: $(stat -c '%y' "$BOT_DIR/bot.py" 2>/dev/null || stat -f '%Sm' "$BOT_DIR/bot.py" 2>/dev/null || echo "unknown")"
-        echo "   🔍 Systemd ExecStart path: $VENV_DIR/bin/python $BOT_DIR/bot.py"
+        echo "   🔍 Systemd ExecStart path: $VENV_DIR/bin/python $BOT_DIR/main.py"
     else
         echo "   ❌ bot.py file not found at $BOT_DIR/bot.py"
     fi
