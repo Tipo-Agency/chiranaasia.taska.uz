@@ -1,4 +1,4 @@
-import React, { useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Department, Warehouse, InventoryItem, StockBalance, StockMovement, InventoryRevision } from '../types';
 import {
   Layers,
@@ -70,8 +70,10 @@ const InventoryView: React.FC<InventoryViewProps> = ({
   const [filterCategory, setFilterCategory] = useState('');
   const [alertMessage, setAlertMessage] = useState<string | null>(null);
   const [isCreateItemOpen, setIsCreateItemOpen] = useState(false);
+  const [isEditItemOpen, setIsEditItemOpen] = useState(false);
   const [isCreateMovementOpen, setIsCreateMovementOpen] = useState(false);
   const [isCreateRevisionOpen, setIsCreateRevisionOpen] = useState(false);
+  const [isCreateWarehouseOpen, setIsCreateWarehouseOpen] = useState(false);
   const importInputRef = useRef<HTMLInputElement>(null);
 
   // Form state: new item
@@ -80,6 +82,19 @@ const InventoryView: React.FC<InventoryViewProps> = ({
   const [newItemUnit, setNewItemUnit] = useState('');
   const [newItemCategory, setNewItemCategory] = useState('');
   const [newItemNotes, setNewItemNotes] = useState('');
+
+  // Form state: edit item
+  const [editingItemId, setEditingItemId] = useState<string | null>(null);
+  const [editItemSku, setEditItemSku] = useState('');
+  const [editItemName, setEditItemName] = useState('');
+  const [editItemUnit, setEditItemUnit] = useState('');
+  const [editItemCategory, setEditItemCategory] = useState('');
+  const [editItemNotes, setEditItemNotes] = useState('');
+
+  // Form state: new warehouse
+  const [newWarehouseName, setNewWarehouseName] = useState('');
+  const [newWarehouseLocation, setNewWarehouseLocation] = useState('');
+  const [newWarehouseDepartmentId, setNewWarehouseDepartmentId] = useState('');
 
   // Form state: movement
   const [movementType, setMovementType] = useState<'receipt' | 'transfer' | 'writeoff' | 'adjustment'>('receipt');
@@ -98,13 +113,22 @@ const InventoryView: React.FC<InventoryViewProps> = ({
     [warehouses, selectedDepartmentId]
   );
 
+  const activeWarehouses = useMemo(() => warehouses.filter((w) => !w.isArchived), [warehouses]);
+  const defaultWarehouseId = useMemo(() => activeWarehouses.find((w) => w.isDefault)?.id || '', [activeWarehouses]);
+
+  useEffect(() => {
+    if (!selectedWarehouseId && defaultWarehouseId) {
+      setSelectedWarehouseId(defaultWarehouseId);
+    }
+  }, [defaultWarehouseId, selectedWarehouseId]);
+
   const categories = useMemo(
     () => Array.from(new Set(items.map((i) => i.category).filter(Boolean) as string[])).sort((a, b) => a.localeCompare(b)),
     [items]
   );
 
   const balancesForView = useMemo(() => {
-    const whId = selectedWarehouseId || filteredWarehouses[0]?.id;
+    const whId = selectedWarehouseId || defaultWarehouseId || filteredWarehouses[0]?.id;
     if (!whId) return [];
     return balances
       .filter(b => b.warehouseId === whId)
@@ -128,7 +152,7 @@ const InventoryView: React.FC<InventoryViewProps> = ({
         return itemName.includes(q) || itemSku.includes(q);
       })
       .sort((a, b) => a.itemName.localeCompare(b.itemName));
-  }, [balances, items, filteredWarehouses, selectedWarehouseId, search, filterOnlyNonZero, filterCategory]);
+  }, [balances, items, filteredWarehouses, selectedWarehouseId, defaultWarehouseId, search, filterOnlyNonZero, filterCategory]);
 
   const filteredItems = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -179,6 +203,60 @@ const InventoryView: React.FC<InventoryViewProps> = ({
     setNewItemCategory('');
     setNewItemNotes('');
     setIsCreateItemOpen(false);
+  };
+
+  const openEditItem = (item: InventoryItem) => {
+    setEditingItemId(item.id);
+    setEditItemSku(item.sku || '');
+    setEditItemName(item.name || '');
+    setEditItemUnit(item.unit || '');
+    setEditItemCategory(item.category || '');
+    setEditItemNotes(item.notes || '');
+    setIsEditItemOpen(true);
+  };
+
+  const handleSaveEditedItem = () => {
+    if (!editingItemId) return;
+    if (!editItemName.trim()) {
+      setAlertMessage('Введите название номенклатуры');
+      return;
+    }
+    onSaveItem({
+      id: editingItemId,
+      sku: editItemSku.trim(),
+      name: editItemName.trim(),
+      unit: editItemUnit.trim() || 'шт',
+      category: editItemCategory.trim() || undefined,
+      notes: editItemNotes.trim() || undefined,
+    });
+    setIsEditItemOpen(false);
+    setEditingItemId(null);
+  };
+
+  const handleDeleteEditedItem = () => {
+    if (!editingItemId) return;
+    onDeleteItem(editingItemId);
+    setIsEditItemOpen(false);
+    setEditingItemId(null);
+  };
+
+  const handleCreateWarehouse = () => {
+    if (!newWarehouseName.trim()) {
+      setAlertMessage('Введите название склада');
+      return;
+    }
+    const isFirst = activeWarehouses.length === 0;
+    onSaveWarehouse({
+      id: `wh-${Date.now()}`,
+      name: newWarehouseName.trim(),
+      location: newWarehouseLocation.trim() || undefined,
+      departmentId: newWarehouseDepartmentId || undefined,
+      isDefault: isFirst,
+    });
+    setNewWarehouseName('');
+    setNewWarehouseLocation('');
+    setNewWarehouseDepartmentId('');
+    setIsCreateWarehouseOpen(false);
   };
 
   const handleCreateMovement = () => {
@@ -347,6 +425,13 @@ const InventoryView: React.FC<InventoryViewProps> = ({
                   accent="emerald"
                   items={[
                     {
+                      id: 'wh',
+                      label: 'Новый склад',
+                      icon: Layers,
+                      onClick: () => setIsCreateWarehouseOpen(true),
+                      iconClassName: 'text-emerald-600 dark:text-emerald-400',
+                    },
+                    {
                       id: 'nom',
                       label: 'Новая номенклатура',
                       icon: Package,
@@ -390,6 +475,26 @@ const InventoryView: React.FC<InventoryViewProps> = ({
       </div>
       <div className="flex-1 overflow-y-auto custom-scrollbar min-h-0">
         <div className={`${MODULE_PAGE_GUTTER} pb-20`}>
+          {activeWarehouses.length === 0 && (
+            <div className="rounded-2xl border border-emerald-200/70 dark:border-emerald-900/40 bg-emerald-50/60 dark:bg-emerald-950/20 p-4 sm:p-5 mb-4">
+              <p className="text-sm font-semibold text-emerald-900 dark:text-emerald-100">
+                Сначала создайте первый склад
+              </p>
+              <p className="text-sm text-emerald-800/80 dark:text-emerald-200/80 mt-1">
+                Без склада нельзя вести остатки и проводить операции.
+              </p>
+              <div className="mt-3">
+                <button
+                  type="button"
+                  onClick={() => setIsCreateWarehouseOpen(true)}
+                  className="inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold"
+                >
+                  <Layers size={16} />
+                  Создать склад
+                </button>
+              </div>
+            </div>
+          )}
 
           {showFilters && (
             <div className="rounded-2xl border border-gray-200 dark:border-[#333] bg-white dark:bg-[#191919] p-4 sm:p-5 mb-4 shadow-sm">
@@ -417,7 +522,9 @@ const InventoryView: React.FC<InventoryViewProps> = ({
                     onChange={(e) => setSelectedWarehouseId(e.target.value)}
                     className="rounded-xl border border-gray-200 dark:border-[#333] bg-gray-50 dark:bg-[#252525] px-3 py-2.5 text-sm text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-emerald-500/30 outline-none"
                   >
-                    <option value="">Все / авто (первый склад)</option>
+                    <option value="">
+                      Все / авто ({defaultWarehouseId ? 'основной склад' : 'первый склад'})
+                    </option>
                     {filteredWarehouses.map((w) => (
                       <option key={w.id} value={w.id}>
                         {w.name}
@@ -516,7 +623,12 @@ const InventoryView: React.FC<InventoryViewProps> = ({
                   </thead>
                   <tbody className="divide-y divide-gray-100 dark:divide-[#2a2a2a]">
                     {filteredItems.map(item => (
-                      <tr key={item.id} className="hover:bg-slate-50/80 dark:hover:bg-[#222] transition-colors">
+                      <tr
+                        key={item.id}
+                        className="hover:bg-slate-50/80 dark:hover:bg-[#222] transition-colors cursor-pointer"
+                        onClick={() => openEditItem(item)}
+                        title="Нажмите, чтобы редактировать"
+                      >
                         <td className="px-4 py-3 text-gray-500 dark:text-gray-400 font-mono text-xs">{item.sku}</td>
                         <td className="px-4 py-3 text-gray-900 dark:text-gray-100 font-medium">{item.name}</td>
                         <td className="px-4 py-3 text-gray-600 dark:text-gray-400">{item.unit}</td>
@@ -744,6 +856,58 @@ const InventoryView: React.FC<InventoryViewProps> = ({
                 <div className="px-4 pb-4 flex justify-end gap-2">
                   <button type="button" onClick={() => setIsCreateItemOpen(false)} className="px-3 py-2 rounded-lg border border-gray-200 dark:border-[#444] text-sm">Отмена</button>
                   <button type="button" onClick={handleCreateItem} className="px-3 py-2 rounded-lg text-sm text-white bg-emerald-600 hover:bg-emerald-700">Создать</button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {isEditItemOpen && (
+            <div className="fixed inset-0 z-[220] bg-black/35 flex items-center justify-center p-4" onClick={() => setIsEditItemOpen(false)}>
+              <div className="w-full max-w-2xl rounded-xl border border-gray-200 dark:border-[#444] bg-white dark:bg-[#252525] shadow-2xl" onClick={(e) => e.stopPropagation()}>
+                <div className="px-4 py-3 border-b border-gray-100 dark:border-[#333] flex items-center justify-between">
+                  <h4 className="text-sm font-semibold text-gray-900 dark:text-white">Редактировать номенклатуру</h4>
+                  <button type="button" onClick={() => setIsEditItemOpen(false)} className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-[#333] text-gray-500"><X size={16} /></button>
+                </div>
+                <div className="p-4 grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <input value={editItemSku} onChange={e => setEditItemSku(e.target.value)} placeholder="Код" className="rounded-xl border border-gray-200 dark:border-[#333] px-3 py-2.5 text-sm bg-white dark:bg-[#252525]" />
+                  <input value={editItemName} onChange={e => setEditItemName(e.target.value)} placeholder="Название *" className="rounded-xl border border-gray-200 dark:border-[#333] px-3 py-2.5 text-sm bg-white dark:bg-[#252525]" />
+                  <input value={editItemUnit} onChange={e => setEditItemUnit(e.target.value)} placeholder="Ед. изм. (шт, кг...)" className="rounded-xl border border-gray-200 dark:border-[#333] px-3 py-2.5 text-sm bg-white dark:bg-[#252525]" />
+                  <input value={editItemCategory} onChange={e => setEditItemCategory(e.target.value)} placeholder="Категория" className="rounded-xl border border-gray-200 dark:border-[#333] px-3 py-2.5 text-sm bg-white dark:bg-[#252525]" />
+                  <input value={editItemNotes} onChange={e => setEditItemNotes(e.target.value)} placeholder="Комментарий" className="rounded-xl border border-gray-200 dark:border-[#333] px-3 py-2.5 text-sm bg-white dark:bg-[#252525] md:col-span-2" />
+                </div>
+                <div className="px-4 pb-4 flex justify-between gap-2">
+                  <button type="button" onClick={handleDeleteEditedItem} className="px-3 py-2 rounded-lg text-sm text-white bg-red-600 hover:bg-red-700">
+                    Удалить
+                  </button>
+                  <div className="flex gap-2">
+                    <button type="button" onClick={() => setIsEditItemOpen(false)} className="px-3 py-2 rounded-lg border border-gray-200 dark:border-[#444] text-sm">Отмена</button>
+                    <button type="button" onClick={handleSaveEditedItem} className="px-3 py-2 rounded-lg text-sm text-white bg-emerald-600 hover:bg-emerald-700">Сохранить</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {isCreateWarehouseOpen && (
+            <div className="fixed inset-0 z-[220] bg-black/35 flex items-center justify-center p-4" onClick={() => setIsCreateWarehouseOpen(false)}>
+              <div className="w-full max-w-2xl rounded-xl border border-gray-200 dark:border-[#444] bg-white dark:bg-[#252525] shadow-2xl" onClick={(e) => e.stopPropagation()}>
+                <div className="px-4 py-3 border-b border-gray-100 dark:border-[#333] flex items-center justify-between">
+                  <h4 className="text-sm font-semibold text-gray-900 dark:text-white">Новый склад</h4>
+                  <button type="button" onClick={() => setIsCreateWarehouseOpen(false)} className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-[#333] text-gray-500"><X size={16} /></button>
+                </div>
+                <div className="p-4 grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <input value={newWarehouseName} onChange={e => setNewWarehouseName(e.target.value)} placeholder="Название склада *" className="rounded-xl border border-gray-200 dark:border-[#333] px-3 py-2.5 text-sm bg-white dark:bg-[#252525] md:col-span-2" />
+                  <input value={newWarehouseLocation} onChange={e => setNewWarehouseLocation(e.target.value)} placeholder="Локация" className="rounded-xl border border-gray-200 dark:border-[#333] px-3 py-2.5 text-sm bg-white dark:bg-[#252525] md:col-span-2" />
+                  <select value={newWarehouseDepartmentId} onChange={(e) => setNewWarehouseDepartmentId(e.target.value)} className="rounded-xl border border-gray-200 dark:border-[#333] px-3 py-2.5 text-sm bg-white dark:bg-[#252525] md:col-span-2">
+                    <option value="">Без подразделения</option>
+                    {departments.filter((d) => !d.isArchived).map((d) => (
+                      <option key={d.id} value={d.id}>{d.name}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="px-4 pb-4 flex justify-end gap-2">
+                  <button type="button" onClick={() => setIsCreateWarehouseOpen(false)} className="px-3 py-2 rounded-lg border border-gray-200 dark:border-[#444] text-sm">Отмена</button>
+                  <button type="button" onClick={handleCreateWarehouse} className="px-3 py-2 rounded-lg text-sm text-white bg-emerald-600 hover:bg-emerald-700">Создать</button>
                 </div>
               </div>
             </div>
