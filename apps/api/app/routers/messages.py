@@ -27,7 +27,11 @@ async def get_messages(
     else:
         result = await db.execute(
             select(InboxMessage).where(
-                or_(InboxMessage.recipient_id == user_id, InboxMessage.recipient_id.is_(None))
+                or_(
+                    InboxMessage.recipient_id == user_id,
+                    InboxMessage.recipient_id.is_(None),
+                    InboxMessage.recipient_id == "",
+                )
             ).order_by(InboxMessage.created_at.desc())
         )
     rows = result.scalars().all()
@@ -42,10 +46,13 @@ async def add_message(
     """Create a new message. Body: senderId, recipientId?, text, attachments? (array of {entityType, entityId, label})."""
     mid = body.get("id") or str(uuid.uuid4())
     now = datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3] + "Z"
+    rid = body.get("recipientId")
+    if not rid:
+        rid = None
     db.add(InboxMessage(
         id=mid,
         sender_id=body.get("senderId", ""),
-        recipient_id=body.get("recipientId"),
+        recipient_id=rid,
         text=body.get("text", ""),
         attachments=body.get("attachments", []),
         created_at=body.get("createdAt", now),
@@ -61,7 +68,7 @@ async def add_message(
         source="messages-router",
         actor_id=body.get("senderId") or None,
         payload={
-            "recipientId": body.get("recipientId"),
+            "recipientId": rid,
             "textLen": len(text),
             "attachmentCount": len(body.get("attachments") or []),
         },

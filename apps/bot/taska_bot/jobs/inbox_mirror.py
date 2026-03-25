@@ -61,7 +61,9 @@ async def job_inbox_mirror(context: ContextTypes.DEFAULT_TYPE) -> None:
             if ca <= watermark:
                 continue
             sender_id = str(m.get("senderId") or "")
-            if sender_id == uid:
+            recipient_id = m.get("recipientId")
+            is_broadcast = recipient_id in (None, "", 0)
+            if sender_id == uid and not is_broadcast:
                 watermark = max(watermark, ca)
                 continue
 
