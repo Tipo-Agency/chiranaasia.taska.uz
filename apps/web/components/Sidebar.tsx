@@ -211,14 +211,7 @@ const Sidebar: React.FC<SidebarProps> = ({
                 <FileText size={18} /> {!isCollapsed && <span className="text-sm">Документы</span>}
             </div>
 
-            {/* Чат — только на мобилке (на десктопе/планшете открывается круглой кнопкой) */}
-            <div 
-                className={`md:hidden flex items-center ${isCollapsed ? 'justify-center' : 'gap-2'} ${isCollapsed ? 'px-2' : 'px-3'} py-1.5 rounded cursor-pointer transition-colors ${currentView === 'chat' ? 'bg-notion-hover dark:bg-[#252525] text-notion-text dark:text-white font-medium' : 'text-notion-text/70 dark:text-gray-400 hover:bg-notion-hover dark:hover:bg-[#252525] hover:text-notion-text dark:hover:text-gray-200'}`}
-                onClick={() => handleNav(() => onNavigate('chat'))}
-                title={isCollapsed ? "Чат" : ""}
-            >
-                <MessageCircle size={18} /> {!isCollapsed && <span className="text-sm">Чат</span>}
-            </div>
+            {/* Чат на мобильной версии отключён (плохой UX). */}
 
             {/* 8. Сотрудники (только админ) */}
             {currentUser.role === Role.ADMIN && (

@@ -1,4 +1,4 @@
-import React, { useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Tabs } from '../ui/Tabs';
 import { MiniMessenger } from '../features/chat/MiniMessenger';
 import { WeeklyPlansView, type WeeklyPlansViewHandle } from '../documents/WeeklyPlansView';
@@ -54,7 +54,9 @@ export const WorkdeskView: React.FC<WorkdeskViewProps> = ({
   onCreateEntity,
   onUpdateEntity,
 }) => {
-  const [activeTab, setActiveTab] = useState<WorkdeskTab>('chat');
+  // На мобильной версии чат не нужен (плохой UX) — стартуем с задач.
+  // На десктопе можно оставлять чат.
+  const [activeTab, setActiveTab] = useState<WorkdeskTab>('tasks');
   const weeklyPlansRef = useRef<WeeklyPlansViewHandle>(null);
   const [editingDeal, setEditingDeal] = useState<Deal | null>(null);
   const [editingMeeting, setEditingMeeting] = useState<Meeting | null>(null);
@@ -141,6 +143,12 @@ export const WorkdeskView: React.FC<WorkdeskViewProps> = ({
     [processTemplates]
   );
 
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const isDesktop = window.matchMedia?.('(min-width: 768px)')?.matches; // md breakpoint
+    if (isDesktop) setActiveTab('chat');
+  }, []);
+
   return (
     <ModulePageShell>
       <div className={`${MODULE_PAGE_GUTTER} pt-6 md:pt-8 flex-shrink-0`}>
@@ -148,7 +156,8 @@ export const WorkdeskView: React.FC<WorkdeskViewProps> = ({
             <div className="flex flex-wrap items-center justify-between gap-2">
               <Tabs
                 tabs={[
-                  { id: 'chat', label: 'Чат' },
+                  // Чат скрываем на мобилке
+                  { id: 'chat', label: 'Чат', className: 'hidden md:flex' },
                   { id: 'weekly', label: 'Недельные планы' },
                   { id: 'tasks', label: 'Задачи' },
                   { id: 'deals', label: 'Сделки' },
@@ -214,7 +223,7 @@ export const WorkdeskView: React.FC<WorkdeskViewProps> = ({
       <div className="flex-1 min-h-0 overflow-hidden">
         <div className={`${MODULE_PAGE_GUTTER} mt-3 pb-24 md:pb-32 h-full overflow-y-auto overflow-x-hidden custom-scrollbar space-y-4`}>
           {activeTab === 'chat' && (
-            <div className="h-[min(74vh,780px)]">
+            <div className="hidden md:block h-[min(74vh,780px)]">
               <MiniMessenger
                 users={users}
                 currentUser={currentUser}

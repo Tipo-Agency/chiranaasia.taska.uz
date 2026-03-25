@@ -4,6 +4,8 @@ interface Tab {
   id: string;
   label: string;
   icon?: React.ReactNode;
+  /** Extra classes for the tab button (e.g. responsive hide). */
+  className?: string;
 }
 
 interface TabsProps {
@@ -19,7 +21,7 @@ interface TabsProps {
 export const Tabs: React.FC<TabsProps> = ({ tabs, activeTab, onChange, className = '' }) => {
   return (
     <div
-      className={`inline-flex flex-wrap items-center gap-1.5 rounded-2xl bg-white dark:bg-[#1a1a1a] border border-gray-200 dark:border-[#333] p-1 shadow-sm text-sm ${className}`}
+      className={`inline-flex flex-nowrap items-center gap-1.5 rounded-2xl bg-white dark:bg-[#1a1a1a] border border-gray-200 dark:border-[#333] p-1 shadow-sm text-sm max-w-full overflow-x-auto custom-scrollbar ${className}`}
       role="tablist"
     >
       {tabs.map((tab) => (
@@ -30,7 +32,8 @@ export const Tabs: React.FC<TabsProps> = ({ tabs, activeTab, onChange, className
           aria-selected={activeTab === tab.id}
           onClick={() => onChange(tab.id)}
           className={`
-            px-3 py-2 rounded-xl flex items-center gap-1.5 whitespace-nowrap font-medium transition-colors
+            px-3 py-2 rounded-xl flex items-center gap-1.5 whitespace-nowrap font-medium transition-colors shrink-0
+            ${tab.className || ''}
             ${
               activeTab === tab.id
                 ? 'bg-gray-900 dark:bg-white text-white dark:text-gray-900 shadow-sm'
