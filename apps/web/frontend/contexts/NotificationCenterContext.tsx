@@ -58,32 +58,40 @@ export function NotificationCenterProvider({
     let mounted = true;
     refresh();
 
-    const ws = new WebSocket(api.notifications.wsUrl(userId));
-    ws.onmessage = (evt) => {
-      try {
-        const data = JSON.parse(evt.data);
-        if (data?.type === 'notification.created' && data.notification && mounted) {
-          setNotifications((prev) => [
-            {
-              id: data.notification.id,
-              title: data.notification.title,
-              body: data.notification.body,
-              priority: data.notification.priority,
-              isRead: false,
-              createdAt: new Date().toISOString(),
-            },
-            ...prev,
-          ]);
-          setUnreadCount((prev) => prev + 1);
-          chatLocalService.addSystemFeedMessage({
-            targetUserId: userId,
-            text: `${data.notification.title}: ${data.notification.body}`,
-          });
-        }
-      } catch {
-        /* malformed */
+    let ws: WebSocket | null = null;
+    try {
+      // In some environments (CSP/sandbox/old embedded webviews) WebSocket constructor may throw.
+      if (typeof WebSocket === 'function') {
+        ws = new WebSocket(api.notifications.wsUrl(userId));
+        ws.onmessage = (evt) => {
+          try {
+            const data = JSON.parse(evt.data);
+            if (data?.type === 'notification.created' && data.notification && mounted) {
+              setNotifications((prev) => [
+                {
+                  id: data.notification.id,
+                  title: data.notification.title,
+                  body: data.notification.body,
+                  priority: data.notification.priority,
+                  isRead: false,
+                  createdAt: new Date().toISOString(),
+                },
+                ...prev,
+              ]);
+              setUnreadCount((prev) => prev + 1);
+              chatLocalService.addSystemFeedMessage({
+                targetUserId: userId,
+                text: `${data.notification.title}: ${data.notification.body}`,
+              });
+            }
+          } catch {
+            /* malformed */
+          }
+        };
       }
-    };
+    } catch {
+      ws = null;
+    }
 
     const pollId = window.setInterval(() => {
       api.notifications
@@ -101,7 +109,7 @@ export function NotificationCenterProvider({
       try {
         // In React StrictMode dev cycle cleanup can run while CONNECTING.
         // Avoid explicit close in CONNECTING state to prevent noisy browser warning.
-        if (ws.readyState === WebSocket.OPEN) ws.close();
+        if (ws && ws.readyState === WebSocket.OPEN) ws.close();
       } catch {
         /* ignore */
       }
