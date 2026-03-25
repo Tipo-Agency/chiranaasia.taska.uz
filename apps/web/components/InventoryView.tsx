@@ -1009,90 +1009,134 @@ const InventoryView: React.FC<InventoryViewProps> = ({
             danger
           />
 
-          {isCreateMovementOpen && (
-            <div className="fixed inset-0 z-[220] bg-black/35 flex items-center justify-center p-4" onClick={() => setIsCreateMovementOpen(false)}>
-              <div className="w-full max-w-3xl rounded-xl border border-gray-200 dark:border-[#444] bg-white dark:bg-[#252525] shadow-2xl" onClick={(e) => e.stopPropagation()}>
-                <div className="px-4 py-3 border-b border-gray-100 dark:border-[#333] flex items-center justify-between">
-                  <h4 className="text-sm font-semibold text-gray-900 dark:text-white">Новая складская операция</h4>
-                  <button type="button" onClick={() => setIsCreateMovementOpen(false)} className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-[#333] text-gray-500"><X size={16} /></button>
-                </div>
-                <div className="p-4 grid grid-cols-1 md:grid-cols-2 gap-3">
-                  <select value={movementType} onChange={e => setMovementType(e.target.value as 'receipt' | 'transfer' | 'writeoff' | 'adjustment')} className="rounded-xl border border-gray-200 dark:border-[#333] px-3 py-2.5 text-sm bg-white dark:bg-[#252525]">
-                    <option value="receipt">Оприходование</option>
-                    <option value="transfer">Перемещение</option>
-                    <option value="writeoff">Списание</option>
-                    <option value="adjustment">Корректировка</option>
-                  </select>
-                  <select value={movementWarehouseId} onChange={e => setMovementWarehouseId(e.target.value)} className="rounded-xl border border-gray-200 dark:border-[#333] px-3 py-2.5 text-sm bg-white dark:bg-[#252525]">
-                    <option value="">Склад (быстрый выбор)</option>
+          <StandardModal
+            isOpen={isCreateMovementOpen}
+            onClose={() => setIsCreateMovementOpen(false)}
+            title="Новая складская операция"
+            size="lg"
+            footer={
+              <div className="flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setIsCreateMovementOpen(false)}
+                  className="px-3 py-2 rounded-lg border border-gray-200 dark:border-[#444] text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-[#2e2e2e]"
+                >
+                  Отмена
+                </button>
+                <button
+                  type="button"
+                  onClick={handleCreateMovement}
+                  className="px-3 py-2 rounded-lg text-sm text-white bg-emerald-600 hover:bg-emerald-700"
+                >
+                  Провести
+                </button>
+              </div>
+            }
+          >
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <label className="flex flex-col gap-1.5">
+                <span className="text-xs font-medium text-gray-600 dark:text-gray-300">Тип операции</span>
+                <select value={movementType} onChange={e => setMovementType(e.target.value as 'receipt' | 'transfer' | 'writeoff' | 'adjustment')} className="rounded-xl border border-gray-200 dark:border-[#333] px-3 py-2.5 text-sm bg-gray-50 dark:bg-[#252525]">
+                  <option value="receipt">Оприходование</option>
+                  <option value="transfer">Перемещение</option>
+                  <option value="writeoff">Списание</option>
+                  <option value="adjustment">Корректировка</option>
+                </select>
+              </label>
+              <label className="flex flex-col gap-1.5">
+                <span className="text-xs font-medium text-gray-600 dark:text-gray-300">Склад (быстрый выбор)</span>
+                <select value={movementWarehouseId} onChange={e => setMovementWarehouseId(e.target.value)} className="rounded-xl border border-gray-200 dark:border-[#333] px-3 py-2.5 text-sm bg-gray-50 dark:bg-[#252525]">
+                  <option value="">—</option>
+                  {warehouses.filter(w => !w.isArchived).map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
+                </select>
+              </label>
+              {movementType !== 'receipt' && movementType !== 'adjustment' && (
+                <label className="flex flex-col gap-1.5">
+                  <span className="text-xs font-medium text-gray-600 dark:text-gray-300">Со склада</span>
+                  <select value={fromWarehouseId} onChange={e => setFromWarehouseId(e.target.value)} className="rounded-xl border border-gray-200 dark:border-[#333] px-3 py-2.5 text-sm bg-gray-50 dark:bg-[#252525]">
+                    <option value="">—</option>
                     {warehouses.filter(w => !w.isArchived).map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
                   </select>
-                  {movementType !== 'receipt' && movementType !== 'adjustment' && (
-                    <select value={fromWarehouseId} onChange={e => setFromWarehouseId(e.target.value)} className="rounded-xl border border-gray-200 dark:border-[#333] px-3 py-2.5 text-sm bg-white dark:bg-[#252525]">
-                      <option value="">Со склада</option>
-                      {warehouses.filter(w => !w.isArchived).map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
-                    </select>
-                  )}
-                  {movementType !== 'writeoff' && (
-                    <select value={toWarehouseId} onChange={e => setToWarehouseId(e.target.value)} className="rounded-xl border border-gray-200 dark:border-[#333] px-3 py-2.5 text-sm bg-white dark:bg-[#252525]">
-                      <option value="">На склад</option>
-                      {warehouses.filter(w => !w.isArchived).map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
-                    </select>
-                  )}
-                  <select value={movementItemId} onChange={e => setMovementItemId(e.target.value)} className="rounded-xl border border-gray-200 dark:border-[#333] px-3 py-2.5 text-sm bg-white dark:bg-[#252525] md:col-span-2">
-                    <option value="">Номенклатура</option>
-                    {items.filter(i => !i.isArchived).map(i => <option key={i.id} value={i.id}>{i.name}</option>)}
+                </label>
+              )}
+              {movementType !== 'writeoff' && (
+                <label className="flex flex-col gap-1.5">
+                  <span className="text-xs font-medium text-gray-600 dark:text-gray-300">На склад</span>
+                  <select value={toWarehouseId} onChange={e => setToWarehouseId(e.target.value)} className="rounded-xl border border-gray-200 dark:border-[#333] px-3 py-2.5 text-sm bg-gray-50 dark:bg-[#252525]">
+                    <option value="">—</option>
+                    {warehouses.filter(w => !w.isArchived).map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
                   </select>
-                  <input value={movementQty} onChange={e => setMovementQty(e.target.value)} placeholder={movementType === 'adjustment' ? '± количество' : 'Количество'} className="rounded-xl border border-gray-200 dark:border-[#333] px-3 py-2.5 text-sm bg-white dark:bg-[#252525]" />
-                  <input value={movementReason} onChange={e => setMovementReason(e.target.value)} placeholder="Комментарий" className="rounded-xl border border-gray-200 dark:border-[#333] px-3 py-2.5 text-sm bg-white dark:bg-[#252525]" />
-                </div>
-                <div className="px-4 pb-4 flex justify-end gap-2">
-                  <button type="button" onClick={() => setIsCreateMovementOpen(false)} className="px-3 py-2 rounded-lg border border-gray-200 dark:border-[#444] text-sm">Отмена</button>
-                  <button type="button" onClick={handleCreateMovement} className="px-3 py-2 rounded-lg text-sm text-white bg-emerald-600 hover:bg-emerald-700">Провести</button>
-                </div>
-              </div>
+                </label>
+              )}
+              <label className="flex flex-col gap-1.5 md:col-span-2">
+                <span className="text-xs font-medium text-gray-600 dark:text-gray-300">Номенклатура</span>
+                <select value={movementItemId} onChange={e => setMovementItemId(e.target.value)} className="rounded-xl border border-gray-200 dark:border-[#333] px-3 py-2.5 text-sm bg-gray-50 dark:bg-[#252525]">
+                  <option value="">Выберите номенклатуру</option>
+                  {items.filter(i => !i.isArchived).map(i => <option key={i.id} value={i.id}>{i.name}</option>)}
+                </select>
+              </label>
+              <label className="flex flex-col gap-1.5">
+                <span className="text-xs font-medium text-gray-600 dark:text-gray-300">
+                  {movementType === 'adjustment' ? 'Изменение (±)' : 'Количество'}
+                </span>
+                <input value={movementQty} onChange={e => setMovementQty(e.target.value)} placeholder={movementType === 'adjustment' ? 'например -2 или 10' : 'например 5'} className="rounded-xl border border-gray-200 dark:border-[#333] px-3 py-2.5 text-sm bg-gray-50 dark:bg-[#252525]" />
+              </label>
+              <label className="flex flex-col gap-1.5">
+                <span className="text-xs font-medium text-gray-600 dark:text-gray-300">Комментарий</span>
+                <input value={movementReason} onChange={e => setMovementReason(e.target.value)} placeholder="Опционально" className="rounded-xl border border-gray-200 dark:border-[#333] px-3 py-2.5 text-sm bg-gray-50 dark:bg-[#252525]" />
+              </label>
             </div>
-          )}
+          </StandardModal>
 
-          {isCreateRevisionOpen && (
-            <div className="fixed inset-0 z-[220] bg-black/35 flex items-center justify-center p-4" onClick={() => setIsCreateRevisionOpen(false)}>
-              <div className="w-full max-w-lg rounded-xl border border-gray-200 dark:border-[#444] bg-white dark:bg-[#252525] shadow-2xl" onClick={(e) => e.stopPropagation()}>
-                <div className="px-4 py-3 border-b border-gray-100 dark:border-[#333] flex items-center justify-between">
-                  <h4 className="text-sm font-semibold text-gray-900 dark:text-white">Новая ревизия</h4>
-                  <button type="button" onClick={() => setIsCreateRevisionOpen(false)} className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-[#333] text-gray-500"><X size={16} /></button>
-                </div>
-                <div className="p-4">
-                  <p className="text-sm text-gray-600 dark:text-gray-300 mb-3">Выберите склад и создайте черновик ревизии.</p>
-                  <select value={selectedWarehouseId} onChange={(e) => setSelectedWarehouseId(e.target.value)} className="w-full rounded-xl border border-gray-200 dark:border-[#333] px-3 py-2.5 text-sm bg-white dark:bg-[#252525]">
-                    <option value="">Выберите склад</option>
-                    {filteredWarehouses.map((w) => (
-                      <option key={w.id} value={w.id}>{w.name}</option>
-                    ))}
-                  </select>
-                </div>
-                <div className="px-4 pb-4 flex justify-end gap-2">
-                  <button type="button" onClick={() => setIsCreateRevisionOpen(false)} className="px-3 py-2 rounded-lg border border-gray-200 dark:border-[#444] text-sm">Отмена</button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (!onCreateRevision) return;
-                      const whId = selectedWarehouseId || filteredWarehouses[0]?.id;
-                      if (!whId) {
-                        setAlertMessage('Выберите склад для ревизии.');
-                        return;
-                      }
-                      onCreateRevision({ warehouseId: whId, date: new Date().toISOString().slice(0, 10), createdByUserId: currentUserId });
-                      setIsCreateRevisionOpen(false);
-                      setActiveTab('revisions');
-                    }}
-                    className="px-3 py-2 rounded-lg text-sm text-white bg-emerald-600 hover:bg-emerald-700"
-                  >
-                    Создать
-                  </button>
-                </div>
+          <StandardModal
+            isOpen={isCreateRevisionOpen}
+            onClose={() => setIsCreateRevisionOpen(false)}
+            title="Новая ревизия"
+            size="md"
+            footer={
+              <div className="flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setIsCreateRevisionOpen(false)}
+                  className="px-3 py-2 rounded-lg border border-gray-200 dark:border-[#444] text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-[#2e2e2e]"
+                >
+                  Отмена
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (!onCreateRevision) return;
+                    const whId = selectedWarehouseId || defaultWarehouseId || filteredWarehouses[0]?.id;
+                    if (!whId) {
+                      setAlertMessage('Выберите склад для ревизии.');
+                      return;
+                    }
+                    onCreateRevision({ warehouseId: whId, date: new Date().toISOString().slice(0, 10), createdByUserId: currentUserId });
+                    setIsCreateRevisionOpen(false);
+                    setActiveTab('revisions');
+                  }}
+                  className="px-3 py-2 rounded-lg text-sm text-white bg-emerald-600 hover:bg-emerald-700"
+                >
+                  Создать
+                </button>
               </div>
+            }
+          >
+            <div className="space-y-3">
+              <p className="text-sm text-gray-600 dark:text-gray-300">
+                Выберите склад и создайте черновик ревизии.
+              </p>
+              <label className="flex flex-col gap-1.5">
+                <span className="text-xs font-medium text-gray-600 dark:text-gray-300">Склад</span>
+                <select value={selectedWarehouseId} onChange={(e) => setSelectedWarehouseId(e.target.value)} className="w-full rounded-xl border border-gray-200 dark:border-[#333] px-3 py-2.5 text-sm bg-gray-50 dark:bg-[#252525]">
+                  <option value="">{defaultWarehouseId ? 'Основной склад (по умолчанию)' : 'Выберите склад'}</option>
+                  {filteredWarehouses.map((w) => (
+                    <option key={w.id} value={w.id}>{w.name}</option>
+                  ))}
+                </select>
+              </label>
             </div>
-          )}
+          </StandardModal>
 
           <SystemAlertDialog
             open={!!alertMessage}
