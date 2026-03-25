@@ -9,12 +9,40 @@ from telegram import Update
 from telegram.ext import ApplicationHandlerStop, ContextTypes, MessageHandler, filters
 
 from taska_bot.handlers.crm_context import resolve_crm_user
+from taska_bot.ui.keyboards import (
+    BTN_CHAT,
+    BTN_CLIENTS,
+    BTN_DEALS,
+    BTN_FINANCE,
+    BTN_HELP,
+    BTN_MEETINGS,
+    BTN_PROFILE,
+    BTN_TASKS,
+    BTN_WEBAPP,
+)
+
+_MENU_TEXTS = {
+    BTN_TASKS,
+    BTN_DEALS,
+    BTN_MEETINGS,
+    BTN_CHAT,
+    BTN_FINANCE,
+    BTN_CLIENTS,
+    BTN_PROFILE,
+    BTN_HELP,
+    BTN_WEBAPP,
+}
 
 
 async def handle_chat_text_extras(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if not update.message or not update.effective_chat or update.effective_chat.type != "private":
         return
     text = (update.message.text or "").strip()
+    # Важно: reply-меню в личке — это тоже TEXT.
+    # Если у нас "завис" какой-то сценарий ожидания текста (поиск/ответ/комментарий),
+    # то нажатие кнопок меню должно проходить в menu.py, а не потребляться здесь.
+    if text in _MENU_TEXTS:
+        return
 
     if text == "/cancel_reply":
         if context.user_data.get("pending_reply_sender_id"):

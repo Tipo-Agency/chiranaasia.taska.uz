@@ -6,6 +6,7 @@ from datetime import timedelta
 from telegram.ext import ContextTypes
 
 from taska_bot.api.client import ApiClient
+from taska_bot.jobs.group_broadcast import job_group_broadcast_mirror
 from taska_bot.jobs.inbox_mirror import job_inbox_mirror
 from taska_bot.services.deal_broadcast import run_deal_notifications
 from taska_bot.services.summaries import (
@@ -107,4 +108,10 @@ def schedule_jobs(application, tz) -> None:
         interval=timedelta(seconds=45),
         first=timedelta(seconds=15),
         name="inbox_mirror",
+    )
+    jq.run_repeating(
+        job_group_broadcast_mirror,
+        interval=timedelta(seconds=30),
+        first=timedelta(seconds=18),
+        name="group_broadcast",
     )

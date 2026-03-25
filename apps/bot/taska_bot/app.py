@@ -31,6 +31,9 @@ def build_application(settings: Settings | None = None) -> Application:
             await app.bot.set_my_commands(
                 [
                     BotCommand("task", "Создать задачу из сообщения"),
+                    BotCommand("process", "Запустить бизнес-процесс"),
+                    BotCommand("meeting", "Создать встречу (выбрать участников)"),
+                    BotCommand("weekly", "Отправить недельный план в чат"),
                     BotCommand("bindgroup", "Привязать группу для уведомлений (ADMIN)"),
                     BotCommand("groupstatus", "Показать статус групповых уведомлений"),
                 ],

@@ -104,6 +104,31 @@ class ApiClient:
         data = r.json()
         return data if isinstance(data, dict) else {}
 
+    async def get_processes(self) -> list[dict]:
+        r = await self._http.get("/bpm/processes")
+        if r.status_code != 200:
+            return []
+        data = r.json()
+        return data if isinstance(data, list) else []
+
+    async def put_processes(self, processes: list[dict]) -> bool:
+        r = await self._http.put("/bpm/processes", json=processes)
+        return r.status_code == 200
+
+    async def get_positions(self) -> list[dict]:
+        r = await self._http.get("/bpm/positions")
+        if r.status_code != 200:
+            return []
+        data = r.json()
+        return data if isinstance(data, list) else []
+
+    async def get_weekly_plans(self, *, user_id: str) -> list[dict]:
+        r = await self._http.get("/weekly-plans", params={"user_id": user_id})
+        if r.status_code != 200:
+            return []
+        data = r.json()
+        return data if isinstance(data, list) else []
+
     async def get_tasks(self) -> list[dict]:
         r = await self._http.get("/tasks")
         if r.status_code != 200:
