@@ -139,7 +139,9 @@ export const useTaskLogic = (showNotification: (msg: string) => void, currentUse
                 category: taskData.category,
                 parentTaskId: taskData.parentTaskId !== undefined ? taskData.parentTaskId : undefined,
                 createdAt: taskData.createdAt || new Date().toISOString(),
-                createdByUserId: taskData.createdByUserId
+                createdByUserId: taskData.createdByUserId,
+                linkedFeatureId: taskData.linkedFeatureId,
+                linkedIdeaId: (taskData as any).linkedIdeaId,
             };
             updatedTasks = [...tasks, newTask];
             
@@ -187,7 +189,9 @@ export const useTaskLogic = (showNotification: (msg: string) => void, currentUse
             parentTaskId: taskData.parentTaskId !== undefined ? taskData.parentTaskId : null,
             createdAt: taskData.createdAt || now,
             updatedAt: now,
-            createdByUserId: taskData.createdByUserId || currentUser?.id // Если не указан, используем текущего пользователя
+            createdByUserId: taskData.createdByUserId || currentUser?.id, // Если не указан, используем текущего пользователя
+            linkedFeatureId: taskData.linkedFeatureId,
+            linkedIdeaId: (taskData as any).linkedIdeaId,
         };
         
         // Если задача создана из контент-плана, добавляем системное сообщение
