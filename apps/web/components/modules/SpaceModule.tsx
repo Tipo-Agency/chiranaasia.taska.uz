@@ -259,7 +259,7 @@ export const SpaceModule: React.FC<SpaceModuleProps> = ({
                 title: idea.title,
                 description: idea.description,
                 projectId: idea.projectId,
-                status: defaultStatus,
+                status: workStatus,
                 priority: idea.priority || 'Средний',
                 assigneeId: idea.assigneeId,
                 assigneeIds: idea.assigneeIds,
@@ -271,7 +271,7 @@ export const SpaceModule: React.FC<SpaceModuleProps> = ({
                 createdAt: new Date().toISOString()
             };
             
-            actions.saveTask({ ...newTask, status: workStatus });
+            actions.saveTask(newTask);
             // Идея должна исчезнуть из списка идей
             actions.saveTask({ id: idea.id, status: workStatus, isArchived: true });
         };
