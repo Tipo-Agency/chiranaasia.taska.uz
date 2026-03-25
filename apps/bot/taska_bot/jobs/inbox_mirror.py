@@ -7,10 +7,19 @@ import logging
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
 
-from taska_bot.jobs.scheduled import _as_chat_id
 from taska_bot.services.inbox_watermark import load_watermarks, save_watermarks
 
 logger = logging.getLogger(__name__)
+
+def _as_chat_id(raw) -> int | str:
+    """Переводит chat id (строка/число) из CRM в тип для Telegram API."""
+    if raw is None:
+        return 0
+    s = str(raw).strip()
+    try:
+        return int(s)
+    except ValueError:
+        return s
 
 
 def _prune(d: dict, max_size: int) -> None:
