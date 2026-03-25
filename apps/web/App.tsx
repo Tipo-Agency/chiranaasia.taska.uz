@@ -52,6 +52,43 @@ function MainApp() {
   const [chatOpenToSystemFeed, setChatOpenToSystemFeed] = useState(false);
   const deepLinkHandledRef = useRef(false);
 
+  // Важно: useEffect должен вызываться безусловно, до любых ранних return,
+  // иначе React бросает ошибку "Rendered fewer/more hooks than expected" (#310).
+  useEffect(() => {
+    if (deepLinkHandledRef.current) return;
+    if (!state.currentUser) return;
+    if (typeof window === "undefined") return;
+
+    const params = new URLSearchParams(window.location.search);
+    const openTaskId = params.get("openTaskId");
+    const openDealId = params.get("openDealId");
+    const openMeetingId = params.get("openMeetingId");
+
+    if (!openTaskId && !openDealId && !openMeetingId) return;
+    deepLinkHandledRef.current = true;
+
+    if (openTaskId) {
+      actions.setCurrentView("tasks");
+      const task = (state.tasks || []).find((t) => t && t.id === openTaskId) || null;
+      if (task) actions.openTaskModal(task);
+      return;
+    }
+    if (openDealId) {
+      actions.setCurrentView("sales-funnel");
+      window.setTimeout(() => {
+        window.dispatchEvent(new CustomEvent("openDealFromChat", { detail: { dealId: openDealId } }));
+      }, 0);
+      return;
+    }
+    if (openMeetingId) {
+      actions.setCurrentView("meetings");
+      window.setTimeout(() => {
+        window.dispatchEvent(new CustomEvent("openMeetingFromChat", { detail: { meetingId: openMeetingId } }));
+      }, 0);
+      return;
+    }
+  }, [state.currentUser, state.tasks, actions, state.meetings]);
+
   if (state.isLoading) return <div className="h-screen flex items-center justify-center bg-gray-50 dark:bg-[#121212] dark:text-white">Загрузка...</div>;
 
   if (!state.currentUser) {
@@ -82,41 +119,6 @@ function MainApp() {
   const myMeetings = (state.meetings || [])
     .filter((m) => !m.isArchived && (m.participantIds || []).includes(state.currentUser.id))
     .slice(0, 30);
-
-  useEffect(() => {
-    if (deepLinkHandledRef.current) return;
-    if (!state.currentUser) return;
-    if (typeof window === 'undefined') return;
-
-    const params = new URLSearchParams(window.location.search);
-    const openTaskId = params.get('openTaskId');
-    const openDealId = params.get('openDealId');
-    const openMeetingId = params.get('openMeetingId');
-
-    if (!openTaskId && !openDealId && !openMeetingId) return;
-    deepLinkHandledRef.current = true;
-
-    if (openTaskId) {
-      actions.setCurrentView('tasks');
-      const task = (state.tasks || []).find((t) => t && t.id === openTaskId) || null;
-      if (task) actions.openTaskModal(task);
-      return;
-    }
-    if (openDealId) {
-      actions.setCurrentView('sales-funnel');
-      window.setTimeout(() => {
-        window.dispatchEvent(new CustomEvent('openDealFromChat', { detail: { dealId: openDealId } }));
-      }, 0);
-      return;
-    }
-    if (openMeetingId) {
-      actions.setCurrentView('meetings');
-      window.setTimeout(() => {
-        window.dispatchEvent(new CustomEvent('openMeetingFromChat', { detail: { meetingId: openMeetingId } }));
-      }, 0);
-      return;
-    }
-  }, [state.currentUser, state.tasks, actions, state.meetings]);
 
   const createEntityFromChat = async (
     type: 'task' | 'deal' | 'meeting' | 'doc',
