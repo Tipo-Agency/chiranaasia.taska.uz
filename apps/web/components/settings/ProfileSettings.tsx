@@ -162,7 +162,7 @@ export const ProfileSettings: React.FC<ProfileSettingsProps> = ({ currentUser, u
 
   if (activeTab === 'profile') {
       return (
-        <div className="space-y-8 max-w-2xl">
+        <div className="space-y-8 w-full max-w-none">
             <div className="flex items-center gap-6 mb-8">
                     <div className="relative group">
                     <input
@@ -303,7 +303,7 @@ export const ProfileSettings: React.FC<ProfileSettingsProps> = ({ currentUser, u
 
   if (activeTab === 'users') {
       return (
-        <div className="space-y-8 max-w-4xl">
+        <div className="space-y-8 w-full max-w-none">
             {/* Функция заполнения тестовыми данными полностью удалена */}
             <div className="bg-gray-50 dark:bg-[#202020] p-6 rounded-xl border border-gray-200 dark:border-[#333]">
                 <h3 className="text-base font-bold text-gray-800 dark:text-white mb-4">Добавить сотрудника</h3>

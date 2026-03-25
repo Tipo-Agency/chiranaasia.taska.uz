@@ -15,9 +15,17 @@ export const ModuleTabsScroller: React.FC<{
   children: React.ReactNode;
   className?: string;
   contentClassName?: string;
+  /** Rounded clipping for edge gradients (prevents corner artifacts) */
+  clipClassName?: string;
   /** Adds subtle edge shadows when scrollable */
   shadows?: boolean;
-}> = ({ children, className = '', contentClassName = '', shadows = true }) => {
+}> = ({
+  children,
+  className = '',
+  contentClassName = '',
+  clipClassName = 'rounded-2xl',
+  shadows = true,
+}) => {
   const ref = useRef<HTMLDivElement>(null);
   const [{ left, right }, setEdges] = useState({ left: false, right: false });
 
@@ -40,15 +48,15 @@ export const ModuleTabsScroller: React.FC<{
   const edgeClass = useMemo(
     () => ({
       left:
-        'absolute left-0 top-0 bottom-0 w-6 pointer-events-none bg-gradient-to-r from-black/10 to-transparent dark:from-black/35',
+        'absolute left-0 top-0 bottom-0 w-6 pointer-events-none bg-gradient-to-r from-black/10 to-transparent dark:from-white/12',
       right:
-        'absolute right-0 top-0 bottom-0 w-6 pointer-events-none bg-gradient-to-l from-black/10 to-transparent dark:from-black/35',
+        'absolute right-0 top-0 bottom-0 w-6 pointer-events-none bg-gradient-to-l from-black/10 to-transparent dark:from-white/12',
     }),
     []
   );
 
   return (
-    <div className={`relative min-w-0 ${className}`}>
+    <div className={`relative min-w-0 overflow-hidden ${clipClassName} ${className}`}>
       <div
         ref={ref}
         className={`tabs-scrollbar-hidden overflow-x-auto overflow-y-hidden max-w-full ${contentClassName}`}
