@@ -60,7 +60,6 @@ export const FinanceSetupSettings: React.FC<{
     if (!createKind) return;
     openCreate(createKind);
     onConsumedCreateKind?.();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [createKind]);
 
   const saveCategory = () => {

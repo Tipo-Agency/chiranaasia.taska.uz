@@ -667,7 +667,7 @@ export const useAppLogic = () => {
                   }
 
                   const currentStepIndex = steps.findIndex(s => s.id === instance.currentStepId);
-                  let nextStep: ProcessStep | undefined = currentStep.nextStepId
+                  const nextStep: ProcessStep | undefined = currentStep.nextStepId
                       ? steps.find(s => s.id === currentStep.nextStepId)
                       : steps[currentStepIndex + 1];
 

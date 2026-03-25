@@ -174,7 +174,6 @@ export const MiniMessenger: React.FC<MiniMessengerProps> = ({
     if (activeId === SYSTEM_FEED_UI) return;
     if (activeId === TO_ALL_ID) return;
     void markThreadRead(activeId);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeId]);
 
   useEffect(() => {

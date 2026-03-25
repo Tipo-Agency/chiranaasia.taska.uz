@@ -74,7 +74,6 @@ const SalesFunnelsSettings: React.FC<SalesFunnelsSettingsProps> = ({ funnels, us
     React.useEffect(() => {
         if (!createRequested) return;
         handleOpenCreate();
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [createRequested]);
 
     const handleOpenEdit = (funnel: SalesFunnel) => {

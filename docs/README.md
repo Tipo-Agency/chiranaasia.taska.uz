@@ -8,5 +8,6 @@
 | [operations/DEPLOY.md](./operations/DEPLOY.md) | Автодеплой, nginx, шаги `ops/scripts/deploy.sh` |
 | [operations/ENV_AND_SECRETS.md](./operations/ENV_AND_SECRETS.md) | Переменные окружения и секреты GitHub Actions |
 | [operations/TROUBLESHOOTING.md](./operations/TROUBLESHOOTING.md) | Частые неполадки |
+| [CLIENT.md](./CLIENT.md) | Кратко для заказчика: развёртывание и эксплуатация (без внутренностей репо) |
 
 Источник правды по коду — репозиторий: `apps/api/app/models/`, миграции Alembic, роутеры `apps/api/app/routers/`, UI в `apps/web/`.

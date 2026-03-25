@@ -136,7 +136,6 @@ const SettingsView: React.FC<SettingsViewProps> = ({
   useEffect(() => {
     // When Settings opened with legacy tab ids, map them to new unified tab.
     setActiveTab((prev) => normalizeTab(prev));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   return (

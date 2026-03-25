@@ -200,7 +200,7 @@ export const pollTelegramUpdates = async (): Promise<{
             const defaultFunnelId = notificationPrefs?.defaultFunnelId;
 
             let stageId = 'new';
-            let funnelId = defaultFunnelId;
+            const funnelId = defaultFunnelId;
             if (defaultFunnelId) {
               const funnels = (await api.funnels.getAll()) as SalesFunnel[];
               const defaultFunnel = funnels.find((f) => f.id === defaultFunnelId);
