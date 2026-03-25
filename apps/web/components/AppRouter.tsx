@@ -1,5 +1,4 @@
-
-import React from 'react';
+import React, { lazy, Suspense } from 'react';
 import { 
   Task, User, Project, StatusOption, PriorityOption, ActivityLog, 
   Deal, Client, Contract, EmployeeInfo, Meeting, ContentPost, 
@@ -15,9 +14,6 @@ import { WorkdeskView } from './pages/WorkdeskView';
 import { TasksPage } from './pages/TasksPage';
 import ClientsView from './ClientsView';
 import { InboxPage } from './pages/InboxPage';
-import SettingsView from './SettingsView';
-import AnalyticsView from './AnalyticsView';
-import DocEditor from './DocEditor';
 import TableView from './TableView'; // Needed for Global Search
 import { SpacesTabsView } from './SpacesTabsView';
 import { SpaceModule } from './modules/SpaceModule';
@@ -26,11 +22,22 @@ import { FinanceModule } from './modules/FinanceModule';
 import { HRModule } from './modules/HRModule';
 import { MeetingsModule } from './modules/MeetingsModule';
 import { DocumentsModule } from './modules/DocumentsModule';
-import InventoryView from './InventoryView';
-import { AdminView } from './admin/AdminView';
 import { MiniMessenger } from './features/chat/MiniMessenger';
 import { PageLayout } from './ui/PageLayout';
 import { Container } from './ui/Container';
+
+/** Тяжёлые экраны подгружаются отдельными чанками (меньше initial JS). */
+const AdminViewLazy = lazy(() => import('./admin/AdminView').then((m) => ({ default: m.AdminView })));
+const SettingsViewLazy = lazy(() => import('./SettingsView'));
+const AnalyticsViewLazy = lazy(() => import('./AnalyticsView'));
+const DocEditorLazy = lazy(() => import('./DocEditor'));
+const InventoryViewLazy = lazy(() => import('./InventoryView'));
+
+const RouteFallback = () => (
+  <div className="h-full min-h-[40vh] flex items-center justify-center bg-white dark:bg-[#191919] text-gray-500 dark:text-gray-400 text-sm">
+    Загрузка…
+  </div>
+);
 
 interface AppRouterProps {
   currentView: string;
@@ -366,12 +373,17 @@ export const AppRouter: React.FC<AppRouterProps> = (props) => {
   }
 
   if (view === 'admin') {
-      return <AdminView />;
+      return (
+        <Suspense fallback={<RouteFallback />}>
+          <AdminViewLazy />
+        </Suspense>
+      );
   }
 
   if (view === 'settings') {
       return (
-          <SettingsView 
+        <Suspense fallback={<RouteFallback />}>
+          <SettingsViewLazy 
               users={props.users} projects={props.projects} tasks={props.allTasks} statuses={props.statuses} priorities={props.priorities} tables={props.tables} automationRules={props.automationRules} currentUser={props.currentUser}
               departments={props.departments}
               docs={props.docs} contentPosts={props.contentPosts} financeCategories={props.financeCategories} funds={props.funds}
@@ -403,17 +415,26 @@ export const AppRouter: React.FC<AppRouterProps> = (props) => {
               onRestoreContract={actions.restoreContract}
               onRestoreMeeting={actions.restoreMeeting}
           />
+        </Suspense>
       );
   }
 
   if (view === 'doc-editor' && props.activeDoc) {
-      return <DocEditor doc={props.activeDoc} onSave={actions.saveDocContent} onBack={() => { 
+      return (
+        <Suspense fallback={<RouteFallback />}>
+          <DocEditorLazy doc={props.activeDoc} onSave={actions.saveDocContent} onBack={() => { 
           actions.setCurrentView('docs'); 
-      }} />;
+      }} />
+        </Suspense>
+      );
   }
 
   if (view === 'analytics') {
-      return <AnalyticsView tasks={props.filteredTasks} deals={props.deals} users={props.users} financePlan={props.financePlan} contracts={props.contracts} />;
+      return (
+        <Suspense fallback={<RouteFallback />}>
+          <AnalyticsViewLazy tasks={props.filteredTasks} deals={props.deals} users={props.users} financePlan={props.financePlan} contracts={props.contracts} />
+        </Suspense>
+      );
   }
 
   // 2. Search (Global)
@@ -523,7 +544,8 @@ export const AppRouter: React.FC<AppRouterProps> = (props) => {
 
   if (view === 'inventory') {
       return (
-          <InventoryView
+        <Suspense fallback={<RouteFallback />}>
+          <InventoryViewLazy
               departments={props.departments}
               warehouses={props.warehouses}
               items={props.inventoryItems}
@@ -540,6 +562,7 @@ export const AppRouter: React.FC<AppRouterProps> = (props) => {
               onUpdateRevision={actions.updateInventoryRevision}
               onPostRevision={actions.postInventoryRevision}
           />
+        </Suspense>
       );
   }
 
