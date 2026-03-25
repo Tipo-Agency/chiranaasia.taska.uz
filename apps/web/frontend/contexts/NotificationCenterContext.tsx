@@ -59,10 +59,32 @@ export function NotificationCenterProvider({
     refresh();
 
     let ws: WebSocket | null = null;
+    const wsDisableKey = `notifications_ws_disabled:${userId}`;
     try {
+      try {
+        if (sessionStorage.getItem(wsDisableKey) === '1') {
+          ws = null;
+        }
+      } catch {
+        // ignore
+      }
       // In some environments (CSP/sandbox/old embedded webviews) WebSocket constructor may throw.
       if (typeof WebSocket === 'function') {
         ws = new WebSocket(api.notifications.wsUrl(userId));
+        ws.onerror = () => {
+          // If WS is not supported by server/proxy (common in prod without upgrade headers),
+          // disable reconnect attempts for this session to avoid console spam.
+          try {
+            sessionStorage.setItem(wsDisableKey, '1');
+          } catch {
+            // ignore
+          }
+          try {
+            if (ws && ws.readyState === WebSocket.OPEN) ws.close();
+          } catch {
+            // ignore
+          }
+        };
         ws.onmessage = (evt) => {
           try {
             const data = JSON.parse(evt.data);
