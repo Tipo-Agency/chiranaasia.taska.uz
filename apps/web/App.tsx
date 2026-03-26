@@ -652,6 +652,43 @@ function MainApp() {
   );
 }
 
+class AppErrorBoundary extends React.Component<
+  { children: React.ReactNode },
+  { hasError: boolean; error?: unknown }
+> {
+  declare props: { children: React.ReactNode };
+  state: { hasError: boolean; error?: unknown } = { hasError: false };
+
+  static getDerivedStateFromError(error: unknown) {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error: unknown) {
+    // Keep console output: helps debugging production issues (minified React errors).
+    // eslint-disable-next-line no-console
+    console.error('App crashed:', error);
+  }
+
+  render() {
+    if (!this.state.hasError) return this.props.children;
+    return (
+      <div className="min-h-screen bg-white dark:bg-[#121212] flex items-center justify-center p-6">
+        <div className="max-w-lg w-full rounded-2xl border border-gray-200 dark:border-[#333] bg-white dark:bg-[#1a1a1a] p-6">
+          <div className="text-lg font-bold text-gray-900 dark:text-white">Ошибка приложения</div>
+          <div className="text-sm text-gray-600 dark:text-gray-300 mt-2">
+            Похоже, приложение упало при рендере. Обновите страницу. Если повторяется — пришлите скрин консоли.
+          </div>
+          <div className="mt-4 flex items-center justify-end gap-2">
+            <Button variant="secondary" onClick={() => window.location.reload()}>
+              Обновить
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+}
+
 const App = () => {
   const [publicContentPlanId, setPublicContentPlanId] = useState<string | null>(() => getPublicContentPlanIdFromPath());
 
@@ -665,7 +702,11 @@ const App = () => {
     return <PublicContentPlanView tableId={publicContentPlanId} />;
   }
 
-  return <MainApp />;
+  return (
+    <AppErrorBoundary>
+      <MainApp />
+    </AppErrorBoundary>
+  );
 };
 
 export default App;
