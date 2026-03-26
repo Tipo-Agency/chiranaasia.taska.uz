@@ -3,7 +3,7 @@ import { FileText, ChevronDown, ChevronRight, RefreshCw, Loader2, Plus } from 'l
 import { financeEndpoint, type BankStatementApi, type IncomeReportApi } from '../../services/apiClient';
 import { DateInput, ModuleSegmentedControl } from '../ui';
 import { TaskSelect } from '../TaskSelect';
-import { parseBankStatementFile } from '../../utils/bankStatementParser';
+import { dedupeBankStatementFlatLines, parseBankStatementFile } from '../../utils/bankStatementParser';
 
 export interface BankStatementsViewHandle {
   triggerUpload: () => void;
@@ -87,7 +87,7 @@ export const BankStatementsView = forwardRef<BankStatementsViewHandle>(function 
         });
       });
     });
-    return lines.sort((a, b) => a.lineDate.localeCompare(b.lineDate));
+    return dedupeBankStatementFlatLines(lines).sort((a, b) => a.lineDate.localeCompare(b.lineDate));
   }, [statements]);
 
   const filteredLines = useMemo(() => {
@@ -241,6 +241,9 @@ export const BankStatementsView = forwardRef<BankStatementsViewHandle>(function 
               <p className="text-lg font-semibold text-amber-600">{totals.commission.toLocaleString('ru-RU')} UZS</p>
             </div>
           </div>
+          <p className="text-[11px] text-gray-500 dark:text-gray-400">
+            Итоги: строки «итого/сальдо» из выписки не входят в приход/расход; при загрузке нескольких выписок с пересекающимися операциями одинаковые строки учитываются один раз.
+          </p>
 
           {statements.length === 0 ? (
             <p className="text-sm text-gray-500 dark:text-gray-400">Выписок пока нет.</p>

@@ -138,6 +138,21 @@ function lineId(i: number): string {
   return `ln-${Date.now()}-${i}-${Math.random().toString(36).slice(2, 10)}`;
 }
 
+/** Строка итогов/подвала выписки — не операция, иначе дублирует суммы с реальными проводками. */
+function isStatementSummaryRow(description: string, row: unknown[]): boolean {
+  const d = String(description ?? '').toLowerCase();
+  if (
+    /^\s*итого\b|итого\s+оборот|итого\s+по|всего\s+оборот|оборот\s+за\s*период|сводн|subtotal|^total\b/i.test(
+      d
+    )
+  ) {
+    return true;
+  }
+  const nonEmpty = row.filter((c) => c !== '' && c != null).length;
+  if (nonEmpty <= 2 && /итого|всего|остаток|сальдо/i.test(d)) return true;
+  return false;
+}
+
 export async function parseBankStatementFile(file: ArrayBuffer | File): Promise<ParsedStatement> {
   const data = file instanceof File ? await file.arrayBuffer() : file;
   const workbook = XLSX.read(data, { type: 'array', cellDates: false });
@@ -210,6 +225,7 @@ export async function parseBankStatementFile(file: ArrayBuffer | File): Promise<
 
     if (!date && !description && !amount) return;
     if (!amount) return;
+    if (isStatementSummaryRow(description, row)) return;
 
     lines.push({
       id: lineId(i),
@@ -226,4 +242,19 @@ export async function parseBankStatementFile(file: ArrayBuffer | File): Promise<
     period: meta.period || periodFromLines,
     lines,
   };
+}
+
+/** Одинаковые строки из разных загрузок выписок (пересекающиеся периоды) — учитываем один раз. */
+export function dedupeBankStatementFlatLines<
+  T extends { lineDate: string; lineType: 'in' | 'out'; amount: number; description?: string },
+>(lines: T[]): T[] {
+  const seen = new Set<string>();
+  const out: T[] = [];
+  for (const l of lines) {
+    const key = `${l.lineDate}|${l.lineType}|${l.amount}|${String(l.description ?? '').trim().toLowerCase()}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(l);
+  }
+  return out;
 }
