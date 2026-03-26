@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { SalesFunnel, FunnelStage, NotificationPreferences, FunnelSourceConfig, User } from '../../types';
 import { Plus, X, Edit2, Trash2, GripVertical, Settings, Instagram, MessageSquare, Star } from 'lucide-react';
 import { TaskSelect } from '../TaskSelect';
@@ -63,6 +63,7 @@ const SalesFunnelsSettings: React.FC<SalesFunnelsSettingsProps> = ({ funnels, us
     const [instagramPageId, setInstagramPageId] = useState('');
     const [telegramEnabled, setTelegramEnabled] = useState(false);
     const [telegramBotToken, setTelegramBotToken] = useState('');
+    const lastCreateRequestRef = useRef<number>(createRequested || 0);
 
     const handleOpenCreate = () => {
         setEditingFunnel(null);
@@ -86,9 +87,14 @@ const SalesFunnelsSettings: React.FC<SalesFunnelsSettingsProps> = ({ funnels, us
         setIsModalOpen(true);
     };
 
-    React.useEffect(() => {
-        if (!createRequested) return;
-        handleOpenCreate();
+    useEffect(() => {
+        const current = createRequested || 0;
+        // Важно: не открываем модалку просто при переходе на вкладку,
+        // если значение createRequested осталось > 0 от прошлого клика на "+".
+        if (current > lastCreateRequestRef.current) {
+            handleOpenCreate();
+        }
+        lastCreateRequestRef.current = current;
     }, [createRequested]);
 
     const handleOpenEdit = (funnel: SalesFunnel) => {
