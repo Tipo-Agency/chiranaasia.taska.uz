@@ -168,6 +168,8 @@ export interface FunnelSourceConfig {
 export interface SalesFunnel {
   id: string;
   name: string; // Название воронки (направление бизнеса)
+  /** Цвет самой воронки (бейдж/акцент), отдельно от цветов этапов */
+  color?: string;
   stages: FunnelStage[]; // Этапы воронки
   sources?: FunnelSourceConfig; // Настройки источников для воронки
   createdAt?: string;

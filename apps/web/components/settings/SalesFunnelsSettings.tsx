@@ -36,10 +36,23 @@ const STAGE_COLOR_OPTIONS = [
     { name: 'Amber', class: 'bg-amber-200 dark:bg-amber-900' },
 ];
 
+const FUNNEL_COLOR_OPTIONS = [
+    { name: 'Gray', class: 'bg-gray-200 dark:bg-gray-700' },
+    { name: 'Blue', class: 'bg-blue-200 dark:bg-blue-900' },
+    { name: 'Purple', class: 'bg-purple-200 dark:bg-purple-900' },
+    { name: 'Orange', class: 'bg-orange-200 dark:bg-orange-900' },
+    { name: 'Green', class: 'bg-green-200 dark:bg-green-900' },
+    { name: 'Red', class: 'bg-red-200 dark:bg-red-900' },
+    { name: 'Indigo', class: 'bg-indigo-200 dark:bg-indigo-900' },
+    { name: 'Yellow', class: 'bg-yellow-200 dark:bg-yellow-900' },
+    { name: 'Cyan', class: 'bg-cyan-200 dark:bg-cyan-900' },
+];
+
 const SalesFunnelsSettings: React.FC<SalesFunnelsSettingsProps> = ({ funnels, users = [], onSave, onDelete, createRequested }) => {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingFunnel, setEditingFunnel] = useState<SalesFunnel | null>(null);
     const [funnelName, setFunnelName] = useState('');
+    const [funnelColor, setFunnelColor] = useState<string>(FUNNEL_COLOR_OPTIONS[1]?.class || FUNNEL_COLOR_OPTIONS[0]?.class || 'bg-gray-200');
     const [stages, setStages] = useState<FunnelStage[]>([]);
     const [activeTab, setActiveTab] = useState<'stages' | 'sources'>('stages');
     // Источники
@@ -53,6 +66,7 @@ const SalesFunnelsSettings: React.FC<SalesFunnelsSettingsProps> = ({ funnels, us
     const handleOpenCreate = () => {
         setEditingFunnel(null);
         setFunnelName('');
+        setFunnelColor(FUNNEL_COLOR_OPTIONS[1]?.class || FUNNEL_COLOR_OPTIONS[0]?.class || 'bg-gray-200');
         setActiveTab('stages');
         // Создаем воронку с дефолтными этапами
         setStages([
@@ -79,6 +93,7 @@ const SalesFunnelsSettings: React.FC<SalesFunnelsSettingsProps> = ({ funnels, us
     const handleOpenEdit = (funnel: SalesFunnel) => {
         setEditingFunnel(funnel);
         setFunnelName(funnel.name);
+        setFunnelColor(funnel.color || FUNNEL_COLOR_OPTIONS[1]?.class || FUNNEL_COLOR_OPTIONS[0]?.class || 'bg-gray-200');
         setStages([...funnel.stages]);
         setActiveTab('stages');
         // Загрузка настроек источников
@@ -182,6 +197,7 @@ const SalesFunnelsSettings: React.FC<SalesFunnelsSettingsProps> = ({ funnels, us
         const funnel: SalesFunnel = {
             id: editingFunnel?.id || `funnel-${Date.now()}`,
             name: funnelName.trim(),
+            color: funnelColor || undefined,
             stages,
             sources: Object.keys(sources).length > 0 ? sources : undefined,
             createdAt: editingFunnel?.createdAt || new Date().toISOString(),
@@ -192,6 +208,7 @@ const SalesFunnelsSettings: React.FC<SalesFunnelsSettingsProps> = ({ funnels, us
         setIsModalOpen(false);
         setEditingFunnel(null);
         setFunnelName('');
+        setFunnelColor(FUNNEL_COLOR_OPTIONS[1]?.class || FUNNEL_COLOR_OPTIONS[0]?.class || 'bg-gray-200');
         setStages([]);
         setInstagramEnabled(false);
         setInstagramAccountId('');
@@ -225,7 +242,10 @@ const SalesFunnelsSettings: React.FC<SalesFunnelsSettingsProps> = ({ funnels, us
                             <div key={funnel.id} className="p-4 hover:bg-gray-50 dark:hover:bg-[#303030]">
                                 <div className="flex justify-between items-start">
                                     <div className="flex-1">
-                                        <h4 className="font-semibold text-gray-800 dark:text-white mb-2">{funnel.name}</h4>
+                                        <div className="flex items-center gap-2 mb-2">
+                                            <span className={`w-3 h-3 rounded ${funnel.color || funnel.stages?.[0]?.color || 'bg-gray-200 dark:bg-gray-700'}`} />
+                                            <h4 className="font-semibold text-gray-800 dark:text-white">{funnel.name}</h4>
+                                        </div>
                                         <div className="flex flex-wrap gap-2">
                                             {funnel.stages.map((stage, idx) => (
                                                 <div
@@ -288,6 +308,29 @@ const SalesFunnelsSettings: React.FC<SalesFunnelsSettingsProps> = ({ funnels, us
                                     className="w-full border border-gray-300 dark:border-gray-600 rounded px-3 py-2 text-sm bg-white dark:bg-[#333] text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 outline-none" 
                                     placeholder="Например: Веб-разработка, Дизайн, Консалтинг"
                                 />
+                            </div>
+
+                            <div>
+                                <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 mb-1">
+                                    Цвет воронки
+                                </label>
+                                <div className="flex items-center gap-3">
+                                    <div className={`w-8 h-8 rounded border-2 border-gray-300 dark:border-gray-600 ${funnelColor}`}></div>
+                                    <select
+                                        value={funnelColor}
+                                        onChange={(e) => setFunnelColor(e.target.value)}
+                                        className="flex-1 border border-gray-300 dark:border-gray-600 rounded px-3 py-2 text-sm bg-white dark:bg-[#333] text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 outline-none"
+                                    >
+                                        {FUNNEL_COLOR_OPTIONS.map((c) => (
+                                            <option key={c.class} value={c.class}>
+                                                {c.name}
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
+                                <p className="text-[11px] text-gray-500 dark:text-gray-400 mt-1">
+                                    Цвет воронки используется как акцент в выборе воронок. Цвета этапов настраиваются ниже.
+                                </p>
                             </div>
 
                             {/* Вкладки: Этапы и Источники */}

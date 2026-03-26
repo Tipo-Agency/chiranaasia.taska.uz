@@ -61,7 +61,7 @@ const SalesFunnelView: React.FC<SalesFunnelViewProps> = ({ deals, clients, users
   const [showCreateMeetingForm, setShowCreateMeetingForm] = useState(false);
   const [newMeetingDate, setNewMeetingDate] = useState('');
   const [newMeetingTime, setNewMeetingTime] = useState('10:00');
-  const [selectedFunnelIds, setSelectedFunnelIds] = useState<string[]>([]);
+  const [selectedFunnelId, setSelectedFunnelId] = useState<string>('all');
   const [funnelId, setFunnelId] = useState<string>('');
   const [dealProjectId, setDealProjectId] = useState<string>(''); // вид услуг (модуль/проект)
   const [defaultFunnelId, setDefaultFunnelId] = useState<string | undefined>(undefined);
@@ -69,7 +69,11 @@ const SalesFunnelView: React.FC<SalesFunnelViewProps> = ({ deals, clients, users
   const [confirmState, setConfirmState] = useState<{ open: boolean; title: string; message: string; onConfirm?: () => void }>({ open: false, title: '', message: '' });
 
   const activeFunnels = useMemo(() => salesFunnels.filter((f) => !f.isArchived), [salesFunnels]);
-  const primaryFunnelId = selectedFunnelIds[0] || defaultFunnelId || activeFunnels[0]?.id || salesFunnels[0]?.id || '';
+  const selectedFunnelIds = useMemo(() => {
+    if (selectedFunnelId === 'all') return activeFunnels.map((f) => f.id);
+    return activeFunnels.some((f) => f.id === selectedFunnelId) ? [selectedFunnelId] : activeFunnels.map((f) => f.id);
+  }, [selectedFunnelId, activeFunnels]);
+  const primaryFunnelId = defaultFunnelId || activeFunnels[0]?.id || salesFunnels[0]?.id || '';
 
   /** Этапы для канбана — из выбранной воронки в шапке страницы */
   const kanbanStages = useMemo(() => {
@@ -118,16 +122,8 @@ const SalesFunnelView: React.FC<SalesFunnelViewProps> = ({ deals, clients, users
 
   // По умолчанию выбираем ВСЕ активные воронки (чтобы "основная воронка" в настройках была не нужна для фильтра)
   useEffect(() => {
-    if (!activeFunnels.length) {
-      setSelectedFunnelIds([]);
-      return;
-    }
-    setSelectedFunnelIds((prev) => {
-      if (!prev.length) return activeFunnels.map((f) => f.id);
-      const filtered = prev.filter((id) => activeFunnels.some((f) => f.id === id));
-      const missing = activeFunnels.map((f) => f.id).filter((id) => !filtered.includes(id));
-      return [...filtered, ...missing];
-    });
+    if (!activeFunnels.length) return;
+    setSelectedFunnelId((prev) => (prev && (prev === 'all' || activeFunnels.some((f) => f.id === prev)) ? prev : 'all'));
   }, [activeFunnels]);
 
   // Автоматически открываем модалку создания при монтировании, если autoOpenCreateModal = true
@@ -156,14 +152,12 @@ const SalesFunnelView: React.FC<SalesFunnelViewProps> = ({ deals, clients, users
       if (!dealId) return;
       const target = funnelDeals.find((d) => d.id === dealId);
       if (!target) return;
-      if (target.funnelId) {
-        setSelectedFunnelIds((prev) => (prev.includes(target.funnelId as string) ? prev : [...prev, target.funnelId as string]));
-      }
+      if (target.funnelId && selectedFunnelId !== 'all') setSelectedFunnelId(String(target.funnelId));
       handleOpenEdit(target);
     };
     window.addEventListener('openDealFromChat', handleOpenDealById as EventListener);
     return () => window.removeEventListener('openDealFromChat', handleOpenDealById as EventListener);
-  }, [funnelDeals]);
+  }, [funnelDeals, selectedFunnelId]);
 
   const handleOpenCreate = (presetStageId?: string) => { 
     setEditingDeal(null); 
@@ -454,18 +448,9 @@ const SalesFunnelView: React.FC<SalesFunnelViewProps> = ({ deals, clients, users
   // Фильтрация сделок по выбранным воронкам, исключаем архивные
   // Если выбраны ВСЕ воронки — показываем также сделки без воронки.
   const filteredDeals = useMemo(() => {
-    const selectedSet = new Set(selectedFunnelIds);
-    const allSelected = activeFunnels.length > 0 && selectedFunnelIds.length === activeFunnels.length;
-
-    if (!selectedFunnelIds.length || allSelected) return funnelDeals;
-
-    const showWithoutFunnel = !!defaultFunnelId && selectedSet.has(defaultFunnelId);
-
-    return funnelDeals.filter((d) => {
-      if (d.funnelId) return selectedSet.has(d.funnelId);
-      return showWithoutFunnel;
-    });
-  }, [funnelDeals, selectedFunnelIds, defaultFunnelId, activeFunnels]);
+    if (selectedFunnelId === 'all') return funnelDeals;
+    return funnelDeals.filter((d) => String(d.funnelId || '') === String(selectedFunnelId));
+  }, [funnelDeals, selectedFunnelId]);
   
   const activeDeals = filteredDeals.filter(d => d.stage !== 'won' && d.stage !== 'lost');
   const wonDeals = filteredDeals.filter(d => d.stage === 'won');
@@ -580,52 +565,30 @@ const SalesFunnelView: React.FC<SalesFunnelViewProps> = ({ deals, clients, users
               <>
                 <div className="flex items-center gap-2 flex-wrap">
                   <div className="flex items-center gap-2 flex-wrap">
-                    {(() => {
-                      const allSelected = activeFunnels.length > 0 && selectedFunnelIds.length === activeFunnels.length;
-                      return (
-                        <button
-                          type="button"
-                          onClick={() => setSelectedFunnelIds(activeFunnels.map((f) => f.id))}
-                          className={`px-3 py-2 rounded-lg text-xs font-semibold border transition-colors ${
-                            allSelected
-                              ? 'bg-violet-100 dark:bg-violet-900/30 text-violet-700 dark:text-violet-300 border-violet-200 dark:border-violet-800'
-                              : 'bg-white dark:bg-[#252525] border-gray-300 dark:border-[#444] text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-[#303030]'
+                    <div className="min-w-[260px]">
+                      <TaskSelect
+                        value={selectedFunnelId}
+                        onChange={setSelectedFunnelId}
+                        options={[
+                          { value: 'all', label: `Основная: Все (${activeFunnels.length})` },
+                          ...activeFunnels.map((f) => ({ value: f.id, label: f.name })),
+                        ]}
+                      />
+                    </div>
+                    {selectedFunnelId !== 'all' && (
+                      <div className="hidden md:flex items-center gap-2 px-3 py-2 rounded-lg border border-gray-200 dark:border-[#333] bg-white dark:bg-[#252525]">
+                        <span
+                          className={`w-3 h-3 rounded ${
+                            activeFunnels.find((f) => f.id === selectedFunnelId)?.color ||
+                            activeFunnels.find((f) => f.id === selectedFunnelId)?.stages?.[0]?.color ||
+                            'bg-gray-200 dark:bg-gray-700'
                           }`}
-                          title="Показать все воронки"
-                        >
-                          Все ({activeFunnels.length})
-                        </button>
-                      );
-                    })()}
-
-                    {activeFunnels.map((f) => {
-                      const selected = selectedFunnelIds.includes(f.id);
-                      const accent = f.stages?.[0]?.color || 'bg-gray-200 dark:bg-gray-700';
-                      return (
-                        <button
-                          key={f.id}
-                          type="button"
-                          onClick={() => {
-                            setSelectedFunnelIds((prev) => {
-                              if (prev.includes(f.id)) {
-                                const next = prev.filter((id) => id !== f.id);
-                                // Чтобы нельзя было случайно убрать всё — оставляем "все"
-                                return next.length ? next : activeFunnels.map((x) => x.id);
-                              }
-                              return [...prev, f.id];
-                            });
-                          }}
-                          className={`px-3 py-2 rounded-lg text-xs font-semibold border transition-colors ${
-                            selected
-                              ? `${accent} text-gray-800 dark:text-gray-100 border-transparent`
-                              : 'bg-white dark:bg-[#252525] border-gray-300 dark:border-[#444] text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-[#303030]'
-                          }`}
-                          title={f.name}
-                        >
-                          {f.name}
-                        </button>
-                      );
-                    })}
+                        />
+                        <span className="text-xs font-semibold text-gray-700 dark:text-gray-200 truncate max-w-[220px]">
+                          {activeFunnels.find((f) => f.id === selectedFunnelId)?.name || 'Воронка'}
+                        </span>
+                      </div>
+                    )}
                   </div>
 
                   <ModuleCreateIconButton accent="violet" label="Новая сделка" onClick={() => handleOpenCreate()} />
