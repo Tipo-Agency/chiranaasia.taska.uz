@@ -19,12 +19,12 @@ import { MiniMessenger } from './features/chat/MiniMessenger';
 import { PageLayout } from './ui/PageLayout';
 import { Container } from './ui/Container';
 import { RouteFallback } from './ui/RouteFallback';
+import AnalyticsView from './AnalyticsView';
 import { resolveAssigneesForOrgPosition } from '../utils/orgPositionAssignee';
 
 /** Тяжёлые экраны подгружаются отдельными чанками (меньше initial JS). */
 const AdminViewLazy = lazy(() => import('./admin/AdminView').then((m) => ({ default: m.AdminView })));
 const SettingsViewLazy = lazy(() => import('./SettingsView'));
-const AnalyticsViewLazy = lazy(() => import('./AnalyticsView'));
 const DocEditorLazy = lazy(() => import('./DocEditor'));
 const InventoryViewLazy = lazy(() => import('./InventoryView'));
 const ClientsViewLazy = lazy(() => import('./ClientsView'));
@@ -440,7 +440,7 @@ export const AppRouter: React.FC<AppRouterProps> = (props) => {
   if (view === 'analytics') {
       return (
         <Suspense fallback={<RouteFallback />}>
-          <AnalyticsViewLazy tasks={props.filteredTasks} deals={props.deals} users={props.users} financePlan={props.financePlan} contracts={props.contracts} />
+        <AnalyticsView tasks={props.filteredTasks} deals={props.deals} users={props.users} financePlan={props.financePlan} contracts={props.contracts} />
         </Suspense>
       );
   }
