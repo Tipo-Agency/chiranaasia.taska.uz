@@ -29,9 +29,8 @@ export const TaskSelect: React.FC<TaskSelectProps> = ({
   const rootRef = useRef<HTMLDivElement>(null);
   const sizeClass =
     size === 'compact'
-      ? 'h-8 min-h-8 px-2.5 pr-8 text-sm leading-tight rounded-md'
-      : 'min-h-[42px] px-3 pr-10 py-2.5 text-sm rounded-lg';
-  const chevronRight = size === 'compact' ? 'right-2' : 'right-3';
+      ? 'h-8 min-h-8 px-2.5 text-sm leading-tight rounded-md'
+      : 'min-h-[42px] px-3 py-2.5 text-sm rounded-lg';
   const chevronSize = size === 'compact' ? 14 : 16;
   const selectedOption = useMemo(() => options.find((opt) => opt.value === value), [options, value]);
   const displayLabel = selectedOption?.label || placeholder;
@@ -72,7 +71,7 @@ export const TaskSelect: React.FC<TaskSelectProps> = ({
         className={`
           w-full
           text-left
-          flex items-center
+          inline-flex items-center justify-between gap-2
           ${sizeClass}
           bg-white
           dark:bg-[#252525]
@@ -92,12 +91,13 @@ export const TaskSelect: React.FC<TaskSelectProps> = ({
           ${className}
         `.trim()}
       >
-        <span className="truncate">{displayLabel}</span>
+        <span className="truncate flex-1 min-w-0">{displayLabel}</span>
+        <ChevronDown
+          size={chevronSize}
+          className={`shrink-0 text-gray-400 dark:text-gray-500 transition-transform ${isOpen ? 'rotate-180' : ''}`}
+          aria-hidden
+        />
       </button>
-      <ChevronDown
-        size={chevronSize}
-        className={`absolute ${chevronRight} top-1/2 -translate-y-1/2 pointer-events-none text-gray-400 dark:text-gray-500 transition-transform ${isOpen ? 'rotate-180' : ''}`}
-      />
       {isOpen && !disabled && (
         <div className="absolute z-[220] top-full left-0 mt-1 w-full rounded-lg border border-gray-200 dark:border-[#333] bg-white dark:bg-[#252525] shadow-xl overflow-hidden">
           <div className="max-h-64 overflow-y-auto custom-scrollbar p-1">

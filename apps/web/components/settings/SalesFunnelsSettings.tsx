@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { SalesFunnel, FunnelStage, NotificationPreferences, FunnelSourceConfig, User } from '../../types';
 import { Plus, X, Edit2, Trash2, GripVertical, Settings, Instagram, MessageSquare, Star } from 'lucide-react';
+import { TaskSelect } from '../TaskSelect';
 
 interface SalesFunnelsSettingsProps {
     funnels: SalesFunnel[];
@@ -315,18 +316,15 @@ const SalesFunnelsSettings: React.FC<SalesFunnelsSettingsProps> = ({ funnels, us
                                     Цвет воронки
                                 </label>
                                 <div className="flex items-center gap-3">
-                                    <div className={`w-8 h-8 rounded border-2 border-gray-300 dark:border-gray-600 ${funnelColor}`}></div>
-                                    <select
-                                        value={funnelColor}
-                                        onChange={(e) => setFunnelColor(e.target.value)}
-                                        className="flex-1 border border-gray-300 dark:border-gray-600 rounded px-3 py-2 text-sm bg-white dark:bg-[#333] text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 outline-none"
-                                    >
-                                        {FUNNEL_COLOR_OPTIONS.map((c) => (
-                                            <option key={c.class} value={c.class}>
-                                                {c.name}
-                                            </option>
-                                        ))}
-                                    </select>
+                                    <div className={`w-8 h-8 rounded border-2 border-gray-300 dark:border-gray-600 shrink-0 ${funnelColor}`} />
+                                    <div className="flex-1 min-w-0">
+                                        <TaskSelect
+                                            value={funnelColor}
+                                            onChange={setFunnelColor}
+                                            options={FUNNEL_COLOR_OPTIONS.map((c) => ({ value: c.class, label: c.name }))}
+                                            placeholder="Цвет"
+                                        />
+                                    </div>
                                 </div>
                                 <p className="text-[11px] text-gray-500 dark:text-gray-400 mt-1">
                                     Цвет воронки используется как акцент в выборе воронок. Цвета этапов настраиваются ниже.

@@ -9,6 +9,7 @@ import { DateInput } from './ui/DateInput';
 import { TaskSelect } from './TaskSelect';
 import { api } from '../backend/api';
 import { isFunnelDeal } from '../utils/dealModel';
+import { getFunnelKanbanCardAccent } from '../utils/funnelVisual';
 import { devWarn } from '../utils/devLog';
 
 interface SalesFunnelViewProps {
@@ -618,7 +619,7 @@ const SalesFunnelView: React.FC<SalesFunnelViewProps> = ({ deals, clients, users
                                       const dealProject = projects.find(p => p.id === d.projectId);
                                       const cardFunnelId = d.funnelId || stageToFunnelId.get(String(d.stage)) || primaryFunnelId;
                                       const cardFunnel = salesFunnels.find((f) => f.id === cardFunnelId);
-                                      const funnelAccent = cardFunnel?.stages?.[0]?.color || 'bg-gray-200 dark:bg-gray-700';
+                                      const funnelAccent = getFunnelKanbanCardAccent(cardFunnel);
                                       return (
                                           <div
                                             key={d.id}
@@ -626,12 +627,20 @@ const SalesFunnelView: React.FC<SalesFunnelViewProps> = ({ deals, clients, users
                                             onDragStart={(e) => onDragStart(e, d.id)}
                                             onDragEnd={() => setDraggedDealId(null)}
                                             onClick={(e) => { e.stopPropagation(); handleOpenEdit(d); }}
-                                            className="relative bg-white dark:bg-[#2b2b2b] p-2 md:p-3 rounded shadow-sm border border-gray-200 dark:border-[#3a3a3a] cursor-pointer hover:shadow-md transition-all overflow-hidden"
+                                            className={`relative p-2 md:p-3 rounded-lg shadow-sm border cursor-pointer hover:shadow-md transition-all overflow-hidden ${funnelAccent.card}`}
                                           >
-                                            <div className={`absolute left-0 top-0 bottom-0 w-1 ${funnelAccent} rounded-l`} />
-                                            <div className="relative z-10">
-                                              <div className="font-medium text-xs md:text-sm text-gray-800 dark:text-gray-100 mb-1 line-clamp-2 pl-2">{d.title}</div>
-                                              <div className="flex items-center justify-between gap-2 mb-1 pl-2">
+                                            <div className={`absolute left-0 top-0 bottom-0 w-2 ${funnelAccent.stripe} rounded-l`} />
+                                            <div className="relative z-10 pl-2.5">
+                                              {selectedFunnelId === 'all' && cardFunnel && (
+                                                <div className="flex items-center gap-1.5 mb-1 min-w-0">
+                                                  <span className={`inline-block w-1.5 h-1.5 rounded-full shrink-0 ${funnelAccent.stripe}`} />
+                                                  <span className="text-[10px] font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400 truncate">
+                                                    {cardFunnel.name}
+                                                  </span>
+                                                </div>
+                                              )}
+                                              <div className="font-medium text-xs md:text-sm text-gray-800 dark:text-gray-100 mb-1 line-clamp-2">{d.title}</div>
+                                              <div className="flex items-center justify-between gap-2 mb-1">
                                                 <span className="text-xs text-gray-500">{(d.amount || 0).toLocaleString()} UZS</span>
                                                 {dealProject && (
                                                     <div className="flex items-center gap-1 text-xs">
@@ -640,7 +649,7 @@ const SalesFunnelView: React.FC<SalesFunnelViewProps> = ({ deals, clients, users
                                                     </div>
                                                 )}
                                               </div>
-                                              <div className="text-xs text-gray-500 flex justify-end items-center pl-2">{getSourceIcon(d.source || 'manual')}</div>
+                                              <div className="text-xs text-gray-500 flex justify-end items-center">{getSourceIcon(d.source || 'manual')}</div>
                                             </div>
                                           </div>
                                       );
