@@ -33,8 +33,6 @@ const setLocal = (key: string, data: unknown) => {
 };
 
 export const storageService = {
-  getDbUrl: () => '',
-
   getActiveUserId: (): string | null => localStorage.getItem(STORAGE_KEYS.ACTIVE_USER_ID),
   setActiveUserId: (id: string) => localStorage.setItem(STORAGE_KEYS.ACTIVE_USER_ID, id),
   clearActiveUserId: () => localStorage.removeItem(STORAGE_KEYS.ACTIVE_USER_ID),
@@ -63,10 +61,4 @@ export const storageService = {
   getNotificationPrefs: (): NotificationPreferences =>
     getLocal(STORAGE_KEYS.NOTIFICATION_PREFS, DEFAULT_NOTIFICATION_PREFS),
   setNotificationPrefs: (prefs: NotificationPreferences) => setLocal(STORAGE_KEYS.NOTIFICATION_PREFS, prefs),
-
-  /** Зарезервировано: данные с облака приходят через API. */
-  loadFromCloud: async (_force = false) => false,
-
-  /** Зарезервировано: сохранение через API. */
-  saveToCloud: async () => {},
 };
