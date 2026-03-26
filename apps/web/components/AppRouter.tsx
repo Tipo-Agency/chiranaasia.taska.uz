@@ -19,6 +19,7 @@ import { MiniMessenger } from './features/chat/MiniMessenger';
 import { PageLayout } from './ui/PageLayout';
 import { Container } from './ui/Container';
 import { RouteFallback } from './ui/RouteFallback';
+import { resolveAssigneesForOrgPosition } from '../utils/orgPositionAssignee';
 
 /** Тяжёлые экраны подгружаются отдельными чанками (меньше initial JS). */
 const AdminViewLazy = lazy(() => import('./admin/AdminView').then((m) => ({ default: m.AdminView })));
@@ -182,8 +183,15 @@ export const AppRouter: React.FC<AppRouterProps> = (props) => {
     if (!selected || !selected.steps?.length) return null;
     const firstStep = selected.steps[0];
     let assigneeId: string | null = null;
+    let assigneeIds: string[] | undefined;
     if (firstStep.assigneeType === 'position') {
-      assigneeId = props.orgPositions.find((p) => p.id === firstStep.assigneeId)?.holderUserId || null;
+      const position = props.orgPositions.find((p) => p.id === firstStep.assigneeId);
+      const resolved = resolveAssigneesForOrgPosition(position, props.employeeInfos);
+      assigneeId = resolved.assigneeId;
+      assigneeIds = resolved.assigneeIds;
+      if (resolved.positionPatch && position) {
+        actions.savePosition({ ...position, ...resolved.positionPatch });
+      }
     } else {
       assigneeId = firstStep.assigneeId || null;
     }
@@ -226,6 +234,7 @@ export const AppRouter: React.FC<AppRouterProps> = (props) => {
       status: 'Не начато',
       priority: props.priorities?.[1]?.name || props.priorities?.[0]?.name || 'Средний',
       assigneeId,
+      assigneeIds,
       source: 'Процесс',
       startDate: today,
       endDate: nextWeek,

@@ -187,7 +187,9 @@ export interface Department {
 export interface EmployeeInfo {
   id: string;
   userId: string; 
-  departmentId?: string; 
+  departmentId?: string;
+  /** Должность в оргсхеме; на одну должность может быть несколько карточек сотрудников */
+  orgPositionId?: string;
   position: string;
   hireDate: string;
   birthDate?: string;
@@ -203,10 +205,15 @@ export interface OrgPosition {
     title: string;
     departmentId?: string;
     managerPositionId?: string; 
+    /** Legacy / визуальный «первый» при отображении; участники должности — по карточкам сотрудников (orgPositionId) */
     holderUserId?: string;
     order?: number; // Порядок для определения позиции слева/справа (меньше = левее)
     isArchived?: boolean;
     updatedAt?: string;
+    /** Как назначать задачи BPM, если на должность несколько человек: по очереди или всем сразу */
+    taskAssigneeMode?: 'round_robin' | 'all';
+    /** Для round_robin: кому отдали последнюю задачу на этот пост */
+    lastTaskAssigneeUserId?: string;
 }
 
 /** Вариант перехода для шага типа variant (ветвление) */

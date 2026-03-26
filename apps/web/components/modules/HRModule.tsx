@@ -30,7 +30,8 @@ export const HRModule: React.FC<HRModuleProps> = ({ view, employees, users, depa
     if (view === 'business-processes') {
         return <BusinessProcessesView 
             processes={processes} 
-            orgPositions={orgPositions} 
+            orgPositions={orgPositions}
+            employees={employees}
             users={users} 
             tasks={tasks}
             tables={tables}
@@ -40,6 +41,7 @@ export const HRModule: React.FC<HRModuleProps> = ({ view, employees, users, depa
             onSaveTask={actions.saveTask}
             onOpenTask={actions.openTaskModal}
             onCompleteProcessStepWithBranch={actions.completeProcessStepWithBranch}
+            onSavePosition={actions.savePosition}
             autoOpenCreateModal={autoOpenCreateModal}
         />;
     }

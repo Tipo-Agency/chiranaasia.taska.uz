@@ -13,6 +13,7 @@ import { DEFAULT_NOTIFICATION_PREFS } from '../constants';
 // Integrations are managed outside Settings now.
 import { ArchiveView, ARCHIVE_TAB_OPTIONS, type ArchiveTabId } from './settings/ArchiveView';
 import { FinanceSetupSettings } from './settings/FinanceSetupSettings';
+import { TasksSetupSettings } from './settings/TasksSetupSettings';
 
 interface SettingsViewProps {
   // Data
@@ -91,6 +92,7 @@ interface SettingsViewProps {
 const SETTINGS_TABS: { id: string; label: string; icon: React.ReactNode }[] = [
   { id: 'profile', label: 'Профиль', icon: <UserIcon size={14} /> },
   { id: 'users', label: 'Пользователи', icon: <Users size={14} /> },
+  { id: 'tasks', label: 'Задачи', icon: <Briefcase size={14} /> },
   { id: 'structure', label: 'Структура', icon: <Building2 size={14} /> },
   { id: 'finance-setup', label: 'Финансы', icon: <Wallet size={14} /> },
   { id: 'sales-funnels', label: 'Воронки продаж', icon: <TrendingUp size={14} /> },
@@ -304,6 +306,14 @@ const SettingsView: React.FC<SettingsViewProps> = ({
             <>
               {activeTab === 'profile' && currentUser && <ProfileSettings activeTab="profile" currentUser={currentUser} users={users} onUpdateProfile={onUpdateProfile!} onUpdateUsers={onUpdateUsers} />}
               {activeTab === 'users' && <ProfileSettings activeTab="users" currentUser={currentUser!} users={users} onUpdateProfile={onUpdateProfile!} onUpdateUsers={onUpdateUsers} />}
+              {activeTab === 'tasks' && (
+                <TasksSetupSettings
+                  statuses={statuses}
+                  priorities={priorities}
+                  onUpdateStatuses={onUpdateStatuses}
+                  onUpdatePriorities={onUpdatePriorities}
+                />
+              )}
               {activeTab === 'structure' && (
                 <StructureSettings
                   projects={projects}

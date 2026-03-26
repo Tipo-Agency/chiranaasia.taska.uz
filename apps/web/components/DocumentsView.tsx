@@ -32,6 +32,7 @@ interface DocumentsViewProps {
   onAddDoc: (folderId?: string) => void;
   onCreateFolder: (name: string, parentFolderId?: string) => void;
   onDeleteFolder: (id: string) => void;
+  onUpdateFolder?: (folder: Folder) => void;
   onDeleteDoc?: (id: string) => void;
   onEditDoc?: (doc: Doc) => void;
   onOpenTask?: (task: Task) => void;
@@ -54,6 +55,7 @@ const DocumentsView: React.FC<DocumentsViewProps> = ({
     onAddDoc, 
     onCreateFolder,
     onDeleteFolder,
+    onUpdateFolder,
     onDeleteDoc,
     onEditDoc,
     onOpenTask,
@@ -70,12 +72,16 @@ const DocumentsView: React.FC<DocumentsViewProps> = ({
   // Modal State
   const [isFolderModalOpen, setIsFolderModalOpen] = useState(false);
   const [newFolderName, setNewFolderName] = useState('');
+  const [renameFolderTarget, setRenameFolderTarget] = useState<Folder | null>(null);
+  const [renameFolderName, setRenameFolderName] = useState('');
 
   // Получаем текущую папку (последняя в пути)
   const currentFolderId = folderPath.length > 0 ? folderPath[folderPath.length - 1] : null;
   
-  // Получаем все папки для текущей таблицы
-  const allFolders = folders.filter(f => showAll ? true : f.tableId === tableId);
+  // Папки таблицы (архивные не показываем; GET /folders тоже отдаёт только неархивные)
+  const allFolders = folders.filter(
+    (f) => (showAll ? true : f.tableId === tableId) && !f.isArchived
+  );
   
   // Получаем папки на текущем уровне (те, у которых parentFolderId совпадает с currentFolderId)
   const visibleFolders = allFolders.filter(f => {
@@ -133,15 +139,25 @@ const DocumentsView: React.FC<DocumentsViewProps> = ({
   };
 
   const handleDeleteFolderSafe = (folder: Folder) => {
-      const hasDocs = docs.some(d => d.folderId === folder.id);
-      const hasSubfolders = allFolders.some(f => f.parentFolderId === folder.id);
-      if (hasDocs || hasSubfolders) {
-          alert('Нельзя удалить папку, пока в ней есть документы или вложенные папки. Сначала удалите или переместите их.');
-          return;
-      }
-      if (confirm(`Удалить папку "${folder.name}"?`)) {
+      const hasDocs = docs.some((d) => d.folderId === folder.id && !d.isArchived);
+      const hasSubfolders = allFolders.some((f) => f.parentFolderId === folder.id);
+      const msg =
+          hasDocs || hasSubfolders
+              ? `Папка «${folder.name}» не пуста. Переместить её в архив? Она скроется из списка.`
+              : `Удалить папку «${folder.name}»?`;
+      if (confirm(msg)) {
           onDeleteFolder(folder.id);
       }
+  };
+
+  const handleRenameFolderSubmit = (e: React.FormEvent) => {
+      e.preventDefault();
+      if (!renameFolderTarget || !onUpdateFolder) return;
+      const name = renameFolderName.trim();
+      if (!name) return;
+      onUpdateFolder({ ...renameFolderTarget, name });
+      setRenameFolderTarget(null);
+      setRenameFolderName('');
   };
 
   const renderAttachmentsTab = () => {
@@ -322,7 +338,7 @@ const DocumentsView: React.FC<DocumentsViewProps> = ({
                       icon: Users,
                       onClick: () => protocolsRef.current?.createProtocol(),
                     },
-                    ...(!currentFolderId && activeTab === 'docs'
+                    ...(activeTab === 'docs'
                       ? [
                           {
                             id: 'folder',
@@ -368,16 +384,34 @@ const DocumentsView: React.FC<DocumentsViewProps> = ({
                                                 {getTableName(folder.tableId)}
                                             </div>
                                         )}
-                                        
-                                        {!showAll && (
-                                            <button 
-                                                onClick={(e) => { e.stopPropagation(); handleDeleteFolderSafe(folder); }}
-                                                className="absolute top-2 right-2 text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded-full hover:bg-red-50 dark:hover:bg-red-900/30"
-                                                title="Удалить папку"
+
+                                        <div className="absolute top-2 right-2 flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                                            {onUpdateFolder && (
+                                                <button
+                                                    type="button"
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        setRenameFolderTarget(folder);
+                                                        setRenameFolderName(folder.name);
+                                                    }}
+                                                    className="text-gray-300 hover:text-blue-500 p-1 rounded-full hover:bg-blue-50 dark:hover:bg-blue-900/30"
+                                                    title="Переименовать"
+                                                >
+                                                    <Edit2 size={14} />
+                                                </button>
+                                            )}
+                                            <button
+                                                type="button"
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    handleDeleteFolderSafe(folder);
+                                                }}
+                                                className="text-gray-300 hover:text-red-500 p-1 rounded-full hover:bg-red-50 dark:hover:bg-red-900/30"
+                                                title="В архив"
                                             >
                                                 <Trash2 size={14} />
                                             </button>
-                                        )}
+                                        </div>
                                    </div>
                                ))}
                            </div>
@@ -443,7 +477,7 @@ const DocumentsView: React.FC<DocumentsViewProps> = ({
                                {showAll && <th className="px-4 py-3 font-semibold w-32">Источник</th>}
                                <th className="px-4 py-3 font-semibold w-32">Тип</th>
                                <th className="px-4 py-3 font-semibold w-48">Теги</th>
-                               {!showAll && <th className="px-4 py-3 w-10"></th>}
+                               <th className="px-4 py-3 w-24 text-right"></th>
                            </tr>
                        </thead>
                        <tbody className="divide-y divide-gray-100 dark:divide-[#333]">
@@ -461,16 +495,35 @@ const DocumentsView: React.FC<DocumentsViewProps> = ({
                                    )}
                                    <td className="px-4 py-3 text-gray-500 dark:text-gray-400 text-xs">Папка</td>
                                    <td className="px-4 py-3"></td>
-                                   {!showAll && (
-                                       <td className="px-4 py-3 text-right">
-                                           <button 
-                                                onClick={(e) => { e.stopPropagation(); handleDeleteFolderSafe(folder); }} 
-                                                className="text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
-                                            >
-                                                <Trash2 size={14}/>
-                                            </button>
-                                       </td>
-                                   )}
+                                   <td className="px-4 py-3 text-right">
+                                       <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                           {onUpdateFolder && (
+                                               <button
+                                                   type="button"
+                                                   onClick={(e) => {
+                                                       e.stopPropagation();
+                                                       setRenameFolderTarget(folder);
+                                                       setRenameFolderName(folder.name);
+                                                   }}
+                                                   className="text-gray-300 hover:text-blue-500 p-1 rounded hover:bg-blue-50 dark:hover:bg-blue-900/30"
+                                                   title="Переименовать"
+                                               >
+                                                   <Edit2 size={14} />
+                                               </button>
+                                           )}
+                                           <button
+                                               type="button"
+                                               onClick={(e) => {
+                                                   e.stopPropagation();
+                                                   handleDeleteFolderSafe(folder);
+                                               }}
+                                               className="text-gray-300 hover:text-red-500 p-1 rounded hover:bg-red-50 dark:hover:bg-red-900/30"
+                                               title="В архив"
+                                           >
+                                               <Trash2 size={14} />
+                                           </button>
+                                       </div>
+                                   </td>
                                </tr>
                            ))}
 
@@ -494,15 +547,13 @@ const DocumentsView: React.FC<DocumentsViewProps> = ({
                                                {doc.tags.map(t => <span key={t} className="text-[10px] bg-gray-100 dark:bg-[#303030] px-1.5 py-0.5 rounded text-gray-600 dark:text-gray-400 rounded border border-gray-200 dark:border-gray-600">{t}</span>)}
                                            </div>
                                        </td>
-                                       {!showAll && (
-                                           <td className="px-4 py-3 text-right">
-                                                {onDeleteDoc && (
+                                       <td className="px-4 py-3 text-right">
+                                                {!showAll && onDeleteDoc && (
                                                     <button onClick={(e) => { e.stopPropagation(); onDeleteDoc(doc.id); }} className="text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity">
                                                         <Trash2 size={14}/>
                                                     </button>
                                                 )}
                                            </td>
-                                       )}
                                    </tr>
                                );
                            })}
@@ -567,6 +618,30 @@ const DocumentsView: React.FC<DocumentsViewProps> = ({
                        <div className="flex justify-end gap-2">
                            <Button type="button" variant="secondary" onClick={() => setIsFolderModalOpen(false)} size="md">Отмена</Button>
                            <Button type="submit" size="md">Создать</Button>
+                       </div>
+                   </form>
+               </div>
+           </div>
+      )}
+      {renameFolderTarget && onUpdateFolder && (
+           <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-[80] animate-in fade-in duration-200">
+               <div className="bg-white dark:bg-[#252525] rounded-xl shadow-2xl w-full max-w-sm overflow-hidden border border-gray-200 dark:border-[#333] p-6">
+                   <h3 className="text-lg font-bold text-gray-800 dark:text-white mb-4 flex items-center gap-2">
+                       <Edit2 size={20} className="text-blue-500"/>
+                       Переименовать папку
+                   </h3>
+                   <form onSubmit={handleRenameFolderSubmit}>
+                       <input 
+                            autoFocus
+                            required
+                            value={renameFolderName}
+                            onChange={(e) => setRenameFolderName(e.target.value)}
+                            placeholder="Название папки"
+                            className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-4 py-2 mb-4 focus:ring-2 focus:ring-blue-500 outline-none bg-white dark:bg-[#333] text-gray-900 dark:text-gray-100"
+                       />
+                       <div className="flex justify-end gap-2">
+                           <Button type="button" variant="secondary" onClick={() => { setRenameFolderTarget(null); setRenameFolderName(''); }} size="md">Отмена</Button>
+                           <Button type="submit" size="md">Сохранить</Button>
                        </div>
                    </form>
                </div>

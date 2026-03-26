@@ -28,6 +28,8 @@ async def update_employees(employees: list[dict], db: AsyncSession = Depends(get
         if existing:
             existing.user_id = e.get("userId", existing.user_id)
             existing.department_id = e.get("departmentId")
+            if "orgPositionId" in e:
+                existing.org_position_id = e.get("orgPositionId")
             existing.position = e.get("position", existing.position)
             existing.hire_date = e.get("hireDate", existing.hire_date)
             existing.birth_date = e.get("birthDate")
@@ -37,6 +39,7 @@ async def update_employees(employees: list[dict], db: AsyncSession = Depends(get
                 id=eid,
                 user_id=e.get("userId", ""),
                 department_id=e.get("departmentId"),
+                org_position_id=e.get("orgPositionId"),
                 position=e.get("position", ""),
                 hire_date=e.get("hireDate", ""),
                 birth_date=e.get("birthDate"),

@@ -45,7 +45,8 @@ export const DocumentsModule: React.FC<DocumentsModuleProps> = ({
         onAddDoc={(folderId) => actions.openDocModal(folderId)} 
         onEditDoc={actions.openEditDocModal}
         onCreateFolder={(name, parentFolderId) => actions.createFolder(name, table.id, parentFolderId)} 
-        onDeleteFolder={actions.deleteFolder} 
+        onDeleteFolder={actions.deleteFolder}
+        onUpdateFolder={actions.updateFolder}
         onDeleteDoc={actions.deleteDoc}
         onOpenTask={actions.openTaskModal}
         onUpdateTask={(taskId, updates) => actions.saveTask({ id: taskId, ...updates })}

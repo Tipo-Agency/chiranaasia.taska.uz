@@ -2,7 +2,7 @@
 import React, { useState, useRef, useMemo, useEffect, useCallback } from 'react';
 import { TaskSelect } from './TaskSelect';
 import { FinanceCategory, Fund, FinancePlan, PurchaseRequest, Department, User, Role, FinancialPlanDocument, FinancialPlanning, Bdr } from '../types';
-import { Wallet, Plus, X, Edit2, Trash2, PieChart, TrendingUp, DollarSign, Check, AlertCircle, Calendar, Settings, ArrowLeft, ArrowRight, Save, FileText, Clock, CheckCircle2, ChevronDown, Upload } from 'lucide-react';
+import { Wallet, Plus, X, Edit2, Trash2, PieChart, TrendingUp, DollarSign, Check, AlertCircle, Calendar, Settings, ArrowLeft, ArrowRight, Save, FileText, Clock, CheckCircle2, ChevronDown, Upload, Archive, RotateCcw } from 'lucide-react';
 import { Button, Card, ModulePageShell, ModulePageHeader, MODULE_PAGE_GUTTER, ModuleCreateDropdown, ModuleFilterIconButton, DateInput, ModuleSegmentedControl, SystemAlertDialog } from './ui';
 import { BankStatementsView, type BankStatementsViewHandle } from './finance/BankStatementsView';
 import { BdrView } from './finance/BdrView';
@@ -59,6 +59,8 @@ const FinanceView: React.FC<FinanceViewProps> = ({
   const [requestDepartmentFilter, setRequestDepartmentFilter] = useState<string>('all');
   const [requestCategoryFilter, setRequestCategoryFilter] = useState<string>('all');
   const [showRequestFilters, setShowRequestFilters] = useState(false);
+  /** Активные записи vs архив — только в модуле «Финансы», не в Settings → Архив */
+  const [financeArchiveScope, setFinanceArchiveScope] = useState<'active' | 'archived'>('active');
   
   /** Список | полноэкранное создание | полноэкранная карточка сущности */
   const [planningSubView, setPlanningSubView] = useState<'list' | 'create' | 'detail'>('list');
@@ -301,9 +303,15 @@ const FinanceView: React.FC<FinanceViewProps> = ({
     if (showApprovedPlannings === 'hide') {
       result = result.filter(p => p.status !== 'approved');
     }
+
+    if (financeArchiveScope === 'active') {
+      result = result.filter(p => !p.isArchived);
+    } else {
+      result = result.filter(p => p.isArchived === true);
+    }
     
     return result;
-  }, [financialPlannings, planningStatusFilter, planningDepartmentFilter, showApprovedPlannings]);
+  }, [financialPlannings, planningStatusFilter, planningDepartmentFilter, showApprovedPlannings, financeArchiveScope]);
 
   // Конфигурация фильтров для планирований
   const planningFilters: FilterConfig[] = useMemo(() => [
@@ -370,9 +378,15 @@ const FinanceView: React.FC<FinanceViewProps> = ({
     if (showApprovedPlans === 'hide') {
       result = result.filter(p => p.status !== 'approved');
     }
+
+    if (financeArchiveScope === 'active') {
+      result = result.filter(p => !p.isArchived);
+    } else {
+      result = result.filter(p => p.isArchived === true);
+    }
     
     return result;
-  }, [financialPlanDocuments, currentPeriod, planStatusFilter, planDepartmentFilter, showApprovedPlans]);
+  }, [financialPlanDocuments, currentPeriod, planStatusFilter, planDepartmentFilter, showApprovedPlans, financeArchiveScope]);
 
   // Конфигурация фильтров для планов
   const planFilters: FilterConfig[] = useMemo(() => [
@@ -463,9 +477,21 @@ const FinanceView: React.FC<FinanceViewProps> = ({
     setRequestCategoryFilter('all');
   }, []);
 
+  const filteredFinanceRequests = useMemo(() => {
+    return requests.filter(req => {
+      if (requestStatusFilter !== 'all' && req.status !== requestStatusFilter) return false;
+      if (requestDepartmentFilter !== 'all' && req.departmentId !== requestDepartmentFilter) return false;
+      if (requestCategoryFilter !== 'all' && req.categoryId !== requestCategoryFilter) return false;
+      if (financeArchiveScope === 'active' && req.isArchived) return false;
+      if (financeArchiveScope === 'archived' && !req.isArchived) return false;
+      return true;
+    });
+  }, [requests, requestStatusFilter, requestDepartmentFilter, requestCategoryFilter, financeArchiveScope]);
+
   // --- Handlers ---
 
   const handleOpenRequestCreate = () => {
+      setFinanceArchiveScope('active');
       setEditingRequest(null);
       setReqAmount(''); setReqDesc(''); setReqDep(departments[0]?.id || ''); setReqCat(categories[0]?.id || '');
       setReqPaymentDate('');
@@ -494,7 +520,8 @@ const FinanceView: React.FC<FinanceViewProps> = ({
           amount: parseFloat(reqAmount) || 0,
           description: `${reqDesc || ''}${reqPaymentDate ? ` [paymentDate:${reqPaymentDate}]` : ''}`.trim(),
           status: editingRequest ? editingRequest.status : 'pending',
-          date: editingRequest ? editingRequest.date : new Date().toISOString()
+          date: editingRequest ? editingRequest.date : new Date().toISOString(),
+          isArchived: editingRequest?.isArchived,
       });
       setIsRequestModalOpen(false);
   };
@@ -502,6 +529,43 @@ const FinanceView: React.FC<FinanceViewProps> = ({
   const handleStatusChange = (req: PurchaseRequest, status: PurchaseRequest['status']) => {
       onSaveRequest({ ...req, status, decisionDate: new Date().toISOString() });
   };
+
+  const archiveFinancialPlanning = useCallback((e: React.MouseEvent, p: FinancialPlanning) => {
+    e.stopPropagation();
+    if (!onSaveFinancialPlanning) return;
+    if (!confirm('Переместить финансовое планирование в архив?')) return;
+    onSaveFinancialPlanning({ ...p, isArchived: true, updatedAt: new Date().toISOString() });
+  }, [onSaveFinancialPlanning]);
+
+  const restoreFinancialPlanning = useCallback((e: React.MouseEvent, p: FinancialPlanning) => {
+    e.stopPropagation();
+    if (!onSaveFinancialPlanning) return;
+    onSaveFinancialPlanning({ ...p, isArchived: false, updatedAt: new Date().toISOString() });
+  }, [onSaveFinancialPlanning]);
+
+  const archiveFinancialPlanDocument = useCallback((e: React.MouseEvent, d: FinancialPlanDocument) => {
+    e.stopPropagation();
+    if (!onSaveFinancialPlanDocument) return;
+    if (!confirm('Переместить документ финансового плана в архив?')) return;
+    onSaveFinancialPlanDocument({ ...d, isArchived: true, updatedAt: new Date().toISOString() });
+  }, [onSaveFinancialPlanDocument]);
+
+  const restoreFinancialPlanDocument = useCallback((e: React.MouseEvent, d: FinancialPlanDocument) => {
+    e.stopPropagation();
+    if (!onSaveFinancialPlanDocument) return;
+    onSaveFinancialPlanDocument({ ...d, isArchived: false, updatedAt: new Date().toISOString() });
+  }, [onSaveFinancialPlanDocument]);
+
+  const archivePurchaseRequest = useCallback((e: React.MouseEvent, r: PurchaseRequest) => {
+    e.stopPropagation();
+    if (!confirm('Переместить заявку в архив?')) return;
+    onSaveRequest({ ...r, isArchived: true });
+  }, [onSaveRequest]);
+
+  const restorePurchaseRequest = useCallback((e: React.MouseEvent, r: PurchaseRequest) => {
+    e.stopPropagation();
+    onSaveRequest({ ...r, isArchived: false });
+  }, [onSaveRequest]);
 
   const getStatusLabel = (status: string) => {
     switch (status) {
@@ -530,8 +594,14 @@ const FinanceView: React.FC<FinanceViewProps> = ({
         {filteredPlannings.length === 0 ? (
           <div className="bg-white dark:bg-[#252525] border border-gray-200 dark:border-[#333] rounded-xl p-12 text-center">
             <FileText size={48} className="mx-auto text-gray-300 dark:text-gray-600 mb-4" />
-            <p className="text-gray-400 dark:text-gray-500 text-sm mb-2">Нет финансовых планирований</p>
-            <p className="text-xs text-gray-400 dark:text-gray-500">Создайте первое планирование через кнопку с плюсом в шапке</p>
+            <p className="text-gray-400 dark:text-gray-500 text-sm mb-2">
+              {financeArchiveScope === 'archived' ? 'Нет архивных планирований' : 'Нет финансовых планирований'}
+            </p>
+            <p className="text-xs text-gray-400 dark:text-gray-500">
+              {financeArchiveScope === 'archived'
+                ? 'Архивные записи появятся после перемещения в архив'
+                : 'Создайте первое планирование через кнопку с плюсом в шапке'}
+            </p>
           </div>
         ) : (
           (() => {
@@ -602,7 +672,28 @@ const FinanceView: React.FC<FinanceViewProps> = ({
                                 </span>
                               </div>
                             </div>
-                            <ArrowRight size={20} className="text-gray-400 group-hover:text-gray-600 dark:group-hover:text-gray-200 shrink-0" />
+                            <div className="flex items-center gap-1 shrink-0">
+                              {financeArchiveScope === 'active' ? (
+                                <button
+                                  type="button"
+                                  onClick={(e) => archiveFinancialPlanning(e, planning)}
+                                  className="p-2 rounded-lg text-gray-400 hover:bg-gray-100 dark:hover:bg-[#333] hover:text-amber-600 dark:hover:text-amber-400 opacity-0 group-hover:opacity-100 transition-opacity"
+                                  title="В архив"
+                                >
+                                  <Archive size={18} />
+                                </button>
+                              ) : (
+                                <button
+                                  type="button"
+                                  onClick={(e) => restoreFinancialPlanning(e, planning)}
+                                  className="p-2 rounded-lg text-gray-400 hover:bg-gray-100 dark:hover:bg-[#333] hover:text-emerald-600 dark:hover:text-emerald-400 opacity-0 group-hover:opacity-100 transition-opacity"
+                                  title="Восстановить"
+                                >
+                                  <RotateCcw size={18} />
+                                </button>
+                              )}
+                              <ArrowRight size={20} className="text-gray-400 group-hover:text-gray-600 dark:group-hover:text-gray-200" />
+                            </div>
                           </div>
                         </Card>
                       );
@@ -702,7 +793,7 @@ const FinanceView: React.FC<FinanceViewProps> = ({
         // Проверяем статус (берем все, кроме отклоненных)
         const isValidStatus = req.status !== 'rejected';
         
-        return isInPeriod && isSameDepartment && isValidStatus;
+        return isInPeriod && isSameDepartment && isValidStatus && !req.isArchived;
       });
       
       const newRequestIds = Array.from(new Set([...planningDetailRequestIds, ...matchingRequests.map(r => r.id)]));
@@ -734,6 +825,21 @@ const FinanceView: React.FC<FinanceViewProps> = ({
       setSelectedPlanning(updated);
       onSaveFinancialPlanning(updated);
     };
+
+    const isPlanningArchived = selectedPlanning.isArchived === true;
+
+    const handleArchivePlanningFromDetail = () => {
+      if (!onSaveFinancialPlanning) return;
+      if (!confirm('Переместить финансовое планирование в архив?')) return;
+      onSaveFinancialPlanning({ ...selectedPlanning, isArchived: true, updatedAt: new Date().toISOString() });
+      setPlanningSubView('list');
+      setSelectedPlanning(null);
+    };
+
+    const handleRestorePlanningFromDetail = () => {
+      if (!onSaveFinancialPlanning) return;
+      onSaveFinancialPlanning({ ...selectedPlanning, isArchived: false, updatedAt: new Date().toISOString() });
+    };
     
     return (
       <div className="flex flex-col flex-1 min-h-0 -mx-4 md:-mx-6">
@@ -754,43 +860,66 @@ const FinanceView: React.FC<FinanceViewProps> = ({
             </p>
           </div>
           <div className="flex items-center gap-2 flex-wrap justify-end">
-            <button
-              type="button"
-              onClick={() => {
-                if (selectedPlanning.status === 'created') return handleConduct();
-                if (selectedPlanning.status === 'conducted' && currentUser.role === Role.ADMIN) return handleApprove();
-              }}
-              disabled={!(selectedPlanning.status === 'created' || (selectedPlanning.status === 'conducted' && currentUser.role === Role.ADMIN))}
-              className={`px-3 py-2 rounded-xl text-sm font-bold uppercase border transition-colors ${
-                (selectedPlanning.status === 'created' || (selectedPlanning.status === 'conducted' && currentUser.role === Role.ADMIN))
-                  ? 'cursor-pointer hover:opacity-90'
-                  : 'cursor-default opacity-70'
-              } ${getStatusColor(selectedPlanning.status)} border-transparent`}
-              title={
-                selectedPlanning.status === 'created'
-                  ? 'Нажмите, чтобы провести'
-                  : selectedPlanning.status === 'conducted' && currentUser.role === Role.ADMIN
-                  ? 'Нажмите, чтобы одобрить'
-                  : 'Статус'
-              }
-            >
-              {selectedPlanning.status === 'created'
-                ? 'Провести'
-                : selectedPlanning.status === 'conducted' && currentUser.role === Role.ADMIN
-                ? 'Утвердить'
-                : getStatusLabel(selectedPlanning.status)}
-            </button>
-            <button
-              type="button"
-              onClick={handleSave}
-              className="px-3 py-2 bg-gray-900 dark:bg-white text-white dark:text-gray-900 text-sm font-medium hover:opacity-90 rounded-xl flex items-center gap-2"
-            >
-              <Save size={16} />
-              Сохранить
-            </button>
+            {isPlanningArchived ? (
+              <button
+                type="button"
+                onClick={handleRestorePlanningFromDetail}
+                className="px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium rounded-xl flex items-center gap-2"
+              >
+                <RotateCcw size={16} />
+                Восстановить
+              </button>
+            ) : (
+              <>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (selectedPlanning.status === 'created') return handleConduct();
+                    if (selectedPlanning.status === 'conducted' && currentUser.role === Role.ADMIN) return handleApprove();
+                  }}
+                  disabled={!(selectedPlanning.status === 'created' || (selectedPlanning.status === 'conducted' && currentUser.role === Role.ADMIN))}
+                  className={`px-3 py-2 rounded-xl text-sm font-bold uppercase border transition-colors ${
+                    (selectedPlanning.status === 'created' || (selectedPlanning.status === 'conducted' && currentUser.role === Role.ADMIN))
+                      ? 'cursor-pointer hover:opacity-90'
+                      : 'cursor-default opacity-70'
+                  } ${getStatusColor(selectedPlanning.status)} border-transparent`}
+                  title={
+                    selectedPlanning.status === 'created'
+                      ? 'Нажмите, чтобы провести'
+                      : selectedPlanning.status === 'conducted' && currentUser.role === Role.ADMIN
+                      ? 'Нажмите, чтобы одобрить'
+                      : 'Статус'
+                  }
+                >
+                  {selectedPlanning.status === 'created'
+                    ? 'Провести'
+                    : selectedPlanning.status === 'conducted' && currentUser.role === Role.ADMIN
+                    ? 'Утвердить'
+                    : getStatusLabel(selectedPlanning.status)}
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSave}
+                  className="px-3 py-2 bg-gray-900 dark:bg-white text-white dark:text-gray-900 text-sm font-medium hover:opacity-90 rounded-xl flex items-center gap-2"
+                >
+                  <Save size={16} />
+                  Сохранить
+                </button>
+                <button
+                  type="button"
+                  onClick={handleArchivePlanningFromDetail}
+                  className="px-3 py-2 border border-gray-200 dark:border-[#444] text-gray-700 dark:text-gray-200 text-sm font-medium hover:bg-gray-50 dark:hover:bg-[#252525] rounded-xl flex items-center gap-2"
+                  title="В архив"
+                >
+                  <Archive size={16} />
+                  В архив
+                </button>
+              </>
+            )}
           </div>
         </div>
-        <div className="flex-1 overflow-y-auto custom-scrollbar min-h-0 px-4 md:px-6 py-6 space-y-6 max-w-5xl w-full mx-auto">
+        <div className="flex-1 overflow-y-auto custom-scrollbar min-h-0 px-4 md:px-6 py-6 max-w-5xl w-full mx-auto">
+        <fieldset disabled={isPlanningArchived} className="border-0 p-0 m-0 min-w-0 space-y-6 flex flex-col">
 
         {/* Период + подразделение */}
         <div className="bg-white dark:bg-[#252525] border border-gray-200 dark:border-[#333] rounded-xl p-6">
@@ -983,6 +1112,7 @@ const FinanceView: React.FC<FinanceViewProps> = ({
             placeholder="Добавьте примечания..."
           />
         </div>
+        </fieldset>
         </div>
       </div>
     );
@@ -997,8 +1127,14 @@ const FinanceView: React.FC<FinanceViewProps> = ({
         {filteredPlanDocs.length === 0 ? (
           <div className="bg-white dark:bg-[#252525] border border-gray-200 dark:border-[#333] rounded-xl p-12 text-center">
             <FileText size={48} className="mx-auto text-gray-300 dark:text-gray-600 mb-4" />
-            <p className="text-gray-400 dark:text-gray-500 text-sm mb-2">Нет финансовых планов</p>
-            <p className="text-xs text-gray-400 dark:text-gray-500">Создайте первый план через кнопку с плюсом в шапке</p>
+            <p className="text-gray-400 dark:text-gray-500 text-sm mb-2">
+              {financeArchiveScope === 'archived' ? 'Нет архивных документов плана' : 'Нет финансовых планов'}
+            </p>
+            <p className="text-xs text-gray-400 dark:text-gray-500">
+              {financeArchiveScope === 'archived'
+                ? 'Архивные документы появятся после перемещения в архив'
+                : 'Создайте первый план через кнопку с плюсом в шапке'}
+            </p>
           </div>
         ) : (
           (() => {
@@ -1067,7 +1203,28 @@ const FinanceView: React.FC<FinanceViewProps> = ({
                                 </span>
                               </div>
                             </div>
-                            <ArrowRight size={20} className="text-gray-400 group-hover:text-gray-600 dark:group-hover:text-gray-200 shrink-0" />
+                            <div className="flex items-center gap-1 shrink-0">
+                              {financeArchiveScope === 'active' ? (
+                                <button
+                                  type="button"
+                                  onClick={(e) => archiveFinancialPlanDocument(e, planDoc)}
+                                  className="p-2 rounded-lg text-gray-400 hover:bg-gray-100 dark:hover:bg-[#333] hover:text-amber-600 dark:hover:text-amber-400 opacity-0 group-hover:opacity-100 transition-opacity"
+                                  title="В архив"
+                                >
+                                  <Archive size={18} />
+                                </button>
+                              ) : (
+                                <button
+                                  type="button"
+                                  onClick={(e) => restoreFinancialPlanDocument(e, planDoc)}
+                                  className="p-2 rounded-lg text-gray-400 hover:bg-gray-100 dark:hover:bg-[#333] hover:text-emerald-600 dark:hover:text-emerald-400 opacity-0 group-hover:opacity-100 transition-opacity"
+                                  title="Восстановить"
+                                >
+                                  <RotateCcw size={18} />
+                                </button>
+                              )}
+                              <ArrowRight size={20} className="text-gray-400 group-hover:text-gray-600 dark:group-hover:text-gray-200" />
+                            </div>
                           </div>
                         </Card>
                       );
@@ -1190,6 +1347,21 @@ const FinanceView: React.FC<FinanceViewProps> = ({
       setSelectedPlanDoc(updated);
       onSaveFinancialPlanDocument(updated);
     };
+
+    const isPlanDocArchived = selectedPlanDoc.isArchived === true;
+
+    const handleArchivePlanDocFromDetail = () => {
+      if (!onSaveFinancialPlanDocument) return;
+      if (!confirm('Переместить документ финансового плана в архив?')) return;
+      onSaveFinancialPlanDocument({ ...selectedPlanDoc, isArchived: true, updatedAt: new Date().toISOString() });
+      setPlanSubView('list');
+      setSelectedPlanDoc(null);
+    };
+
+    const handleRestorePlanDocFromDetail = () => {
+      if (!onSaveFinancialPlanDocument) return;
+      onSaveFinancialPlanDocument({ ...selectedPlanDoc, isArchived: false, updatedAt: new Date().toISOString() });
+    };
     
     const balance = planDetailIncome - planDetailTotalExpenses;
     
@@ -1212,43 +1384,66 @@ const FinanceView: React.FC<FinanceViewProps> = ({
             </p>
           </div>
           <div className="flex items-center gap-2 flex-wrap justify-end">
-            <button
-              type="button"
-              onClick={() => {
-                if (selectedPlanDoc.status === 'created') return handleConduct();
-                if (selectedPlanDoc.status === 'conducted' && currentUser.role === Role.ADMIN) return handleApprove();
-              }}
-              disabled={!(selectedPlanDoc.status === 'created' || (selectedPlanDoc.status === 'conducted' && currentUser.role === Role.ADMIN))}
-              className={`px-3 py-2 rounded-xl text-sm font-bold uppercase border transition-colors ${
-                (selectedPlanDoc.status === 'created' || (selectedPlanDoc.status === 'conducted' && currentUser.role === Role.ADMIN))
-                  ? 'cursor-pointer hover:opacity-90'
-                  : 'cursor-default opacity-70'
-              } ${getStatusColor(selectedPlanDoc.status)} border-transparent`}
-              title={
-                selectedPlanDoc.status === 'created'
-                  ? 'Нажмите, чтобы провести'
-                  : selectedPlanDoc.status === 'conducted' && currentUser.role === Role.ADMIN
-                  ? 'Нажмите, чтобы утвердить'
-                  : 'Статус'
-              }
-            >
-              {selectedPlanDoc.status === 'created'
-                ? 'Провести'
-                : selectedPlanDoc.status === 'conducted' && currentUser.role === Role.ADMIN
-                ? 'Утвердить'
-                : getStatusLabel(selectedPlanDoc.status)}
-            </button>
-            <button
-              type="button"
-              onClick={handleSave}
-              className="px-3 py-2 bg-gray-900 dark:bg-white text-white dark:text-gray-900 text-sm font-medium hover:opacity-90 rounded-xl flex items-center gap-2"
-            >
-              <Save size={16} />
-              Сохранить
-            </button>
+            {isPlanDocArchived ? (
+              <button
+                type="button"
+                onClick={handleRestorePlanDocFromDetail}
+                className="px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium rounded-xl flex items-center gap-2"
+              >
+                <RotateCcw size={16} />
+                Восстановить
+              </button>
+            ) : (
+              <>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (selectedPlanDoc.status === 'created') return handleConduct();
+                    if (selectedPlanDoc.status === 'conducted' && currentUser.role === Role.ADMIN) return handleApprove();
+                  }}
+                  disabled={!(selectedPlanDoc.status === 'created' || (selectedPlanDoc.status === 'conducted' && currentUser.role === Role.ADMIN))}
+                  className={`px-3 py-2 rounded-xl text-sm font-bold uppercase border transition-colors ${
+                    (selectedPlanDoc.status === 'created' || (selectedPlanDoc.status === 'conducted' && currentUser.role === Role.ADMIN))
+                      ? 'cursor-pointer hover:opacity-90'
+                      : 'cursor-default opacity-70'
+                  } ${getStatusColor(selectedPlanDoc.status)} border-transparent`}
+                  title={
+                    selectedPlanDoc.status === 'created'
+                      ? 'Нажмите, чтобы провести'
+                      : selectedPlanDoc.status === 'conducted' && currentUser.role === Role.ADMIN
+                      ? 'Нажмите, чтобы утвердить'
+                      : 'Статус'
+                  }
+                >
+                  {selectedPlanDoc.status === 'created'
+                    ? 'Провести'
+                    : selectedPlanDoc.status === 'conducted' && currentUser.role === Role.ADMIN
+                    ? 'Утвердить'
+                    : getStatusLabel(selectedPlanDoc.status)}
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSave}
+                  className="px-3 py-2 bg-gray-900 dark:bg-white text-white dark:text-gray-900 text-sm font-medium hover:opacity-90 rounded-xl flex items-center gap-2"
+                >
+                  <Save size={16} />
+                  Сохранить
+                </button>
+                <button
+                  type="button"
+                  onClick={handleArchivePlanDocFromDetail}
+                  className="px-3 py-2 border border-gray-200 dark:border-[#444] text-gray-700 dark:text-gray-200 text-sm font-medium hover:bg-gray-50 dark:hover:bg-[#252525] rounded-xl flex items-center gap-2"
+                  title="В архив"
+                >
+                  <Archive size={16} />
+                  В архив
+                </button>
+              </>
+            )}
           </div>
         </div>
-        <div className="flex-1 overflow-y-auto custom-scrollbar min-h-0 px-4 md:px-6 py-6 space-y-6 max-w-5xl w-full mx-auto">
+        <div className="flex-1 overflow-y-auto custom-scrollbar min-h-0 px-4 md:px-6 py-6 max-w-5xl w-full mx-auto">
+        <fieldset disabled={isPlanDocArchived} className="border-0 p-0 m-0 min-w-0 space-y-6 flex flex-col">
 
         {/* Период + подразделение */}
         <div className="bg-white dark:bg-[#252525] border border-gray-200 dark:border-[#333] rounded-xl p-6">
@@ -1456,6 +1651,7 @@ const FinanceView: React.FC<FinanceViewProps> = ({
             </span>
           </div>
         </div>
+        </fieldset>
         </div>
       </div>
     );
@@ -1463,13 +1659,6 @@ const FinanceView: React.FC<FinanceViewProps> = ({
 
   // --- Render Requests Tab ---
   const renderRequestsTab = () => {
-      const filteredRequests = requests.filter(req => {
-          if (requestStatusFilter !== 'all' && req.status !== requestStatusFilter) return false;
-          if (requestDepartmentFilter !== 'all' && req.departmentId !== requestDepartmentFilter) return false;
-          if (requestCategoryFilter !== 'all' && req.categoryId !== requestCategoryFilter) return false;
-          return true;
-      });
-      
       return (
       <div className="space-y-6">
           <div className="flex justify-between items-center">
@@ -1491,7 +1680,7 @@ const FinanceView: React.FC<FinanceViewProps> = ({
                       </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100 dark:divide-[#333]">
-                      {filteredRequests.map(req => {
+                      {filteredFinanceRequests.map(req => {
                           const cat = categories.find(c => c.id === req.categoryId);
                           const dep = departments.find(d => d.id === req.departmentId);
                           const user = users.find(u => u.id === req.requesterId);
@@ -1523,15 +1712,36 @@ const FinanceView: React.FC<FinanceViewProps> = ({
                                   </td>
                                   <td className="px-4 py-3 text-right">
                                       <div className="flex items-center justify-end gap-2">
+                                          {financeArchiveScope === 'active' ? (
+                                            <button
+                                              type="button"
+                                              onClick={(e) => archivePurchaseRequest(e, req)}
+                                              className="text-gray-400 hover:text-amber-600 dark:hover:text-amber-400"
+                                              title="В архив"
+                                            >
+                                              <Archive size={14} />
+                                            </button>
+                                          ) : (
+                                            <button
+                                              type="button"
+                                              onClick={(e) => restorePurchaseRequest(e, req)}
+                                              className="text-gray-400 hover:text-emerald-600 dark:hover:text-emerald-400"
+                                              title="Восстановить"
+                                            >
+                                              <RotateCcw size={14} />
+                                            </button>
+                                          )}
                                           <button 
+                                              type="button"
                                               onClick={() => handleOpenRequestEdit(req)} 
                                               className="text-gray-400 hover:text-blue-600 dark:hover:text-blue-400"
                                               title="Редактировать"
-                                          >
+                                              disabled={req.isArchived === true}
+                                            >
                                               <Edit2 size={14}/>
                                           </button>
                                           {currentUser.role === Role.ADMIN && (
-                                              <button onClick={() => { if(confirm('Удалить?')) onDeleteRequest(req.id) }} className="text-gray-400 hover:text-red-600"><Trash2 size={14}/></button>
+                                              <button type="button" onClick={() => { if(confirm('Удалить?')) onDeleteRequest(req.id) }} className="text-gray-400 hover:text-red-600"><Trash2 size={14}/></button>
                                           )}
                                       </div>
                                   </td>
@@ -1567,6 +1777,7 @@ const FinanceView: React.FC<FinanceViewProps> = ({
       createdAt: new Date().toISOString(),
     };
     onSaveFinancialPlanDocument(planDoc);
+    setFinanceArchiveScope('active');
     setActiveTab('plan');
     setSelectedPlanDoc(planDoc);
     setPlanSubView('detail');
@@ -1594,6 +1805,7 @@ const FinanceView: React.FC<FinanceViewProps> = ({
       createdAt: new Date().toISOString(),
     };
     onSaveFinancialPlanning(planning);
+    setFinanceArchiveScope('active');
     setActiveTab('planning');
     setSelectedPlanning(planning);
     setPlanningSubView('detail');
@@ -1648,6 +1860,19 @@ const FinanceView: React.FC<FinanceViewProps> = ({
               }
               controls={
                 <div className="flex items-center gap-2 flex-wrap lg:justify-end">
+                    {((activeTab === 'planning' && planningSubView === 'list') ||
+                      (activeTab === 'plan' && planSubView === 'list') ||
+                      activeTab === 'requests') && (
+                      <ModuleSegmentedControl
+                        variant="neutral"
+                        value={financeArchiveScope}
+                        onChange={(v) => setFinanceArchiveScope(v as 'active' | 'archived')}
+                        options={[
+                          { value: 'active', label: 'Активные' },
+                          { value: 'archived', label: 'Архив' },
+                        ]}
+                      />
+                    )}
                     {activeTab === 'planning' && planningSubView === 'list' && (
                       <ModuleFilterIconButton
                         accent="emerald"

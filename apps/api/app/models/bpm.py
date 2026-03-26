@@ -21,6 +21,8 @@ class OrgPosition(Base):
     holder_user_id = Column(String(36), nullable=True)
     order_val = Column(String(10), default="0")
     is_archived = Column(Boolean, default=False)
+    task_assignee_mode = Column(String(20), default="round_robin")
+    last_task_assignee_user_id = Column(String(36), nullable=True)
 
 
 class BusinessProcess(Base):

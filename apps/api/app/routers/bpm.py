@@ -19,6 +19,8 @@ def row_to_position(row):
         "holderUserId": row.holder_user_id,
         "order": int(row.order_val) if row.order_val and str(row.order_val).isdigit() else row.order_val,
         "isArchived": bool(getattr(row, "is_archived", False)),
+        "taskAssigneeMode": getattr(row, "task_assignee_mode", None) or "round_robin",
+        "lastTaskAssigneeUserId": getattr(row, "last_task_assignee_user_id", None),
     }
 
 
@@ -57,6 +59,10 @@ async def update_positions(positions: list[dict], db: AsyncSession = Depends(get
             existing.holder_user_id = p.get("holderUserId")
             existing.order_val = str(p.get("order", 0))
             existing.is_archived = bool(p.get("isArchived", False))
+            if "taskAssigneeMode" in p:
+                existing.task_assignee_mode = p.get("taskAssigneeMode") or "round_robin"
+            if "lastTaskAssigneeUserId" in p:
+                existing.last_task_assignee_user_id = p.get("lastTaskAssigneeUserId")
         else:
             db.add(OrgPosition(
                 id=pid,
@@ -66,6 +72,8 @@ async def update_positions(positions: list[dict], db: AsyncSession = Depends(get
                 holder_user_id=p.get("holderUserId"),
                 order_val=str(p.get("order", 0)),
                 is_archived=bool(p.get("isArchived", False)),
+                task_assignee_mode=p.get("taskAssigneeMode") or "round_robin",
+                last_task_assignee_user_id=p.get("lastTaskAssigneeUserId"),
             ))
         await db.flush()
         await log_entity_mutation(

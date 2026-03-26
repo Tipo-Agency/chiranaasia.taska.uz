@@ -173,6 +173,21 @@ export const useContentLogic = (showNotification: (msg: string) => void, activeT
       showNotification('Папка удалена'); 
   };
 
+  const updateFolder = (patch: Folder) => {
+      if (!patch.id || !patch.name?.trim()) {
+          showNotification('Введите название папки');
+          return;
+      }
+      const u = folders.map(f =>
+          f.id === patch.id
+              ? { ...f, ...patch, name: patch.name.trim() }
+              : f
+      );
+      setFolders(u);
+      api.folders.updateAll(u).catch(() => showNotification('Ошибка сохранения папки'));
+      showNotification('Папка обновлена');
+  };
+
   const handleDocClick = (doc: Doc) => {
       if (doc.type === 'link' && doc.url) window.open(doc.url, '_blank');
       else { setActiveDocId(doc.id); return 'doc-editor'; }
@@ -184,7 +199,7 @@ export const useContentLogic = (showNotification: (msg: string) => void, activeT
     setters: { setDocs, setFolders, setMeetings, setContentPosts, setActiveDocId },
     actions: { 
         saveMeeting, deleteMeeting, updateMeetingSummary, savePost, deletePost,
-        saveDoc, saveDocContent, deleteDoc, createFolder, deleteFolder, handleDocClick,
+        saveDoc, saveDocContent, deleteDoc, createFolder, deleteFolder, updateFolder, handleDocClick,
         openDocModal: (folderId?: string) => { setTargetFolderId(folderId); setEditingDoc(null); setIsDocModalOpen(true); },
         openEditDocModal: (doc: Doc) => { setEditingDoc(doc); setTargetFolderId(doc.folderId); setIsDocModalOpen(true); },
         closeDocModal: () => { setIsDocModalOpen(false); setTargetFolderId(undefined); setEditingDoc(null); }

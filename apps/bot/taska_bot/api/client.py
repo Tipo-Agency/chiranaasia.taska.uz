@@ -122,6 +122,17 @@ class ApiClient:
         data = r.json()
         return data if isinstance(data, list) else []
 
+    async def put_positions(self, positions: list[dict]) -> bool:
+        r = await self._http.put("/bpm/positions", json=positions)
+        return r.status_code == 200
+
+    async def get_employees(self) -> list[dict]:
+        r = await self._http.get("/employees")
+        if r.status_code != 200:
+            return []
+        data = r.json()
+        return data if isinstance(data, list) else []
+
     async def get_weekly_plans(self, *, user_id: str) -> list[dict]:
         r = await self._http.get("/weekly-plans", params={"user_id": user_id})
         if r.status_code != 200:

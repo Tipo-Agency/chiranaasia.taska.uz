@@ -16,6 +16,7 @@ from telegram.ext import (
     filters,
 )
 
+from taska_bot.domain.org_position_assignee import resolve_assignees_for_org_position
 from taska_bot.handlers.crm_context import is_admin, resolve_crm_user, user_name
 
 
@@ -309,14 +310,26 @@ async def on_group_process_pick(update: Update, context: ContextTypes.DEFAULT_TY
         await query.message.reply_text("У процесса нет первого шага.")
         return
 
-    # Определяем ответственного: user или position(holderUserId)
+    # Определяем ответственного: user или должность (карточки HR + round_robin / all)
     users = [u for u in await api.get_users() if not u.get("isArchived")]
     positions = await api.get_positions()
+    employees = await api.get_employees()
     assignee_uid: str = ""
+    assignee_ids_task: list[str] = []
+    position_patch: dict | None = None
+    pos_id_for_patch: str | None = None
+
     if first_step.get("assigneeType") == "position":
         pos_id = str(first_step.get("assigneeId") or "")
         pos = next((p for p in positions if str(p.get("id")) == pos_id), None)
-        assignee_uid = str(pos.get("holderUserId") or "") if pos else ""
+        resolved = resolve_assignees_for_org_position(pos, employees)
+        assignee_uid = str(resolved.get("assignee_id") or "")
+        if resolved.get("assignee_ids"):
+            assignee_ids_task = list(resolved["assignee_ids"])
+        patch = resolved.get("position_patch")
+        if patch and pos:
+            position_patch = patch
+            pos_id_for_patch = pos_id
     else:
         assignee_uid = str(first_step.get("assigneeId") or "")
 
@@ -363,6 +376,21 @@ async def on_group_process_pick(update: Update, context: ContextTypes.DEFAULT_TY
         await query.message.reply_text("Не удалось запустить процесс (обновление BPM).")
         return
 
+    if position_patch and pos_id_for_patch:
+        merged_positions: list[dict] = []
+        for p in positions:
+            if str(p.get("id")) == pos_id_for_patch:
+                merged_positions.append({**p, **position_patch})
+            else:
+                merged_positions.append(p)
+        ok_pos = await api.put_positions(merged_positions)
+        if not ok_pos:
+            await query.answer()
+            await query.message.reply_text(
+                "Процесс записан, но не удалось обновить курсор назначения на должности."
+            )
+            return
+
     # 2) Создаем задачу для первого шага
     first_step_id = str(first_step.get("id") or "")
     step_title = str(first_step.get("title") or "Шаг")
@@ -376,7 +404,7 @@ async def on_group_process_pick(update: Update, context: ContextTypes.DEFAULT_TY
                 "status": st,
                 "priority": pr,
                 "assigneeId": assignee_uid,
-                "assigneeIds": [],
+                "assigneeIds": assignee_ids_task,
                 "endDate": end,
                 "isArchived": False,
                 "entityType": "task",
@@ -393,9 +421,16 @@ async def on_group_process_pick(update: Update, context: ContextTypes.DEFAULT_TY
     )
 
     if created_task_ok:
+        if len(assignee_ids_task) > 1:
+            names = ", ".join(
+                html.escape(user_name(users, uid)) for uid in assignee_ids_task
+            )
+            who_line = f"Ответственные: <b>{names}</b>"
+        else:
+            who_line = f"Ответственный: <b>{html.escape(user_name(users, assignee_uid))}</b>"
         await query.message.reply_text(
             f"✅ Запущен процесс:\n<b>{html.escape(proc_title)}</b>\nШаг: <i>{html.escape(step_title)}</i>\n"
-            f"Ответственный: <b>{html.escape(user_name(users, assignee_uid))}</b>",
+            f"{who_line}",
             parse_mode="HTML",
         )
     else:

@@ -61,19 +61,44 @@ const SalesFunnelView: React.FC<SalesFunnelViewProps> = ({ deals, clients, users
   const [showCreateMeetingForm, setShowCreateMeetingForm] = useState(false);
   const [newMeetingDate, setNewMeetingDate] = useState('');
   const [newMeetingTime, setNewMeetingTime] = useState('10:00');
-  const [selectedFunnelId, setSelectedFunnelId] = useState<string>('');
+  const [selectedFunnelIds, setSelectedFunnelIds] = useState<string[]>([]);
   const [funnelId, setFunnelId] = useState<string>('');
   const [dealProjectId, setDealProjectId] = useState<string>(''); // вид услуг (модуль/проект)
   const [defaultFunnelId, setDefaultFunnelId] = useState<string | undefined>(undefined);
   const [alertState, setAlertState] = useState<{ open: boolean; title: string; message: string }>({ open: false, title: '', message: '' });
   const [confirmState, setConfirmState] = useState<{ open: boolean; title: string; message: string; onConfirm?: () => void }>({ open: false, title: '', message: '' });
 
+  const activeFunnels = useMemo(() => salesFunnels.filter((f) => !f.isArchived), [salesFunnels]);
+  const primaryFunnelId = selectedFunnelIds[0] || defaultFunnelId || activeFunnels[0]?.id || salesFunnels[0]?.id || '';
+
   /** Этапы для канбана — из выбранной воронки в шапке страницы */
   const kanbanStages = useMemo(() => {
-    const f = salesFunnels.find(x => x.id === selectedFunnelId);
-    if (f?.stages?.length) return f.stages;
-    return STAGES.map(s => ({ id: s.id, label: s.label, color: s.color }));
-  }, [salesFunnels, selectedFunnelId]);
+    const stageMap = new Map<string, (typeof STAGES)[number]>();
+    activeFunnels
+      .filter((f) => selectedFunnelIds.includes(f.id))
+      .forEach((f) => {
+        (f.stages || []).forEach((s) => {
+          if (!stageMap.has(s.id)) stageMap.set(s.id, s);
+        });
+      });
+
+    const stages = Array.from(stageMap.values());
+    if (stages.length) return stages as any;
+
+    // Фолбэк, если выбранная комбинация воронок без стадий
+    return STAGES.map((s) => ({ id: s.id, label: s.label, color: s.color }));
+  }, [activeFunnels, salesFunnels, selectedFunnelIds]);
+
+  // Подсказка: к какой воронке принадлежит stage.id (используем для открытия/дропа в канбане)
+  const stageToFunnelId = useMemo(() => {
+    const map = new Map<string, string>();
+    activeFunnels.forEach((f) => {
+      (f.stages || []).forEach((s) => {
+        map.set(s.id, f.id);
+      });
+    });
+    return map;
+  }, [activeFunnels]);
 
   // Получаем основную воронку из настроек
   useEffect(() => {
@@ -82,26 +107,28 @@ const SalesFunnelView: React.FC<SalesFunnelViewProps> = ({ deals, clients, users
         const notificationPrefs = (await api.notificationPrefs.get()) as NotificationPreferences;
         const defaultId = notificationPrefs?.defaultFunnelId;
         setDefaultFunnelId(defaultId);
-        
-        // Устанавливаем основную воронку по умолчанию только при первой загрузке
-        if (defaultId && salesFunnels.find(f => f.id === defaultId)) {
-          setSelectedFunnelId(prev => prev || defaultId);
-        } else if (salesFunnels.length > 0) {
-          // Если основной воронки нет, выбираем первую
-          setSelectedFunnelId(prev => prev || salesFunnels[0].id);
-        }
       } catch (error) {
         console.error('Error loading default funnel:', error);
-        // При ошибке выбираем первую воронку
-        if (salesFunnels.length > 0) {
-          setSelectedFunnelId(prev => prev || salesFunnels[0].id);
-        }
       }
     };
     if (salesFunnels.length > 0) {
       loadDefaultFunnel();
     }
   }, [salesFunnels]);
+
+  // По умолчанию выбираем ВСЕ активные воронки (чтобы "основная воронка" в настройках была не нужна для фильтра)
+  useEffect(() => {
+    if (!activeFunnels.length) {
+      setSelectedFunnelIds([]);
+      return;
+    }
+    setSelectedFunnelIds((prev) => {
+      if (!prev.length) return activeFunnels.map((f) => f.id);
+      const filtered = prev.filter((id) => activeFunnels.some((f) => f.id === id));
+      const missing = activeFunnels.map((f) => f.id).filter((id) => !filtered.includes(id));
+      return [...filtered, ...missing];
+    });
+  }, [activeFunnels]);
 
   // Автоматически открываем модалку создания при монтировании, если autoOpenCreateModal = true
   useEffect(() => {
@@ -129,7 +156,9 @@ const SalesFunnelView: React.FC<SalesFunnelViewProps> = ({ deals, clients, users
       if (!dealId) return;
       const target = funnelDeals.find((d) => d.id === dealId);
       if (!target) return;
-      if (target.funnelId) setSelectedFunnelId(target.funnelId);
+      if (target.funnelId) {
+        setSelectedFunnelIds((prev) => (prev.includes(target.funnelId as string) ? prev : [...prev, target.funnelId as string]));
+      }
       handleOpenEdit(target);
     };
     window.addEventListener('openDealFromChat', handleOpenDealById as EventListener);
@@ -143,7 +172,8 @@ const SalesFunnelView: React.FC<SalesFunnelViewProps> = ({ deals, clients, users
     setContactName(''); 
     setAmount(''); 
     setSource('manual'); 
-    const fid = selectedFunnelId || salesFunnels[0]?.id || '';
+    const stageFunnelId = presetStageId ? stageToFunnelId.get(presetStageId) : undefined;
+    const fid = stageFunnelId || primaryFunnelId || salesFunnels[0]?.id || '';
     setFunnelId(fid);
     const fu = salesFunnels.find(f => f.id === fid);
     setStage(presetStageId || fu?.stages?.[0]?.id || 'new');
@@ -197,8 +227,8 @@ const SalesFunnelView: React.FC<SalesFunnelViewProps> = ({ deals, clients, users
               return;
           }
           
-          // Если воронка не указана, используем основную воронку из настроек
-          let finalFunnelId = funnelId || selectedFunnelId;
+          // Если воронка не указана, используем выбранные воронки (первую) или настройки
+          let finalFunnelId = funnelId || primaryFunnelId;
           if (!finalFunnelId) {
               try {
                   const notificationPrefs = (await api.notificationPrefs.get()) as NotificationPreferences;
@@ -277,40 +307,63 @@ const SalesFunnelView: React.FC<SalesFunnelViewProps> = ({ deals, clients, users
   const onDragStart = (e: React.DragEvent, id: string) => { setDraggedDealId(id); e.dataTransfer.effectAllowed = 'move'; };
   const onDrop = (e: React.DragEvent, stage: any) => { 
     e.preventDefault(); 
-    if(draggedDealId) { 
-      const d = funnelDeals.find(x => x.id === draggedDealId);
-      if(d && d.stage !== stage) {
-        const updatedDeal = {...d, stage};
-        onSaveDeal(updatedDeal);
-        
-        // Если перетащили на "Успех" - создаем клиента
-        if (stage === 'won' && onCreateClient) {
-          const existingClient = d.clientId ? clients.find(c => c.id === d.clientId) : null;
-          if (!existingClient) {
-            // Используем название клиента из сделки (если было введено) или название сделки
-            const clientName = d.contactName || d.title; // contactName теперь хранит название клиента
-          const client: Client = {
-            id: `cl-${Date.now()}`,
-              name: clientName,
-            contactPerson: d.contactName,
-              responsibleUserId: d.assigneeId,
-              phone: undefined, // Можно добавить из комментариев
-              email: undefined,
-              telegram: d.telegramUsername,
-              instagram: d.source === 'instagram' ? d.telegramUsername : undefined,
-              companyName: d.title,
-              companyInfo: d.notes,
-              funnelId: d.funnelId || selectedFunnelId || undefined,
-            notes: `Создано из сделки: ${d.title}. Сумма: ${d.amount} ${d.currency}`
-          };
-          onCreateClient(client);
-            // Обновляем сделку с clientId
-            onSaveDeal({ ...updatedDeal, clientId: client.id });
-          }
+    if(!draggedDealId) return;
+
+    const d = funnelDeals.find((x) => x.id === draggedDealId);
+    if(!d) {
+      setDraggedDealId(null);
+      return;
+    }
+
+    if(d.stage === stage) {
+      setDraggedDealId(null);
+      return;
+    }
+
+    const stageFunnelId = stageToFunnelId.get(String(stage));
+    const isWonLost = stage === 'won' || stage === 'lost';
+
+    // Если это stage из конкретной воронки — сделка может попасть туда только если stage существует в её воронке
+    if(!isWonLost) {
+      if(d.funnelId) {
+        if(stageFunnelId && stageFunnelId !== d.funnelId) {
+          setDraggedDealId(null);
+          return;
         }
       }
-      setDraggedDealId(null); 
-    } 
+    }
+
+    const nextFunnelId = d.funnelId || stageFunnelId || primaryFunnelId || undefined;
+    const updatedDeal = {...d, stage, funnelId: nextFunnelId};
+    onSaveDeal(updatedDeal);
+    
+    // Если перетащили на "Успех" - создаем клиента
+    if (stage === 'won' && onCreateClient) {
+      const existingClient = d.clientId ? clients.find((c) => c.id === d.clientId) : null;
+      if (!existingClient) {
+        // Используем название клиента из сделки (если было введено) или название сделки
+        const clientName = d.contactName || d.title; // contactName теперь хранит название клиента
+        const client: Client = {
+          id: `cl-${Date.now()}`,
+          name: clientName,
+          contactPerson: d.contactName,
+          responsibleUserId: d.assigneeId,
+          phone: undefined, // Можно добавить из комментариев
+          email: undefined,
+          telegram: d.telegramUsername,
+          instagram: d.source === 'instagram' ? d.telegramUsername : undefined,
+          companyName: d.title,
+          companyInfo: d.notes,
+          funnelId: d.funnelId || nextFunnelId || undefined,
+          notes: `Создано из сделки: ${d.title}. Сумма: ${d.amount} ${d.currency}`
+        };
+        onCreateClient(client);
+        // Обновляем сделку с clientId
+        onSaveDeal({ ...updatedDeal, clientId: client.id });
+      }
+    }
+
+    setDraggedDealId(null); 
   };
   
   const handleCreateTask = (taskTitle: string) => {
@@ -375,7 +428,7 @@ const SalesFunnelView: React.FC<SalesFunnelViewProps> = ({ deals, clients, users
         instagram: source === 'instagram' ? editingDeal.telegramUsername : undefined,
         companyName: title || editingDeal.title,
         companyInfo: notes || editingDeal.notes,
-        funnelId: funnelId || editingDeal.funnelId || selectedFunnelId || undefined,
+        funnelId: funnelId || editingDeal.funnelId || primaryFunnelId || undefined,
         notes: `Создано из сделки: ${editingDeal.title}. Сумма: ${editingDeal.amount} ${editingDeal.currency}`
       };
       onCreateClient(client);
@@ -398,21 +451,21 @@ const SalesFunnelView: React.FC<SalesFunnelViewProps> = ({ deals, clients, users
     setIsModalOpen(false);
   };
   
-  // Фильтрация сделок по выбранной воронке, исключаем архивные
-  // Если выбрана основная воронка, показываем сделки с этой воронкой И сделки без воронки
+  // Фильтрация сделок по выбранным воронкам, исключаем архивные
+  // Если выбраны ВСЕ воронки — показываем также сделки без воронки.
   const filteredDeals = useMemo(() => {
-    if (!selectedFunnelId) {
-      return funnelDeals;
-    }
-    
-    // Если выбрана основная воронка, показываем сделки с этой воронкой и сделки без воронки
-    if (selectedFunnelId === defaultFunnelId) {
-      return funnelDeals.filter(d => !d.funnelId || d.funnelId === selectedFunnelId);
-    }
-    
-    // Для других воронок показываем только сделки с этой воронкой
-    return funnelDeals.filter(d => d.funnelId === selectedFunnelId);
-  }, [funnelDeals, selectedFunnelId, defaultFunnelId]);
+    const selectedSet = new Set(selectedFunnelIds);
+    const allSelected = activeFunnels.length > 0 && selectedFunnelIds.length === activeFunnels.length;
+
+    if (!selectedFunnelIds.length || allSelected) return funnelDeals;
+
+    const showWithoutFunnel = !!defaultFunnelId && selectedSet.has(defaultFunnelId);
+
+    return funnelDeals.filter((d) => {
+      if (d.funnelId) return selectedSet.has(d.funnelId);
+      return showWithoutFunnel;
+    });
+  }, [funnelDeals, selectedFunnelIds, defaultFunnelId, activeFunnels]);
   
   const activeDeals = filteredDeals.filter(d => d.stage !== 'won' && d.stage !== 'lost');
   const wonDeals = filteredDeals.filter(d => d.stage === 'won');
@@ -525,17 +578,58 @@ const SalesFunnelView: React.FC<SalesFunnelViewProps> = ({ deals, clients, users
             }
             controls={
               <>
-                <ModuleSelectDropdown
-                  accent="violet"
-                  prefixLabel="Воронка"
-                  valueLabel={salesFunnels.find((f) => f.id === selectedFunnelId)?.name || '—'}
-                  items={salesFunnels.map((f) => ({
-                    id: f.id,
-                    label: f.name,
-                    onClick: () => setSelectedFunnelId(f.id),
-                  }))}
-                />
-                <ModuleCreateIconButton accent="violet" label="Новая сделка" onClick={handleOpenCreate} />
+                <div className="flex items-center gap-2 flex-wrap">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    {(() => {
+                      const allSelected = activeFunnels.length > 0 && selectedFunnelIds.length === activeFunnels.length;
+                      return (
+                        <button
+                          type="button"
+                          onClick={() => setSelectedFunnelIds(activeFunnels.map((f) => f.id))}
+                          className={`px-3 py-2 rounded-lg text-xs font-semibold border transition-colors ${
+                            allSelected
+                              ? 'bg-violet-100 dark:bg-violet-900/30 text-violet-700 dark:text-violet-300 border-violet-200 dark:border-violet-800'
+                              : 'bg-white dark:bg-[#252525] border-gray-300 dark:border-[#444] text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-[#303030]'
+                          }`}
+                          title="Показать все воронки"
+                        >
+                          Все ({activeFunnels.length})
+                        </button>
+                      );
+                    })()}
+
+                    {activeFunnels.map((f) => {
+                      const selected = selectedFunnelIds.includes(f.id);
+                      const accent = f.stages?.[0]?.color || 'bg-gray-200 dark:bg-gray-700';
+                      return (
+                        <button
+                          key={f.id}
+                          type="button"
+                          onClick={() => {
+                            setSelectedFunnelIds((prev) => {
+                              if (prev.includes(f.id)) {
+                                const next = prev.filter((id) => id !== f.id);
+                                // Чтобы нельзя было случайно убрать всё — оставляем "все"
+                                return next.length ? next : activeFunnels.map((x) => x.id);
+                              }
+                              return [...prev, f.id];
+                            });
+                          }}
+                          className={`px-3 py-2 rounded-lg text-xs font-semibold border transition-colors ${
+                            selected
+                              ? `${accent} text-gray-800 dark:text-gray-100 border-transparent`
+                              : 'bg-white dark:bg-[#252525] border-gray-300 dark:border-[#444] text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-[#303030]'
+                          }`}
+                          title={f.name}
+                        >
+                          {f.name}
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  <ModuleCreateIconButton accent="violet" label="Новая сделка" onClick={() => handleOpenCreate()} />
+                </div>
               </>
             }
           />
@@ -559,19 +653,32 @@ const SalesFunnelView: React.FC<SalesFunnelViewProps> = ({ deals, clients, users
                               >
                                   {activeDeals.filter(d => d.stage === s.id).map(d => {
                                       const dealProject = projects.find(p => p.id === d.projectId);
+                                      const cardFunnelId = d.funnelId || stageToFunnelId.get(String(d.stage)) || primaryFunnelId;
+                                      const cardFunnel = salesFunnels.find((f) => f.id === cardFunnelId);
+                                      const funnelAccent = cardFunnel?.stages?.[0]?.color || 'bg-gray-200 dark:bg-gray-700';
                                       return (
-                                          <div key={d.id} draggable onDragStart={(e) => onDragStart(e, d.id)} onDragEnd={() => setDraggedDealId(null)} onClick={(e) => { e.stopPropagation(); handleOpenEdit(d); }} className="bg-white dark:bg-[#2b2b2b] p-2 md:p-3 rounded shadow-sm border border-gray-200 dark:border-[#3a3a3a] cursor-pointer hover:shadow-md transition-all">
-                                              <div className="font-medium text-xs md:text-sm text-gray-800 dark:text-gray-100 mb-1 line-clamp-2">{d.title}</div>
-                                              <div className="flex items-center justify-between gap-2 mb-1">
-                                                  <span className="text-xs text-gray-500">{(d.amount || 0).toLocaleString()} UZS</span>
-                                                  {dealProject && (
-                                                      <div className="flex items-center gap-1 text-xs">
-                                                          <DynamicIcon name={dealProject.icon} className={`${dealProject.color} w-3 h-3`} />
-                                                          <span className="text-gray-500 dark:text-gray-400">{dealProject.name}</span>
-                                                      </div>
-                                                  )}
+                                          <div
+                                            key={d.id}
+                                            draggable
+                                            onDragStart={(e) => onDragStart(e, d.id)}
+                                            onDragEnd={() => setDraggedDealId(null)}
+                                            onClick={(e) => { e.stopPropagation(); handleOpenEdit(d); }}
+                                            className="relative bg-white dark:bg-[#2b2b2b] p-2 md:p-3 rounded shadow-sm border border-gray-200 dark:border-[#3a3a3a] cursor-pointer hover:shadow-md transition-all overflow-hidden"
+                                          >
+                                            <div className={`absolute left-0 top-0 bottom-0 w-1 ${funnelAccent} rounded-l`} />
+                                            <div className="relative z-10">
+                                              <div className="font-medium text-xs md:text-sm text-gray-800 dark:text-gray-100 mb-1 line-clamp-2 pl-2">{d.title}</div>
+                                              <div className="flex items-center justify-between gap-2 mb-1 pl-2">
+                                                <span className="text-xs text-gray-500">{(d.amount || 0).toLocaleString()} UZS</span>
+                                                {dealProject && (
+                                                    <div className="flex items-center gap-1 text-xs">
+                                                        <DynamicIcon name={dealProject.icon} className={`${dealProject.color} w-3 h-3`} />
+                                                        <span className="text-gray-500 dark:text-gray-400">{dealProject.name}</span>
+                                                    </div>
+                                                )}
                                               </div>
-                                              <div className="text-xs text-gray-500 flex justify-end items-center">{getSourceIcon(d.source || 'manual')}</div>
+                                              <div className="text-xs text-gray-500 flex justify-end items-center pl-2">{getSourceIcon(d.source || 'manual')}</div>
+                                            </div>
                                           </div>
                                       );
                                   })}

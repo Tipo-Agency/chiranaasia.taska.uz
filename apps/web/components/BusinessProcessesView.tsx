@@ -1,7 +1,8 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { BusinessProcess, ProcessStep, ProcessStepBranch, OrgPosition, User, Task, ProcessInstance, TableCollection } from '../types';
+import { BusinessProcess, ProcessStep, ProcessStepBranch, OrgPosition, User, Task, ProcessInstance, TableCollection, EmployeeInfo } from '../types';
 import { getStepsForInstance } from '../utils/bpmDealFunnel';
+import { resolveAssigneesForOrgPosition } from '../utils/orgPositionAssignee';
 import { Network, Plus, Edit2, Trash2, ChevronRight, User as UserIcon, Building2, Save, X, ArrowDown, Play, CheckCircle2, Clock, FileText, ArrowLeft, Calendar, Users, Layers3 } from 'lucide-react';
 import { TaskSelect } from './TaskSelect';
 import { ProcessCard } from './features/processes/ProcessCard';
@@ -10,6 +11,8 @@ import { Button, ModuleCreateDropdown, ModulePageShell, ModulePageHeader, Module
 interface BusinessProcessesViewProps {
   processes: BusinessProcess[];
   orgPositions: OrgPosition[];
+  /** Карточки HR: привязка к должности (orgPositionId), в т.ч. несколько человек на пост */
+  employees: EmployeeInfo[];
   users: User[];
   tasks: Task[];
   tables: TableCollection[];
@@ -19,11 +22,13 @@ interface BusinessProcessesViewProps {
   onSaveTask: (task: Partial<Task>) => void;
   onOpenTask: (task: Task) => void;
   onCompleteProcessStepWithBranch?: (instanceId: string, nextStepId: string) => void;
+  /** Сохранить курсор round-robin при назначении по должности */
+  onSavePosition?: (pos: OrgPosition) => void;
   autoOpenCreateModal?: boolean;
 }
 
 const BusinessProcessesView: React.FC<BusinessProcessesViewProps> = ({ 
-    processes, orgPositions, users, tasks, tables, currentUser, onSaveProcess, onDeleteProcess, onSaveTask, onOpenTask, onCompleteProcessStepWithBranch, autoOpenCreateModal = false
+    processes, orgPositions, employees, users, tasks, tables, currentUser, onSaveProcess, onDeleteProcess, onSaveTask, onOpenTask, onCompleteProcessStepWithBranch, onSavePosition, autoOpenCreateModal = false
 }) => {
   const activeOrgPositions = useMemo(
       () => orgPositions.filter((p) => !p.isArchived),
@@ -221,7 +226,8 @@ const BusinessProcessesView: React.FC<BusinessProcessesViewProps> = ({
   const getAssigneeId = (step: ProcessStep): string | null => {
       if (step.assigneeType === 'position') {
           const position = orgPositions.find(p => p.id === step.assigneeId);
-          return position?.holderUserId || null;
+          const resolved = resolveAssigneesForOrgPosition(position, employees);
+          return resolved.assigneeId;
       } else {
           return step.assigneeId || null;
       }
@@ -235,7 +241,19 @@ const BusinessProcessesView: React.FC<BusinessProcessesViewProps> = ({
       }
 
       const firstStep = proc.steps[0];
-      const assigneeId = getAssigneeId(firstStep);
+      let assigneeId: string | null = null;
+      let assigneeIds: string[] | undefined;
+      if (firstStep.assigneeType === 'position') {
+          const position = orgPositions.find((p) => p.id === firstStep.assigneeId);
+          const resolved = resolveAssigneesForOrgPosition(position, employees);
+          assigneeId = resolved.assigneeId;
+          assigneeIds = resolved.assigneeIds;
+          if (resolved.positionPatch && position && onSavePosition) {
+              onSavePosition({ ...position, ...resolved.positionPatch });
+          }
+      } else {
+          assigneeId = firstStep.assigneeId || null;
+      }
       
       if (!assigneeId) {
           setAlertText('Не назначен исполнитель для первого шага');
@@ -263,6 +281,7 @@ const BusinessProcessesView: React.FC<BusinessProcessesViewProps> = ({
           status: 'Не начато',
           priority: 'Средний',
           assigneeId: assigneeId,
+          assigneeIds,
           source: 'Процесс',
           startDate: new Date().toISOString().split('T')[0],
           endDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],

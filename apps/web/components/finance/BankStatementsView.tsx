@@ -10,7 +10,7 @@ export interface BankStatementsViewHandle {
 }
 
 export const BankStatementsView = forwardRef<BankStatementsViewHandle>(function BankStatementsView(_, ref) {
-  const [tab, setTab] = useState<'balance' | 'reconciliation' | 'income-reports'>('balance');
+  const [tab, setTab] = useState<'balance' | 'income' | 'expense' | 'commission' | 'reconciliation' | 'income-reports'>('balance');
   const [statements, setStatements] = useState<BankStatementApi[]>([]);
   const [incomeReports, setIncomeReports] = useState<IncomeReportApi[]>([]);
   const [loading, setLoading] = useState(true);
@@ -22,6 +22,31 @@ export const BankStatementsView = forwardRef<BankStatementsViewHandle>(function 
   const [reportCommission, setReportCommission] = useState('');
   const [reportPeriod, setReportPeriod] = useState(new Date().toISOString().slice(0, 7));
   const uploadRef = useRef<HTMLInputElement>(null);
+
+  const isSaldoLine = (desc?: string) => {
+    const d = String(desc ?? '').toLowerCase();
+    return (
+      d.includes('сальдо') ||
+      d.includes('остаток') ||
+      d.includes('начало дня') ||
+      d.includes('конец дня') ||
+      d.includes('входящее') ||
+      d.includes('исходящее')
+    );
+  };
+
+  const isCommissionLine = (desc?: string) => {
+    const d = String(desc ?? '').toLowerCase();
+    return (
+      d.includes('комис') ||
+      d.includes('обслужив') ||
+      d.includes('тариф') ||
+      d.includes('за документ') ||
+      d.includes('съёмк') ||
+      d.includes('съемк') ||
+      d.includes('плата')
+    );
+  };
 
   useImperativeHandle(ref, () => ({
     triggerUpload: () => uploadRef.current?.click(),
@@ -73,11 +98,16 @@ export const BankStatementsView = forwardRef<BankStatementsViewHandle>(function 
     });
   }, [flatLines, startDate, endDate]);
 
+  const incomeLines = useMemo(() => filteredLines.filter((l) => l.lineType === 'in' && !isSaldoLine(l.description)), [filteredLines]);
+  const expenseLines = useMemo(() => filteredLines.filter((l) => l.lineType === 'out' && !isSaldoLine(l.description)), [filteredLines]);
+  const commissionLines = useMemo(() => expenseLines.filter((l) => isCommissionLine(l.description)), [expenseLines]);
+
   const totals = useMemo(() => {
-    const income = filteredLines.filter((l) => l.lineType === 'in').reduce((s, l) => s + l.amount, 0);
-    const expense = filteredLines.filter((l) => l.lineType === 'out').reduce((s, l) => s + l.amount, 0);
-    return { income, expense, balance: income - expense };
-  }, [filteredLines]);
+    const income = incomeLines.reduce((s, l) => s + l.amount, 0);
+    const expense = expenseLines.reduce((s, l) => s + l.amount, 0);
+    const commission = commissionLines.reduce((s, l) => s + l.amount, 0);
+    return { income, expense, commission, balance: income - expense };
+  }, [incomeLines, expenseLines, commissionLines]);
 
   const salesIncomeByDay = useMemo(() => {
     const report = incomeReports.find((r) => r.period === reportPeriod);
@@ -86,7 +116,7 @@ export const BankStatementsView = forwardRef<BankStatementsViewHandle>(function 
 
   const reconciliationRows = useMemo(() => {
     const byDayBank = new Map<string, number>();
-    filteredLines
+    incomeLines
       .filter((l) => l.lineType === 'in')
       .forEach((l) => byDayBank.set(l.lineDate, (byDayBank.get(l.lineDate) || 0) + l.amount));
     const days = Array.from(new Set([...Object.keys(salesIncomeByDay), ...Array.from(byDayBank.keys())])).sort();
@@ -95,20 +125,26 @@ export const BankStatementsView = forwardRef<BankStatementsViewHandle>(function 
       const bank = Number(byDayBank.get(day) || 0);
       return { day, sales, bank, delta: bank - sales };
     });
-  }, [filteredLines, salesIncomeByDay]);
+  }, [incomeLines, salesIncomeByDay]);
 
   const reconciliationTotal = useMemo(() => reconciliationRows.reduce((s, r) => s + r.delta, 0), [reconciliationRows]);
 
   const handleUpload = async (file: File) => {
     const parsed = await parseBankStatementFile(file);
+    const period = parsed.period || new Date().toISOString().slice(0, 7);
+    const statementKeyName = parsed.name || file.name;
+    const existing = statements.find((s) => s.period === period && (s.name === statementKeyName || s.period === period));
+    const nextId = existing?.id ?? `st-${period}`;
+    const createdAt = existing?.createdAt ?? new Date().toISOString();
     const next: BankStatementApi = {
-      id: `st-${Date.now()}`,
+      id: nextId,
       name: parsed.name || file.name,
-      period: parsed.period || new Date().toISOString().slice(0, 7),
-      createdAt: new Date().toISOString(),
+      period,
+      createdAt,
       lines: parsed.lines,
     };
-    await financeEndpoint.updateBankStatements([...statements, next]);
+    const rest = existing ? statements.filter((s) => s.id !== existing.id) : statements;
+    await financeEndpoint.updateBankStatements([...rest, next]);
     await load();
   };
 
@@ -146,6 +182,9 @@ export const BankStatementsView = forwardRef<BankStatementsViewHandle>(function 
           onChange={(v) => setTab(v as typeof tab)}
           options={[
             { value: 'balance', label: 'Баланс и движение' },
+            { value: 'income', label: 'Поступления' },
+            { value: 'expense', label: 'Расходы' },
+            { value: 'commission', label: 'Комиссия' },
             { value: 'reconciliation', label: 'Сверка' },
             { value: 'income-reports', label: 'Справки о доходах' },
           ]}
@@ -196,6 +235,13 @@ export const BankStatementsView = forwardRef<BankStatementsViewHandle>(function 
             </div>
           </div>
 
+          <div className="mt-3 grid grid-cols-1 md:grid-cols-3 gap-3">
+            <div className="rounded-xl border border-gray-200 dark:border-[#333] p-4 bg-white dark:bg-[#252525] md:col-span-1">
+              <p className="text-xs text-gray-500">Комиссия</p>
+              <p className="text-lg font-semibold text-amber-600">{totals.commission.toLocaleString('ru-RU')} UZS</p>
+            </div>
+          </div>
+
           {statements.length === 0 ? (
             <p className="text-sm text-gray-500 dark:text-gray-400">Выписок пока нет.</p>
           ) : (
@@ -243,6 +289,123 @@ export const BankStatementsView = forwardRef<BankStatementsViewHandle>(function 
             </div>
           )}
         </>
+      )}
+
+      {tab === 'income' && (
+        <div className="border border-gray-200 dark:border-[#333] rounded-xl overflow-hidden">
+          <div className="px-4 py-3 border-b border-gray-200 dark:border-[#333] bg-gray-50 dark:bg-[#202020] text-xs text-gray-500">
+            Поступления (без строк с сальдо)
+          </div>
+          <div className="px-4 py-2 text-sm flex justify-end bg-white dark:bg-[#252525] border-b border-gray-100 dark:border-[#333]">
+            Итого: {totals.income.toLocaleString('ru-RU')} UZS
+          </div>
+          <div className="bg-gray-50 dark:bg-[#252525] px-4 py-2 overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-left text-gray-600 dark:text-gray-400">
+                  <th className="pr-4 py-1">Дата</th>
+                  <th className="pr-4 py-1">Описание</th>
+                  <th className="py-1">Сумма</th>
+                </tr>
+              </thead>
+              <tbody>
+                {incomeLines.length === 0 ? (
+                  <tr>
+                    <td className="py-3 text-sm text-gray-500" colSpan={3}>
+                      Нет данных за выбранный период
+                    </td>
+                  </tr>
+                ) : (
+                  incomeLines.map((l) => (
+                    <tr key={l.statementId + '-' + l.lineDate + '-' + l.amount + '-' + (l.description || '').slice(0, 16)} className="border-t border-gray-200 dark:border-[#333]">
+                      <td className="pr-4 py-1">{l.lineDate}</td>
+                      <td className="pr-4 py-1 max-w-xs truncate">{l.description || '—'}</td>
+                      <td className="py-1 font-mono">{l.amount}</td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {tab === 'expense' && (
+        <div className="border border-gray-200 dark:border-[#333] rounded-xl overflow-hidden">
+          <div className="px-4 py-3 border-b border-gray-200 dark:border-[#333] bg-gray-50 dark:bg-[#202020] text-xs text-gray-500">
+            Расходы (без строк с сальдо)
+          </div>
+          <div className="px-4 py-2 text-sm flex justify-end bg-white dark:bg-[#252525] border-b border-gray-100 dark:border-[#333]">
+            Итого: {totals.expense.toLocaleString('ru-RU')} UZS
+          </div>
+          <div className="bg-gray-50 dark:bg-[#252525] px-4 py-2 overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-left text-gray-600 dark:text-gray-400">
+                  <th className="pr-4 py-1">Дата</th>
+                  <th className="pr-4 py-1">Описание</th>
+                  <th className="py-1">Сумма</th>
+                </tr>
+              </thead>
+              <tbody>
+                {expenseLines.length === 0 ? (
+                  <tr>
+                    <td className="py-3 text-sm text-gray-500" colSpan={3}>
+                      Нет данных за выбранный период
+                    </td>
+                  </tr>
+                ) : (
+                  expenseLines.map((l) => (
+                    <tr key={l.statementId + '-' + l.lineDate + '-' + l.amount + '-' + (l.description || '').slice(0, 16)} className="border-t border-gray-200 dark:border-[#333]">
+                      <td className="pr-4 py-1">{l.lineDate}</td>
+                      <td className="pr-4 py-1 max-w-xs truncate">{l.description || '—'}</td>
+                      <td className="py-1 font-mono">{l.amount}</td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {tab === 'commission' && (
+        <div className="border border-gray-200 dark:border-[#333] rounded-xl overflow-hidden">
+          <div className="px-4 py-3 border-b border-gray-200 dark:border-[#333] bg-gray-50 dark:bg-[#202020] text-xs text-gray-500">
+            Комиссия (выделяется по описанию)
+          </div>
+          <div className="px-4 py-2 text-sm flex justify-end bg-white dark:bg-[#252525] border-b border-gray-100 dark:border-[#333]">
+            Итого: {totals.commission.toLocaleString('ru-RU')} UZS
+          </div>
+          <div className="bg-gray-50 dark:bg-[#252525] px-4 py-2 overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-left text-gray-600 dark:text-gray-400">
+                  <th className="pr-4 py-1">Дата</th>
+                  <th className="pr-4 py-1">Описание</th>
+                  <th className="py-1">Сумма</th>
+                </tr>
+              </thead>
+              <tbody>
+                {commissionLines.length === 0 ? (
+                  <tr>
+                    <td className="py-3 text-sm text-gray-500" colSpan={3}>
+                      Нет комиссий за выбранный период
+                    </td>
+                  </tr>
+                ) : (
+                  commissionLines.map((l) => (
+                    <tr key={l.statementId + '-' + l.lineDate + '-' + l.amount + '-' + (l.description || '').slice(0, 16)} className="border-t border-gray-200 dark:border-[#333]">
+                      <td className="pr-4 py-1">{l.lineDate}</td>
+                      <td className="pr-4 py-1 max-w-xs truncate">{l.description || '—'}</td>
+                      <td className="py-1 font-mono">{l.amount}</td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
       )}
 
       {tab === 'reconciliation' && (

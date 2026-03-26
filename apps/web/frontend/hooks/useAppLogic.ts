@@ -28,6 +28,7 @@ import { useInventoryLogic } from './slices/useInventoryLogic';
 import { STANDARD_FEATURES } from '../../components/FunctionalityView';
 import { buildLocation, parseLocation } from '../../utils/urlSync';
 import { devWarn } from '../../utils/devLog';
+import { resolveAssigneesForOrgPosition } from '../../utils/orgPositionAssignee';
 // Функция заполнения тестовыми данными полностью удалена
 
 export const useAppLogic = () => {
@@ -434,11 +435,14 @@ export const useAppLogic = () => {
               break;
           case 'settings':
               // Для архива нужны подразделения, категории, воронки и т.д.
+              // Склады (Structure → склады) живут в inventory slice и раньше подгружались
+              // только при заходе в модуль «Склад», из‑за чего список складов в настройках был пуст.
               await Promise.all([
                   loadFinanceData(),
                   loadCRMData(),
                   loadContentData(),
                   loadBPMData(),
+                  loadInventoryData(),
               ]);
               break;
           case 'employees':
@@ -679,9 +683,15 @@ export const useAppLogic = () => {
                       const tasksTable = settingsSlice.state.tables.find(t => t.type === 'tasks');
                       if (tasksTable) {
                           let nextAssigneeId: string | null = null;
+                          let nextAssigneeIds: string[] | undefined;
                           if (nextStep.assigneeType === 'position') {
                               const position = bpmSlice.state.orgPositions.find(p => p.id === nextStep.assigneeId);
-                              nextAssigneeId = position?.holderUserId || null;
+                              const resolved = resolveAssigneesForOrgPosition(position, crmSlice.state.employeeInfos);
+                              nextAssigneeId = resolved.assigneeId;
+                              nextAssigneeIds = resolved.assigneeIds;
+                              if (resolved.positionPatch && position) {
+                                  bpmSlice.actions.savePosition({ ...position, ...resolved.positionPatch });
+                              }
                           } else {
                               nextAssigneeId = nextStep.assigneeId || null;
                           }
@@ -699,6 +709,7 @@ export const useAppLogic = () => {
                                   status: 'Не начато',
                                   priority: 'Средний',
                                   assigneeId: nextAssigneeId,
+                                  assigneeIds: nextAssigneeIds,
                                   startDate: new Date().toISOString().split('T')[0],
                                   endDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
                                   processId: process.id,
@@ -716,18 +727,22 @@ export const useAppLogic = () => {
                                   crmSlice.actions.saveDeal({ ...dealForInstance, stage: nextStep.id });
                               }
 
-                              if (
-                                  nextTask.id &&
-                                  nextAssigneeId &&
-                                  authSlice.state.currentUser &&
-                                  nextAssigneeId !== authSlice.state.currentUser.id
-                              ) {
-                                  chatLocalService.addSystemFeedMessage({
-                                      targetUserId: nextAssigneeId,
-                                      text: `Новая задача по сделке: ${taskTitle}`,
-                                      entityType: 'task',
-                                      entityId: nextTask.id,
-                                  });
+                              const feedUserIds =
+                                  nextAssigneeIds && nextAssigneeIds.length > 0
+                                      ? nextAssigneeIds
+                                      : nextAssigneeId
+                                        ? [nextAssigneeId]
+                                        : [];
+                              const cur = authSlice.state.currentUser?.id;
+                              for (const uid of feedUserIds) {
+                                  if (nextTask.id && uid && cur && uid !== cur) {
+                                      chatLocalService.addSystemFeedMessage({
+                                          targetUserId: uid,
+                                          text: `Новая задача по сделке: ${taskTitle}`,
+                                          entityType: 'task',
+                                          entityId: nextTask.id,
+                                      });
+                                  }
                               }
 
                               const updatedInstance = {
@@ -851,9 +866,15 @@ export const useAppLogic = () => {
           if (!tasksTable) return;
 
           let assigneeId: string | null = null;
+          let assigneeIds: string[] | undefined;
           if (nextStep.assigneeType === 'position') {
               const position = bpmSlice.state.orgPositions.find(p => p.id === nextStep.assigneeId);
-              assigneeId = position?.holderUserId || null;
+              const resolved = resolveAssigneesForOrgPosition(position, crmSlice.state.employeeInfos);
+              assigneeId = resolved.assigneeId;
+              assigneeIds = resolved.assigneeIds;
+              if (resolved.positionPatch && position) {
+                  bpmSlice.actions.savePosition({ ...position, ...resolved.positionPatch });
+              }
           } else {
               assigneeId = nextStep.assigneeId || null;
           }
@@ -878,6 +899,7 @@ export const useAppLogic = () => {
               status: 'Не начато',
               priority: 'Средний',
               assigneeId,
+              assigneeIds,
               startDate: new Date().toISOString().split('T')[0],
               endDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
               processId: process.id,
@@ -1053,6 +1075,7 @@ export const useAppLogic = () => {
       deleteDoc: contentSlice.actions.deleteDoc,
       createFolder: contentSlice.actions.createFolder,
       deleteFolder: contentSlice.actions.deleteFolder,
+      updateFolder: contentSlice.actions.updateFolder,
       handleDocClick: handleDocClickWrapper,
       openDocModal: contentSlice.actions.openDocModal,
       openEditDocModal: contentSlice.actions.openEditDocModal,

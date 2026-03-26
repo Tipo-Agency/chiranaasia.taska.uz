@@ -70,6 +70,7 @@ class EmployeeInfo(Base):
     id = Column(String(36), primary_key=True, default=gen_id)
     user_id = Column(String(36), nullable=False)
     department_id = Column(String(36), nullable=True)
+    org_position_id = Column(String(36), nullable=True)
     position = Column(String(255), nullable=False)
     hire_date = Column(String(50), nullable=False)
     birth_date = Column(String(50), nullable=True)

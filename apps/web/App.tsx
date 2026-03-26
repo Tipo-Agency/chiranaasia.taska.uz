@@ -19,6 +19,7 @@ import { useAppLogic } from './frontend/hooks/useAppLogic';
 import { NotificationCenterProvider, useNotificationCenter } from './frontend/contexts/NotificationCenterContext';
 import type { AppHeaderProps } from './components/AppHeader';
 import { StandardModal, Input, Button } from './components/ui';
+import { resolveAssigneesForOrgPosition } from './utils/orgPositionAssignee';
 
 /** Синхронно из pathname — чтобы не монтировать useAppLogic на публичной странице (избегаем React #310). */
 function getPublicContentPlanIdFromPath(): string | null {
@@ -338,10 +339,19 @@ function MainApp() {
                       if (!selected) return null;
                       if (!selected.steps?.length) return null;
                       const firstStep = selected.steps[0];
-                      const assigneeId =
-                        firstStep.assigneeType === 'position'
-                          ? state.orgPositions.find((p) => p.id === firstStep.assigneeId)?.holderUserId || null
-                          : firstStep.assigneeId || null;
+                      let assigneeId: string | null = null;
+                      let assigneeIds: string[] | undefined;
+                      if (firstStep.assigneeType === 'position') {
+                        const position = state.orgPositions.find((p) => p.id === firstStep.assigneeId);
+                        const resolved = resolveAssigneesForOrgPosition(position, state.employeeInfos);
+                        assigneeId = resolved.assigneeId;
+                        assigneeIds = resolved.assigneeIds;
+                        if (resolved.positionPatch && position) {
+                          actions.savePosition({ ...position, ...resolved.positionPatch });
+                        }
+                      } else {
+                        assigneeId = firstStep.assigneeId || null;
+                      }
                       if (!assigneeId) return null;
                       const instanceId = `inst-${Date.now()}`;
                       const taskId = `task-${Date.now()}`;
@@ -374,6 +384,7 @@ function MainApp() {
                         status: 'Не начато',
                         priority: state.priorities?.[1]?.name || state.priorities?.[0]?.name || 'Средний',
                         assigneeId,
+                        assigneeIds,
                         source: 'Процесс',
                         startDate: now.toISOString().slice(0, 10),
                         endDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10),

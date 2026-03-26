@@ -208,6 +208,7 @@ def row_to_employee(row) -> dict:
         "id": row.id,
         "userId": row.user_id,
         "departmentId": row.department_id,
+        "orgPositionId": getattr(row, "org_position_id", None),
         "position": row.position,
         "hireDate": row.hire_date,
         "birthDate": row.birth_date,

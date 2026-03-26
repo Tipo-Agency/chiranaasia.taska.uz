@@ -435,7 +435,8 @@ export const SpaceModule: React.FC<SpaceModuleProps> = ({
                     onOpenDoc={actions.handleDocClick} 
                     onAddDoc={(folderId) => actions.openDocModal(folderId)} 
                     onCreateFolder={(name, parentFolderId) => actions.createFolder(name, activeTable.id, parentFolderId)} 
-                    onDeleteFolder={actions.deleteFolder} 
+                    onDeleteFolder={actions.deleteFolder}
+                    onUpdateFolder={actions.updateFolder}
                     onDeleteDoc={actions.deleteDoc}
                     onDeleteAttachment={(taskId, attachmentId) => {
                         const task = tasks.find(t => t.id === taskId);
