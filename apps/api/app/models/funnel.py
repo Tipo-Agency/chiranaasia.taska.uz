@@ -16,6 +16,7 @@ class SalesFunnel(Base):
 
     id = Column(String(36), primary_key=True, default=gen_id)
     name = Column(String(255), nullable=False)
+    color = Column(String(100), nullable=True)
     stages = Column(JSONB, default=list)
     sources = Column(JSONB, default=dict)
     created_at = Column(String(50), nullable=True)

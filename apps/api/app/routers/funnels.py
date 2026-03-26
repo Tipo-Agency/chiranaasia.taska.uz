@@ -14,6 +14,7 @@ def row_to_funnel(row):
     return {
         "id": row.id,
         "name": row.name,
+        "color": row.color,
         "stages": row.stages or [],
         "sources": row.sources or {},
         "createdAt": row.created_at,
@@ -38,6 +39,7 @@ async def update_funnels(funnels: list[dict], db: AsyncSession = Depends(get_db)
         is_new = existing is None
         if existing:
             existing.name = f.get("name", existing.name)
+            existing.color = f.get("color", existing.color)
             existing.stages = f.get("stages", existing.stages or [])
             existing.sources = f.get("sources", existing.sources or {})
             existing.created_at = f.get("createdAt")
@@ -47,6 +49,7 @@ async def update_funnels(funnels: list[dict], db: AsyncSession = Depends(get_db)
             db.add(SalesFunnel(
                 id=fid,
                 name=f.get("name", ""),
+                color=f.get("color"),
                 stages=f.get("stages", []),
                 sources=f.get("sources", {}),
                 created_at=f.get("createdAt"),
@@ -74,6 +77,7 @@ async def create_funnel(funnel: dict, db: AsyncSession = Depends(get_db)):
     db.add(SalesFunnel(
         id=fid,
         name=funnel.get("name", "Новая воронка"),
+        color=funnel.get("color"),
         stages=funnel.get("stages", []),
         sources=funnel.get("sources", {}),
         created_at=now,
@@ -109,6 +113,8 @@ async def update_funnel(funnel_id: str, updates: dict, db: AsyncSession = Depend
         return None
     if "name" in updates:
         f.name = updates["name"]
+    if "color" in updates:
+        f.color = updates["color"]
     if "stages" in updates:
         f.stages = updates["stages"]
     if "sources" in updates:
