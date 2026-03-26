@@ -258,3 +258,67 @@ export function dedupeBankStatementFlatLines<
   }
   return out;
 }
+
+/** Согласовано с BankStatementsView — строки метаданных, не операции. */
+export function isBankStatementSaldoLine(desc?: string): boolean {
+  const d = String(desc ?? '').toLowerCase();
+  return (
+    d.includes('сальдо') ||
+    d.includes('остаток') ||
+    d.includes('начало дня') ||
+    d.includes('конец дня') ||
+    d.includes('входящее') ||
+    d.includes('исходящее') ||
+    /^\s*итого\b|итого\s+оборот|итого\s+по|всего\s+оборот|оборот\s+за\s*период|сводн/i.test(d)
+  );
+}
+
+export function isBankStatementCommissionLine(desc?: string): boolean {
+  const d = String(desc ?? '').toLowerCase();
+  return (
+    d.includes('комис') ||
+    d.includes('обслужив') ||
+    d.includes('тариф') ||
+    d.includes('за документ') ||
+    d.includes('съёмк') ||
+    d.includes('съемк') ||
+    d.includes('плата')
+  );
+}
+
+export type BankStatementFlatLine = {
+  lineDate: string;
+  description?: string;
+  amount: number;
+  lineType: 'in' | 'out';
+};
+
+/** Итоги по загруженным выпискам (дедуп строк, без сальдо/итого). Опционально — только строки с lineDate в диапазоне YYYY-MM-DD. */
+export function computeBankStatementTotals(
+  statements: Array<{ lines?: BankStatementFlatLine[] }>,
+  dateRange?: { start: string; end: string }
+): { income: number; expense: number; commission: number; balance: number } {
+  const flat: BankStatementFlatLine[] = [];
+  statements.forEach((s) => {
+    s.lines?.forEach((line) => {
+      const ld = String(line.lineDate ?? '').slice(0, 10);
+      if (dateRange) {
+        if (!ld || ld < dateRange.start || ld > dateRange.end) return;
+      }
+      flat.push({
+        lineDate: line.lineDate,
+        description: line.description,
+        amount: Number(line.amount || 0),
+        lineType: line.lineType,
+      });
+    });
+  });
+  const deduped = dedupeBankStatementFlatLines(flat);
+  const incomeLines = deduped.filter((l) => l.lineType === 'in' && !isBankStatementSaldoLine(l.description));
+  const expenseLines = deduped.filter((l) => l.lineType === 'out' && !isBankStatementSaldoLine(l.description));
+  const commissionLines = expenseLines.filter((l) => isBankStatementCommissionLine(l.description));
+  const income = incomeLines.reduce((s, l) => s + l.amount, 0);
+  const expense = expenseLines.reduce((s, l) => s + l.amount, 0);
+  const commission = commissionLines.reduce((s, l) => s + l.amount, 0);
+  return { income, expense, commission, balance: income - expense };
+}

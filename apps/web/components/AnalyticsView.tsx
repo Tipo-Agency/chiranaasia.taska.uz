@@ -1,10 +1,37 @@
-
-import React, { useState } from 'react';
-import { Task, Deal, User, FinancePlan, Contract } from '../types';
-import { PieChart, TrendingUp, DollarSign, CheckCircle2, User as UserIcon, BarChart3, Clock, Wallet, Download, FileText, Filter, Layers, X, Eye } from 'lucide-react';
+import React, { useState, useMemo, useEffect } from 'react';
+import {
+  Task,
+  Deal,
+  User,
+  FinancePlan,
+  Contract,
+  AccountsReceivable,
+  PurchaseRequest,
+  FinancialPlanning,
+  FinancialPlanDocument,
+} from '../types';
+import {
+  TrendingUp,
+  DollarSign,
+  CheckCircle2,
+  User as UserIcon,
+  BarChart3,
+  Wallet,
+  FileText,
+  Filter,
+  Layers,
+  X,
+  Eye,
+  Landmark,
+  Receipt,
+  ArrowDownRight,
+  ArrowUpRight,
+} from 'lucide-react';
 import { ResponsiveTable } from './features/common/ResponsiveTable';
 import { UserAvatar } from './features/common/UserAvatar';
 import { ModulePageShell, ModulePageHeader, ModuleSegmentedControl, MODULE_PAGE_GUTTER } from './ui';
+import { financeEndpoint, type BankStatementApi } from '../services/apiClient';
+import { computeBankStatementTotals } from '../utils/bankStatementParser';
 
 interface AnalyticsViewProps {
   tasks: Task[];
@@ -12,6 +39,50 @@ interface AnalyticsViewProps {
   users: User[];
   financePlan: FinancePlan | null;
   contracts: Contract[];
+  accountsReceivable?: AccountsReceivable[];
+  purchaseRequests?: PurchaseRequest[];
+  financialPlannings?: FinancialPlanning[];
+  financialPlanDocuments?: FinancialPlanDocument[];
+}
+
+function getAnalyticsPeriodBounds(period: 'month' | 'quarter' | 'year'): { start: string; end: string } {
+  const now = new Date();
+  const y = now.getFullYear();
+  const m = now.getMonth();
+  const pad = (n: number) => String(n).padStart(2, '0');
+  if (period === 'month') {
+    const start = `${y}-${pad(m + 1)}-01`;
+    const lastDay = new Date(y, m + 1, 0).getDate();
+    return { start, end: `${y}-${pad(m + 1)}-${pad(lastDay)}` };
+  }
+  if (period === 'quarter') {
+    const qStart = Math.floor(m / 3) * 3;
+    const start = `${y}-${pad(qStart + 1)}-01`;
+    const endDate = new Date(y, qStart + 3, 0);
+    return {
+      start,
+      end: `${endDate.getFullYear()}-${pad(endDate.getMonth() + 1)}-${pad(endDate.getDate())}`,
+    };
+  }
+  return { start: `${y}-01-01`, end: `${y}-12-31` };
+}
+
+function planningOverlapsBounds(
+  p: { period?: string; periodStart?: string; periodEnd?: string },
+  bounds: { start: string; end: string }
+): boolean {
+  let ps = p.periodStart?.slice(0, 10);
+  let pe = p.periodEnd?.slice(0, 10);
+  if (p.period && /^\d{4}-\d{2}$/.test(p.period)) {
+    if (!ps) ps = `${p.period}-01`;
+    if (!pe) {
+      const d = new Date(`${p.period}-01T12:00:00`);
+      const last = new Date(d.getFullYear(), d.getMonth() + 1, 0);
+      pe = last.toISOString().slice(0, 10);
+    }
+  }
+  if (!ps || !pe) return true;
+  return pe >= bounds.start && ps <= bounds.end;
 }
 
 type EmployeeLeaderboardRow = {
@@ -23,30 +94,114 @@ type EmployeeLeaderboardRow = {
   revenue: number;
 };
 
-const AnalyticsView: React.FC<AnalyticsViewProps> = ({ tasks, deals, users, financePlan, contracts }) => {
+const AnalyticsView: React.FC<AnalyticsViewProps> = ({
+  tasks,
+  deals,
+  users,
+  financePlan,
+  contracts,
+  accountsReceivable = [],
+  purchaseRequests = [],
+  financialPlannings = [],
+  financialPlanDocuments = [],
+}) => {
   const [period, setPeriod] = useState<'month' | 'quarter' | 'year'>('month');
   const [activeTab, setActiveTab] = useState<'dashboard' | 'statistics' | 'reports'>('dashboard');
   const [openReport, setOpenReport] = useState<string | null>(null);
+  const [bankStatements, setBankStatements] = useState<BankStatementApi[]>([]);
+  const [bankLoadState, setBankLoadState] = useState<'idle' | 'loading' | 'done' | 'error'>('idle');
+
+  useEffect(() => {
+    let cancelled = false;
+    setBankLoadState('loading');
+    financeEndpoint
+      .getBankStatements()
+      .then((data) => {
+        if (!cancelled) {
+          setBankStatements(Array.isArray(data) ? data : []);
+          setBankLoadState('done');
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setBankStatements([]);
+          setBankLoadState('error');
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const periodBounds = useMemo(() => getAnalyticsPeriodBounds(period), [period]);
+
+  const bankTotals = useMemo(
+    () => computeBankStatementTotals(bankStatements, periodBounds),
+    [bankStatements, periodBounds]
+  );
+
+  const requestById = useMemo(() => new Map(purchaseRequests.map((r) => [r.id, r])), [purchaseRequests]);
+
+  const financePlanningConducted = useMemo(() => {
+    const conducted = financialPlannings.filter(
+      (p) => !p.isArchived && p.status === 'conducted' && planningOverlapsBounds(p, periodBounds)
+    );
+    let income = 0;
+    let expensesApproved = 0;
+    conducted.forEach((p) => {
+      income += p.income ?? 0;
+      p.requestIds.forEach((rid) => {
+        const req = requestById.get(rid);
+        if (!req || req.isArchived || req.status !== 'approved') return;
+        expensesApproved += req.amount ?? 0;
+      });
+    });
+    return { count: conducted.length, income, expensesApproved, net: income - expensesApproved };
+  }, [financialPlannings, periodBounds, requestById]);
+
+  const financePlanDocsConducted = useMemo(() => {
+    const docs = financialPlanDocuments.filter(
+      (d) => !d.isArchived && d.status === 'conducted' && planningOverlapsBounds(d, periodBounds)
+    );
+    let income = 0;
+    let expenses = 0;
+    docs.forEach((d) => {
+      income += d.income ?? 0;
+      const ex = d.expenses ?? {};
+      for (const v of Object.values(ex)) {
+        expenses += Number(v) || 0;
+      }
+    });
+    return { count: docs.length, income, expenses, net: income - expenses };
+  }, [financialPlanDocuments, periodBounds]);
+
+  const outstandingReceivable = useMemo(() => {
+    return accountsReceivable.reduce((sum, r) => {
+      if (!r || r.isArchived || r.status === 'paid') return sum;
+      return sum + Math.max(0, (r.amount || 0) - (r.paidAmount ?? 0));
+    }, 0);
+  }, [accountsReceivable]);
 
   // --- Calculations ---
-  
-  // Фильтруем архивные задачи и сделки
-  const activeTasks = tasks.filter(t => !t.isArchived);
-  const activeDeals = deals.filter(d => !d.isArchived);
-  
-  // Tasks
-  const completedTasks = activeTasks.filter(t => t.status === 'Выполнено' || t.status === 'Done' || t.status === 'Завершено').length;
-  const inProgressTasks = activeTasks.filter(t => t.status === 'В работе' || t.status === 'In Progress').length;
+
+  const activeTasks = tasks.filter((t) => !t.isArchived);
+  const activeDeals = deals.filter((d) => !d.isArchived);
+  const activeUsers = users.filter((u) => !u.isArchived);
+  const activeContracts = contracts.filter((c) => !c.isArchived && c.status === 'active');
+
+  const completedTasks = activeTasks.filter(
+    (t) => t.status === 'Выполнено' || t.status === 'Done' || t.status === 'Завершено'
+  ).length;
+  const inProgressTasks = activeTasks.filter((t) => t.status === 'В работе' || t.status === 'In Progress').length;
   const totalTasks = activeTasks.length;
   const taskCompletionRate = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
 
-  // Deals
-  const wonDeals = activeDeals.filter(d => d.stage === 'won');
-  const totalRevenue = wonDeals.reduce((sum, d) => sum + d.amount, 0) + contracts.filter(c => c.status === 'active').reduce((sum, c) => sum + c.amount, 0);
+  const wonDeals = activeDeals.filter((d) => d.stage === 'won');
+  const totalRevenue =
+    wonDeals.reduce((sum, d) => sum + d.amount, 0) + activeContracts.reduce((sum, c) => sum + c.amount, 0);
   const pipelineValue = activeDeals.reduce((sum, d) => sum + d.amount, 0);
-  
-  // Employees Leaderboard
-  const employeeStats: EmployeeLeaderboardRow[] = users.map(user => {
+
+  const employeeStats: EmployeeLeaderboardRow[] = activeUsers.map((user) => {
       const userTasks = activeTasks.filter(t => t.assigneeId === user.id || (t.assigneeIds && t.assigneeIds.includes(user.id)));
       const userCompleted = userTasks.filter(t => t.status === 'Выполнено' || t.status === 'Done').length;
       const userDeals = activeDeals.filter(d => d.assigneeId === user.id && d.stage === 'won');
@@ -74,15 +229,19 @@ const AnalyticsView: React.FC<AnalyticsViewProps> = ({ tasks, deals, users, fina
 
   // --- Render Tabs ---
 
+  const periodHint =
+    period === 'month' ? 'текущий месяц' : period === 'quarter' ? 'текущий квартал' : 'текущий год';
+
   const renderDashboard = () => (
       <div className="space-y-6">
            {/* KPI CARDS */}
-           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+           <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-4 md:gap-6">
                 <div className="bg-white dark:bg-[#252525] p-6 rounded-xl border border-gray-200 dark:border-[#333] shadow-sm flex items-center gap-4">
                     <div className="p-3 bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400 rounded-full"><DollarSign size={24}/></div>
                     <div>
                         <div className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase">Выручка (Факт)</div>
                         <div className="text-xl font-bold text-gray-900 dark:text-white">{totalRevenue.toLocaleString()} <span className="text-xs text-gray-400">UZS</span></div>
+                        <div className="text-[11px] text-gray-400 mt-1">CRM + активные договоры</div>
                     </div>
                 </div>
                 <div className="bg-white dark:bg-[#252525] p-6 rounded-xl border border-gray-200 dark:border-[#333] shadow-sm flex items-center gap-4">
@@ -100,12 +259,129 @@ const AnalyticsView: React.FC<AnalyticsViewProps> = ({ tasks, deals, users, fina
                     </div>
                 </div>
                 <div className="bg-white dark:bg-[#252525] p-6 rounded-xl border border-gray-200 dark:border-[#333] shadow-sm flex items-center gap-4">
+                    <div className="p-3 bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 rounded-full"><Receipt size={24}/></div>
+                    <div>
+                        <div className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase">Дебиторка (остаток)</div>
+                        <div className="text-xl font-bold text-gray-900 dark:text-white">{outstandingReceivable.toLocaleString()} <span className="text-xs text-gray-400">UZS</span></div>
+                        <div className="text-[11px] text-gray-400 mt-1">без архива и оплаченных</div>
+                    </div>
+                </div>
+                <div className="bg-white dark:bg-[#252525] p-6 rounded-xl border border-gray-200 dark:border-[#333] shadow-sm flex items-center gap-4 sm:col-span-2 xl:col-span-1">
                     <div className="p-3 bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 rounded-full"><UserIcon size={24}/></div>
                     <div>
                         <div className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase">Команда</div>
-                        <div className="text-xl font-bold text-gray-900 dark:text-white">{users.length} <span className="text-xs text-gray-400">чел.</span></div>
+                        <div className="text-xl font-bold text-gray-900 dark:text-white">{activeUsers.length} <span className="text-xs text-gray-400">чел.</span></div>
                     </div>
                 </div>
+           </div>
+
+           {/* Финансы: выписки + проведённые планирования */}
+           <div className="rounded-2xl border border-sky-200/80 dark:border-sky-800/50 bg-gradient-to-br from-sky-50/90 via-white to-white dark:from-sky-950/30 dark:via-[#252525] dark:to-[#252525] p-6 shadow-sm">
+              <div className="flex flex-wrap items-end justify-between gap-3 mb-6">
+                <div>
+                  <h3 className="font-bold text-gray-900 dark:text-white text-lg flex items-center gap-2">
+                    <Landmark size={22} className="text-sky-600 dark:text-sky-400" />
+                    Финансы по периоду
+                  </h3>
+                  <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                    Расчётный счёт (выписки) и модуль «Финансы» — проведённые планирования и план-документы. Период: {periodHint}.
+                  </p>
+                </div>
+                {bankLoadState === 'loading' && (
+                  <span className="text-xs text-gray-400">Загрузка выписок…</span>
+                )}
+                {bankLoadState === 'error' && (
+                  <span className="text-xs text-amber-600 dark:text-amber-400">Выписки недоступны (офлайн или ошибка API)</span>
+                )}
+              </div>
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                <div className="rounded-xl border border-gray-200 dark:border-[#333] bg-white/80 dark:bg-[#1e1e1e] p-5">
+                  <div className="flex items-center gap-2 mb-4 text-sm font-semibold text-gray-800 dark:text-gray-100">
+                    <Wallet className="text-emerald-600 dark:text-emerald-400" size={18} />
+                    Расчётный счёт (выписки)
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="rounded-lg bg-emerald-50/80 dark:bg-emerald-950/30 px-3 py-3 border border-emerald-100 dark:border-emerald-900/40">
+                      <div className="text-[11px] uppercase font-bold text-emerald-700 dark:text-emerald-400 flex items-center gap-1">
+                        <ArrowDownRight size={14} /> Приход
+                      </div>
+                      <div className="text-lg font-bold text-emerald-800 dark:text-emerald-200 mt-1">{bankTotals.income.toLocaleString()} UZS</div>
+                    </div>
+                    <div className="rounded-lg bg-rose-50/80 dark:bg-rose-950/30 px-3 py-3 border border-rose-100 dark:border-rose-900/40">
+                      <div className="text-[11px] uppercase font-bold text-rose-700 dark:text-rose-400 flex items-center gap-1">
+                        <ArrowUpRight size={14} /> Расход
+                      </div>
+                      <div className="text-lg font-bold text-rose-800 dark:text-rose-200 mt-1">{bankTotals.expense.toLocaleString()} UZS</div>
+                    </div>
+                    <div className="rounded-lg bg-slate-50 dark:bg-[#2a2a2a] px-3 py-2 border border-slate-200 dark:border-[#444] col-span-2">
+                      <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400">
+                        <span>Комиссии банка (оценка)</span>
+                        <span className="font-medium text-gray-800 dark:text-gray-200">{bankTotals.commission.toLocaleString()} UZS</span>
+                      </div>
+                      <div className="flex justify-between items-center mt-2 pt-2 border-t border-slate-200 dark:border-[#444]">
+                        <span className="text-sm font-semibold text-gray-800 dark:text-white">Чистое движение</span>
+                        <span className={`text-lg font-bold ${bankTotals.balance >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}`}>
+                          {bankTotals.balance.toLocaleString()} UZS
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="rounded-xl border border-gray-200 dark:border-[#333] bg-white/80 dark:bg-[#1e1e1e] p-5">
+                  <div className="flex items-center gap-2 mb-4 text-sm font-semibold text-gray-800 dark:text-gray-100">
+                    <FileText className="text-sky-600 dark:text-sky-400" size={18} />
+                    Проведённые планирования (касса)
+                  </div>
+                  <div className="space-y-3">
+                    <div className="flex justify-between text-sm">
+                      <span className="text-gray-500 dark:text-gray-400">Документов проведено</span>
+                      <span className="font-bold text-gray-900 dark:text-white">{financePlanningConducted.count}</span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-gray-500 dark:text-gray-400">Доход (кассовый метод)</span>
+                      <span className="font-bold text-emerald-600 dark:text-emerald-400">{financePlanningConducted.income.toLocaleString()} UZS</span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-gray-500 dark:text-gray-400">Расходы по одобренным заявкам</span>
+                      <span className="font-bold text-rose-600 dark:text-rose-400">{financePlanningConducted.expensesApproved.toLocaleString()} UZS</span>
+                    </div>
+                    <div className="rounded-lg bg-sky-50/90 dark:bg-sky-950/25 px-3 py-3 border border-sky-100 dark:border-sky-900/40 flex justify-between items-center">
+                      <span className="text-sm font-semibold text-gray-800 dark:text-white">Итог</span>
+                      <span className={`text-lg font-bold ${financePlanningConducted.net >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
+                        {financePlanningConducted.net.toLocaleString()} UZS
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="rounded-xl border border-gray-200 dark:border-[#333] bg-white/80 dark:bg-[#1e1e1e] p-5 lg:col-span-2">
+                  <div className="flex items-center gap-2 mb-4 text-sm font-semibold text-gray-800 dark:text-gray-100">
+                    <BarChart3 className="text-violet-600 dark:text-violet-400" size={18} />
+                    Проведённые финансовые план-документы (по статьям)
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div>
+                      <div className="text-xs text-gray-500 dark:text-gray-400">Документов</div>
+                      <div className="text-xl font-bold text-gray-900 dark:text-white">{financePlanDocsConducted.count}</div>
+                    </div>
+                    <div>
+                      <div className="text-xs text-gray-500 dark:text-gray-400">План дохода</div>
+                      <div className="text-xl font-bold text-emerald-600 dark:text-emerald-400">{financePlanDocsConducted.income.toLocaleString()} UZS</div>
+                    </div>
+                    <div>
+                      <div className="text-xs text-gray-500 dark:text-gray-400">План расходов (статьи)</div>
+                      <div className="text-xl font-bold text-rose-600 dark:text-rose-400">{financePlanDocsConducted.expenses.toLocaleString()} UZS</div>
+                    </div>
+                  </div>
+                  <div className="mt-4 pt-3 border-t border-gray-100 dark:border-[#333] flex justify-between items-center">
+                    <span className="text-sm text-gray-600 dark:text-gray-300">Сальдо по план-документам</span>
+                    <span className={`font-bold ${financePlanDocsConducted.net >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
+                      {financePlanDocsConducted.net.toLocaleString()} UZS
+                    </span>
+                  </div>
+                </div>
+              </div>
            </div>
 
            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -196,7 +472,7 @@ const AnalyticsView: React.FC<AnalyticsViewProps> = ({ tasks, deals, users, fina
                           {/* We'd need to group tasks by project here, doing simplified version */}
                           <div className="flex justify-between items-center p-2 border-b border-gray-100 dark:border-[#333]">
                               <span className="text-sm text-gray-600 dark:text-gray-400">Всего задач</span>
-                              <span className="font-bold text-gray-800 dark:text-white">{tasks.length}</span>
+                              <span className="font-bold text-gray-800 dark:text-white">{activeTasks.length}</span>
                           </div>
                           <div className="flex justify-between items-center p-2 border-b border-gray-100 dark:border-[#333]">
                               <span className="text-sm text-gray-600 dark:text-gray-400">Просрочено</span>
@@ -273,7 +549,7 @@ const AnalyticsView: React.FC<AnalyticsViewProps> = ({ tasks, deals, users, fina
   const renderReportContent = (reportType: string) => {
     switch(reportType) {
       case 'Финансовый отчет':
-        const totalRevenue = activeDeals.filter(d => d.stage === 'won').reduce((sum, d) => sum + d.amount, 0) + contracts.filter(c => c.status === 'active').reduce((sum, c) => sum + c.amount, 0);
+        const totalRevenue = activeDeals.filter(d => d.stage === 'won').reduce((sum, d) => sum + d.amount, 0) + activeContracts.reduce((sum, c) => sum + c.amount, 0);
         const totalBudget = financePlan ? (financePlan.salesPlan || 0) : 0;
         return (
           <div className="space-y-6">
@@ -296,7 +572,7 @@ const AnalyticsView: React.FC<AnalyticsViewProps> = ({ tasks, deals, users, fina
             <div className="bg-white dark:bg-[#252525] border border-gray-200 dark:border-[#333] rounded-lg p-4">
               <h4 className="font-bold text-gray-800 dark:text-white mb-3">Активные договоры</h4>
               <div className="space-y-2">
-                {contracts.filter(c => c.status === 'active').slice(0, 10).map(c => (
+                {activeContracts.slice(0, 10).map(c => (
                   <div key={c.id} className="flex justify-between items-center py-2 border-b border-gray-100 dark:border-[#333] last:border-0">
                     <span className="text-sm text-gray-700 dark:text-gray-300">{c.number}</span>
                     <span className="font-bold text-gray-900 dark:text-white">{c.amount.toLocaleString()} UZS</span>
@@ -345,7 +621,7 @@ const AnalyticsView: React.FC<AnalyticsViewProps> = ({ tasks, deals, users, fina
                     <div className="flex-1 bg-gray-200 dark:bg-gray-700 rounded-full h-6 relative">
                       <div 
                         className="bg-blue-500 h-6 rounded-full flex items-center justify-end pr-2"
-                        style={{ width: `${deals.length > 0 ? (s.count / deals.length) * 100 : 0}%` }}
+                        style={{ width: `${activeDeals.length > 0 ? (s.count / activeDeals.length) * 100 : 0}%` }}
                       >
                         <span className="text-xs font-bold text-white">{s.count}</span>
                       </div>
@@ -363,7 +639,7 @@ const AnalyticsView: React.FC<AnalyticsViewProps> = ({ tasks, deals, users, fina
             <div className="bg-white dark:bg-[#252525] border border-gray-200 dark:border-[#333] rounded-lg p-4">
               <h4 className="font-bold text-gray-800 dark:text-white mb-3">Команда</h4>
               <div className="space-y-2">
-                {users.map(u => (
+                {activeUsers.map(u => (
                   <div key={u.id} className="flex justify-between items-center py-2 border-b border-gray-100 dark:border-[#333] last:border-0">
                     <div className="flex items-center gap-3">
                       <img src={u.avatar} className="w-8 h-8 rounded-full object-cover object-center" alt="" />
@@ -397,7 +673,7 @@ const AnalyticsView: React.FC<AnalyticsViewProps> = ({ tasks, deals, users, fina
               </div>
               <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg border border-blue-200 dark:border-blue-800">
                 <div className="text-xs font-bold text-blue-600 dark:text-blue-400 uppercase mb-1">Всего</div>
-                <div className="text-2xl font-bold text-blue-700 dark:text-blue-300">{tasks.length}</div>
+                <div className="text-2xl font-bold text-blue-700 dark:text-blue-300">{activeTasks.length}</div>
               </div>
             </div>
             <div className="bg-white dark:bg-[#252525] border border-gray-200 dark:border-[#333] rounded-lg p-4">

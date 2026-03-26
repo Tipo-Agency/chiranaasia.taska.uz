@@ -4,14 +4,14 @@
 import React from 'react';
 import { Card } from '../../ui/Card';
 import { Wallet, TrendingUp, Briefcase, CheckCircle2 } from 'lucide-react';
-import { Deal, FinancePlan, Task, User } from '../../../types';
+import { AccountsReceivable, Deal, FinancePlan, Task, User } from '../../../types';
 
 interface StatsCardsProps {
   deals: Deal[];
   financePlan?: FinancePlan | null;
   tasks: Task[];
   currentUser: User;
-  accountsReceivable?: { amount: number }[];
+  accountsReceivable?: AccountsReceivable[];
 }
 
 export const StatsCards: React.FC<StatsCardsProps> = ({
@@ -21,12 +21,16 @@ export const StatsCards: React.FC<StatsCardsProps> = ({
   currentUser,
   accountsReceivable = [],
 }) => {
-  const totalRevenue = (deals || []).filter(d => d && d.stage === 'won').reduce((sum, d) => sum + d.amount, 0);
-  const totalReceivable = (accountsReceivable || []).reduce((sum, r) => sum + (r?.amount || 0), 0);
+  const totalRevenue = (deals || []).filter(d => d && !d.isArchived && d.stage === 'won').reduce((sum, d) => sum + d.amount, 0);
+  const totalReceivable = (accountsReceivable || []).reduce((sum, r) => {
+    if (!r || r.isArchived || r.status === 'paid') return sum;
+    const outstanding = Math.max(0, (r.amount || 0) - (r.paidAmount ?? 0));
+    return sum + outstanding;
+  }, 0);
   const planPercent = financePlan && financePlan.salesPlan > 0
     ? Math.round((totalRevenue / financePlan.salesPlan) * 100)
     : 0;
-  const myDeals = deals.filter(d => d && d.assigneeId === currentUser?.id && d.stage !== 'won' && d.stage !== 'lost');
+  const myDeals = deals.filter(d => d && !d.isArchived && d.assigneeId === currentUser?.id && d.stage !== 'won' && d.stage !== 'lost');
   const myTasks = tasks.filter(t =>
     t &&
     t.entityType !== 'idea' &&

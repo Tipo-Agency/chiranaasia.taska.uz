@@ -440,7 +440,17 @@ export const AppRouter: React.FC<AppRouterProps> = (props) => {
   if (view === 'analytics') {
       return (
         <Suspense fallback={<RouteFallback />}>
-        <AnalyticsView tasks={props.filteredTasks} deals={props.deals} users={props.users} financePlan={props.financePlan} contracts={props.contracts} />
+        <AnalyticsView
+          tasks={props.filteredTasks}
+          deals={props.deals}
+          users={props.users}
+          financePlan={props.financePlan}
+          contracts={props.contracts}
+          accountsReceivable={props.accountsReceivable}
+          purchaseRequests={props.purchaseRequests}
+          financialPlannings={props.financialPlannings}
+          financialPlanDocuments={props.financialPlanDocuments}
+        />
         </Suspense>
       );
   }
