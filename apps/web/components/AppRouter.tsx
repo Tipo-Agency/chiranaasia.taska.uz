@@ -508,7 +508,9 @@ export const AppRouter: React.FC<AppRouterProps> = (props) => {
           <ClientChatsPage
               deals={props.deals}
               users={props.users}
-              onOpenDeal={(deal) => {
+              currentUser={props.currentUser}
+              onSaveDeal={actions.saveDeal}
+              onOpenInFunnel={(deal) => {
                   actions.setCurrentView('sales-funnel');
                   window.setTimeout(() => {
                       window.dispatchEvent(new CustomEvent('openDealFromChat', { detail: { dealId: deal.id } }));

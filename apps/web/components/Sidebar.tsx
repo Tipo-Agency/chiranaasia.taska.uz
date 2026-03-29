@@ -157,13 +157,13 @@ const Sidebar: React.FC<SidebarProps> = ({
                 <BarChart3 size={18} /> {!isCollapsed && <span className="text-sm">Воронка продаж</span>}
             </div>
 
-            {/* 3.0. Чаты с клиентами (Instagram) */}
+            {/* 3.0. Переписка Instagram (Direct) */}
             <div 
                 onClick={() => handleNav(() => onNavigate('client-chats'))}
                 className={`flex items-center ${isCollapsed ? 'justify-center' : 'gap-2'} ${isCollapsed ? 'px-2' : 'px-3'} py-1.5 rounded cursor-pointer transition-colors ${currentView === 'client-chats' ? 'bg-notion-hover dark:bg-[#252525] text-notion-text dark:text-white font-medium' : 'text-notion-text/70 dark:text-gray-400 hover:bg-notion-hover dark:hover:bg-[#252525] hover:text-notion-text dark:hover:text-gray-200'}`}
-                title={isCollapsed ? "Чаты с клиентами" : ""}
+                title={isCollapsed ? "Instagram" : ""}
             >
-                <Instagram size={18} /> {!isCollapsed && <span className="text-sm">Чаты с клиентами</span>}
+                <Instagram size={18} /> {!isCollapsed && <span className="text-sm">Instagram</span>}
             </div>
 
             {/* 3.1. Клиенты и договора (под Воронка продаж) */}
