@@ -43,6 +43,7 @@ services:
       META_TASKA: ${META_TASKA:-}
       META_TIPA: ${META_TIPA:-}
       META_UCHETGRAM: ${META_UCHETGRAM:-}
+      META_WEBHOOK_LOG_BODY: ${META_WEBHOOK_LOG_BODY:-false}
     depends_on:
       db:
         condition: service_healthy

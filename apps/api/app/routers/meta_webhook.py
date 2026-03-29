@@ -38,19 +38,29 @@ async def meta_verify_subscription(
 @router.post("/webhook/meta")
 async def meta_receive_events(request: Request, db: AsyncSession = Depends(get_db)):
     """Входящие события Meta: создание/обновление сделки и комментариев."""
+    settings = get_settings()
     raw = await request.body()
     try:
         body = json.loads(raw.decode("utf-8") or "{}")
     except json.JSONDecodeError:
-        return {"status": "ok"}
+        log.warning("meta webhook: не JSON")
+        return {"status": "ok", "processed": 0}
     if not isinstance(body, dict):
-        return {"status": "ok"}
+        return {"status": "ok", "processed": 0}
+    if settings.META_WEBHOOK_LOG_BODY:
+        log.warning("meta webhook RAW body: %s", raw.decode("utf-8", errors="replace")[:20000])
+    n = 0
     try:
         n = await process_instagram_webhook(db, body)
         await db.commit()
         if n:
-            log.info("meta webhook: обработано сообщений: %s", n)
+            log.info("meta webhook: commit ok, обработано сообщений: %s", n)
+        else:
+            log.warning(
+                "meta webhook: commit ok, но обработано 0 сообщений — смотрите логи выше "
+                "(object/entry/messaging). Для полного тела: META_WEBHOOK_LOG_BODY=1 на сервере."
+            )
     except Exception:
         await db.rollback()
         log.exception("meta webhook processing failed")
-    return {"status": "ok"}
+    return {"status": "ok", "processed": n}

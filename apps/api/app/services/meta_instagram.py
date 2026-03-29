@@ -75,7 +75,16 @@ async def resolve_page_id_for_entry(entry_id: str, settings: Settings) -> str | 
     if entry_id in known:
         return entry_id
     await refresh_ig_entry_map(settings)
-    return _ig_entry_to_page.get(entry_id)
+    resolved = _ig_entry_to_page.get(entry_id)
+    if not resolved:
+        log.warning(
+            "meta IG: entry_id=%s не найден в маппинге. Известные Page id: %s. "
+            "Ключи IG→Page из Graph: %s. Проверьте токены META_TASKA/META_TIPA/META_UCHETGRAM.",
+            entry_id,
+            sorted(known),
+            list(_ig_entry_to_page.keys()),
+        )
+    return resolved
 
 
 def thread_key(page_id: str, customer_psid: str) -> str:
@@ -141,26 +150,77 @@ async def send_instagram_text(page_id: str, recipient_psid: str, text: str, sett
     return data if isinstance(data, dict) else {"ok": True}
 
 
+def _normalize_messaging_events(entry: dict[str, Any]) -> list[dict[str, Any]]:
+    """Messenger-формат `messaging` и запасной вариант через `changes` (поле messages)."""
+    raw = entry.get("messaging") or []
+    if isinstance(raw, list) and raw:
+        return [x for x in raw if isinstance(x, dict)]
+    out: list[dict[str, Any]] = []
+    for ch in entry.get("changes") or []:
+        if not isinstance(ch, dict):
+            continue
+        field = (ch.get("field") or "").lower()
+        if field not in ("messages", "messaging", "message"):
+            continue
+        val = ch.get("value")
+        if isinstance(val, dict):
+            if "sender" in val and "message" in val:
+                out.append(val)
+            elif "from" in val and "message" in val:
+                out.append(
+                    {
+                        "sender": val.get("from"),
+                        "recipient": val.get("to"),
+                        "timestamp": val.get("timestamp"),
+                        "message": val.get("message"),
+                    }
+                )
+    return out
+
+
 async def process_instagram_webhook(db: AsyncSession, body: dict[str, Any]) -> int:
     """Разбор вебхука Meta (object instagram или page). Возвращает число обработанных сообщений."""
     obj = body.get("object")
-    if obj not in ("instagram", "page"):
+    entries = [e for e in (body.get("entry") or []) if isinstance(e, dict)]
+    if not entries:
+        log.warning("meta webhook: пустой entry — тело не похоже на вебхук сообщений")
         return 0
+
+    if obj not in ("instagram", "page"):
+        has_msg = any(
+            (e.get("messaging") or _normalize_messaging_events(e)) for e in entries
+        )
+        if not has_msg:
+            log.warning(
+                "meta webhook: object=%r не instagram/page и нет messaging — игнор (полный тест см. META_WEBHOOK_LOG_BODY)",
+                obj,
+            )
+            return 0
+        log.warning("meta webhook: object=%r нестандартный, но есть messaging — разбираем", obj)
+
     settings = get_settings()
+    log.info("meta webhook: object=%r entries=%s", obj, len(entries))
     n = 0
-    for entry in body.get("entry") or []:
-        if not isinstance(entry, dict):
-            continue
+    for entry in entries:
         entry_id = str(entry.get("id") or "")
         page_id = await resolve_page_id_for_entry(entry_id, settings)
         if not page_id:
-            log.warning("meta webhook: не удалось сопоставить entry id=%s с Page", entry_id)
             continue
         if not page_access_token(page_id, settings):
             log.warning("meta webhook: нет токена для page_id=%s", page_id)
             continue
 
-        for m in entry.get("messaging") or []:
+        messaging_list = entry.get("messaging") or []
+        if not messaging_list:
+            messaging_list = _normalize_messaging_events(entry)
+        if not messaging_list:
+            log.info(
+                "meta webhook: entry id=%s без messaging/changes — ключи entry: %s",
+                entry_id,
+                list(entry.keys()),
+            )
+
+        for m in messaging_list:
             if not isinstance(m, dict):
                 continue
             if "message" not in m:
@@ -171,7 +231,7 @@ async def process_instagram_webhook(db: AsyncSession, body: dict[str, Any]) -> i
             if msg.get("is_echo"):
                 continue
             mid = msg.get("mid")
-            sender = m.get("sender") or {}
+            sender = m.get("sender") or m.get("from") or {}
             if not isinstance(sender, dict):
                 continue
             customer_psid = str(sender.get("id") or "")
@@ -257,15 +317,22 @@ async def process_instagram_webhook(db: AsyncSession, body: dict[str, Any]) -> i
             )
             db.add(deal)
             await db.flush()
-            await emit_domain_event(
-                db,
-                event_type="deal.created",
-                org_id="default",
-                entity_type="deal",
-                entity_id=did,
-                source="meta-webhook",
-                payload={"title": title, "source": "instagram"},
-            )
+            try:
+                await emit_domain_event(
+                    db,
+                    event_type="deal.created",
+                    org_id="default",
+                    entity_type="deal",
+                    entity_id=did,
+                    source="meta-webhook",
+                    payload={"title": title, "source": "instagram"},
+                )
+            except Exception as exc:
+                log.warning(
+                    "meta webhook: сделка %s создана, но emit_domain_event не удался: %s",
+                    did,
+                    exc,
+                )
             n += 1
 
     return n

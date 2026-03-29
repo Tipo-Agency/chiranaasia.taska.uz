@@ -33,6 +33,8 @@ class Settings(BaseSettings):
     META_TASKA: str = ""
     META_TIPA: str = ""
     META_UCHETGRAM: str = ""
+    # Временно: логировать полное тело POST /webhook/meta (отладка; не оставляйте в проде надолго)
+    META_WEBHOOK_LOG_BODY: bool = False
 
     # Redis / Event bus
     REDIS_URL: str = "redis://localhost:6379/0"
