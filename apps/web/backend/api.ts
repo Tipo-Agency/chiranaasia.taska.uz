@@ -32,6 +32,7 @@ import {
   bpmEndpoint,
   inventoryEndpoint,
   funnelsEndpoint,
+  integrationsMetaEndpoint,
   publicContentPlanEndpoint,
 } from "../services/apiClient";
 
@@ -70,6 +71,8 @@ export const api = {
   bpm: bpmEndpoint,
   inventory: inventoryEndpoint,
   funnels: funnelsEndpoint,
+
+  integrationsMeta: integrationsMetaEndpoint,
 
   publicContentPlan: publicContentPlanEndpoint,
 };

@@ -51,7 +51,7 @@ async def update_deals(deals: list[dict], db: AsyncSession = Depends(get_db)):
             "stage": lim(d.get("stage", "new"), 100) or "new",
             "funnel_id": lim(d.get("funnelId"), 36),
             "source": lim(d.get("source"), 50),
-            "telegram_chat_id": lim(d.get("telegramChatId"), 50),
+            "telegram_chat_id": lim(d.get("telegramChatId"), 255),
             "telegram_username": lim(d.get("telegramUsername"), 100),
             "assignee_id": lim(d.get("assigneeId", ""), 36) or "",
             "created_at": d.get("createdAt", existing.created_at if existing else __import__("datetime").datetime.utcnow().isoformat()),

@@ -41,7 +41,7 @@ class Deal(Base):
     stage = Column(String(100), nullable=False)
     funnel_id = Column(String(36), nullable=True)
     source = Column(String(50), nullable=True)
-    telegram_chat_id = Column(String(50), nullable=True)
+    telegram_chat_id = Column(String(255), nullable=True)
     telegram_username = Column(String(100), nullable=True)
     assignee_id = Column(String(36), nullable=False)
     created_at = Column(String(50), nullable=False)

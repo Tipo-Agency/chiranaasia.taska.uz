@@ -130,7 +130,9 @@ export interface Comment {
   text: string;
   authorId: string;
   createdAt: string;
-  type?: 'internal' | 'telegram_in' | 'telegram_out'; // New field for chat context
+  type?: 'internal' | 'telegram_in' | 'telegram_out' | 'instagram_in' | 'instagram_out';
+  /** id сообщения Meta (дедуп вебхука) */
+  metaMid?: string;
 }
 
 export interface FunnelStage {

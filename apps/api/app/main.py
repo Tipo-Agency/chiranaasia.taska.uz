@@ -28,6 +28,7 @@ from app.routers import (
     finance,
     folders,
     funnels,
+    integrations_meta,
     inventory,
     meetings,
     messages,
@@ -126,6 +127,7 @@ app.add_middleware(
 
 # Meta webhooks: без /api — URL как в кабинете Meta (например /webhook/meta)
 app.include_router(meta_webhook.router)
+app.include_router(integrations_meta.router, prefix=settings.API_PREFIX)
 
 # Routers (prefix already in router)
 app.include_router(admin.router, prefix=settings.API_PREFIX)

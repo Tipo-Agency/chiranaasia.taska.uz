@@ -1,11 +1,15 @@
 """Meta (Messenger / Instagram) webhooks: subscription verify + event sink."""
 
+import json
 import logging
 
-from fastapi import APIRouter, HTTPException, Query, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import PlainTextResponse
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import get_settings
+from app.database import get_db
+from app.services.meta_instagram import process_instagram_webhook
 
 router = APIRouter(tags=["meta-webhook"])
 log = logging.getLogger("uvicorn.error")
@@ -32,7 +36,21 @@ async def meta_verify_subscription(
 
 
 @router.post("/webhook/meta")
-async def meta_receive_events(request: Request):
-    """Meta POST: acknowledge payload; processing is added when messaging is wired."""
-    await request.body()
+async def meta_receive_events(request: Request, db: AsyncSession = Depends(get_db)):
+    """Входящие события Meta: создание/обновление сделки и комментариев."""
+    raw = await request.body()
+    try:
+        body = json.loads(raw.decode("utf-8") or "{}")
+    except json.JSONDecodeError:
+        return {"status": "ok"}
+    if not isinstance(body, dict):
+        return {"status": "ok"}
+    try:
+        n = await process_instagram_webhook(db, body)
+        await db.commit()
+        if n:
+            log.info("meta webhook: обработано сообщений: %s", n)
+    except Exception:
+        await db.rollback()
+        log.exception("meta webhook processing failed")
     return {"status": "ok"}

@@ -283,15 +283,34 @@ const SalesFunnelView: React.FC<SalesFunnelViewProps> = ({ deals, clients, users
 
   const handleSendChat = async () => {
       if (!chatMessage.trim() || !editingDeal) return;
-      
+
       const deal = editingDeal;
-      // Комментарий сохраняется в сделке через onSaveDeal
-      const c: Comment = { 
-          id: `c-${Date.now()}`, 
-          text: chatMessage, 
-          authorId: currentUser?.id || 'demo-user', 
-          createdAt: new Date().toISOString(), 
-          type: 'internal' 
+      const text = chatMessage.trim();
+
+      if (deal.source === 'instagram' && deal.telegramChatId?.startsWith('ig:')) {
+          try {
+              const updated = (await api.integrationsMeta.sendInstagram({ dealId: deal.id, text })) as Deal;
+              const next = updated.comments || [];
+              setComments(next);
+              onSaveDeal({ ...deal, ...updated, comments: next });
+              setChatMessage('');
+          } catch (e) {
+              devWarn('[DEAL] Instagram send failed:', e);
+              setAlertState({
+                  open: true,
+                  title: 'Не удалось отправить в Instagram',
+                  message: e instanceof Error ? e.message : 'Проверьте токены страниц и права приложения.',
+              });
+          }
+          return;
+      }
+
+      const c: Comment = {
+          id: `c-${Date.now()}`,
+          text,
+          authorId: currentUser?.id || 'demo-user',
+          createdAt: new Date().toISOString(),
+          type: 'internal',
       };
       const nextComments = [...(comments || []), c];
       setComments(nextComments);
@@ -396,6 +415,9 @@ const SalesFunnelView: React.FC<SalesFunnelViewProps> = ({ deals, clients, users
     return aTime - bTime;
   });
   const getCommentAuthorName = (comment: Comment) => {
+    if (comment.type === 'instagram_in' || comment.type === 'telegram_in') {
+      if (comment.authorId?.startsWith('ig_user:')) return 'Клиент (Instagram)';
+    }
     const user = users.find((u) => u.id === comment.authorId);
     return user?.name || 'Система';
   };
@@ -1001,7 +1023,10 @@ const SalesFunnelView: React.FC<SalesFunnelViewProps> = ({ deals, clients, users
                                         </div>
                                       ) : (
                                         sortedComments.map((c) => {
-                                          const mine = c.authorId === currentUser?.id || c.type === 'telegram_out';
+                                          const mine =
+                                            c.authorId === currentUser?.id ||
+                                            c.type === 'telegram_out' ||
+                                            c.type === 'instagram_out';
                                           return (
                                             <div key={c.id} className={`max-w-[88%] ${mine ? 'ml-auto' : ''}`}>
                                               <div className={`rounded-xl px-3 py-2 text-sm ${mine ? 'bg-[#3337AD] text-white' : 'bg-white dark:bg-[#333] text-gray-800 dark:text-gray-200 border border-gray-200 dark:border-[#444]'}`}>
@@ -1016,7 +1041,16 @@ const SalesFunnelView: React.FC<SalesFunnelViewProps> = ({ deals, clients, users
                                       )}
                                   </div>
                                   <div className="p-4 border-t border-gray-200 dark:border-[#333] flex gap-2">
-                                      <input value={chatMessage} onChange={e => setChatMessage(e.target.value)} className="flex-1 border border-gray-300 dark:border-gray-600 rounded-lg px-2.5 py-1.5 min-h-[36px] text-sm bg-white dark:bg-[#333] text-gray-900 dark:text-gray-100" placeholder="Сообщение по сделке..."/>
+                                      <input
+                                          value={chatMessage}
+                                          onChange={(e) => setChatMessage(e.target.value)}
+                                          className="flex-1 border border-gray-300 dark:border-gray-600 rounded-lg px-2.5 py-1.5 min-h-[36px] text-sm bg-white dark:bg-[#333] text-gray-900 dark:text-gray-100"
+                                          placeholder={
+                                              editingDeal?.source === 'instagram' && editingDeal.telegramChatId?.startsWith('ig:')
+                                                  ? 'Ответ в Instagram…'
+                                                  : 'Сообщение по сделке…'
+                                          }
+                                      />
                                       <button onClick={handleSendChat} className="bg-blue-600 text-white p-2 rounded"><Send size={16}/></button>
                                   </div>
                               </>

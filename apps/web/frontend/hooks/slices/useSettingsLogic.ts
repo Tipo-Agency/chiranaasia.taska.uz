@@ -12,7 +12,7 @@ export const useSettingsLogic = (showNotification: (msg: string) => void) => {
   const [automationRules, setAutomationRules] = useState<AutomationRule[]>([]);
   
   // UI Global State
-  const [currentView, setCurrentView] = useState<'home' | 'tasks' | 'inbox' | 'search' | 'table' | 'doc-editor' | 'clients' | 'employees' | 'sales-funnel' | 'finance' | 'business-processes' | 'analytics' | 'settings' | 'spaces' | 'meetings' | 'docs' | 'inventory' | 'chat' | 'admin'>('home');
+  const [currentView, setCurrentView] = useState<'home' | 'tasks' | 'inbox' | 'search' | 'table' | 'doc-editor' | 'clients' | 'employees' | 'sales-funnel' | 'client-chats' | 'finance' | 'business-processes' | 'analytics' | 'settings' | 'spaces' | 'meetings' | 'docs' | 'inventory' | 'chat' | 'admin'>('home');
   const [activeTableId, setActiveTableId] = useState<string>('');
   const [viewMode, setViewMode] = useState<ViewMode>(ViewMode.TABLE);
   const [searchQuery, setSearchQuery] = useState('');
@@ -113,7 +113,7 @@ export const useSettingsLogic = (showNotification: (msg: string) => void) => {
       api.activity.updateAll(u).catch(() => showNotification('Ошибка обновления ленты'));
   };
 
-  const handleNavigate = (view: 'home' | 'tasks' | 'inbox' | 'search' | 'clients' | 'employees' | 'sales-funnel' | 'finance' | 'business-processes' | 'analytics' | 'spaces' | 'meetings' | 'docs' | 'inventory' | 'chat' | 'admin' | 'settings') => {
+  const handleNavigate = (view: 'home' | 'tasks' | 'inbox' | 'search' | 'clients' | 'employees' | 'sales-funnel' | 'client-chats' | 'finance' | 'business-processes' | 'analytics' | 'spaces' | 'meetings' | 'docs' | 'inventory' | 'chat' | 'admin' | 'settings') => {
       setCurrentView(view); setActiveTableId('');
   };
 

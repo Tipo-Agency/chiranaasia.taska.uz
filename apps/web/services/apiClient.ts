@@ -310,6 +310,11 @@ export const dealsEndpoint = {
   delete: (id: string) => del<{ ok: boolean }>(`/deals/${id}`),
 };
 
+export const integrationsMetaEndpoint = {
+  sendInstagram: (body: { dealId: string; text: string }) =>
+    post<unknown>('/integrations/meta/instagram/send', body),
+};
+
 export const contractsEndpoint = {
   getAll: async () => {
     const all = await get<unknown[]>('/deals');

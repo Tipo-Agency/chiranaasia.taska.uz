@@ -425,6 +425,7 @@ export const useAppLogic = () => {
               break;
           case 'sales-funnel':
           case 'clients':
+          case 'client-chats':
               await Promise.all([
                   loadTasksData(), // Tasks нужны для CRM модуля
                   loadCRMData(),

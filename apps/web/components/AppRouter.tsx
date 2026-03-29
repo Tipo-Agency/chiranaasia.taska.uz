@@ -13,6 +13,7 @@ import type { AppActions } from '../frontend/hooks/useAppLogic';
 import { WorkdeskView } from './pages/WorkdeskView';
 import { TasksPage } from './pages/TasksPage';
 import { InboxPage } from './pages/InboxPage';
+import { ClientChatsPage } from './pages/ClientChatsPage';
 import TableView from './TableView'; // Needed for Global Search
 import { SpacesTabsView } from './SpacesTabsView';
 import { MiniMessenger } from './features/chat/MiniMessenger';
@@ -499,6 +500,21 @@ export const AppRouter: React.FC<AppRouterProps> = (props) => {
               onDeleteAccountsReceivable={actions.deleteAccountsReceivable}
           />
         </Suspense>
+      );
+  }
+
+  if (view === 'client-chats') {
+      return (
+          <ClientChatsPage
+              deals={props.deals}
+              users={props.users}
+              onOpenDeal={(deal) => {
+                  actions.setCurrentView('sales-funnel');
+                  window.setTimeout(() => {
+                      window.dispatchEvent(new CustomEvent('openDealFromChat', { detail: { dealId: deal.id } }));
+                  }, 0);
+              }}
+          />
       );
   }
 
