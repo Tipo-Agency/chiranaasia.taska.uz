@@ -39,6 +39,10 @@ services:
       REDIS_URL: redis://redis:6379/0
       REDIS_EVENTS_STREAM: events.domain.v1
       TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
+      META_MARKER: ${META_MARKER:-}
+      META_TASKA: ${META_TASKA:-}
+      META_TIPA: ${META_TIPA:-}
+      META_UCHETGRAM: ${META_UCHETGRAM:-}
     depends_on:
       db:
         condition: service_healthy

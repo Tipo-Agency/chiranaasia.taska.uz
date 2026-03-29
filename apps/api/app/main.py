@@ -30,6 +30,7 @@ from app.routers import (
     funnels,
     inventory,
     meetings,
+    meta_webhook,
     messages,
     notification_events,
     notification_prefs,
@@ -122,6 +123,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Meta webhooks: без /api — URL как в кабинете Meta (например /webhook/meta)
+app.include_router(meta_webhook.router)
 
 # Routers (prefix already in router)
 app.include_router(admin.router, prefix=settings.API_PREFIX)

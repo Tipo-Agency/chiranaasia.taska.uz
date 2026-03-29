@@ -63,6 +63,12 @@ jobs:
           script: |
             export SERVER_PATH="${{ secrets.SERVER_PATH }}"
             export TELEGRAM_BOT_TOKEN="${{ secrets.TELEGRAM_BOT_TOKEN }}"
+            # Секрет «Подтверждение маркера»: в GitHub — Meta_marker (приоритет) или META_MARKER
+            export META_MARKER="${{ secrets.Meta_marker }}"
+            if [ -z "$META_MARKER" ]; then export META_MARKER="${{ secrets.META_MARKER }}"; fi
+            export META_TASKA="${{ secrets.META_TASKA }}"
+            export META_TIPA="${{ secrets.META_TIPA }}"
+            export META_UCHETGRAM="${{ secrets.META_UCHETGRAM }}"
             export BACKEND_URL="${{ secrets.BACKEND_URL }}"
             export NGINX_SITE_NAME="${{ secrets.NGINX_SITE_NAME }}"
             cd "$SERVER_PATH"

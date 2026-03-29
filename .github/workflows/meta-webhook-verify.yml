@@ -1,0 +1,41 @@
+# Ручная проверка: тот же GET, что делает Meta при «Подтвердить и сохранить» (hub.challenge).
+# Секрет в GitHub: Meta_marker (строка из «Подтверждение маркера» в Messenger API Settings).
+name: Verify Meta webhook
+
+on:
+  workflow_dispatch:
+    inputs:
+      base_url:
+        description: "Базовый URL сайта (без /webhook/...)"
+        required: false
+        default: "https://tipa.taska.uz"
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: GET hub.challenge
+        env:
+          META_MARKER: ${{ secrets.Meta_marker }}
+          META_MARKER_ALT: ${{ secrets.META_MARKER }}
+        run: |
+          set -euo pipefail
+          M="${META_MARKER:-${META_MARKER_ALT:-}}"
+          if [ -z "$M" ]; then
+            echo "Добавьте секрет Meta_marker (или META_MARKER) — то же значение, что «Подтверждение маркера» в Meta"
+            exit 1
+          fi
+          BASE="${{ github.event.inputs.base_url }}"
+          BASE="${BASE:-https://tipa.taska.uz}"
+          CH=$(openssl rand -hex 16)
+          URL="${BASE%/}/webhook/meta"
+          echo "Запрос: GET $URL (hub.challenge=$CH)"
+          resp=$(curl -sS -G "$URL" \
+            --data-urlencode "hub.mode=subscribe" \
+            --data-urlencode "hub.verify_token=$M" \
+            --data-urlencode "hub.challenge=$CH")
+          if [ "$resp" != "$CH" ]; then
+            echo "Ожидали тело ответа = challenge, получили: $resp"
+            exit 1
+          fi
+          echo "OK: сервер вернул hub.challenge — можно жать «Подтвердить и сохранить» в Meta."

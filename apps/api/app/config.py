@@ -27,6 +27,13 @@ class Settings(BaseSettings):
     # Optional: same bot token for admin "test send" (sends to group from API)
     TELEGRAM_BOT_TOKEN: str = ""
 
+    # Meta Messenger / Instagram: «Подтверждение маркера» в настройках Webhooks (один на приложение)
+    META_MARKER: str = ""
+    # Page access tokens (по одному на Instagram / Page) — для отправки через Graph API
+    META_TASKA: str = ""
+    META_TIPA: str = ""
+    META_UCHETGRAM: str = ""
+
     # Redis / Event bus
     REDIS_URL: str = "redis://localhost:6379/0"
     REDIS_EVENTS_STREAM: str = "events.domain.v1"
