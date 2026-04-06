@@ -272,6 +272,7 @@ export const AppRouter: React.FC<AppRouterProps> = (props) => {
               users={props.users}
               docs={props.docs}
               accountsReceivable={props.accountsReceivable}
+              salesFunnels={props.salesFunnels}
               onOpenTask={actions.openTaskModal}
               onNavigateToTasks={() => actions.setCurrentView('tasks')}
               onNavigateToMeetings={() => actions.setCurrentView('meetings')}
@@ -639,6 +640,7 @@ export const AppRouter: React.FC<AppRouterProps> = (props) => {
           users={props.users}
           docs={props.docs}
           accountsReceivable={props.accountsReceivable}
+          salesFunnels={props.salesFunnels}
           onOpenTask={actions.openTaskModal}
           onNavigateToTasks={() => actions.setCurrentView('tasks')}
           onNavigateToMeetings={() => actions.setCurrentView('meetings')}

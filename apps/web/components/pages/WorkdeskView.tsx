@@ -16,7 +16,7 @@ import {
   Megaphone,
   Zap,
 } from 'lucide-react';
-import { Deal, FinancePlan, Meeting, Task, User, Doc, BusinessProcess } from '../../types';
+import { Deal, FinancePlan, Meeting, Task, User, Doc, BusinessProcess, SalesFunnel } from '../../types';
 import { getDealDisplayTitle, isFunnelDeal } from '../../utils/dealModel';
 import { ModuleCreateDropdown } from '../ui/ModuleCreateDropdown';
 import { ModulePageHeader, ModulePageShell, MODULE_PAGE_GUTTER } from '../ui';
@@ -47,6 +47,25 @@ function taskOverdue(t: Task): boolean {
   return end < new Date();
 }
 
+/** Цвет воронки в настройках — Tailwind-классы вида bg-* dark:bg-* */
+function FunnelDotLabel({ funnel, funnelId }: { funnel: SalesFunnel | undefined; funnelId?: string }) {
+  const colorClass = funnel?.color?.trim() || 'bg-slate-400 dark:bg-slate-500';
+  const name =
+    funnel?.name?.trim() || (funnelId ? 'Воронка не найдена' : 'Без воронки');
+  return (
+    <div className="flex items-center gap-2 min-w-0 max-w-[200px]">
+      <span
+        className={`inline-block w-2.5 h-2.5 rounded-full shrink-0 shadow-sm ring-1 ring-black/10 dark:ring-white/15 ${colorClass}`}
+        title={name}
+        aria-hidden
+      />
+      <span className="truncate text-gray-700 dark:text-gray-200" title={name}>
+        {name}
+      </span>
+    </div>
+  );
+}
+
 interface WorkdeskViewProps {
   currentUser: User;
   users: User[];
@@ -56,6 +75,8 @@ interface WorkdeskViewProps {
   docs: Doc[];
   financePlan?: FinancePlan | null;
   accountsReceivable?: { amount: number }[];
+  /** Для названия и цвета воронки в таблице недавних сделок */
+  salesFunnels?: SalesFunnel[];
   onOpenTask: (task: Task) => void;
   onNavigateToTasks: () => void;
   onNavigateToDeals: () => void;
@@ -80,6 +101,7 @@ export const WorkdeskView: React.FC<WorkdeskViewProps> = ({
   docs,
   financePlan,
   accountsReceivable = [],
+  salesFunnels = [],
   onOpenTask,
   onNavigateToTasks,
   onNavigateToDeals,
@@ -262,6 +284,14 @@ export const WorkdeskView: React.FC<WorkdeskViewProps> = ({
       .sort((a, b) => `${a.date}T${a.time || '00:00'}`.localeCompare(`${b.date}T${b.time || '00:00'}`))
       .slice(0, 6);
   }, [myMeetings]);
+
+  const funnelById = useMemo(() => {
+    const m = new Map<string, SalesFunnel>();
+    (salesFunnels || []).forEach((f) => {
+      if (f?.id) m.set(f.id, f);
+    });
+    return m;
+  }, [salesFunnels]);
 
 
   return (
@@ -529,6 +559,7 @@ export const WorkdeskView: React.FC<WorkdeskViewProps> = ({
                       <thead>
                         <tr className="text-[11px] uppercase text-gray-500 dark:text-gray-400 border-b border-gray-200 dark:border-[#333]">
                           <th className="py-2 pr-2 font-medium">Сделка</th>
+                          <th className="py-2 pr-2 font-medium">Воронка</th>
                           <th className="py-2 pr-2 font-medium">Этап</th>
                           <th className="py-2 pr-2 font-medium">Источник</th>
                           <th className="py-2 pr-2 font-medium text-right">Сумма</th>
@@ -540,6 +571,12 @@ export const WorkdeskView: React.FC<WorkdeskViewProps> = ({
                           <tr key={d.id} className="border-b border-gray-100 dark:border-[#333]/60">
                             <td className="py-2 pr-2 text-gray-900 dark:text-white max-w-[200px] truncate">
                               {getDealDisplayTitle(d)}
+                            </td>
+                            <td className="py-2 pr-2">
+                              <FunnelDotLabel
+                                funnelId={d.funnelId}
+                                funnel={d.funnelId ? funnelById.get(d.funnelId) : undefined}
+                              />
                             </td>
                             <td className="py-2 pr-2 text-gray-600 dark:text-gray-300">{d.stage || '—'}</td>
                             <td className="py-2 pr-2 text-gray-600 dark:text-gray-300">{sourceLabel(d.source)}</td>
