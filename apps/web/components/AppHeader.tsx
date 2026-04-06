@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { 
   Search, Moon, Sun, Settings, Bell, ChevronDown, LogOut, User as UserIcon, Home, Menu, X, MessageCircle,
-  BarChart3, Wallet, Network, PieChart, Briefcase, UserCheck, CheckSquare, Users, FileText, Instagram, Layers, Package, Cog
+  BarChart3, Wallet, Network, Briefcase, UserCheck, CheckSquare, Users, FileText, Instagram, Layers, Package, Cog
 } from 'lucide-react';
 import { User, TableCollection } from '../types';
 import { hasPermission } from '../utils/permissions';
@@ -11,6 +11,10 @@ import { getDefaultAvatarForId } from '../constants/avatars';
 export interface AppHeaderProps {
   darkMode: boolean;
   currentView: string;
+  /** Уточнение для шестерёнки «настройки модуля» */
+  workdeskTab?: 'dashboard' | 'weekly' | 'tasks' | 'deals' | 'meetings' | 'documents';
+  crmHubTab?: 'funnel' | 'chats' | 'clients';
+  bpmHubTab?: 'processes' | 'inventory';
   activeTable?: TableCollection;
   currentUser: User;
   searchQuery: string;
@@ -32,6 +36,9 @@ export interface AppHeaderProps {
 export const AppHeader: React.FC<AppHeaderProps> = ({
   darkMode,
   currentView,
+  workdeskTab,
+  crmHubTab,
+  bpmHubTab,
   activeTable,
   currentUser,
   searchQuery,
@@ -87,19 +94,20 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
   const getModuleSettingsTab = (view: string): string | null => {
     switch (view) {
       case 'tasks': return 'statuses';
-      case 'sales-funnel': return 'sales-funnels';
-      case 'client-chats': return 'integrations';
-      case 'clients': return 'integrations';
+      case 'sales-funnel':
+        if (crmHubTab === 'chats' || crmHubTab === 'clients') return 'notifications';
+        return 'sales-funnels';
       case 'finance': return 'finance-categories';
-      case 'business-processes': return 'spaces';
+      case 'business-processes':
+        if (bpmHubTab === 'inventory') return 'finance-setup';
+        return 'spaces';
       case 'employees': return 'departments';
       case 'spaces': return 'spaces';
-      case 'meetings': return 'automation';
       case 'inbox': return 'automation';
-      case 'analytics': return 'system';
-      case 'home': return 'profile';
-      case 'admin': return 'system';
-      case 'inventory': return 'funds';
+      case 'home':
+        if (workdeskTab === 'meetings') return 'automation';
+        if (workdeskTab === 'documents') return 'spaces';
+        return 'profile';
       case 'table': return 'spaces';
       default: return null;
     }
@@ -107,24 +115,26 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
 
   const getPageHeader = (view: string) => {
     switch(view) {
-      case 'home': return { title: 'Рабочий стол', icon: <Home size={18} />, iconBox: 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300' };
+      case 'home':
+        if (workdeskTab === 'meetings') return { title: 'Календарь', icon: <Users size={18} />, iconBox: 'bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-300' };
+        if (workdeskTab === 'documents') return { title: 'Документы', icon: <FileText size={18} />, iconBox: 'bg-slate-100 text-slate-700 dark:bg-slate-900/30 dark:text-slate-300' };
+        return { title: 'Рабочий стол', icon: <Home size={18} />, iconBox: 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300' };
       case 'tasks': return { title: 'Задачи', icon: <CheckSquare size={18} />, iconBox: 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300' };
       case 'inbox': return { title: 'Входящие', icon: <Bell size={18} />, iconBox: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300' };
       case 'chat': return { title: 'Чат', icon: <MessageCircle size={18} />, iconBox: 'bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-300' };
       case 'search': return { title: 'Поиск', icon: <Search size={18} />, iconBox: 'bg-slate-100 text-slate-700 dark:bg-slate-900/30 dark:text-slate-300' };
       case 'settings': return { title: 'Настройки', icon: <Settings size={18} />, iconBox: 'bg-slate-100 text-slate-700 dark:bg-slate-900/30 dark:text-slate-300' };
-      case 'analytics': return { title: 'Аналитика', icon: <PieChart size={18} />, iconBox: 'bg-cyan-100 text-cyan-700 dark:bg-cyan-900/30 dark:text-cyan-300' };
-      case 'sales-funnel': return { title: 'Воронка продаж', icon: <BarChart3 size={18} />, iconBox: 'bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-300' };
-      case 'client-chats': return { title: 'Диалоги', icon: <MessageCircle size={18} />, iconBox: 'bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-300' };
-      case 'clients': return { title: 'Клиенты', icon: <Briefcase size={18} />, iconBox: 'bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-300' };
+      case 'sales-funnel':
+        if (crmHubTab === 'chats') return { title: 'Диалоги', icon: <MessageCircle size={18} />, iconBox: 'bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-300' };
+        if (crmHubTab === 'clients') return { title: 'Клиенты и договора', icon: <Briefcase size={18} />, iconBox: 'bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-300' };
+        return { title: 'Воронка продаж', icon: <BarChart3 size={18} />, iconBox: 'bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-300' };
       case 'finance': return { title: 'Финансы', icon: <Wallet size={18} />, iconBox: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300' };
-      case 'business-processes': return { title: 'Бизнес-процессы', icon: <Network size={18} />, iconBox: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300' };
+      case 'business-processes':
+        if (bpmHubTab === 'inventory') return { title: 'Склад', icon: <Package size={18} />, iconBox: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300' };
+        return { title: 'Бизнес-процессы', icon: <Network size={18} />, iconBox: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300' };
       case 'employees': return { title: 'Сотрудники', icon: <UserCheck size={18} />, iconBox: 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300' };
       case 'spaces': return { title: 'Пространство', icon: <Layers size={18} />, iconBox: 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300' };
-      case 'meetings': return { title: 'Календарь', icon: <Users size={18} />, iconBox: 'bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-300' };
-      case 'docs': return { title: 'Документы', icon: <FileText size={18} />, iconBox: 'bg-slate-100 text-slate-700 dark:bg-slate-900/30 dark:text-slate-300' };
       case 'doc-editor': return { title: 'Редактор документа', icon: <FileText size={18} />, iconBox: 'bg-slate-100 text-slate-700 dark:bg-slate-900/30 dark:text-slate-300' };
-      case 'inventory': return { title: 'Склад', icon: <Package size={18} />, iconBox: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300' };
       default: return { title: view, icon: <Settings size={18} />, iconBox: 'bg-slate-100 text-slate-700 dark:bg-slate-900/30 dark:text-slate-300' };
     }
   };

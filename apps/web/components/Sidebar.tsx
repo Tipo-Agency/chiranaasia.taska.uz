@@ -9,20 +9,14 @@ import {
   BarChart3,
   Wallet,
   Network,
-  PieChart,
   Briefcase,
   UserCheck,
   X,
   CheckSquare,
   ChevronRight,
   ChevronDown,
-  Instagram,
-  FileText,
   Users,
-  Archive,
   Layers,
-  ShieldCheck,
-  MessageCircle
 } from 'lucide-react';
 import { TableCollection, User } from '../types';
 import { LogoIcon, DynamicIcon } from './AppIcons';
@@ -155,47 +149,14 @@ const Sidebar: React.FC<SidebarProps> = ({
             </div>
             )}
 
-            {/* 3. Воронка продаж */}
-            {can('crm.sales_funnel') && (
+            {/* Воронка продаж + диалоги + клиенты (единый раздел) */}
+            {(can('crm.sales_funnel') || can('crm.client_chats') || can('crm.clients')) && (
             <div 
                 onClick={() => handleNav(() => onNavigate('sales-funnel'))}
                 className={`flex items-center ${isCollapsed ? 'justify-center' : 'gap-2'} ${isCollapsed ? 'px-2' : 'px-3'} py-1.5 rounded cursor-pointer transition-colors ${currentView === 'sales-funnel' ? 'bg-notion-hover dark:bg-[#252525] text-notion-text dark:text-white font-medium' : 'text-notion-text/70 dark:text-gray-400 hover:bg-notion-hover dark:hover:bg-[#252525] hover:text-notion-text dark:hover:text-gray-200'}`}
                 title={isCollapsed ? "Воронка продаж" : ""}
             >
                 <BarChart3 size={18} /> {!isCollapsed && <span className="text-sm">Воронка продаж</span>}
-            </div>
-            )}
-
-            {/* 3.0. Диалоги (центр коммуникаций: Instagram, Telegram и др.) */}
-            {can('crm.client_chats') && (
-            <div 
-                onClick={() => handleNav(() => onNavigate('client-chats'))}
-                className={`flex items-center ${isCollapsed ? 'justify-center' : 'gap-2'} ${isCollapsed ? 'px-2' : 'px-3'} py-1.5 rounded cursor-pointer transition-colors ${currentView === 'client-chats' ? 'bg-notion-hover dark:bg-[#252525] text-notion-text dark:text-white font-medium' : 'text-notion-text/70 dark:text-gray-400 hover:bg-notion-hover dark:hover:bg-[#252525] hover:text-notion-text dark:hover:text-gray-200'}`}
-                title={isCollapsed ? "Диалоги" : ""}
-            >
-                <MessageCircle size={18} /> {!isCollapsed && <span className="text-sm">Диалоги</span>}
-            </div>
-            )}
-
-            {/* 3.1. Клиенты и договора (под Воронка продаж) */}
-            {can('crm.clients') && (
-            <div 
-                onClick={() => handleNav(() => onNavigate('clients'))}
-                className={`flex items-center ${isCollapsed ? 'justify-center' : 'gap-2'} ${isCollapsed ? 'px-2' : 'px-3'} py-1.5 rounded cursor-pointer transition-colors ${currentView === 'clients' ? 'bg-notion-hover dark:bg-[#252525] text-notion-text dark:text-white font-medium' : 'text-notion-text/70 dark:text-gray-400 hover:bg-notion-hover dark:hover:bg-[#252525] hover:text-notion-text dark:hover:text-gray-200'}`}
-                title={isCollapsed ? "Клиенты и договора" : ""}
-            >
-                <Briefcase size={18} /> {!isCollapsed && <span className="text-sm">Клиенты и договора</span>}
-            </div>
-            )}
-
-            {/* 3.2. Склад */}
-            {can('org.inventory') && (
-            <div 
-                onClick={() => handleNav(() => onNavigate('inventory'))}
-                className={`flex items-center ${isCollapsed ? 'justify-center' : 'gap-2'} ${isCollapsed ? 'px-2' : 'px-3'} py-1.5 rounded cursor-pointer transition-colors ${currentView === 'inventory' ? 'bg-notion-hover dark:bg-[#252525] text-notion-text dark:text-white font-medium' : 'text-notion-text/70 dark:text-gray-400 hover:bg-notion-hover dark:hover:bg-[#252525] hover:text-notion-text dark:hover:text-gray-200'}`}
-                title={isCollapsed ? "Склад" : ""}
-            >
-                <Layers size={18} /> {!isCollapsed && <span className="text-sm">Склад</span>}
             </div>
             )}
 
@@ -210,36 +171,14 @@ const Sidebar: React.FC<SidebarProps> = ({
             </div>
             )}
 
-            {/* 5. Бизнес-процессы */}
-            {can('org.bpm') && (
+            {/* Бизнес-процессы + склад */}
+            {(can('org.bpm') || can('org.inventory')) && (
             <div 
                 onClick={() => handleNav(() => onNavigate('business-processes'))}
                 className={`flex items-center ${isCollapsed ? 'justify-center' : 'gap-2'} ${isCollapsed ? 'px-2' : 'px-3'} py-1.5 rounded cursor-pointer transition-colors ${currentView === 'business-processes' ? 'bg-notion-hover dark:bg-[#252525] text-notion-text dark:text-white font-medium' : 'text-notion-text/70 dark:text-gray-400 hover:bg-notion-hover dark:hover:bg-[#252525] hover:text-notion-text dark:hover:text-gray-200'}`}
                 title={isCollapsed ? "Бизнес-процессы" : ""}
             >
                 <Network size={18} /> {!isCollapsed && <span className="text-sm">Бизнес-процессы</span>}
-            </div>
-            )}
-
-            {/* 6. Календарь */}
-            {can('core.meetings') && (
-              <div
-                onClick={() => handleNav(() => onNavigate('meetings'))}
-                className={`flex items-center ${isCollapsed ? 'justify-center' : 'gap-2'} ${isCollapsed ? 'px-2' : 'px-3'} py-1.5 rounded cursor-pointer transition-colors ${currentView === 'meetings' ? 'bg-notion-hover dark:bg-[#252525] text-notion-text dark:text-white font-medium' : 'text-notion-text/70 dark:text-gray-400 hover:bg-notion-hover dark:hover:bg-[#252525] hover:text-notion-text dark:hover:text-gray-200'}`}
-                title={isCollapsed ? "Календарь" : ""}
-              >
-                <Users size={18} /> {!isCollapsed && <span className="text-sm">Календарь</span>}
-            </div>
-            )}
-
-            {/* 7. Документы */}
-            {can('core.docs') && (
-            <div 
-                onClick={() => handleNav(() => onNavigate('docs'))}
-                className={`flex items-center ${isCollapsed ? 'justify-center' : 'gap-2'} ${isCollapsed ? 'px-2' : 'px-3'} py-1.5 rounded cursor-pointer transition-colors ${currentView === 'docs' ? 'bg-notion-hover dark:bg-[#252525] text-notion-text dark:text-white font-medium' : 'text-notion-text/70 dark:text-gray-400 hover:bg-notion-hover dark:hover:bg-[#252525] hover:text-notion-text dark:hover:text-gray-200'}`}
-                title={isCollapsed ? "Документы" : ""}
-            >
-                <FileText size={18} /> {!isCollapsed && <span className="text-sm">Документы</span>}
             </div>
             )}
 
@@ -256,60 +195,19 @@ const Sidebar: React.FC<SidebarProps> = ({
                 </div>
             )}
 
-            {/* 8.1. Аналитика и отчеты (под Сотрудники) */}
-            {can('analytics.analytics') && (
-            <div 
-                onClick={() => handleNav(() => onNavigate('analytics'))}
-                className={`flex items-center ${isCollapsed ? 'justify-center' : 'gap-2'} ${isCollapsed ? 'px-2' : 'px-3'} py-1.5 rounded cursor-pointer transition-colors ${currentView === 'analytics' ? 'bg-notion-hover dark:bg-[#252525] text-notion-text dark:text-white font-medium' : 'text-notion-text/70 dark:text-gray-400 hover:bg-notion-hover dark:hover:bg-[#252525] hover:text-notion-text dark:hover:text-gray-200'}`}
-                title={isCollapsed ? "Аналитика и отчеты" : ""}
-            >
-                <PieChart size={18} /> {!isCollapsed && <span className="text-sm">Аналитика и отчеты</span>}
-            </div>
-            )}
-
-            {/* Админ-панель */}
-            {can('admin.system') && (
-                <div 
-                    onClick={() => handleNav(() => onNavigate('admin'))}
-                    className={`flex items-center ${isCollapsed ? 'justify-center' : 'gap-2'} ${isCollapsed ? 'px-2' : 'px-3'} py-1.5 rounded cursor-pointer transition-colors ${currentView === 'admin' ? 'bg-notion-hover dark:bg-[#252525] text-notion-text dark:text-white font-medium' : 'text-notion-text/70 dark:text-gray-400 hover:bg-notion-hover dark:hover:bg-[#252525] hover:text-notion-text dark:hover:text-gray-200'}`}
-                    title={isCollapsed ? "Админ-панель" : ""}
-                >
-                    <ShieldCheck size={18} /> {!isCollapsed && <span className="text-sm">Админ-панель</span>}
-                </div>
-            )}
         </div>
 
         {/* Tables List with Grouping */}
         <div className={`${isCollapsed ? 'px-2' : 'px-3'} flex-1 overflow-y-auto custom-scrollbar min-h-0`}>
-            {/* Контент планы, Беклог, Функционал */}
-            {!isCollapsed && can('crm.spaces') && (
+            {can('crm.spaces') && (
               <div className="space-y-0.5 mb-3">
-                {/* Контент планы */}
                 <div 
                   onClick={() => handleNav(() => onNavigateToType?.('content-plan'))}
-                  className={`flex items-center gap-2 px-3 py-1.5 rounded cursor-pointer transition-colors ${(currentView === 'spaces' && activeSpaceTab === 'content-plan') || (currentView === 'table' && activeTableId && tables.find(t => t.id === activeTableId)?.type === 'content-plan') ? 'bg-notion-hover dark:bg-[#252525] text-notion-text dark:text-white font-medium' : 'text-notion-text/70 dark:text-gray-400 hover:bg-notion-hover dark:hover:bg-[#252525] hover:text-notion-text dark:hover:text-gray-200'}`}
+                  className={`flex items-center ${isCollapsed ? 'justify-center' : 'gap-2'} ${isCollapsed ? 'px-2' : 'px-3'} py-1.5 rounded cursor-pointer transition-colors ${(currentView === 'spaces' && activeSpaceTab === 'content-plan') || (currentView === 'table' && activeTableId && tables.find(t => t.id === activeTableId)?.type === 'content-plan') ? 'bg-notion-hover dark:bg-[#252525] text-notion-text dark:text-white font-medium' : 'text-notion-text/70 dark:text-gray-400 hover:bg-notion-hover dark:hover:bg-[#252525] hover:text-notion-text dark:hover:text-gray-200'}`}
+                  title={isCollapsed ? 'Пространство' : ''}
                 >
-                  <Instagram size={16} /> <span className="text-sm">Контент планы</span>
+                  <Layers size={isCollapsed ? 18 : 16} /> {!isCollapsed && <span className="text-sm">Пространство</span>}
                 </div>
-
-                {/* Беклог */}
-                <div 
-                  data-nav-item="backlog"
-                  onClick={() => handleNav(() => onNavigateToType?.('backlog'))}
-                  className={`flex items-center gap-2 px-3 py-1.5 rounded cursor-pointer transition-colors ${(currentView === 'spaces' && activeSpaceTab === 'backlog') || (currentView === 'table' && activeTableId && tables.find(t => t.id === activeTableId)?.type === 'backlog') ? 'bg-notion-hover dark:bg-[#252525] text-notion-text dark:text-white font-medium' : 'text-notion-text/70 dark:text-gray-400 hover:bg-notion-hover dark:hover:bg-[#252525] hover:text-notion-text dark:hover:text-gray-200'}`}
-                >
-                  <Archive size={16} /> <span className="text-sm">Беклог</span>
-                </div>
-
-                {/* Функционал */}
-                <div 
-                  data-nav-item="functionality"
-                  onClick={() => handleNav(() => onNavigateToType?.('functionality'))}
-                  className={`flex items-center gap-2 px-3 py-1.5 rounded cursor-pointer transition-colors ${(currentView === 'spaces' && activeSpaceTab === 'functionality') || (currentView === 'table' && activeTableId && tables.find(t => t.id === activeTableId)?.type === 'functionality') ? 'bg-notion-hover dark:bg-[#252525] text-notion-text dark:text-white font-medium' : 'text-notion-text/70 dark:text-gray-400 hover:bg-notion-hover dark:hover:bg-[#252525] hover:text-notion-text dark:hover:text-gray-200'}`}
-                >
-                  <Layers size={16} /> <span className="text-sm">Функционал</span>
-                </div>
-
               </div>
             )}
 

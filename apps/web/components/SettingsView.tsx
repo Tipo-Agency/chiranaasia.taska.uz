@@ -1,7 +1,7 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, lazy, Suspense } from 'react';
 import { Project, Role, Task, User, StatusOption, PriorityOption, NotificationPreferences, AutomationRule, TableCollection, Deal, Department, FinanceCategory, Fund, SalesFunnel, Doc, ContentPost, EmployeeInfo, Client, Contract, BusinessProcess, Meeting, Warehouse, OrgPosition } from '../types';
-import { User as UserIcon, Briefcase, Archive, Users, Building2, Wallet, TrendingUp, PiggyBank, ShieldAlert, Settings, BellRing, Zap, Package, ArrowLeft, Plus } from 'lucide-react';
+import { User as UserIcon, Briefcase, Archive, Users, Building2, Wallet, TrendingUp, PiggyBank, ShieldAlert, Settings, BellRing, Zap, Package, ArrowLeft, Plus, ShieldCheck } from 'lucide-react';
 import { Button, Input, ModuleFilterIconButton, ModulePageHeader, ModulePageShell, ModuleSegmentedControl, MODULE_PAGE_GUTTER, StandardModal } from './ui';
 import { ProfileSettings } from './settings/ProfileSettings';
 import { StructureSettings } from './settings/StructureSettings';
@@ -15,6 +15,10 @@ import { SYSTEM_ROLE_EMPLOYEE_ID } from '../constants/systemRoles';
 import { ArchiveView, ARCHIVE_TAB_OPTIONS, type ArchiveTabId } from './settings/ArchiveView';
 import { FinanceSetupSettings } from './settings/FinanceSetupSettings';
 import { TasksSetupSettings } from './settings/TasksSetupSettings';
+import { hasPermission } from '../utils/permissions';
+import { RouteFallback } from './ui/RouteFallback';
+
+const AdminViewLazy = lazy(() => import('./admin/AdminView').then((m) => ({ default: m.AdminView })));
 
 interface SettingsViewProps {
   // Data
@@ -90,7 +94,7 @@ interface SettingsViewProps {
   initialTab?: string;
 }
 
-const SETTINGS_TABS: { id: string; label: string; icon: React.ReactNode }[] = [
+const SETTINGS_TABS_BASE: { id: string; label: string; icon: React.ReactNode }[] = [
   { id: 'profile', label: 'Профиль', icon: <UserIcon size={14} /> },
   { id: 'users', label: 'Пользователи', icon: <Users size={14} /> },
   { id: 'tasks', label: 'Задачи', icon: <Briefcase size={14} /> },
@@ -123,10 +127,19 @@ const SettingsView: React.FC<SettingsViewProps> = ({
   employeeInfos = [], deals = [], clients = [], contracts = [], meetings = [], businessProcesses = [], orgPositions = [],
   notificationPrefs, onClose: _onClose
 }) => {
+  const settingsTabs = useMemo(() => {
+    const t = [...SETTINGS_TABS_BASE];
+    if (currentUser && hasPermission(currentUser, 'admin.system')) {
+      t.push({ id: 'admin', label: 'Админ-панель', icon: <ShieldCheck size={14} /> });
+    }
+    return t;
+  }, [currentUser]);
+
   const normalizeTab = (t: string) => {
     if (t === 'spaces' || t === 'departments' || t === 'warehouses') return 'structure';
     if (t === 'finance-categories' || t === 'funds') return 'finance-setup';
     if (t === 'integrations' || t === 'system') return 'notifications';
+    if (t === 'admin' && (!currentUser || !hasPermission(currentUser, 'admin.system'))) return 'users';
     return t;
   };
   const [activeTab, setActiveTab] = useState<string>(normalizeTab(initialTab));
@@ -172,7 +185,7 @@ const SettingsView: React.FC<SettingsViewProps> = ({
                   variant="neutral"
                   value={activeTab}
                   onChange={(v) => setActiveTab(v)}
-                  options={SETTINGS_TABS.map((t) => ({
+                  options={settingsTabs.map((t) => ({
                     value: t.id,
                     label: t.label,
                     icon: t.icon,
@@ -221,7 +234,14 @@ const SettingsView: React.FC<SettingsViewProps> = ({
                     }`}
                     title={activeTab === 'users' ? 'Создать' : 'Создание доступно не во всех вкладках'}
                     aria-label="Создать"
-                    disabled={!(activeTab === 'users' || activeTab === 'structure' || activeTab === 'finance-setup' || activeTab === 'sales-funnels')}
+                    disabled={
+                      !(
+                        activeTab === 'users' ||
+                        activeTab === 'structure' ||
+                        activeTab === 'finance-setup' ||
+                        activeTab === 'sales-funnels'
+                      )
+                    }
                   >
                     <Plus size={18} />
                   </button>
@@ -374,6 +394,11 @@ const SettingsView: React.FC<SettingsViewProps> = ({
                   onDeleteRule={onDeleteAutomationRule!}
                   onUpdatePrefs={onUpdateNotificationPrefs}
                 />
+              )}
+              {activeTab === 'admin' && currentUser && hasPermission(currentUser, 'admin.system') && (
+                <Suspense fallback={<RouteFallback />}>
+                  <AdminViewLazy />
+                </Suspense>
               )}
             </>
           )}

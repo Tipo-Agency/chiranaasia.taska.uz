@@ -23,7 +23,7 @@ import { ModulePageHeader, ModulePageShell, MODULE_PAGE_GUTTER } from '../ui';
 import { DateInput } from '../ui/DateInput';
 import { normalizeDateForInput, parseLocalDate } from '../../utils/dateUtils';
 
-type WorkdeskTab = 'dashboard' | 'weekly' | 'tasks' | 'deals' | 'meetings' | 'analytics';
+type WorkdeskTab = 'dashboard' | 'weekly' | 'tasks' | 'deals' | 'meetings' | 'documents';
 
 const TASK_DONE_STATUSES = ['Выполнено', 'Done', 'Завершено'];
 
@@ -82,6 +82,11 @@ interface WorkdeskViewProps {
   onNavigateToTasks: () => void;
   onNavigateToDeals: () => void;
   onNavigateToMeetings: () => void;
+  onNavigateToDocuments?: () => void;
+  workdeskTab: WorkdeskTab;
+  onWorkdeskTabChange: (tab: WorkdeskTab) => void;
+  meetingsSlot?: React.ReactNode;
+  documentsSlot?: React.ReactNode;
   onOpenDocument?: (doc: Doc) => void;
   processTemplates?: BusinessProcess[];
   onStartProcessTemplate?: (processId: string) => Promise<{ id: string; label: string } | null> | { id: string; label: string } | null;
@@ -107,13 +112,19 @@ export const WorkdeskView: React.FC<WorkdeskViewProps> = ({
   onNavigateToTasks,
   onNavigateToDeals,
   onNavigateToMeetings,
+  onNavigateToDocuments,
+  workdeskTab,
+  onWorkdeskTabChange,
+  meetingsSlot,
+  documentsSlot,
   onOpenDocument,
   processTemplates = [],
   onStartProcessTemplate,
   onCreateEntity,
   onUpdateEntity,
 }) => {
-  const [activeTab, setActiveTab] = useState<WorkdeskTab>('dashboard');
+  const activeTab = workdeskTab;
+  const setActiveTab = onWorkdeskTabChange;
   const weeklyPlansRef = useRef<WeeklyPlansViewHandle>(null);
   const [editingDeal, setEditingDeal] = useState<Deal | null>(null);
   const [editingMeeting, setEditingMeeting] = useState<Meeting | null>(null);
@@ -198,16 +209,6 @@ export const WorkdeskView: React.FC<WorkdeskViewProps> = ({
       });
     return map;
   }, [tasks]);
-  const meetingsByDate = useMemo(() => {
-    const groups = new Map<string, Meeting[]>();
-    myMeetings.forEach((m) => {
-      const key = m.date ? normalizeDateForInput(m.date) || 'Без даты' : 'Без даты';
-      const arr = groups.get(key) || [];
-      arr.push(m);
-      groups.set(key, arr);
-    });
-    return [...groups.entries()].sort((a, b) => a[0].localeCompare(b[0]));
-  }, [myMeetings]);
   const availableProcessTemplates = useMemo(
     () => processTemplates.filter((process) => !process.isArchived && !process.systemKey),
     [processTemplates]
@@ -313,7 +314,7 @@ export const WorkdeskView: React.FC<WorkdeskViewProps> = ({
                   { id: 'tasks', label: 'Задачи' },
                   { id: 'deals', label: 'Сделки' },
                   { id: 'meetings', label: 'Календарь' },
-                  { id: 'analytics', label: 'Аналитика' },
+                  { id: 'documents', label: 'Документы' },
                 ]}
                 activeTab={activeTab}
                 onChange={(id) => setActiveTab(id as WorkdeskTab)}
@@ -726,75 +727,18 @@ export const WorkdeskView: React.FC<WorkdeskViewProps> = ({
           )}
 
           {activeTab === 'meetings' && (
-            <div className="bg-white dark:bg-[#252525] rounded-2xl border border-gray-200 dark:border-[#333] p-4 space-y-3">
-              <div className="flex items-center justify-between">
-                <h3 className="font-semibold text-gray-900 dark:text-white">Календарь</h3>
-                <button type="button" onClick={onNavigateToMeetings} className="text-sm text-[#3337AD] hover:underline">
-                  Открыть модуль
-                </button>
-              </div>
-              <div className="rounded-xl border border-gray-200 dark:border-[#333] p-2 text-xs">
-                <p className="text-gray-500">Событий в календаре на этой неделе</p>
-                <p className="font-semibold text-gray-900 dark:text-white">{meetingsThisWeek}</p>
-              </div>
-              {myMeetings.length === 0 ? (
-                <p className="text-sm text-gray-500 dark:text-gray-400">Нет встреч.</p>
-              ) : (
-                <div className="space-y-3">
-                  {meetingsByDate.map(([date, list]) => (
-                    <div key={date} className="rounded-xl border border-gray-200 dark:border-[#333]">
-                      <div className="px-3 py-2 text-xs font-semibold bg-gray-50 dark:bg-[#2a2a2a] text-gray-700 dark:text-gray-300">{date}</div>
-                      <div className="divide-y divide-gray-100 dark:divide-[#333]">
-                        {list
-                          .sort((a, b) => (a.time || '').localeCompare(b.time || ''))
-                          .map((m) => (
-                            <div key={m.id} className="px-3 py-2.5">
-                              <div className="font-medium text-sm text-gray-900 dark:text-white">{m.title || 'Встреча'}</div>
-                              <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">{m.time || '—'} · {(m.participantIds || []).length} участ.</div>
-                              <button
-                                type="button"
-                                onClick={() => setEditingMeeting(m)}
-                                className="mt-1 text-xs text-[#3337AD] hover:underline"
-                              >
-                                Открыть карточку встречи
-                              </button>
-                            </div>
-                          ))}
-                      </div>
-                    </div>
-                  ))}
-                </div>
+            <div className="rounded-2xl border border-gray-200 dark:border-[#333] overflow-hidden bg-white dark:bg-[#191919] min-h-[min(70vh,720px)] flex flex-col">
+              {meetingsSlot ?? (
+                <div className="p-4 text-sm text-gray-500 dark:text-gray-400">Календарь недоступен.</div>
               )}
             </div>
           )}
 
-          {activeTab === 'analytics' && (
-            <div className="bg-white dark:bg-[#252525] rounded-2xl border border-gray-200 dark:border-[#333] p-4 space-y-4">
-              <StatsCards
-                deals={deals}
-                financePlan={financePlan || null}
-                tasks={tasks}
-                currentUser={currentUser}
-                accountsReceivable={accountsReceivable}
-              />
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs">
-                <div className="rounded-xl border border-gray-200 dark:border-[#333] p-3">
-                  <p className="text-gray-500">Открытые задачи</p>
-                  <p className="font-semibold text-gray-900 dark:text-white">{myOpenTasksCount}</p>
-                </div>
-                <div className="rounded-xl border border-gray-200 dark:border-[#333] p-3">
-                  <p className="text-gray-500">Закрытые задачи</p>
-                  <p className="font-semibold text-gray-900 dark:text-white">{tasksDone}</p>
-                </div>
-                <div className="rounded-xl border border-gray-200 dark:border-[#333] p-3">
-                  <p className="text-gray-500">Сделок в работе</p>
-                  <p className="font-semibold text-gray-900 dark:text-white">{myDeals.filter((d) => d.stage !== 'won' && d.stage !== 'lost').length}</p>
-                </div>
-                <div className="rounded-xl border border-gray-200 dark:border-[#333] p-3">
-                  <p className="text-gray-500">Событий в календаре на неделе</p>
-                  <p className="font-semibold text-gray-900 dark:text-white">{meetingsThisWeek}</p>
-                </div>
-              </div>
+          {activeTab === 'documents' && (
+            <div className="rounded-2xl border border-gray-200 dark:border-[#333] overflow-hidden bg-white dark:bg-[#191919] min-h-[min(70vh,720px)] flex flex-col">
+              {documentsSlot ?? (
+                <div className="p-4 text-sm text-gray-500 dark:text-gray-400">Документы недоступны.</div>
+              )}
             </div>
           )}
         </div>

@@ -13,24 +13,20 @@ import type { AppActions } from '../frontend/hooks/useAppLogic';
 import { WorkdeskView } from './pages/WorkdeskView';
 import { TasksPage } from './pages/TasksPage';
 import { InboxPage } from './pages/InboxPage';
-import { ClientChatsPage } from './pages/ClientChatsPage';
 import TableView from './TableView'; // Needed for Global Search
 import { SpacesTabsView } from './SpacesTabsView';
 import { MiniMessenger } from './features/chat/MiniMessenger';
 import { PageLayout } from './ui/PageLayout';
 import { Container } from './ui/Container';
 import { RouteFallback } from './ui/RouteFallback';
-import AnalyticsView from './AnalyticsView';
 import { resolveAssigneesForOrgPosition } from '../utils/orgPositionAssignee';
 
 /** Тяжёлые экраны подгружаются отдельными чанками (меньше initial JS). */
-const AdminViewLazy = lazy(() => import('./admin/AdminView').then((m) => ({ default: m.AdminView })));
 const SettingsViewLazy = lazy(() => import('./SettingsView'));
 const DocEditorLazy = lazy(() => import('./DocEditor'));
-const InventoryViewLazy = lazy(() => import('./InventoryView'));
-const ClientsViewLazy = lazy(() => import('./ClientsView'));
 const SpaceModuleLazy = lazy(() => import('./modules/SpaceModule').then((m) => ({ default: m.SpaceModule })));
-const CRMModuleLazy = lazy(() => import('./modules/CRMModule').then((m) => ({ default: m.CRMModule })));
+const CRMHubModuleLazy = lazy(() => import('./modules/CRMHubModule').then((m) => ({ default: m.CRMHubModule })));
+const BPMHubModuleLazy = lazy(() => import('./modules/BPMHubModule').then((m) => ({ default: m.BPMHubModule })));
 const FinanceModuleLazy = lazy(() => import('./modules/FinanceModule').then((m) => ({ default: m.FinanceModule })));
 const HRModuleLazy = lazy(() => import('./modules/HRModule').then((m) => ({ default: m.HRModule })));
 const MeetingsModuleLazy = lazy(() => import('./modules/MeetingsModule').then((m) => ({ default: m.MeetingsModule })));
@@ -80,6 +76,9 @@ interface AppRouterProps {
   salesFunnels?: SalesFunnel[];
   settingsActiveTab?: string;
   activeSpaceTab?: 'content-plan' | 'backlog' | 'functionality';
+  workdeskTab?: 'dashboard' | 'weekly' | 'tasks' | 'deals' | 'meetings' | 'documents';
+  crmHubTab?: 'funnel' | 'chats' | 'clients';
+  bpmHubTab?: 'processes' | 'inventory';
   notificationPrefs?: NotificationPreferences;
   actions: AppActions;
 }
@@ -261,30 +260,99 @@ export const AppRouter: React.FC<AppRouterProps> = (props) => {
   // Fallback: если currentView пустой или undefined, показываем home
   const view = currentView || 'home';
 
+  const renderHomeWorkdesk = () => {
+    let meetingsTable =
+      props.tables.find((t) => t.type === 'meetings' && t.isSystem) || props.tables.find((t) => t.type === 'meetings');
+    if (!meetingsTable) {
+      meetingsTable = {
+        id: 'meetings-system',
+        name: 'Календарь',
+        type: 'meetings',
+        icon: 'Users',
+        color: 'text-purple-500',
+        isSystem: true,
+      };
+    }
+    let docsTable = props.tables.find((t) => t.type === 'docs' && t.isSystem) || props.tables.find((t) => t.type === 'docs');
+    if (!docsTable) {
+      docsTable = {
+        id: 'docs-system',
+        name: 'Документы',
+        type: 'docs',
+        icon: 'FileText',
+        color: 'text-yellow-500',
+        isSystem: true,
+      };
+    }
+    return (
+      <WorkdeskView
+        currentUser={props.currentUser}
+        tasks={props.filteredTasks}
+        meetings={props.meetings}
+        financePlan={props.financePlan}
+        deals={props.deals}
+        users={props.users}
+        docs={props.docs}
+        accountsReceivable={props.accountsReceivable}
+        salesFunnels={props.salesFunnels}
+        workdeskTab={props.workdeskTab ?? 'dashboard'}
+        onWorkdeskTabChange={actions.setWorkdeskTab}
+        onOpenTask={actions.openTaskModal}
+        onNavigateToTasks={() => actions.setCurrentView('tasks')}
+        onNavigateToMeetings={() => {
+          actions.setWorkdeskTab('meetings');
+          actions.setCurrentView('home');
+        }}
+        onNavigateToDocuments={() => {
+          actions.setWorkdeskTab('documents');
+          actions.setCurrentView('home');
+        }}
+        onNavigateToDeals={() => actions.setCurrentView('sales-funnel')}
+        onOpenDocument={actions.handleDocClick}
+        onCreateEntity={createEntityFromChat}
+        onUpdateEntity={updateEntityFromChat}
+        processTemplates={props.businessProcesses}
+        onStartProcessTemplate={startBusinessProcessFromTemplate}
+        meetingsSlot={
+          <Suspense fallback={<RouteFallback />}>
+            <MeetingsModuleLazy
+              table={meetingsTable}
+              meetings={props.meetings}
+              users={props.users}
+              projects={props.projects}
+              clients={props.clients}
+              deals={props.deals}
+              tables={props.tables}
+              notificationPrefs={props.notificationPrefs}
+              shootPlans={props.shootPlans}
+              contentPosts={props.contentPosts}
+              actions={actions}
+            />
+          </Suspense>
+        }
+        documentsSlot={
+          <Suspense fallback={<RouteFallback />}>
+            <DocumentsModuleLazy
+              table={docsTable}
+              docs={props.docs}
+              folders={props.folders}
+              tables={props.tables}
+              tasks={props.allTasks}
+              users={props.users}
+              departments={props.departments}
+              employees={props.employeeInfos}
+              currentUser={props.currentUser}
+              actions={actions}
+            />
+          </Suspense>
+        }
+      />
+    );
+  };
+
   // 1. Global / Core Views
   if (view === 'home') {
-      return (
-          <WorkdeskView
-              currentUser={props.currentUser}
-              tasks={props.filteredTasks}
-              meetings={props.meetings}
-              financePlan={props.financePlan}
-              deals={props.deals}
-              users={props.users}
-              docs={props.docs}
-              accountsReceivable={props.accountsReceivable}
-              salesFunnels={props.salesFunnels}
-              onOpenTask={actions.openTaskModal}
-              onNavigateToTasks={() => actions.setCurrentView('tasks')}
-              onNavigateToMeetings={() => actions.setCurrentView('meetings')}
-              onNavigateToDeals={() => actions.setCurrentView('sales-funnel')}
-              onOpenDocument={actions.handleDocClick}
-              onCreateEntity={createEntityFromChat}
-              onUpdateEntity={updateEntityFromChat}
-              processTemplates={props.businessProcesses}
-              onStartProcessTemplate={startBusinessProcessFromTemplate}
-          />
-      );
+    return renderHomeWorkdesk();
   }
 
   if (view === 'tasks') {
@@ -315,6 +383,7 @@ export const AppRouter: React.FC<AppRouterProps> = (props) => {
               activeTableId={props.activeTableId}
               currentView={props.currentView}
               initialTab={props.activeSpaceTab}
+              onActiveSpaceTypeChange={(t) => actions.setActiveSpaceTab(t)}
               onSelectTable={(id) => { actions.setActiveTableId(id); actions.setCurrentView('table'); }}
               onEditTable={actions.openEditTable}
               onDeleteTable={actions.deleteTable}
@@ -379,14 +448,6 @@ export const AppRouter: React.FC<AppRouterProps> = (props) => {
       );
   }
 
-  if (view === 'admin') {
-      return (
-        <Suspense fallback={<RouteFallback />}>
-          <AdminViewLazy />
-        </Suspense>
-      );
-  }
-
   if (view === 'settings') {
       return (
         <Suspense fallback={<RouteFallback />}>
@@ -440,24 +501,6 @@ export const AppRouter: React.FC<AppRouterProps> = (props) => {
       );
   }
 
-  if (view === 'analytics') {
-      return (
-        <Suspense fallback={<RouteFallback />}>
-        <AnalyticsView
-          tasks={props.filteredTasks}
-          deals={props.deals}
-          users={props.users}
-          financePlan={props.financePlan}
-          contracts={props.contracts}
-          accountsReceivable={props.accountsReceivable}
-          purchaseRequests={props.purchaseRequests}
-          financialPlannings={props.financialPlannings}
-          financialPlanDocuments={props.financialPlanDocuments}
-        />
-        </Suspense>
-      );
-  }
-
   // 2. Search (Global)
   if (view === 'search') {
       return <TableView tasks={props.filteredTasks} users={props.users} projects={props.projects} statuses={props.statuses} priorities={props.priorities} tables={props.tables} isAggregator={true} currentUser={props.currentUser} businessProcesses={props.businessProcesses} onUpdateTask={(id, updates) => actions.saveTask({ id, ...updates })} onDeleteTask={actions.deleteTask} onOpenTask={actions.openTaskModal} />;
@@ -485,50 +528,25 @@ export const AppRouter: React.FC<AppRouterProps> = (props) => {
                         );
   }
 
-  if (view === 'clients') {
-      return (
-        <Suspense fallback={<RouteFallback />}>
-          <ClientsViewLazy
-              clients={props.clients}
-              contracts={props.contracts}
-              oneTimeDeals={props.oneTimeDeals}
-              accountsReceivable={props.accountsReceivable}
-              salesFunnels={props.salesFunnels}
-              onSaveClient={actions.saveClient}
-              onDeleteClient={actions.deleteClient}
-              onSaveContract={actions.saveContract}
-              onDeleteContract={actions.deleteContract}
-              onSaveOneTimeDeal={actions.saveOneTimeDeal}
-              onDeleteOneTimeDeal={actions.deleteOneTimeDeal}
-              onSaveAccountsReceivable={actions.saveAccountsReceivable}
-              onDeleteAccountsReceivable={actions.deleteAccountsReceivable}
-          />
-        </Suspense>
-      );
-  }
-
-  if (view === 'client-chats') {
-      return (
-          <ClientChatsPage
-              deals={props.deals}
-              users={props.users}
-              currentUser={props.currentUser}
-              salesFunnels={props.salesFunnels}
-              onSaveDeal={actions.saveDeal}
-              onOpenInFunnel={(deal) => {
-                  actions.setCurrentView('sales-funnel');
-                  window.setTimeout(() => {
-                      window.dispatchEvent(new CustomEvent('openDealFromChat', { detail: { dealId: deal.id } }));
-                  }, 0);
-              }}
-          />
-      );
-  }
-
   if (view === 'sales-funnel') {
       return (
         <Suspense fallback={<RouteFallback />}>
-          <CRMModuleLazy view={view} deals={props.deals} clients={props.clients} contracts={props.contracts} oneTimeDeals={props.oneTimeDeals} accountsReceivable={props.accountsReceivable} users={props.users} salesFunnels={props.salesFunnels} projects={props.projects} tasks={props.allTasks} meetings={props.meetings} currentUser={props.currentUser} actions={actions} />
+          <CRMHubModuleLazy
+            tab={props.crmHubTab ?? 'funnel'}
+            onTabChange={actions.setCrmHubTab}
+            currentUser={props.currentUser}
+            deals={props.deals}
+            clients={props.clients}
+            contracts={props.contracts}
+            oneTimeDeals={props.oneTimeDeals}
+            accountsReceivable={props.accountsReceivable}
+            users={props.users}
+            salesFunnels={props.salesFunnels}
+            projects={props.projects}
+            tasks={props.allTasks}
+            meetings={props.meetings}
+            actions={actions}
+          />
         </Suspense>
       );
   }
@@ -541,119 +559,50 @@ export const AppRouter: React.FC<AppRouterProps> = (props) => {
       );
   }
 
-  if (view === 'employees' || view === 'business-processes') {
+  if (view === 'employees') {
       return (
         <Suspense fallback={<RouteFallback />}>
           <HRModuleLazy
-          view={view}
-          employees={props.employeeInfos}
-          users={props.users}
-          currentUser={props.currentUser}
-          departments={props.departments}
-          orgPositions={props.orgPositions}
-          processes={props.businessProcesses}
-          tasks={props.filteredTasks}
-          tables={props.tables}
-          actions={actions}
-      />
+            view="employees"
+            employees={props.employeeInfos}
+            users={props.users}
+            currentUser={props.currentUser}
+            departments={props.departments}
+            orgPositions={props.orgPositions}
+            processes={props.businessProcesses}
+            tasks={props.filteredTasks}
+            tables={props.tables}
+            actions={actions}
+          />
         </Suspense>
       );
   }
 
-  // Meetings and Documents as separate modules (хардкодные, работают без создания таблиц)
-  if (view === 'meetings') {
-      // Автоматически создаем фиктивную таблицу для встреч, если её нет (не показывается в настройках)
-      let meetingsTable = props.tables.find(t => t.type === 'meetings' && t.isSystem) || 
-                          props.tables.find(t => t.type === 'meetings');
-      if (!meetingsTable) {
-          // Создаем фиктивную таблицу автоматически
-          meetingsTable = { 
-              id: 'meetings-system', 
-              name: 'Календарь', 
-              type: 'meetings', 
-              icon: 'Users', 
-              color: 'text-purple-500', 
-              isSystem: true 
-          };
-          // Добавляем в таблицы, но не сохраняем (чтобы не показывалась в настройках)
-          // Модуль будет работать с этой фиктивной таблицей
-      }
+  if (view === 'business-processes') {
       return (
         <Suspense fallback={<RouteFallback />}>
-          <MeetingsModuleLazy table={meetingsTable} meetings={props.meetings} users={props.users} projects={props.projects} clients={props.clients} deals={props.deals} tables={props.tables} notificationPrefs={props.notificationPrefs} shootPlans={props.shootPlans} contentPosts={props.contentPosts} actions={actions} />
-        </Suspense>
-      );
-  }
-
-  if (view === 'docs') {
-      // Автоматически создаем фиктивную таблицу для документов, если её нет (не показывается в настройках)
-      let docsTable = props.tables.find(t => t.type === 'docs' && t.isSystem) || 
-                     props.tables.find(t => t.type === 'docs');
-      if (!docsTable) {
-          // Создаем фиктивную таблицу автоматически
-          docsTable = { 
-              id: 'docs-system', 
-              name: 'Документы', 
-              type: 'docs', 
-              icon: 'FileText', 
-              color: 'text-yellow-500', 
-              isSystem: true 
-          };
-          // Добавляем в таблицы, но не сохраняем (чтобы не показывалась в настройках)
-          // Модуль будет работать с этой фиктивной таблицей
-      }
-      return (
-        <Suspense fallback={<RouteFallback />}>
-          <DocumentsModuleLazy table={docsTable} docs={props.docs} folders={props.folders} tables={props.tables} tasks={props.allTasks} users={props.users} departments={props.departments} employees={props.employeeInfos} currentUser={props.currentUser} actions={actions} />
-        </Suspense>
-      );
-  }
-
-  if (view === 'inventory') {
-      return (
-        <Suspense fallback={<RouteFallback />}>
-          <InventoryViewLazy
-              departments={props.departments}
-              warehouses={props.warehouses}
-              items={props.inventoryItems}
-              balances={props.inventoryBalances}
-              movements={props.inventoryMovements}
-              revisions={props.inventoryRevisions || []}
-              currentUserId={props.currentUser?.id || ''}
-              onSaveWarehouse={actions.saveWarehouse}
-              onDeleteWarehouse={actions.deleteWarehouse}
-              onSaveItem={actions.saveInventoryItem}
-              onDeleteItem={actions.deleteInventoryItem}
-              onCreateMovement={actions.createInventoryMovement}
-              onCreateRevision={actions.createInventoryRevision}
-              onUpdateRevision={actions.updateInventoryRevision}
-              onPostRevision={actions.postInventoryRevision}
+          <BPMHubModuleLazy
+            tab={props.bpmHubTab ?? 'processes'}
+            onTabChange={actions.setBpmHubTab}
+            currentUser={props.currentUser}
+            employees={props.employeeInfos}
+            users={props.users}
+            departments={props.departments}
+            orgPositions={props.orgPositions}
+            processes={props.businessProcesses}
+            tasks={props.filteredTasks}
+            tables={props.tables}
+            warehouses={props.warehouses}
+            items={props.inventoryItems}
+            balances={props.inventoryBalances}
+            movements={props.inventoryMovements}
+            revisions={props.inventoryRevisions || []}
+            actions={actions}
           />
         </Suspense>
       );
   }
 
   // Fallback: если ничего не подошло, показываем home
-  return (
-      <WorkdeskView
-          currentUser={props.currentUser}
-          tasks={props.filteredTasks}
-          meetings={props.meetings}
-          financePlan={props.financePlan}
-          deals={props.deals}
-          users={props.users}
-          docs={props.docs}
-          accountsReceivable={props.accountsReceivable}
-          salesFunnels={props.salesFunnels}
-          onOpenTask={actions.openTaskModal}
-          onNavigateToTasks={() => actions.setCurrentView('tasks')}
-          onNavigateToMeetings={() => actions.setCurrentView('meetings')}
-          onNavigateToDeals={() => actions.setCurrentView('sales-funnel')}
-          onOpenDocument={actions.handleDocClick}
-          onCreateEntity={createEntityFromChat}
-          onUpdateEntity={updateEntityFromChat}
-          processTemplates={props.businessProcesses}
-          onStartProcessTemplate={startBusinessProcessFromTemplate}
-      />
-  );
+  return renderHomeWorkdesk();
 };

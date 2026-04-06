@@ -1,23 +1,25 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { TableCollection, User } from '../types';
 import { hasPermission } from '../utils/permissions';
 import { DynamicIcon } from './AppIcons';
 import { Instagram, Archive, Layers, Edit2, Trash2 } from 'lucide-react';
 import { ModulePageShell, ModulePageHeader, ModuleSegmentedControl, MODULE_PAGE_GUTTER, ModuleCreateIconButton } from './ui';
 
+type SpaceType = 'content-plan' | 'backlog' | 'functionality';
+
 interface SpacesTabsViewProps {
   tables: TableCollection[];
   currentUser: User;
   activeTableId: string;
   currentView: string;
-  initialTab?: 'content-plan' | 'backlog' | 'functionality';
+  initialTab?: SpaceType;
+  /** Синхронизация с URL / глобальным состоянием при смене типа */
+  onActiveSpaceTypeChange?: (type: SpaceType) => void;
   onSelectTable: (id: string) => void;
   onEditTable: (table: TableCollection) => void;
   onDeleteTable: (id: string) => void;
-  onCreateTable: (type: 'content-plan' | 'backlog' | 'functionality') => void;
+  onCreateTable: (type: SpaceType) => void;
 }
-
-type SpaceType = 'content-plan' | 'backlog' | 'functionality';
 type ViewMode = 'grid' | 'list';
 
 const getTypeLabel = (type: SpaceType): string => {
@@ -42,6 +44,7 @@ export const SpacesTabsView: React.FC<SpacesTabsViewProps> = ({
   activeTableId,
   currentView,
   initialTab,
+  onActiveSpaceTypeChange,
   onSelectTable,
   onEditTable,
   onDeleteTable,
@@ -56,6 +59,12 @@ export const SpacesTabsView: React.FC<SpacesTabsViewProps> = ({
       setActiveTab(initialTab);
     }
   }, [initialTab]);
+
+  const spaceTypeCbRef = useRef(onActiveSpaceTypeChange);
+  spaceTypeCbRef.current = onActiveSpaceTypeChange;
+  useEffect(() => {
+    spaceTypeCbRef.current?.(activeTab);
+  }, [activeTab]);
 
   // Фильтруем пространства по типу, исключаем архивные
   const currentSpaces = tables.filter(t => t.type === activeTab && !t.isArchived);
@@ -92,6 +101,19 @@ export const SpacesTabsView: React.FC<SpacesTabsViewProps> = ({
           }
           actions={undefined}
           className="w-full"
+        />
+      </div>
+
+      <div className={`${MODULE_PAGE_GUTTER} pb-4 shrink-0`}>
+        <ModuleSegmentedControl
+          variant="neutral"
+          value={activeTab}
+          onChange={(v) => setActiveTab(v as SpaceType)}
+          options={[
+            { value: 'content-plan', label: 'Контент-планы', icon: <Instagram size={14} /> },
+            { value: 'backlog', label: 'Бэклог', icon: <Archive size={14} /> },
+            { value: 'functionality', label: 'Функционал', icon: <Layers size={14} /> },
+          ]}
         />
       </div>
 

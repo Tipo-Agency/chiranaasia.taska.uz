@@ -17,6 +17,14 @@ export const useSettingsLogic = (showNotification: (msg: string) => void) => {
   const [viewMode, setViewMode] = useState<ViewMode>(ViewMode.TABLE);
   const [searchQuery, setSearchQuery] = useState('');
   const [activeSpaceTab, setActiveSpaceTab] = useState<'content-plan' | 'backlog' | 'functionality' | undefined>(undefined);
+  /** Вкладка рабочего стола (дашборд, календарь, документы …) */
+  const [workdeskTab, setWorkdeskTab] = useState<
+    'dashboard' | 'weekly' | 'tasks' | 'deals' | 'meetings' | 'documents'
+  >('dashboard');
+  /** Подраздел внутри «Воронка продаж»: воронка / диалоги / клиенты */
+  const [crmHubTab, setCrmHubTab] = useState<'funnel' | 'chats' | 'clients'>('funnel');
+  /** Подраздел внутри «Бизнес-процессы»: процессы / склад */
+  const [bpmHubTab, setBpmHubTab] = useState<'processes' | 'inventory'>('processes');
   
   // Modals
   const [settingsActiveTab, setSettingsActiveTab] = useState<string>('users'); 
@@ -113,17 +121,101 @@ export const useSettingsLogic = (showNotification: (msg: string) => void) => {
       api.activity.updateAll(u).catch(() => showNotification('Ошибка обновления ленты'));
   };
 
-  const handleNavigate = (view: 'home' | 'tasks' | 'inbox' | 'search' | 'clients' | 'employees' | 'sales-funnel' | 'client-chats' | 'finance' | 'business-processes' | 'analytics' | 'spaces' | 'meetings' | 'docs' | 'inventory' | 'chat' | 'admin' | 'settings') => {
-      setCurrentView(view); setActiveTableId('');
+  const handleNavigate = (
+    view:
+      | 'home'
+      | 'tasks'
+      | 'inbox'
+      | 'search'
+      | 'clients'
+      | 'employees'
+      | 'sales-funnel'
+      | 'client-chats'
+      | 'finance'
+      | 'business-processes'
+      | 'analytics'
+      | 'spaces'
+      | 'meetings'
+      | 'docs'
+      | 'inventory'
+      | 'chat'
+      | 'admin'
+      | 'settings'
+  ) => {
+    setActiveTableId('');
+    if (view === 'meetings') {
+      setWorkdeskTab('meetings');
+      setCurrentView('home');
+      return;
+    }
+    if (view === 'docs') {
+      setWorkdeskTab('documents');
+      setCurrentView('home');
+      return;
+    }
+    if (view === 'clients') {
+      setCrmHubTab('clients');
+      setCurrentView('sales-funnel');
+      return;
+    }
+    if (view === 'client-chats') {
+      setCrmHubTab('chats');
+      setCurrentView('sales-funnel');
+      return;
+    }
+    if (view === 'inventory') {
+      setBpmHubTab('inventory');
+      setCurrentView('business-processes');
+      return;
+    }
+    if (view === 'admin') {
+      setSettingsActiveTab('admin');
+      setCurrentView('settings');
+      return;
+    }
+    if (view === 'analytics') {
+      setCurrentView('home');
+      return;
+    }
+    if (view === 'sales-funnel') {
+      setCrmHubTab('funnel');
+      setCurrentView('sales-funnel');
+      return;
+    }
+    if (view === 'business-processes') {
+      setBpmHubTab('processes');
+      setCurrentView('business-processes');
+      return;
+    }
+    if (view === 'spaces') {
+      setActiveSpaceTab((prev) => prev ?? 'content-plan');
+      setCurrentView('spaces');
+      return;
+    }
+    setCurrentView(view);
   };
 
   return {
     state: { 
         darkMode, tables, activityLogs, currentView, activeTableId, viewMode, searchQuery,
         settingsActiveTab, isCreateTableModalOpen, createTableType, isEditTableModalOpen, editingTable, notificationPrefs,
-        automationRules, activeSpaceTab
+        automationRules, activeSpaceTab, workdeskTab, crmHubTab, bpmHubTab
     },
-    setters: { setTables, setActivityLogs, setCurrentView, setActiveTableId, setViewMode, setSearchQuery, setNotificationPrefs, setAutomationRules, setActiveSpaceTab, setSettingsActiveTab },
+    setters: {
+      setTables,
+      setActivityLogs,
+      setCurrentView,
+      setActiveTableId,
+      setViewMode,
+      setSearchQuery,
+      setNotificationPrefs,
+      setAutomationRules,
+      setActiveSpaceTab,
+      setSettingsActiveTab,
+      setWorkdeskTab,
+      setCrmHubTab,
+      setBpmHubTab,
+    },
     actions: {
         toggleDarkMode, createTable, updateTable, deleteTable, markAllRead, navigate: handleNavigate,
         // Changed: Opens settings page instead of modal

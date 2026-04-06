@@ -246,6 +246,9 @@ function MainApp() {
             <AppHeaderWithNotifications
               darkMode={state.darkMode}
               currentView={state.currentView}
+              workdeskTab={state.workdeskTab}
+              crmHubTab={state.crmHubTab}
+              bpmHubTab={state.bpmHubTab}
               activeTable={state.activeTable}
               currentUser={state.currentUser}
               searchQuery={state.searchQuery}
@@ -479,6 +482,9 @@ function MainApp() {
                 automationRules={state.automationRules}
                 settingsActiveTab={state.settingsActiveTab}
                 activeSpaceTab={state.activeSpaceTab}
+                workdeskTab={state.workdeskTab}
+                crmHubTab={state.crmHubTab}
+                bpmHubTab={state.bpmHubTab}
                 notificationPrefs={state.notificationPrefs}
                 actions={actions}
             />

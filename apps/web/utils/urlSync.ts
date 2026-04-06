@@ -50,6 +50,9 @@ export interface UrlStateSlice {
   activeTableId?: string;
   activeSpaceTab?: 'content-plan' | 'backlog' | 'functionality';
   settingsTab?: string;
+  workdeskTab?: 'dashboard' | 'weekly' | 'tasks' | 'deals' | 'meetings' | 'documents';
+  crmHubTab?: 'funnel' | 'chats' | 'clients';
+  bpmHubTab?: 'processes' | 'inventory';
 }
 
 /** Построить path + search из состояния навигации */
@@ -58,8 +61,19 @@ export function buildLocation(opts: {
   activeTableId?: string;
   activeSpaceTab?: 'content-plan' | 'backlog' | 'functionality' | undefined;
   settingsActiveTab?: string;
+  workdeskTab?: 'dashboard' | 'weekly' | 'tasks' | 'deals' | 'meetings' | 'documents';
+  crmHubTab?: 'funnel' | 'chats' | 'clients';
+  bpmHubTab?: 'processes' | 'inventory';
 }): string {
-  const { currentView, activeTableId, activeSpaceTab, settingsActiveTab } = opts;
+  const {
+    currentView,
+    activeTableId,
+    activeSpaceTab,
+    settingsActiveTab,
+    workdeskTab,
+    crmHubTab,
+    bpmHubTab,
+  } = opts;
 
   if (currentView === 'table' && activeTableId) {
     return `/table/${encodeURIComponent(activeTableId)}`;
@@ -82,6 +96,26 @@ export function buildLocation(opts: {
     return `${VIEW_PATHS.settings}?tab=${encodeURIComponent(tab)}`;
   }
 
+  if (currentView === 'home') {
+    if (workdeskTab && workdeskTab !== 'dashboard') {
+      return `/?desk=${encodeURIComponent(workdeskTab)}`;
+    }
+    return '/';
+  }
+
+  if (currentView === 'sales-funnel') {
+    let path = VIEW_PATHS['sales-funnel'];
+    if (crmHubTab === 'chats') path += '?crm=chats';
+    else if (crmHubTab === 'clients') path += '?crm=clients';
+    return path;
+  }
+
+  if (currentView === 'business-processes') {
+    let path = VIEW_PATHS['business-processes'];
+    if (bpmHubTab === 'inventory') path += '?bpm=inventory';
+    return path;
+  }
+
   const path = VIEW_PATHS[currentView];
   if (path) return path === '/' ? '/' : path;
 
@@ -93,7 +127,21 @@ export function parseLocation(pathname: string, search: string): UrlStateSlice |
   const path = pathname.replace(/\/+$/, '') || '/';
 
   if (path === '/' || path === '') {
-    return { view: 'home' };
+    const q = new URLSearchParams(search);
+    const desk = q.get('desk');
+    const out: UrlStateSlice = { view: 'home' };
+    if (
+      desk === 'weekly' ||
+      desk === 'tasks' ||
+      desk === 'deals' ||
+      desk === 'meetings' ||
+      desk === 'documents'
+    ) {
+      out.workdeskTab = desk;
+    } else if (desk === 'dashboard') {
+      out.workdeskTab = 'dashboard';
+    }
+    return out;
   }
 
   const segments = path.split('/').filter(Boolean);
@@ -113,19 +161,58 @@ export function parseLocation(pathname: string, search: string): UrlStateSlice |
   const view = PATH_TO_VIEW[single];
   if (!view) return null;
 
+  const q = new URLSearchParams(search);
   const out: UrlStateSlice = { view };
 
-  if (view === 'spaces') {
-    const q = new URLSearchParams(search);
+  // Обратная совместимость: старые пути → новый хаб CRM / рабочий стол / BPM
+  if (view === 'clients') {
+    out.view = 'sales-funnel';
+    out.crmHubTab = 'clients';
+  }
+  if (view === 'meetings' || view === 'docs') {
+    out.view = 'home';
+    out.workdeskTab = view === 'meetings' ? 'meetings' : 'documents';
+  }
+  if (view === 'inventory') {
+    out.view = 'business-processes';
+    out.bpmHubTab = 'inventory';
+  }
+  if (view === 'analytics') {
+    out.view = 'home';
+    out.workdeskTab = 'dashboard';
+  }
+  if (view === 'admin') {
+    out.view = 'settings';
+    out.settingsTab = 'admin';
+  }
+
+  if (out.view === 'spaces') {
     const space = q.get('space');
     if (space === 'content-plan' || space === 'backlog' || space === 'functionality') {
       out.activeSpaceTab = space;
     }
   }
 
-  if (view === 'settings') {
-    const q = new URLSearchParams(search);
-    out.settingsTab = q.get('tab') || 'users';
+  if (out.view === 'settings') {
+    const t = q.get('tab');
+    if (t) {
+      out.settingsTab = t;
+    } else if (!out.settingsTab) {
+      out.settingsTab = 'users';
+    }
+  }
+
+  if (out.view === 'sales-funnel') {
+    const crm = q.get('crm');
+    if (crm === 'chats') out.crmHubTab = 'chats';
+    else if (crm === 'clients') out.crmHubTab = 'clients';
+    else if (!out.crmHubTab) out.crmHubTab = 'funnel';
+  }
+
+  if (out.view === 'business-processes') {
+    const bpm = q.get('bpm');
+    if (bpm === 'inventory') out.bpmHubTab = 'inventory';
+    else if (!out.bpmHubTab) out.bpmHubTab = 'processes';
   }
 
   return out;
