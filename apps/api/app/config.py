@@ -57,6 +57,9 @@ class Settings(BaseSettings):
     TELEGRAM_LEADS_POLL_INTERVAL_SECONDS: int = 5
     TELEGRAM_LEADS_POLL_LIMIT: int = 50
 
+    # Встречи в БД хранятся как «стена» дата+время без TZ; в .ics отдаём в UTC (Z), иначе Google трактует как UTC и сдвигает на +5 и т.д.
+    CALENDAR_EXPORT_TZID: str = "Asia/Tashkent"
+
     class Config:
         env_file = ".env"
         env_file_encoding = "utf-8"
