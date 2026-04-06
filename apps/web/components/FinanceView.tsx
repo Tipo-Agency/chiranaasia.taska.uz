@@ -4,7 +4,7 @@ import { TaskSelect } from './TaskSelect';
 import { FinanceCategory, Fund, FinancePlan, PurchaseRequest, Department, User, FinancialPlanDocument, FinancialPlanning, Bdr } from '../types';
 import { hasPermission } from '../utils/permissions';
 import { Wallet, Plus, X, Edit2, Trash2, PieChart, TrendingUp, DollarSign, Check, AlertCircle, Calendar, Settings, ArrowLeft, ArrowRight, Save, FileText, Clock, CheckCircle2, ChevronDown, Upload, Archive, RotateCcw } from 'lucide-react';
-import { Button, Card, ModulePageShell, ModulePageHeader, MODULE_PAGE_GUTTER, ModuleCreateDropdown, ModuleFilterIconButton, DateInput, ModuleSegmentedControl, SystemAlertDialog } from './ui';
+import { Button, ModulePageShell, ModulePageHeader, MODULE_PAGE_GUTTER, ModuleCreateDropdown, ModuleFilterIconButton, DateInput, ModuleSegmentedControl, SystemAlertDialog } from './ui';
 import { BankStatementsView, type BankStatementsViewHandle } from './finance/BankStatementsView';
 import { BdrView } from './finance/BdrView';
 import { FilterConfig } from './FiltersPanel';
@@ -37,7 +37,7 @@ const FinanceView: React.FC<FinanceViewProps> = ({
     onSaveRequest, onDeleteRequest,
     onSaveFinancialPlanDocument, onDeleteFinancialPlanDocument, onSaveFinancialPlanning, onDeleteFinancialPlanning
 }) => {
-  const [activeTab, setActiveTab] = useState<'planning' | 'requests' | 'plan' | 'statements' | 'bdr'>('requests');
+  const [activeTab, setActiveTab] = useState<'planning' | 'requests' | 'plan' | 'statements' | 'bdr'>('planning');
   
   // Состояния для детальных страниц
   const [selectedPlanning, setSelectedPlanning] = useState<FinancialPlanning | null>(null);
@@ -587,12 +587,16 @@ const FinanceView: React.FC<FinanceViewProps> = ({
   };
 
   // --- Render Planning List ---
-  const renderPlanningList = () => (
-    <div className="space-y-6">
-
-      {/* Список планирований */}
-      <div className="space-y-3">
-        {filteredPlannings.length === 0 ? (
+  const renderPlanningList = () => {
+    const sorted = [...filteredPlannings].sort(
+      (a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime()
+    );
+    return (
+      <div className="space-y-6">
+        <div className="flex justify-between items-center">
+          <h3 className="text-lg font-bold text-gray-800 dark:text-white">Планирование</h3>
+        </div>
+        {sorted.length === 0 ? (
           <div className="bg-white dark:bg-[#252525] border border-gray-200 dark:border-[#333] rounded-xl p-12 text-center">
             <FileText size={48} className="mx-auto text-gray-300 dark:text-gray-600 mb-4" />
             <p className="text-gray-400 dark:text-gray-500 text-sm mb-2">
@@ -605,109 +609,80 @@ const FinanceView: React.FC<FinanceViewProps> = ({
             </p>
           </div>
         ) : (
-          (() => {
-            const groups = new Map<string, typeof filteredPlannings>();
-            filteredPlannings.forEach((p) => {
-              const key = p.departmentId || 'unknown';
-              const arr = groups.get(key) || [];
-              arr.push(p);
-              groups.set(key, arr);
-            });
-            const ordered = Array.from(groups.entries()).sort((a, b) => {
-              const da = departments.find(d => d.id === a[0])?.name || '—';
-              const db = departments.find(d => d.id === b[0])?.name || '—';
-              return da.localeCompare(db);
-            });
-
-            return ordered.map(([depId, items]) => {
-              const dep = departments.find(d => d.id === depId);
-              return (
-                <div key={depId} className="space-y-3">
-                  <div className="flex items-center justify-between gap-3 px-1">
-                    <div className="min-w-0">
-                      <div className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wide truncate">
-                        {dep?.name || 'Без подразделения'}
-                      </div>
-                      <div className="text-[11px] text-gray-400 dark:text-gray-500">
-                        {items.length} {items.length === 1 ? 'документ' : items.length < 5 ? 'документа' : 'документов'}
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="space-y-3">
-                    {items.map(planning => {
-                    const periodLabel = formatRangeLabel(planning.periodStart, planning.periodEnd, planning.period);
-
-                      return (
-                        <Card
-                          key={planning.id}
-                          onClick={() => {
-                            setSelectedPlanning(planning);
-                            setPlanningSubView('detail');
-                          }}
-                          padding="lg"
-                          hover
-                          className="group"
-                        >
-                          <div className="flex items-start justify-between">
-                            <div className="flex-1">
-                              <div className="flex items-center gap-3 mb-2">
-                                <div className="bg-blue-100 dark:bg-blue-900/30 p-2 rounded-lg text-blue-600 dark:text-blue-400">
-                                  <FileText size={20} />
-                                </div>
-                                <div>
-                                  <h3 className="font-bold text-gray-900 dark:text-white text-lg">
-                                    {periodLabel}
-                                  </h3>
-                                  <p className="text-xs text-gray-500 dark:text-gray-400">
-                                    Доход: {(planning.income || 0).toLocaleString()} UZS · Заявок: {planning.requestIds.length}
-                                  </p>
-                                </div>
-                              </div>
-                              <div className="flex items-center gap-3 mt-3 flex-wrap">
-                                <span className={`px-2.5 py-1 rounded-full text-xs font-bold uppercase ${getStatusColor(planning.status)}`}>
-                                  {getStatusLabel(planning.status)}
-                                </span>
-                                <span className="text-xs text-gray-500 dark:text-gray-400">
-                                  {new Date(planning.createdAt).toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric' }).replace(/\//g, '.')}
-                                </span>
-                              </div>
-                            </div>
-                            <div className="flex items-center gap-1 shrink-0">
-                              {financeArchiveScope === 'active' ? (
-                                <button
-                                  type="button"
-                                  onClick={(e) => archiveFinancialPlanning(e, planning)}
-                                  className="p-2 rounded-lg text-gray-400 hover:bg-gray-100 dark:hover:bg-[#333] hover:text-amber-600 dark:hover:text-amber-400 opacity-0 group-hover:opacity-100 transition-opacity"
-                                  title="В архив"
-                                >
-                                  <Archive size={18} />
-                                </button>
-                              ) : (
-                                <button
-                                  type="button"
-                                  onClick={(e) => restoreFinancialPlanning(e, planning)}
-                                  className="p-2 rounded-lg text-gray-400 hover:bg-gray-100 dark:hover:bg-[#333] hover:text-emerald-600 dark:hover:text-emerald-400 opacity-0 group-hover:opacity-100 transition-opacity"
-                                  title="Восстановить"
-                                >
-                                  <RotateCcw size={18} />
-                                </button>
-                              )}
-                              <ArrowRight size={20} className="text-gray-400 group-hover:text-gray-600 dark:group-hover:text-gray-200" />
-                            </div>
-                          </div>
-                        </Card>
-                      );
-                    })}
-                  </div>
-                </div>
-              );
-            });
-          })()
+          <div className="bg-white dark:bg-[#252525] border border-gray-200 dark:border-[#333] rounded-xl overflow-hidden">
+            <table className="w-full text-left text-sm">
+              <thead className="bg-gray-50 dark:bg-[#202020] border-b border-gray-200 dark:border-[#333]">
+                <tr>
+                  <th className="px-4 py-3 text-gray-600 dark:text-gray-400">Период</th>
+                  <th className="px-4 py-3 text-gray-600 dark:text-gray-400">Подразделение</th>
+                  <th className="px-4 py-3 text-gray-600 dark:text-gray-400">Доход</th>
+                  <th className="px-4 py-3 text-gray-600 dark:text-gray-400">Заявок</th>
+                  <th className="px-4 py-3 text-gray-600 dark:text-gray-400">Статус</th>
+                  <th className="px-4 py-3 text-gray-600 dark:text-gray-400">Создан</th>
+                  <th className="px-4 py-3" />
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100 dark:divide-[#333]">
+                {sorted.map((planning) => {
+                  const periodLabel = formatRangeLabel(planning.periodStart, planning.periodEnd, planning.period);
+                  const dep = departments.find((d) => d.id === planning.departmentId);
+                  return (
+                    <tr
+                      key={planning.id}
+                      className="hover:bg-gray-50 dark:hover:bg-[#303030] cursor-pointer group"
+                      onClick={() => {
+                        setSelectedPlanning(planning);
+                        setPlanningSubView('detail');
+                      }}
+                    >
+                      <td className="px-4 py-3 font-medium text-gray-900 dark:text-gray-100">{periodLabel}</td>
+                      <td className="px-4 py-3 text-gray-600 dark:text-gray-400 text-xs">{dep?.name || '—'}</td>
+                      <td className="px-4 py-3 font-bold text-gray-900 dark:text-gray-100">
+                        {(planning.income || 0).toLocaleString()} UZS
+                      </td>
+                      <td className="px-4 py-3 text-gray-600 dark:text-gray-400 tabular-nums">{planning.requestIds.length}</td>
+                      <td className="px-4 py-3">
+                        <span className={`px-2 py-1 rounded text-[10px] font-bold uppercase ${getStatusColor(planning.status)}`}>
+                          {getStatusLabel(planning.status)}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-gray-500 dark:text-gray-400 text-xs">
+                        {new Date(planning.createdAt).toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric' }).replace(/\//g, '.')}
+                      </td>
+                      <td className="px-4 py-3 text-right" onClick={(e) => e.stopPropagation()}>
+                        <div className="flex items-center justify-end gap-2">
+                          {financeArchiveScope === 'active' ? (
+                            <button
+                              type="button"
+                              onClick={(e) => archiveFinancialPlanning(e, planning)}
+                              className="text-gray-400 hover:text-amber-600 dark:hover:text-amber-400"
+                              title="В архив"
+                            >
+                              <Archive size={14} />
+                            </button>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={(e) => restoreFinancialPlanning(e, planning)}
+                              className="text-gray-400 hover:text-emerald-600 dark:hover:text-emerald-400"
+                              title="Восстановить"
+                            >
+                              <RotateCcw size={14} />
+                            </button>
+                          )}
+                          <ArrowRight size={16} className="text-gray-400 group-hover:text-gray-600 dark:group-hover:text-gray-200" />
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
         )}
       </div>
-    </div>
-  );
+    );
+  };
 
   // --- Render Planning Detail ---
   const renderPlanningDetail = () => {
@@ -1120,12 +1095,16 @@ const FinanceView: React.FC<FinanceViewProps> = ({
   };
 
   // --- Render Plan List ---
-  const renderPlanList = () => (
-    <div className="space-y-6">
-
-      {/* Список планов */}
-      <div className="space-y-3">
-        {filteredPlanDocs.length === 0 ? (
+  const renderPlanList = () => {
+    const sorted = [...filteredPlanDocs].sort(
+      (a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime()
+    );
+    return (
+      <div className="space-y-6">
+        <div className="flex justify-between items-center">
+          <h3 className="text-lg font-bold text-gray-800 dark:text-white">Финансовый план</h3>
+        </div>
+        {sorted.length === 0 ? (
           <div className="bg-white dark:bg-[#252525] border border-gray-200 dark:border-[#333] rounded-xl p-12 text-center">
             <FileText size={48} className="mx-auto text-gray-300 dark:text-gray-600 mb-4" />
             <p className="text-gray-400 dark:text-gray-500 text-sm mb-2">
@@ -1138,107 +1117,77 @@ const FinanceView: React.FC<FinanceViewProps> = ({
             </p>
           </div>
         ) : (
-          (() => {
-            const groups = new Map<string, typeof filteredPlanDocs>();
-            filteredPlanDocs.forEach((p) => {
-              const key = p.departmentId || 'unknown';
-              const arr = groups.get(key) || [];
-              arr.push(p);
-              groups.set(key, arr);
-            });
-            const ordered = Array.from(groups.entries()).sort((a, b) => {
-              const da = departments.find(d => d.id === a[0])?.name || '—';
-              const db = departments.find(d => d.id === b[0])?.name || '—';
-              return da.localeCompare(db);
-            });
-
-            return ordered.map(([depId, items]) => {
-              const dep = departments.find(d => d.id === depId);
-              return (
-                <div key={depId} className="space-y-3">
-                  <div className="flex items-center justify-between gap-3 px-1">
-                    <div className="min-w-0">
-                      <div className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wide truncate">
-                        {dep?.name || 'Без подразделения'}
-                      </div>
-                      <div className="text-[11px] text-gray-400 dark:text-gray-500">
-                        {items.length} {items.length === 1 ? 'документ' : items.length < 5 ? 'документа' : 'документов'}
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="space-y-3">
-                    {items.map(planDoc => {
-                      const periodLabel = formatRangeLabel(planDoc.periodStart, planDoc.periodEnd, planDoc.period);
-                      const totalExpenses = (Object.values(planDoc.expenses || {}) as number[]).reduce((sum, val) => sum + val, 0);
-
-                      return (
-                        <Card
-                          key={planDoc.id}
-                          onClick={() => {
-                            setSelectedPlanDoc(planDoc);
-                            setPlanSubView('detail');
-                          }}
-                          padding="lg"
-                          hover
-                          className="group"
-                        >
-                          <div className="flex items-start justify-between">
-                            <div className="flex-1">
-                              <div className="flex items-center gap-3 mb-2">
-                                <div className="bg-green-100 dark:bg-green-900/30 p-2 rounded-lg text-green-600 dark:text-green-400">
-                                  <FileText size={20} />
-                                </div>
-                                <div>
-                                  <h3 className="font-bold text-gray-900 dark:text-white text-lg">
-                                    {periodLabel}
-                                  </h3>
-                                  <p className="text-xs text-gray-500 dark:text-gray-400">
-                                    Доход: {planDoc.income?.toLocaleString() || 0} UZS · Расход: {totalExpenses.toLocaleString()} UZS
-                                  </p>
-                                </div>
-                              </div>
-                              <div className="flex items-center gap-3 mt-3 flex-wrap">
-                                <span className={`px-2.5 py-1 rounded-full text-xs font-bold uppercase ${getStatusColor(planDoc.status)}`}>
-                                  {getStatusLabel(planDoc.status)}
-                                </span>
-                              </div>
-                            </div>
-                            <div className="flex items-center gap-1 shrink-0">
-                              {financeArchiveScope === 'active' ? (
-                                <button
-                                  type="button"
-                                  onClick={(e) => archiveFinancialPlanDocument(e, planDoc)}
-                                  className="p-2 rounded-lg text-gray-400 hover:bg-gray-100 dark:hover:bg-[#333] hover:text-amber-600 dark:hover:text-amber-400 opacity-0 group-hover:opacity-100 transition-opacity"
-                                  title="В архив"
-                                >
-                                  <Archive size={18} />
-                                </button>
-                              ) : (
-                                <button
-                                  type="button"
-                                  onClick={(e) => restoreFinancialPlanDocument(e, planDoc)}
-                                  className="p-2 rounded-lg text-gray-400 hover:bg-gray-100 dark:hover:bg-[#333] hover:text-emerald-600 dark:hover:text-emerald-400 opacity-0 group-hover:opacity-100 transition-opacity"
-                                  title="Восстановить"
-                                >
-                                  <RotateCcw size={18} />
-                                </button>
-                              )}
-                              <ArrowRight size={20} className="text-gray-400 group-hover:text-gray-600 dark:group-hover:text-gray-200" />
-                            </div>
-                          </div>
-                        </Card>
-                      );
-                    })}
-                  </div>
-                </div>
-              );
-            });
-          })()
+          <div className="bg-white dark:bg-[#252525] border border-gray-200 dark:border-[#333] rounded-xl overflow-hidden">
+            <table className="w-full text-left text-sm">
+              <thead className="bg-gray-50 dark:bg-[#202020] border-b border-gray-200 dark:border-[#333]">
+                <tr>
+                  <th className="px-4 py-3 text-gray-600 dark:text-gray-400">Период</th>
+                  <th className="px-4 py-3 text-gray-600 dark:text-gray-400">Подразделение</th>
+                  <th className="px-4 py-3 text-gray-600 dark:text-gray-400">Доход</th>
+                  <th className="px-4 py-3 text-gray-600 dark:text-gray-400">Расход</th>
+                  <th className="px-4 py-3 text-gray-600 dark:text-gray-400">Статус</th>
+                  <th className="px-4 py-3" />
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100 dark:divide-[#333]">
+                {sorted.map((planDoc) => {
+                  const periodLabel = formatRangeLabel(planDoc.periodStart, planDoc.periodEnd, planDoc.period);
+                  const totalExpenses = (Object.values(planDoc.expenses || {}) as number[]).reduce((sum, val) => sum + val, 0);
+                  const dep = departments.find((d) => d.id === planDoc.departmentId);
+                  return (
+                    <tr
+                      key={planDoc.id}
+                      className="hover:bg-gray-50 dark:hover:bg-[#303030] cursor-pointer group"
+                      onClick={() => {
+                        setSelectedPlanDoc(planDoc);
+                        setPlanSubView('detail');
+                      }}
+                    >
+                      <td className="px-4 py-3 font-medium text-gray-900 dark:text-gray-100">{periodLabel}</td>
+                      <td className="px-4 py-3 text-gray-600 dark:text-gray-400 text-xs">{dep?.name || '—'}</td>
+                      <td className="px-4 py-3 font-bold text-gray-900 dark:text-gray-100">
+                        {(planDoc.income || 0).toLocaleString()} UZS
+                      </td>
+                      <td className="px-4 py-3 text-gray-700 dark:text-gray-300">{totalExpenses.toLocaleString()} UZS</td>
+                      <td className="px-4 py-3">
+                        <span className={`px-2 py-1 rounded text-[10px] font-bold uppercase ${getStatusColor(planDoc.status)}`}>
+                          {getStatusLabel(planDoc.status)}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-right" onClick={(e) => e.stopPropagation()}>
+                        <div className="flex items-center justify-end gap-2">
+                          {financeArchiveScope === 'active' ? (
+                            <button
+                              type="button"
+                              onClick={(e) => archiveFinancialPlanDocument(e, planDoc)}
+                              className="text-gray-400 hover:text-amber-600 dark:hover:text-amber-400"
+                              title="В архив"
+                            >
+                              <Archive size={14} />
+                            </button>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={(e) => restoreFinancialPlanDocument(e, planDoc)}
+                              className="text-gray-400 hover:text-emerald-600 dark:hover:text-emerald-400"
+                              title="Восстановить"
+                            >
+                              <RotateCcw size={14} />
+                            </button>
+                          )}
+                          <ArrowRight size={16} className="text-gray-400 group-hover:text-gray-600 dark:group-hover:text-gray-200" />
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
         )}
       </div>
-    </div>
-  );
+    );
+  };
 
   // --- Render Plan Detail ---
   const renderPlanDetail = () => {

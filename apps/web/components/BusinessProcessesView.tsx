@@ -1423,17 +1423,6 @@ const BusinessProcessesView: React.FC<BusinessProcessesViewProps> = ({
           )
           ) : (
             <div>
-              <div className="mb-4">
-                <h2 className="text-lg font-bold text-gray-900 dark:text-white mb-1">
-                  {activeTab === 'running' ? 'Процессы в работе' : 'Завершённые процессы'}
-                </h2>
-                <p className="text-xs text-gray-500 dark:text-gray-400">
-                  {activeTab === 'running'
-                    ? 'Активные и приостановленные экземпляры. Завершённые — во вкладке «Завершённые».'
-                    : 'История завершённых запусков.'}
-                </p>
-              </div>
-
               {tabInstanceList.length === 0 ? (
                 <div className="bg-white dark:bg-[#252525] border border-gray-200 dark:border-[#333] rounded-xl p-12 text-center">
                   {activeTab === 'running' ? (

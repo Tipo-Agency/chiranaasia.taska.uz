@@ -1,5 +1,5 @@
 import React from 'react';
-import { TableCollection, Meeting, User, Client, Deal, Project, TableCollection as Table, NotificationPreferences, ShootPlan } from '../../types';
+import { TableCollection, Meeting, User, Client, Deal, Project, TableCollection as Table, NotificationPreferences, ShootPlan, ContentPost } from '../../types';
 import type { AppActions } from '../../frontend/hooks/useAppLogic';
 import MeetingsView from '../MeetingsView';
 
@@ -13,6 +13,7 @@ interface MeetingsModuleProps {
   tables: Table[];
   notificationPrefs?: NotificationPreferences;
   shootPlans?: ShootPlan[];
+  contentPosts?: ContentPost[];
   actions: AppActions;
 }
 
@@ -26,6 +27,7 @@ export const MeetingsModule: React.FC<MeetingsModuleProps> = ({
   tables,
   notificationPrefs,
   shootPlans = [],
+  contentPosts = [],
   actions,
 }) => {
   return (
@@ -44,7 +46,8 @@ export const MeetingsModule: React.FC<MeetingsModuleProps> = ({
         onUpdateSummary={actions.updateMeetingSummary}
         notificationPrefs={notificationPrefs}
         shootPlans={shootPlans}
-        onNavigateToShootPlan={actions.openShootPlanFromCalendar}
+        contentPosts={contentPosts}
+        onSaveShootPlan={actions.saveShootPlan}
       />
     </div>
   );

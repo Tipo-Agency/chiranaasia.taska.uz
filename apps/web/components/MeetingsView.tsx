@@ -1,6 +1,6 @@
 
-import React, { useState, useMemo } from 'react';
-import { Meeting, User, TableCollection, Client, Deal, Project, NotificationPreferences, ShootPlan } from '../types';
+import React, { useState, useMemo, useCallback } from 'react';
+import { Meeting, User, TableCollection, Client, Deal, Project, NotificationPreferences, ShootPlan, ContentPost, ShootPlanItem } from '../types';
 import {
   Calendar,
   Camera,
@@ -20,9 +20,12 @@ import {
   ChevronRight,
 } from 'lucide-react';
 import { TaskSelect } from './TaskSelect';
-import { normalizeDateForInput } from '../utils/dateUtils';
-import { ModulePageShell, ModulePageHeader, ModuleSegmentedControl, MODULE_PAGE_GUTTER, ModuleCreateIconButton } from './ui';
+import { normalizeDateForInput, parseLocalDate, compareDates, getTodayLocalDate } from '../utils/dateUtils';
+import { ModulePageShell, ModulePageHeader, ModuleSegmentedControl, MODULE_PAGE_GUTTER } from './ui';
+import { ModuleCreateDropdown } from './ui/ModuleCreateDropdown';
 import { DateInput } from './ui/DateInput';
+import { ShootPlanModal, type ShootPostFormatFilter } from './ShootPlanModal';
+import { getPostIdsReservedInOtherShootPlans } from '../utils/shootPlanUtils';
 
 interface MeetingsViewProps {
   meetings: Meeting[];
@@ -38,9 +41,9 @@ interface MeetingsViewProps {
   onUpdateSummary: (meetingId: string, summary: string) => void;
   /** Цвета карточек из настроек уведомлений */
   notificationPrefs?: NotificationPreferences;
-  /** Для перехода в контент-план → вкладка «Съёмки» */
   shootPlans?: ShootPlan[];
-  onNavigateToShootPlan?: (tableId: string, shootPlanId: string) => void;
+  contentPosts?: ContentPost[];
+  onSaveShootPlan?: (plan: ShootPlan) => void;
 }
 
 const DEFAULT_CAL_COLORS = {
@@ -49,6 +52,16 @@ const DEFAULT_CAL_COLORS = {
   project: '#10b981',
   shoot: '#f97316',
 };
+
+/** Как на бэкенде в shoot_plans: встречи общего календаря, CRM, чата, съёмок. */
+const GLOBAL_MEETINGS_TABLE_ID = 'meetings-system';
+
+function meetingVisibleForCalendarPage(m: Meeting, pageTableId: string, showAll: boolean): boolean {
+  if (showAll) return true;
+  if (m.tableId === pageTableId) return true;
+  if (!m.tableId || m.tableId === GLOBAL_MEETINGS_TABLE_ID) return true;
+  return false;
+}
 
 function meetingTypeKey(m: Meeting): 'client' | 'work' | 'project' | 'shoot' {
   if (m.shootPlanId || m.type === 'shoot') return 'shoot';
@@ -71,12 +84,13 @@ const MeetingsView: React.FC<MeetingsViewProps> = ({
   onUpdateSummary,
   notificationPrefs,
   shootPlans = [],
-  onNavigateToShootPlan,
+  contentPosts = [],
+  onSaveShootPlan,
 }) => {
-  /** Календарь по умолчанию; отдельная вкладка «Съёмки» */
-  const [calendarTab, setCalendarTab] = useState<'calendar' | 'list' | 'shoots'>('calendar');
+  const [calendarTab, setCalendarTab] = useState<'calendar' | 'list'>('calendar');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingMeeting, setEditingMeeting] = useState<Meeting | null>(null);
+  const [meetingTypeLocked, setMeetingTypeLocked] = useState(false);
   const [meetingTypeFilter, setMeetingTypeFilter] = useState<'all' | 'client' | 'work' | 'project' | 'shoot'>('all');
   const [calendarMonth, setCalendarMonth] = useState(() => {
     const t = new Date();
@@ -86,12 +100,24 @@ const MeetingsView: React.FC<MeetingsViewProps> = ({
   // Form State
   const [meetingType, setMeetingType] = useState<'client' | 'work' | 'project'>('work'); // shoot только из планов съёмок
   const [title, setTitle] = useState('');
-  const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
+  const [date, setDate] = useState(getTodayLocalDate());
   const [time, setTime] = useState('10:00');
   const [recurrence, setRecurrence] = useState<'none' | 'daily' | 'weekly' | 'monthly'>('none');
   const [selectedDealId, setSelectedDealId] = useState<string>('');
   const [selectedProjectId, setSelectedProjectId] = useState<string>('');
   const [selectedParticipants, setSelectedParticipants] = useState<string[]>([]);
+
+  const emptyShootItem = useCallback((): ShootPlanItem => ({
+    postId: '',
+    brief: '',
+    referenceUrl: '',
+    referenceImages: [],
+  }), []);
+
+  const [shootModalDraft, setShootModalDraft] = useState<ShootPlan | null>(null);
+  const [shootPostFormatFilter, setShootPostFormatFilter] = useState<ShootPostFormatFilter>('all');
+  const [pickEventKindOpen, setPickEventKindOpen] = useState(false);
+  const [pickEventKindDate, setPickEventKindDate] = useState('');
 
   // DnD State
   const [draggedMeetingId, setDraggedMeetingId] = useState<string | null>(null);
@@ -119,7 +145,7 @@ const MeetingsView: React.FC<MeetingsViewProps> = ({
   const filteredMeetings = useMemo(() => {
     let filtered = (meetings || [])
       .filter(m => !m.isArchived) // Исключаем архивные встречи
-      .filter(m => showAll ? true : m.tableId === tableId)
+      .filter((m) => meetingVisibleForCalendarPage(m, tableId, !!showAll))
       .map((m) => {
         let inferred: Meeting['type'];
         if (m.shootPlanId || m.type === 'shoot') inferred = 'shoot';
@@ -128,52 +154,156 @@ const MeetingsView: React.FC<MeetingsViewProps> = ({
         return { ...m, type: inferred };
       });
     
-    if (calendarTab === 'shoots') {
-      filtered = filtered.filter((m) => m.type === 'shoot');
-    } else if (meetingTypeFilter !== 'all') {
+    if (meetingTypeFilter !== 'all') {
       filtered = filtered.filter(m => m.type === meetingTypeFilter);
     }
     
-    return filtered.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-  }, [meetings, tableId, showAll, meetingTypeFilter, calendarTab]);
+    return filtered.sort((a, b) => {
+      const ak = normalizeDateForInput(a.date);
+      const bk = normalizeDateForInput(b.date);
+      if (!ak && !bk) return 0;
+      if (!ak) return 1;
+      if (!bk) return -1;
+      const dc = compareDates(ak, bk);
+      if (dc !== 0) return -dc;
+      return (a.time || '00:00').localeCompare(b.time || '00:00');
+    });
+  }, [meetings, tableId, showAll, meetingTypeFilter]);
 
   const getTableName = (id: string) => tables.find(t => t.id === id)?.name || '';
 
-  const handleOpenCreate = () => {
-      setEditingMeeting(null);
-      setMeetingType('work');
-      setTitle('');
-      setDate(new Date().toISOString().split('T')[0]);
-      setTime('10:00');
-      setRecurrence('none');
-      setSelectedDealId('');
-      setSelectedProjectId('');
-      setSelectedParticipants([]);
-      setIsModalOpen(true);
+  const contentPlanTables = useMemo(
+    () => tables.filter((t) => t.type === 'content-plan' && !t.isArchived),
+    [tables]
+  );
+
+  const contentPlanOptions = useMemo(
+    () => contentPlanTables.map((t) => ({ id: t.id, name: t.name })),
+    [contentPlanTables]
+  );
+
+  const defaultShootTableId = useMemo(() => {
+    const activeIsCp = tables.find((t) => t.id === tableId)?.type === 'content-plan';
+    if (!showAll && activeIsCp) return tableId;
+    if (contentPlanTables.length === 1) return contentPlanTables[0].id;
+    return contentPlanTables[0]?.id || '';
+  }, [showAll, tableId, tables, contentPlanTables]);
+
+  const reservedForShootModal = useMemo(
+    () =>
+      shootModalDraft
+        ? getPostIdsReservedInOtherShootPlans(shootPlans, shootModalDraft.tableId, shootModalDraft.id)
+        : new Set<string>(),
+    [shootPlans, shootModalDraft]
+  );
+
+  const openMeetingCreate = (type: 'client' | 'work' | 'project', presetDate?: string) => {
+    setEditingMeeting(null);
+    setMeetingType(type);
+    setMeetingTypeLocked(true);
+    setTitle('');
+    setDate(presetDate || getTodayLocalDate());
+    setTime('10:00');
+    setRecurrence('none');
+    setSelectedDealId('');
+    setSelectedProjectId('');
+    setSelectedParticipants([]);
+    setIsModalOpen(true);
+  };
+
+  const openNewShootPlan = (presetDate: string) => {
+    if (!onSaveShootPlan) {
+      alert('Сохранение плана съёмки недоступно.');
+      return;
+    }
+    const tid = defaultShootTableId;
+    if (!tid) {
+      alert('Нет контент-плана. Создайте страницу «Контент-план» в пространстве проекта.');
+      return;
+    }
+    const id = `sp-${Date.now()}`;
+    setShootModalDraft({
+      id,
+      tableId: tid,
+      title: 'Съёмка',
+      date: presetDate,
+      time: '10:00',
+      participantIds: [],
+      items: [emptyShootItem()],
+    });
+    setShootPostFormatFilter('all');
+  };
+
+  const saveShootFromCalendar = () => {
+    if (!shootModalDraft || !onSaveShootPlan) return;
+    if (!shootModalDraft.title.trim()) {
+      alert('Укажите название плана');
+      return;
+    }
+    const cleaned: ShootPlan = {
+      ...shootModalDraft,
+      items: (shootModalDraft.items || [])
+        .filter((it) => it.postId)
+        .map((it) => ({
+          ...it,
+          referenceImages: (it.referenceImages || []).filter(Boolean),
+        })),
+    };
+    if (cleaned.items.length === 0) {
+      alert('Добавьте хотя бы один пост из контент-плана');
+      return;
+    }
+    onSaveShootPlan(cleaned);
+    setShootModalDraft(null);
+  };
+
+  const closeMeetingModal = () => {
+    setIsModalOpen(false);
+    setEditingMeeting(null);
+    setMeetingTypeLocked(false);
+    setTitle('');
+    setSelectedParticipants([]);
+    setSelectedDealId('');
+    setSelectedProjectId('');
+    setRecurrence('none');
+    setMeetingType('work');
+  };
+
+  const openCreateFlowForDate = (dateStr: string) => {
+    setPickEventKindDate(dateStr);
+    setPickEventKindOpen(true);
   };
 
   const handleOpenEdit = (meeting: Meeting) => {
       if (meetingTypeKey(meeting) === 'shoot' || meeting.shootPlanId) {
         const sid = meeting.shootPlanId || '';
-        const plan = sid ? shootPlans.find((p) => p.id === sid) : undefined;
-        const targetTableId = plan?.tableId;
-        if (targetTableId && onNavigateToShootPlan && sid) {
-          onNavigateToShootPlan(targetTableId, sid);
+        const plan = sid ? shootPlans.find((p) => p.id === sid && !p.isArchived) : undefined;
+        if (!plan) {
+          alert('План съёмки не найден.');
           return;
         }
-        alert('План съёмки не найден. Откройте нужный контент-план → вкладка «Съёмки».');
+        if (!onSaveShootPlan) {
+          alert('Редактирование плана съёмки недоступно.');
+          return;
+        }
+        setShootModalDraft({
+          ...plan,
+          items: plan.items?.length ? [...plan.items] : [emptyShootItem()],
+        });
+        setShootPostFormatFilter('all');
         return;
       }
       setEditingMeeting(meeting);
       const inferred: Meeting['type'] = meeting.projectId ? 'project' : (meeting.type || 'work');
       setMeetingType(inferred);
       setTitle(meeting.title);
-      setDate(normalizeDateForInput(meeting.date) || new Date().toISOString().split('T')[0]);
+      setDate(normalizeDateForInput(meeting.date) || getTodayLocalDate());
       setTime(meeting.time);
       setRecurrence(meeting.recurrence || 'none');
       setSelectedDealId(meeting.dealId || '');
       setSelectedProjectId(meeting.projectId || '');
       setSelectedParticipants(meeting.participantIds || []);
+      setMeetingTypeLocked(false);
       setIsModalOpen(true);
   };
 
@@ -231,14 +361,7 @@ const MeetingsView: React.FC<MeetingsViewProps> = ({
           };
           onSaveMeeting(newMeeting);
       }
-      setIsModalOpen(false);
-      setEditingMeeting(null);
-      setTitle('');
-      setSelectedParticipants([]);
-      setSelectedDealId('');
-      setSelectedProjectId('');
-      setRecurrence('none');
-      setMeetingType('work');
+      closeMeetingModal();
   };
 
   const toggleParticipant = (userId: string) => {
@@ -270,7 +393,7 @@ const MeetingsView: React.FC<MeetingsViewProps> = ({
   };
 
   const handleBackdropClick = (e: React.MouseEvent) => {
-      if (e.target === e.currentTarget) setIsModalOpen(false);
+      if (e.target === e.currentTarget) closeMeetingModal();
   };
 
   const goCalendarToday = () => {
@@ -362,12 +485,11 @@ const MeetingsView: React.FC<MeetingsViewProps> = ({
                           dateStr = `${currentYear}-${mm}-${dd}`;
                       }
 
-                      const dayMeetings = day ? filteredMeetings.filter(m => {
-                          try {
-                              const mDate = new Date(m.date);
-                              return mDate.getDate() === day && mDate.getMonth() === currentMonth && mDate.getFullYear() === currentYear;
-                          } catch (e) { return false; }
-                      }) : [];
+                      const dayMeetings = day
+                        ? filteredMeetings
+                            .filter((m) => normalizeDateForInput(m.date) === dateStr)
+                            .sort((a, b) => (a.time || '00:00').localeCompare(b.time || '00:00'))
+                        : [];
                       
                       const isToday =
                         day &&
@@ -376,9 +498,22 @@ const MeetingsView: React.FC<MeetingsViewProps> = ({
                       return (
                         <div 
                             key={idx} 
-                            className={`min-h-[128px] border-r border-b border-gray-100 dark:border-[#2a2a2a] p-1.5 transition-colors ${!day ? 'bg-gray-50/40 dark:bg-[#0f0f0f]' : 'hover:bg-teal-50/30 dark:hover:bg-teal-950/20'}`}
+                            role={day ? 'button' : undefined}
+                            tabIndex={day ? 0 : undefined}
+                            onKeyDown={
+                              day
+                                ? (e) => {
+                                    if (e.key === 'Enter' || e.key === ' ') {
+                                      e.preventDefault();
+                                      openCreateFlowForDate(dateStr);
+                                    }
+                                  }
+                                : undefined
+                            }
+                            className={`min-h-[128px] border-r border-b border-gray-100 dark:border-[#2a2a2a] p-1.5 transition-colors ${!day ? 'bg-gray-50/40 dark:bg-[#0f0f0f]' : 'hover:bg-teal-50/30 dark:hover:bg-teal-950/20 cursor-pointer'}`}
                             onDragOver={day ? onDragOver : undefined}
                             onDrop={day ? (e) => onDrop(e, dateStr) : undefined}
+                            onClick={day ? () => openCreateFlowForDate(dateStr) : undefined}
                         >
                             {day && (
                                 <>
@@ -444,7 +579,6 @@ const MeetingsView: React.FC<MeetingsViewProps> = ({
             title="Календарь"
             description="Встречи, планёрки и события по проектам — в списке и в календаре"
             tabs={
-              calendarTab === 'calendar' ? (
               <ModuleSegmentedControl<'all' | 'client' | 'work' | 'project' | 'shoot'>
                 variant="neutral"
                 value={meetingTypeFilter}
@@ -457,15 +591,10 @@ const MeetingsView: React.FC<MeetingsViewProps> = ({
                   { value: 'shoot', label: 'Съёмки' },
                 ]}
               />
-              ) : (
-                <span className="text-xs text-gray-500 dark:text-gray-400">
-                  {calendarTab === 'shoots' ? 'Только планы съёмок из контент-плана' : 'Все типы событий'}
-                </span>
-              )
             }
             controls={
               <>
-                <ModuleSegmentedControl<'calendar' | 'list' | 'shoots'>
+                <ModuleSegmentedControl<'calendar' | 'list'>
                   variant="accent"
                   accent="teal"
                   value={calendarTab}
@@ -473,14 +602,79 @@ const MeetingsView: React.FC<MeetingsViewProps> = ({
                   options={[
                     { value: 'calendar', label: 'Календарь', icon: <LayoutGrid size={16} /> },
                     { value: 'list', label: 'Список', icon: <List size={16} /> },
-                    { value: 'shoots', label: 'Съёмки', icon: <Clapperboard size={16} /> },
                   ]}
                 />
-                <ModuleCreateIconButton accent="teal" label="Новое событие" onClick={handleOpenCreate} />
+                <ModuleCreateDropdown
+                  accent="teal"
+                  label="Новое событие"
+                  items={[
+                    {
+                      id: 'work',
+                      label: 'Рабочая встреча',
+                      icon: Building2,
+                      onClick: () => openMeetingCreate('work', getTodayLocalDate()),
+                    },
+                    {
+                      id: 'client',
+                      label: 'Встреча с клиентом',
+                      icon: Briefcase,
+                      onClick: () => openMeetingCreate('client', getTodayLocalDate()),
+                    },
+                    {
+                      id: 'project',
+                      label: 'Событие по проекту',
+                      icon: Clapperboard,
+                      onClick: () => openMeetingCreate('project', getTodayLocalDate()),
+                    },
+                    ...(onSaveShootPlan && contentPlanTables.length > 0
+                      ? [
+                          {
+                            id: 'shoot',
+                            label: 'План съёмки',
+                            icon: Camera,
+                            onClick: () => openNewShootPlan(getTodayLocalDate()),
+                          },
+                        ]
+                      : []),
+                  ]}
+                />
               </>
             }
             actions={
-              <ModuleCreateIconButton accent="teal" label="Новое событие" onClick={handleOpenCreate} />
+              <ModuleCreateDropdown
+                accent="teal"
+                label="Новое событие"
+                items={[
+                  {
+                    id: 'work',
+                    label: 'Рабочая встреча',
+                    icon: Building2,
+                    onClick: () => openMeetingCreate('work', getTodayLocalDate()),
+                  },
+                  {
+                    id: 'client',
+                    label: 'Встреча с клиентом',
+                    icon: Briefcase,
+                    onClick: () => openMeetingCreate('client', getTodayLocalDate()),
+                  },
+                  {
+                    id: 'project',
+                    label: 'Событие по проекту',
+                    icon: Clapperboard,
+                    onClick: () => openMeetingCreate('project', getTodayLocalDate()),
+                  },
+                  ...(onSaveShootPlan && contentPlanTables.length > 0
+                    ? [
+                        {
+                          id: 'shoot',
+                          label: 'План съёмки',
+                          icon: Camera,
+                          onClick: () => openNewShootPlan(getTodayLocalDate()),
+                        },
+                      ]
+                    : []),
+                ]}
+              />
             }
           />
         </div>
@@ -496,7 +690,7 @@ const MeetingsView: React.FC<MeetingsViewProps> = ({
                     <p className="text-gray-500 dark:text-gray-400 text-sm mt-2 max-w-md mx-auto">Добавьте встречу с клиентом, планёрку или событие по проекту (например съёмку).</p>
                     <button
                       type="button"
-                      onClick={handleOpenCreate}
+                      onClick={() => openCreateFlowForDate(getTodayLocalDate())}
                       className="mt-6 inline-flex items-center gap-2 rounded-xl bg-teal-600 hover:bg-teal-700 text-white text-sm font-semibold px-5 py-2.5 shadow-sm"
                     >
                       <Calendar size={16} /> Запланировать
@@ -504,7 +698,8 @@ const MeetingsView: React.FC<MeetingsViewProps> = ({
                 </div>
             ) : (
                 filteredMeetings.map(meeting => {
-                  const d = new Date(meeting.date);
+                  const dateKey = normalizeDateForInput(meeting.date);
+                  const d = dateKey ? parseLocalDate(dateKey) : new Date();
                   const dayNum = d.getDate();
                   const monthShort = d.toLocaleString('ru-RU', { month: 'short' });
                   return (
@@ -628,13 +823,14 @@ const MeetingsView: React.FC<MeetingsViewProps> = ({
                       </h3>
                       <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Встреча, планёрка или событие по проекту — укажите участников и время.</p>
                     </div>
-                    <button type="button" onClick={() => setIsModalOpen(false)} className="text-gray-400 hover:text-gray-700 dark:hover:text-white p-2 rounded-xl hover:bg-gray-100 dark:hover:bg-[#333] shrink-0" aria-label="Закрыть">
+                    <button type="button" onClick={closeMeetingModal} className="text-gray-400 hover:text-gray-700 dark:hover:text-white p-2 rounded-xl hover:bg-gray-100 dark:hover:bg-[#333] shrink-0" aria-label="Закрыть">
                       <X size={20} />
                     </button>
                 </div>
 
                 <form onSubmit={handleCreate} className="flex flex-col flex-1 min-h-0">
                     <div className="flex-1 min-h-0 overflow-y-auto custom-scrollbar px-5 py-5 space-y-4">
+                        {(!meetingTypeLocked || editingMeeting) && (
                         <div>
                             <label className="block text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-2">Тип</label>
                             <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
@@ -685,6 +881,7 @@ const MeetingsView: React.FC<MeetingsViewProps> = ({
                                 </button>
                             </div>
                         </div>
+                        )}
 
                         {meetingType === 'client' && (
                             <div>
@@ -812,7 +1009,7 @@ const MeetingsView: React.FC<MeetingsViewProps> = ({
                     <div className="px-5 py-4 border-t border-gray-100 dark:border-[#333] bg-gray-50/80 dark:bg-[#1f1f1f] flex justify-end gap-2 shrink-0">
                         <button 
                             type="button" 
-                            onClick={() => setIsModalOpen(false)}
+                            onClick={closeMeetingModal}
                             className="px-4 py-2.5 text-sm font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-200/80 dark:hover:bg-[#333] rounded-xl"
                         >
                             Отмена
@@ -827,6 +1024,98 @@ const MeetingsView: React.FC<MeetingsViewProps> = ({
                 </form>
             </div>
         </div>
+      )}
+
+      {pickEventKindOpen && (
+        <div
+          className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 p-4"
+          onClick={(e) => e.target === e.currentTarget && setPickEventKindOpen(false)}
+        >
+          <div
+            className="bg-white dark:bg-[#252525] rounded-2xl shadow-xl max-w-sm w-full border border-gray-200 dark:border-[#333] overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="px-5 py-4 border-b border-gray-100 dark:border-[#333]">
+              <h3 className="text-lg font-bold text-gray-900 dark:text-white">Новое событие</h3>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                Дата: {pickEventKindDate ? new Date(pickEventKindDate + 'T12:00:00').toLocaleDateString('ru-RU') : '—'}
+              </p>
+            </div>
+            <div className="p-3 space-y-1">
+              <button
+                type="button"
+                className="w-full flex items-center gap-2 px-3 py-2.5 rounded-xl text-left text-sm text-gray-800 dark:text-gray-100 hover:bg-gray-100 dark:hover:bg-[#333]"
+                onClick={() => {
+                  setPickEventKindOpen(false);
+                  openMeetingCreate('work', pickEventKindDate);
+                }}
+              >
+                <Building2 size={18} className="text-teal-600 shrink-0" />
+                Рабочая встреча
+              </button>
+              <button
+                type="button"
+                className="w-full flex items-center gap-2 px-3 py-2.5 rounded-xl text-left text-sm text-gray-800 dark:text-gray-100 hover:bg-gray-100 dark:hover:bg-[#333]"
+                onClick={() => {
+                  setPickEventKindOpen(false);
+                  openMeetingCreate('client', pickEventKindDate);
+                }}
+              >
+                <Briefcase size={18} className="text-sky-600 shrink-0" />
+                Встреча с клиентом
+              </button>
+              <button
+                type="button"
+                className="w-full flex items-center gap-2 px-3 py-2.5 rounded-xl text-left text-sm text-gray-800 dark:text-gray-100 hover:bg-gray-100 dark:hover:bg-[#333]"
+                onClick={() => {
+                  setPickEventKindOpen(false);
+                  openMeetingCreate('project', pickEventKindDate);
+                }}
+              >
+                <Clapperboard size={18} className="text-emerald-600 shrink-0" />
+                Событие по проекту
+              </button>
+              {onSaveShootPlan && contentPlanTables.length > 0 && (
+                <button
+                  type="button"
+                  className="w-full flex items-center gap-2 px-3 py-2.5 rounded-xl text-left text-sm text-gray-800 dark:text-gray-100 hover:bg-gray-100 dark:hover:bg-[#333]"
+                  onClick={() => {
+                    setPickEventKindOpen(false);
+                    openNewShootPlan(pickEventKindDate);
+                  }}
+                >
+                  <Camera size={18} className="text-orange-500 shrink-0" />
+                  План съёмки
+                </button>
+              )}
+            </div>
+            <div className="px-3 pb-3">
+              <button
+                type="button"
+                className="w-full py-2.5 text-sm font-medium text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-[#333] rounded-xl"
+                onClick={() => setPickEventKindOpen(false)}
+              >
+                Отмена
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {shootModalDraft && onSaveShootPlan && (
+        <ShootPlanModal
+          draft={shootModalDraft}
+          onDraftChange={setShootModalDraft}
+          allPostsForTable={contentPosts}
+          users={users}
+          reservedPostIds={reservedForShootModal}
+          postFormatFilter={shootPostFormatFilter}
+          onPostFormatFilterChange={setShootPostFormatFilter}
+          onSave={saveShootFromCalendar}
+          onCancel={() => setShootModalDraft(null)}
+          isNew={!shootPlans.some((p) => p.id === shootModalDraft.id)}
+          contentPlanOptions={contentPlanOptions.length > 1 ? contentPlanOptions : undefined}
+        />
       )}
     </ModulePageShell>
   );

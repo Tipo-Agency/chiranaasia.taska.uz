@@ -11,6 +11,7 @@ import { api } from '../backend/api';
 import { isFunnelDeal } from '../utils/dealModel';
 import { getFunnelKanbanCardAccent } from '../utils/funnelVisual';
 import { devWarn } from '../utils/devLog';
+import { formatDate } from '../utils/dateUtils';
 
 interface SalesFunnelViewProps {
   deals: Deal[];
@@ -1197,7 +1198,7 @@ const SalesFunnelView: React.FC<SalesFunnelViewProps> = ({ deals, clients, users
                                                   <div className="flex items-center gap-3 text-xs text-gray-500 dark:text-gray-400 mb-2">
                                                       <div className="flex items-center gap-1">
                                                           <Calendar size={12} />
-                                                          <span>{new Date(meeting.date).toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric' })}</span>
+                                                          <span>{formatDate(meeting.date)}</span>
                                                       </div>
                                                       <div className="flex items-center gap-1">
                                                           <Clock size={12} />

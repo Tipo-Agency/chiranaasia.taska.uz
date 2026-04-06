@@ -11,7 +11,7 @@ import { Card } from '../../ui/Card';
 import { Badge } from '../../ui/Badge';
 import { UserAvatar } from '../common/UserAvatar';
 import { Calendar, Clock, Users } from 'lucide-react';
-import { formatDate } from '../../../utils/dateUtils';
+import { formatDate, getTodayLocalDate, normalizeDateForInput, compareDates } from '../../../utils/dateUtils';
 
 interface MeetingCardProps {
   meeting: Meeting;
@@ -27,8 +27,10 @@ export const MeetingCard: React.FC<MeetingCardProps> = ({
   className = '',
 }) => {
   const participants = users.filter(u => meeting.participantIds?.includes(u.id));
-  const isToday = meeting.date && new Date(meeting.date).toDateString() === new Date().toDateString();
-  const isPast = meeting.date && new Date(meeting.date) < new Date();
+  const dayKey = meeting.date ? normalizeDateForInput(meeting.date) : '';
+  const today = getTodayLocalDate();
+  const isToday = !!dayKey && dayKey === today;
+  const isPast = !!dayKey && compareDates(dayKey, today) < 0;
 
   return (
     <Card

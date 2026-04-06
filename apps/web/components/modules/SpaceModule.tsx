@@ -410,7 +410,8 @@ export const SpaceModule: React.FC<SpaceModuleProps> = ({
                     onSaveMeeting={actions.saveMeeting} onDeleteMeeting={actions.deleteMeeting} onUpdateSummary={actions.updateMeetingSummary}
                     notificationPrefs={notificationPrefs}
                     shootPlans={shootPlans}
-                    onNavigateToShootPlan={actions.openShootPlanFromCalendar}
+                    contentPosts={contentPosts}
+                    onSaveShootPlan={actions.saveShootPlan}
                 />
                 </div>
             </div>

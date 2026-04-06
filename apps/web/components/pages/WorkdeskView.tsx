@@ -21,6 +21,7 @@ import { getDealDisplayTitle, isFunnelDeal } from '../../utils/dealModel';
 import { ModuleCreateDropdown } from '../ui/ModuleCreateDropdown';
 import { ModulePageHeader, ModulePageShell, MODULE_PAGE_GUTTER } from '../ui';
 import { DateInput } from '../ui/DateInput';
+import { normalizeDateForInput, parseLocalDate } from '../../utils/dateUtils';
 
 type WorkdeskTab = 'dashboard' | 'weekly' | 'tasks' | 'deals' | 'meetings' | 'analytics';
 
@@ -179,8 +180,10 @@ export const WorkdeskView: React.FC<WorkdeskViewProps> = ({
     const end = new Date(start);
     end.setDate(start.getDate() + 7);
     return myMeetings.filter((m) => {
-      const d = m.date ? new Date(`${m.date}T00:00:00`) : null;
-      return d && d >= start && d < end;
+      const key = m.date ? normalizeDateForInput(m.date) : '';
+      if (!key) return false;
+      const d = parseLocalDate(key);
+      return d >= start && d < end;
     }).length;
   }, [myMeetings]);
   const tasksByDealId = useMemo(() => {
@@ -198,7 +201,7 @@ export const WorkdeskView: React.FC<WorkdeskViewProps> = ({
   const meetingsByDate = useMemo(() => {
     const groups = new Map<string, Meeting[]>();
     myMeetings.forEach((m) => {
-      const key = m.date || 'Без даты';
+      const key = m.date ? normalizeDateForInput(m.date) || 'Без даты' : 'Без даты';
       const arr = groups.get(key) || [];
       arr.push(m);
       groups.set(key, arr);

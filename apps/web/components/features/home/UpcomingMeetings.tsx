@@ -6,7 +6,7 @@ import { Meeting, User } from '../../../types';
 import { MeetingCard } from '../meetings/MeetingCard';
 import { Button } from '../../ui/Button';
 import { ArrowRight, Calendar } from 'lucide-react';
-import { getTodayLocalDate } from '../../../utils/dateUtils';
+import { getTodayLocalDate, normalizeDateForInput, compareDates } from '../../../utils/dateUtils';
 
 interface UpcomingMeetingsProps {
   meetings: Meeting[];
@@ -23,9 +23,15 @@ export const UpcomingMeetings: React.FC<UpcomingMeetingsProps> = ({
 }) => {
   const todayStr = getTodayLocalDate();
   const upcomingMeetings = meetings
-    .filter(m => m && m.date >= todayStr)
+    .filter((m) => {
+      if (!m?.date) return false;
+      const k = normalizeDateForInput(m.date);
+      return !!k && compareDates(k, todayStr) >= 0;
+    })
     .sort((a, b) => {
-      if (a.date !== b.date) return a.date.localeCompare(b.date);
+      const ak = normalizeDateForInput(a.date);
+      const bk = normalizeDateForInput(b.date);
+      if (ak !== bk) return ak.localeCompare(bk);
       return (a.time || '').localeCompare(b.time || '');
     })
     .slice(0, maxItems);

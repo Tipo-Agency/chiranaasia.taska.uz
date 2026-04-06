@@ -580,7 +580,7 @@ export const AppRouter: React.FC<AppRouterProps> = (props) => {
       }
       return (
         <Suspense fallback={<RouteFallback />}>
-          <MeetingsModuleLazy table={meetingsTable} meetings={props.meetings} users={props.users} projects={props.projects} clients={props.clients} deals={props.deals} tables={props.tables} notificationPrefs={props.notificationPrefs} shootPlans={props.shootPlans} actions={actions} />
+          <MeetingsModuleLazy table={meetingsTable} meetings={props.meetings} users={props.users} projects={props.projects} clients={props.clients} deals={props.deals} tables={props.tables} notificationPrefs={props.notificationPrefs} shootPlans={props.shootPlans} contentPosts={props.contentPosts} actions={actions} />
         </Suspense>
       );
   }
