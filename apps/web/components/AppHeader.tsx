@@ -3,7 +3,8 @@ import {
   Search, Moon, Sun, Settings, Bell, ChevronDown, LogOut, User as UserIcon, Home, Menu, X, MessageCircle,
   BarChart3, Wallet, Network, PieChart, Briefcase, UserCheck, CheckSquare, Users, FileText, Instagram, Layers, Package, Cog
 } from 'lucide-react';
-import { User, Role, TableCollection } from '../types';
+import { User, TableCollection } from '../types';
+import { hasPermission } from '../utils/permissions';
 import { DynamicIcon } from './AppIcons';
 import { getDefaultAvatarForId } from '../constants/avatars';
 
@@ -87,6 +88,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
     switch (view) {
       case 'tasks': return 'statuses';
       case 'sales-funnel': return 'sales-funnels';
+      case 'client-chats': return 'integrations';
       case 'clients': return 'integrations';
       case 'finance': return 'finance-categories';
       case 'business-processes': return 'spaces';
@@ -113,12 +115,13 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
       case 'settings': return { title: 'Настройки', icon: <Settings size={18} />, iconBox: 'bg-slate-100 text-slate-700 dark:bg-slate-900/30 dark:text-slate-300' };
       case 'analytics': return { title: 'Аналитика', icon: <PieChart size={18} />, iconBox: 'bg-cyan-100 text-cyan-700 dark:bg-cyan-900/30 dark:text-cyan-300' };
       case 'sales-funnel': return { title: 'Воронка продаж', icon: <BarChart3 size={18} />, iconBox: 'bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-300' };
+      case 'client-chats': return { title: 'Диалоги', icon: <MessageCircle size={18} />, iconBox: 'bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-300' };
       case 'clients': return { title: 'Клиенты', icon: <Briefcase size={18} />, iconBox: 'bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-300' };
       case 'finance': return { title: 'Финансы', icon: <Wallet size={18} />, iconBox: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300' };
       case 'business-processes': return { title: 'Бизнес-процессы', icon: <Network size={18} />, iconBox: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300' };
       case 'employees': return { title: 'Сотрудники', icon: <UserCheck size={18} />, iconBox: 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300' };
       case 'spaces': return { title: 'Пространство', icon: <Layers size={18} />, iconBox: 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300' };
-      case 'meetings': return { title: 'Встречи', icon: <Users size={18} />, iconBox: 'bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-300' };
+      case 'meetings': return { title: 'Календарь', icon: <Users size={18} />, iconBox: 'bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-300' };
       case 'docs': return { title: 'Документы', icon: <FileText size={18} />, iconBox: 'bg-slate-100 text-slate-700 dark:bg-slate-900/30 dark:text-slate-300' };
       case 'doc-editor': return { title: 'Редактор документа', icon: <FileText size={18} />, iconBox: 'bg-slate-100 text-slate-700 dark:bg-slate-900/30 dark:text-slate-300' };
       case 'inventory': return { title: 'Склад', icon: <Package size={18} />, iconBox: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300' };
@@ -148,7 +151,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
               <h2 className="font-semibold text-gray-900 dark:text-white truncate text-sm md:text-base">
                 {activeTable.name}
               </h2>
-              {currentUser.role === Role.ADMIN && (
+              {hasPermission(currentUser, 'settings.general') && (
                 <Settings size={14} className="text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity hidden md:block shrink-0" />
               )}
             </div>

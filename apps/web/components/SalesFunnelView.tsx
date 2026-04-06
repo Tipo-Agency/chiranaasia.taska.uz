@@ -564,7 +564,7 @@ const SalesFunnelView: React.FC<SalesFunnelViewProps> = ({ deals, clients, users
   }
 
   return (
-    <ModulePageShell>
+    <ModulePageShell className="flex-1 min-h-0 flex flex-col overflow-hidden">
       <div className={`${MODULE_PAGE_GUTTER} pt-6 md:pt-8 flex-shrink-0`}>
         <div className="mb-6 space-y-5">
           <ModulePageHeader
@@ -621,13 +621,19 @@ const SalesFunnelView: React.FC<SalesFunnelViewProps> = ({ deals, clients, users
           />
         </div>
       </div>
-      <div className="flex-1 min-h-0 overflow-hidden">
-        <div className={`${MODULE_PAGE_GUTTER} pb-24 md:pb-32 h-full overflow-y-auto overflow-x-hidden custom-scrollbar`}>
+      <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
+        <div
+          className={`${MODULE_PAGE_GUTTER} h-full min-h-0 flex flex-col ${
+            viewMode === 'kanban'
+              ? 'overflow-hidden pb-0'
+              : 'pb-24 md:pb-32 overflow-y-auto overflow-x-hidden custom-scrollbar'
+          }`}
+        >
           {viewMode === 'kanban' ? (
-              <div className="h-full relative">
-                  <div className={`flex h-full overflow-x-auto gap-3 md:gap-4 ${draggedDealId ? 'pb-28 md:pb-32' : 'pb-4'}`}>
+              <div className="flex-1 min-h-0 relative flex flex-col">
+                  <div className={`flex flex-1 min-h-0 overflow-x-auto gap-3 md:gap-4 ${draggedDealId ? 'pb-28 md:pb-32' : 'pb-4'}`}>
                       {kanbanStages.map(s => (
-                          <div key={s.id} className="w-64 md:w-80 flex-shrink-0 flex flex-col bg-gray-50/50 dark:bg-[#1e1e1e] rounded-lg border border-gray-200 dark:border-[#333]" onDragOver={(e) => e.preventDefault()} onDrop={(e) => onDrop(e, s.id)}>
+                          <div key={s.id} className="w-64 md:w-80 flex-shrink-0 h-full min-h-0 max-h-full flex flex-col bg-gray-50/50 dark:bg-[#1e1e1e] rounded-lg border border-gray-200 dark:border-[#333]" onDragOver={(e) => e.preventDefault()} onDrop={(e) => onDrop(e, s.id)}>
                               <div className="p-2 md:p-3 font-bold text-xs md:text-sm text-gray-700 dark:text-gray-200 flex items-center justify-between gap-2">
                                 <div className="flex items-center gap-2 min-w-0">
                                   <span

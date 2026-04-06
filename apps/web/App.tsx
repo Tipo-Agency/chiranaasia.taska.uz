@@ -455,6 +455,7 @@ function MainApp() {
                 employeeInfos={state.employeeInfos}
                 meetings={state.meetings}
                 contentPosts={state.contentPosts}
+                shootPlans={state.shootPlans}
                 docs={state.docs}
                 folders={state.folders}
                 activeDoc={state.activeDoc}

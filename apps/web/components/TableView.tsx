@@ -2,7 +2,8 @@
 import React, { useRef, useState, useEffect, useLayoutEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { computeAnchoredDropdownPosition } from '../utils/floatingDropdownPosition';
-import { Project, Role, Task, User, StatusOption, PriorityOption, TableCollection, BusinessProcess } from '../types';
+import { Project, Task, User, StatusOption, PriorityOption, TableCollection, BusinessProcess } from '../types';
+import { hasPermission } from '../utils/permissions';
 import { Trash2, Layout, AlertCircle, ChevronDown, Check, Network, TrendingUp, FileText, Archive, Layers, Plus, CheckCircle2 as CheckIcon } from 'lucide-react';
 import { normalizeDateForInput, isOverdue } from '../utils/dateUtils';
 import { UserAvatar } from './features/common/UserAvatar';
@@ -420,7 +421,7 @@ const TableView: React.FC<TableViewProps> = ({
                 <th className="py-3 px-4 font-semibold text-xs text-gray-600 dark:text-gray-400 whitespace-nowrap" style={{ width: '104px', minWidth: '104px' }}>Приоритет</th>
                 <th className="py-3 px-4 font-semibold text-xs text-gray-600 dark:text-gray-400 whitespace-nowrap" style={{ width: '120px', minWidth: '120px' }}>Модуль</th>
                 <th className="py-3 px-4 font-semibold text-xs text-gray-600 dark:text-gray-400 whitespace-nowrap" style={{ width: '60px', minWidth: '60px' }}>Срок</th>
-                {currentUser.role === Role.ADMIN && <th className="py-3 px-4 w-10"></th>}
+                {hasPermission(currentUser, 'settings.general') && <th className="py-3 px-4 w-10"></th>}
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100 dark:divide-[#333] bg-white dark:bg-[#252525]">
@@ -530,7 +531,7 @@ const TableView: React.FC<TableViewProps> = ({
                           </td>
                           
                           {/* Удаление */}
-                          {currentUser.role === Role.ADMIN && (
+                          {hasPermission(currentUser, 'settings.general') && (
                               <td className="py-3 px-4 align-middle text-right">
                                   <button 
                                       onClick={(e) => {

@@ -1,4 +1,5 @@
-import { ActivityLog, User, Task, Deal, Client, Contract, Doc, Meeting, Role } from '../types';
+import { ActivityLog, User, Task, Deal, Client, Contract, Doc, Meeting } from '../types';
+import { hasPermission } from './permissions';
 import { getDealDisplayTitle } from './dealModel';
 import { api } from '../backend/api';
 
@@ -64,7 +65,7 @@ export const createActivityLogsForAll = async (
   if (!currentUser) return;
 
   const targetUsers = includeAdminOnly 
-    ? allUsers.filter(u => u.role === Role.ADMIN && !u.isArchived)
+    ? allUsers.filter(u => (hasPermission(u, 'admin.system') || hasPermission(u, 'system.full_access')) && !u.isArchived)
     : allUsers.filter(u => !u.isArchived);
 
   const logs: ActivityLog[] = targetUsers.map(user => ({

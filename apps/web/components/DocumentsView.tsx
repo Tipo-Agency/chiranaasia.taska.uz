@@ -62,7 +62,7 @@ const DocumentsView: React.FC<DocumentsViewProps> = ({
     onUpdateTask,
     onDeleteAttachment
 }) => {
-  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('list');
   const [folderPath, setFolderPath] = useState<string[]>([]);
   const [activeTab, setActiveTab] = useState<'docs' | 'attachments' | 'weekly' | 'protocols'>('docs');
   const [previewFile, setPreviewFile] = useState<{ url: string; name: string; type: string } | null>(null);

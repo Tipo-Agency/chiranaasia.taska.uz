@@ -38,7 +38,7 @@ const getTableTypeIcon = (type: string) => {
 const getTypeLabel = (type: string): string => {
   switch(type) {
     case 'content-plan': return 'Контент планы';
-    case 'meetings': return 'Встречи';
+    case 'meetings': return 'Календарь';
     case 'docs': return 'Документы';
     case 'tasks': return 'Задачи';
     case 'backlog': return 'Бэклог';

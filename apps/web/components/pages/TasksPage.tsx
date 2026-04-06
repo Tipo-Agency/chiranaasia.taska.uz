@@ -205,7 +205,7 @@ export const TasksPage: React.FC<TasksPageProps> = ({
   }, []);
 
   return (
-    <ModulePageShell>
+    <ModulePageShell className="flex-1 min-h-0 flex flex-col overflow-hidden">
       <div className={`${MODULE_PAGE_GUTTER} pt-6 md:pt-8 flex-shrink-0`}>
         <div className="mb-5">
           <TasksHeader
@@ -226,9 +226,10 @@ export const TasksPage: React.FC<TasksPageProps> = ({
         )}
       </div>
 
-      <div className="flex-1 min-h-0 overflow-hidden">
-        <div className={`${MODULE_PAGE_GUTTER} mt-3 pb-24 md:pb-32 h-full overflow-y-auto overflow-x-hidden custom-scrollbar`}>
+      <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
+        <div className={`${MODULE_PAGE_GUTTER} mt-3 flex-1 min-h-0 flex flex-col overflow-hidden pb-4`}>
           {viewMode === ViewMode.TABLE && (
+            <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
             <TableView
               tasks={filteredTasks}
               users={users}
@@ -243,9 +244,11 @@ export const TasksPage: React.FC<TasksPageProps> = ({
               onDeleteTask={onDeleteTask}
               onOpenTask={onOpenTask}
             />
+            </div>
           )}
 
           {viewMode === ViewMode.KANBAN && (
+            <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
             <KanbanBoard
               tasks={filteredTasks}
               users={users}
@@ -258,14 +261,17 @@ export const TasksPage: React.FC<TasksPageProps> = ({
               onUpdateStatus={(id, status) => onUpdateTask(id, { status })}
               onOpenTask={onOpenTask}
             />
+            </div>
           )}
 
           {viewMode === ViewMode.GANTT && (
+            <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
             <GanttView
               tasks={filteredTasks}
               projects={projects}
               onOpenTask={onOpenTask}
             />
+            </div>
           )}
         </div>
       </div>

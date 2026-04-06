@@ -1,7 +1,7 @@
 import React, { lazy, Suspense } from 'react';
 import { 
   Task, User, Project, StatusOption, PriorityOption, ActivityLog, 
-  Deal, Client, Contract, EmployeeInfo, Meeting, ContentPost, 
+  Deal, Client, Contract, EmployeeInfo, Meeting, ContentPost, ShootPlan,
   Doc, Folder, TableCollection, Department, FinanceCategory, Fund,
   FinancePlan, PurchaseRequest, FinancialPlanDocument, FinancialPlanning, OrgPosition, BusinessProcess, SalesFunnel,
   ViewMode, AutomationRule, Warehouse, InventoryItem, StockBalance, StockMovement, InventoryRevision, OneTimeDeal, AccountsReceivable,
@@ -56,6 +56,7 @@ interface AppRouterProps {
   employeeInfos: EmployeeInfo[];
   meetings: Meeting[];
   contentPosts: ContentPost[];
+  shootPlans?: ShootPlan[];
   docs: Doc[];
   folders: Folder[];
   activeDoc?: Doc;
@@ -474,8 +475,10 @@ export const AppRouter: React.FC<AppRouterProps> = (props) => {
                             users={props.users} currentUser={props.currentUser} projects={props.projects}
                             statuses={props.statuses} priorities={props.priorities} tables={props.tables}
                             docs={props.docs} folders={props.folders} meetings={props.meetings}
-                            contentPosts={props.contentPosts} businessProcesses={props.businessProcesses}
+                            contentPosts={props.contentPosts} shootPlans={props.shootPlans}
+                            businessProcesses={props.businessProcesses}
                             clients={props.clients} deals={props.deals}
+                            notificationPrefs={props.notificationPrefs}
                             actions={actions}
                         />
                         </Suspense>
@@ -510,6 +513,7 @@ export const AppRouter: React.FC<AppRouterProps> = (props) => {
               deals={props.deals}
               users={props.users}
               currentUser={props.currentUser}
+              salesFunnels={props.salesFunnels}
               onSaveDeal={actions.saveDeal}
               onOpenInFunnel={(deal) => {
                   actions.setCurrentView('sales-funnel');
@@ -565,7 +569,7 @@ export const AppRouter: React.FC<AppRouterProps> = (props) => {
           // Создаем фиктивную таблицу автоматически
           meetingsTable = { 
               id: 'meetings-system', 
-              name: 'Встречи', 
+              name: 'Календарь', 
               type: 'meetings', 
               icon: 'Users', 
               color: 'text-purple-500', 
@@ -576,7 +580,7 @@ export const AppRouter: React.FC<AppRouterProps> = (props) => {
       }
       return (
         <Suspense fallback={<RouteFallback />}>
-          <MeetingsModuleLazy table={meetingsTable} meetings={props.meetings} users={props.users} clients={props.clients} deals={props.deals} tables={props.tables} actions={actions} />
+          <MeetingsModuleLazy table={meetingsTable} meetings={props.meetings} users={props.users} projects={props.projects} clients={props.clients} deals={props.deals} tables={props.tables} notificationPrefs={props.notificationPrefs} shootPlans={props.shootPlans} actions={actions} />
         </Suspense>
       );
   }

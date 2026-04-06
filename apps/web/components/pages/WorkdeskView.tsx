@@ -309,7 +309,7 @@ export const WorkdeskView: React.FC<WorkdeskViewProps> = ({
                   { id: 'weekly', label: 'Планы' },
                   { id: 'tasks', label: 'Задачи' },
                   { id: 'deals', label: 'Сделки' },
-                  { id: 'meetings', label: 'Встречи' },
+                  { id: 'meetings', label: 'Календарь' },
                   { id: 'analytics', label: 'Аналитика' },
                 ]}
                 activeTab={activeTab}
@@ -396,7 +396,7 @@ export const WorkdeskView: React.FC<WorkdeskViewProps> = ({
                     <p className="font-semibold text-gray-900 dark:text-white">{myPipelineDeals.length}</p>
                   </div>
                   <div className="rounded-xl border border-gray-200 dark:border-[#333] p-3">
-                    <p className="text-gray-500">Встреч на неделе</p>
+                    <p className="text-gray-500">Событий в календаре на неделе</p>
                     <p className="font-semibold text-gray-900 dark:text-white">{meetingsThisWeek}</p>
                   </div>
                 </div>
@@ -507,7 +507,7 @@ export const WorkdeskView: React.FC<WorkdeskViewProps> = ({
                   <div className="flex items-center justify-between gap-2">
                     <div className="flex items-center gap-2">
                       <CalendarClock className="w-4 h-4 text-violet-600 dark:text-violet-400" />
-                      <h3 className="font-semibold text-gray-900 dark:text-white">Ближайшие встречи</h3>
+                      <h3 className="font-semibold text-gray-900 dark:text-white">Ближайшие события</h3>
                     </div>
                     <button
                       type="button"
@@ -518,7 +518,7 @@ export const WorkdeskView: React.FC<WorkdeskViewProps> = ({
                     </button>
                   </div>
                   {upcomingMeetingsBoard.length === 0 ? (
-                    <p className="text-sm text-gray-500 dark:text-gray-400">Нет встреч на ближайшие 2 недели.</p>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">Нет событий на ближайшие 2 недели.</p>
                   ) : (
                     <ul className="space-y-2">
                       {upcomingMeetingsBoard.map((m) => (
@@ -725,13 +725,13 @@ export const WorkdeskView: React.FC<WorkdeskViewProps> = ({
           {activeTab === 'meetings' && (
             <div className="bg-white dark:bg-[#252525] rounded-2xl border border-gray-200 dark:border-[#333] p-4 space-y-3">
               <div className="flex items-center justify-between">
-                <h3 className="font-semibold text-gray-900 dark:text-white">Встречи</h3>
+                <h3 className="font-semibold text-gray-900 dark:text-white">Календарь</h3>
                 <button type="button" onClick={onNavigateToMeetings} className="text-sm text-[#3337AD] hover:underline">
                   Открыть модуль
                 </button>
               </div>
               <div className="rounded-xl border border-gray-200 dark:border-[#333] p-2 text-xs">
-                <p className="text-gray-500">Встреч на этой неделе</p>
+                <p className="text-gray-500">Событий в календаре на этой неделе</p>
                 <p className="font-semibold text-gray-900 dark:text-white">{meetingsThisWeek}</p>
               </div>
               {myMeetings.length === 0 ? (
@@ -788,7 +788,7 @@ export const WorkdeskView: React.FC<WorkdeskViewProps> = ({
                   <p className="font-semibold text-gray-900 dark:text-white">{myDeals.filter((d) => d.stage !== 'won' && d.stage !== 'lost').length}</p>
                 </div>
                 <div className="rounded-xl border border-gray-200 dark:border-[#333] p-3">
-                  <p className="text-gray-500">Встреч на неделе</p>
+                  <p className="text-gray-500">Событий в календаре на неделе</p>
                   <p className="font-semibold text-gray-900 dark:text-white">{meetingsThisWeek}</p>
                 </div>
               </div>

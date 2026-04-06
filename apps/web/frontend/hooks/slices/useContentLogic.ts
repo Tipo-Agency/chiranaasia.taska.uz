@@ -1,6 +1,6 @@
 
 import { useState } from 'react';
-import { Doc, Folder, Meeting, ContentPost } from '../../../types';
+import { Doc, Folder, Meeting, ContentPost, ShootPlan } from '../../../types';
 import { api } from '../../../backend/api';
 
 export const useContentLogic = (showNotification: (msg: string) => void, activeTableId: string) => {
@@ -8,6 +8,7 @@ export const useContentLogic = (showNotification: (msg: string) => void, activeT
   const [folders, setFolders] = useState<Folder[]>([]);
   const [meetings, setMeetings] = useState<Meeting[]>([]);
   const [contentPosts, setContentPosts] = useState<ContentPost[]>([]);
+  const [shootPlans, setShootPlans] = useState<ShootPlan[]>([]);
   
   const [isDocModalOpen, setIsDocModalOpen] = useState(false);
   const [targetFolderId, setTargetFolderId] = useState<string | undefined>(undefined);
@@ -62,6 +63,37 @@ export const useContentLogic = (showNotification: (msg: string) => void, activeT
       setContentPosts(u);
       api.contentPosts.updateAll(u).catch(() => showNotification('Ошибка удаления поста'));
       showNotification('Пост удален'); 
+  };
+
+  const saveShootPlan = (plan: ShootPlan) => {
+    const existing = shootPlans.find((p) => p.id === plan.id);
+    const next = existing
+      ? shootPlans.map((p) => (p.id === plan.id ? { ...plan } : p))
+      : [...shootPlans, { ...plan }];
+    setShootPlans(next);
+    api.shootPlans
+      .updateAll(next)
+      .then(() => api.meetings.getAll())
+      .then((raw) => {
+        setMeetings(raw as Meeting[]);
+        showNotification(existing ? 'План съёмки сохранён' : 'План съёмки создан');
+      })
+      .catch(() => showNotification('Ошибка сохранения плана съёмки'));
+  };
+
+  const deleteShootPlan = (id: string) => {
+    const next = shootPlans.map((p) =>
+      p.id === id ? { ...p, isArchived: true } : p
+    );
+    setShootPlans(next);
+    api.shootPlans
+      .updateAll(next)
+      .then(() => api.meetings.getAll())
+      .then((raw) => {
+        setMeetings(raw as Meeting[]);
+        showNotification('План съёмки в архиве');
+      })
+      .catch(() => showNotification('Ошибка архивации плана'));
   };
 
   // Docs
@@ -195,10 +227,10 @@ export const useContentLogic = (showNotification: (msg: string) => void, activeT
   };
 
   return {
-    state: { docs, folders, meetings, contentPosts, isDocModalOpen, activeDocId, targetFolderId, editingDoc },
-    setters: { setDocs, setFolders, setMeetings, setContentPosts, setActiveDocId },
+    state: { docs, folders, meetings, contentPosts, shootPlans, isDocModalOpen, activeDocId, targetFolderId, editingDoc },
+    setters: { setDocs, setFolders, setMeetings, setContentPosts, setShootPlans, setActiveDocId },
     actions: { 
-        saveMeeting, deleteMeeting, updateMeetingSummary, savePost, deletePost,
+        saveMeeting, deleteMeeting, updateMeetingSummary, savePost, deletePost, saveShootPlan, deleteShootPlan,
         saveDoc, saveDocContent, deleteDoc, createFolder, deleteFolder, updateFolder, handleDocClick,
         openDocModal: (folderId?: string) => { setTargetFolderId(folderId); setEditingDoc(null); setIsDocModalOpen(true); },
         openEditDocModal: (doc: Doc) => { setEditingDoc(doc); setTargetFolderId(doc.folderId); setIsDocModalOpen(true); },

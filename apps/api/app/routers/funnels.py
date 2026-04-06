@@ -49,6 +49,7 @@ def _sanitize_sources(sources) -> dict:
 
 
 def row_to_funnel(row):
+    nt = getattr(row, "notification_templates", None) or {}
     return {
         "id": row.id,
         "name": row.name,
@@ -56,6 +57,7 @@ def row_to_funnel(row):
         "ownerUserId": getattr(row, "owner_user_id", None),
         "stages": row.stages or [],
         "sources": _sanitize_sources(row.sources or {}),
+        "notificationTemplates": nt if isinstance(nt, dict) else {},
         "createdAt": row.created_at,
         "updatedAt": row.updated_at,
         "isArchived": str(row.is_archived).lower() == "true" if row.is_archived else False,
@@ -82,6 +84,8 @@ async def update_funnels(funnels: list[dict], db: AsyncSession = Depends(get_db)
             existing.owner_user_id = f.get("ownerUserId", getattr(existing, "owner_user_id", None))
             existing.stages = f.get("stages", existing.stages or [])
             existing.sources = _merge_sources(existing.sources or {}, f.get("sources", existing.sources or {}))
+            if f.get("notificationTemplates") is not None:
+                existing.notification_templates = f.get("notificationTemplates") or {}
             existing.created_at = f.get("createdAt")
             existing.updated_at = f.get("updatedAt")
             existing.is_archived = "true" if f.get("isArchived") else "false"
@@ -93,6 +97,7 @@ async def update_funnels(funnels: list[dict], db: AsyncSession = Depends(get_db)
                 owner_user_id=f.get("ownerUserId"),
                 stages=f.get("stages", []),
                 sources=f.get("sources", {}),
+                notification_templates=f.get("notificationTemplates") or {},
                 created_at=f.get("createdAt"),
                 updated_at=f.get("updatedAt"),
                 is_archived="true" if f.get("isArchived") else "false",
@@ -122,6 +127,7 @@ async def create_funnel(funnel: dict, db: AsyncSession = Depends(get_db)):
         owner_user_id=funnel.get("ownerUserId"),
         stages=funnel.get("stages", []),
         sources=funnel.get("sources", {}),
+        notification_templates=funnel.get("notificationTemplates") or {},
         created_at=now,
         updated_at=now,
         is_archived="false",

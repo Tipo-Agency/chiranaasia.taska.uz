@@ -8,6 +8,8 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.models.client import Deal
+from app.models.funnel import SalesFunnel
 from app.models.notification import Notification, NotificationDelivery, NotificationPreferences
 from app.models.settings import InboxMessage
 from app.services.notifications_realtime import realtime_hub
@@ -141,8 +143,8 @@ def _route_event(event: dict[str, Any]) -> list[dict[str, Any]]:
             routes.append(
                 {
                     "recipient_id": uid,
-                    "title": "Новая встреча",
-                    "body": f'Запланирована встреча: "{payload.get("title") or "Без названия"}" {payload.get("date") or ""} {payload.get("time") or ""}'.strip(),
+                    "title": "Календарь: новое событие",
+                    "body": f'"{payload.get("title") or "Без названия"}" — {payload.get("date") or ""} {payload.get("time") or ""}'.strip(),
                     "priority": "normal",
                 }
             )
@@ -164,13 +166,108 @@ def _route_event(event: dict[str, Any]) -> list[dict[str, Any]]:
     return list(uniq.values())
 
 
+def _flatten_payload_for_templates(payload: dict[str, Any]) -> dict[str, str]:
+    out: dict[str, str] = {}
+    for k, v in payload.items():
+        if isinstance(v, (bool, int, float)):
+            out[k] = str(v)
+        elif v is None:
+            out[k] = ""
+        elif isinstance(v, str):
+            out[k] = v
+    return out
+
+
+def _render_deal_template(tpl: str, flat: dict[str, str]) -> str:
+    if not tpl:
+        return ""
+    out = tpl
+    for k, v in flat.items():
+        out = out.replace("{{" + k + "}}", v)
+    return out
+
+
+async def _enrich_deal_assigned_event(db: AsyncSession, event: dict[str, Any]) -> None:
+    if event.get("type") != "deal.assigned":
+        return
+    payload = dict(event.get("payload") or {})
+    eid = event.get("entityId")
+    if not eid:
+        event["payload"] = payload
+        return
+    deal = await db.get(Deal, eid)
+    if not deal:
+        event["payload"] = payload
+        return
+    payload.setdefault("funnelId", deal.funnel_id)
+    payload.setdefault("title", deal.title or "")
+    if deal.contact_name:
+        payload.setdefault("contactName", deal.contact_name)
+    if deal.funnel_id:
+        funnel = await db.get(SalesFunnel, deal.funnel_id)
+        if funnel:
+            payload.setdefault("funnelName", funnel.name or "")
+            st = funnel.stages or []
+            stage_label = str(deal.stage or "")
+            if isinstance(st, list):
+                for s in st:
+                    if isinstance(s, dict) and (s.get("id") == deal.stage or s.get("label") == deal.stage):
+                        stage_label = str(s.get("label") or deal.stage or "")
+                        break
+            payload.setdefault("stageLabel", stage_label)
+    event["payload"] = payload
+
+
+async def _apply_funnel_deal_templates(
+    db: AsyncSession, event: dict[str, Any], routes: list[dict[str, Any]]
+) -> list[dict[str, Any]]:
+    if event.get("type") != "deal.assigned" or not routes:
+        return routes
+    payload = event.get("payload") or {}
+    fid = payload.get("funnelId")
+    if not fid:
+        return routes
+    funnel = await db.get(SalesFunnel, fid)
+    if not funnel:
+        return routes
+    raw = getattr(funnel, "notification_templates", None) or {}
+    if not isinstance(raw, dict):
+        return routes
+    da = raw.get("dealAssigned")
+    if not isinstance(da, dict):
+        return routes
+    chat_tpl = (da.get("chatBody") or da.get("chat") or "").strip()
+    title_tpl = (da.get("title") or "").strip()
+    tg_tpl = (da.get("telegramHtml") or da.get("telegram") or "").strip()
+    if not chat_tpl and not title_tpl and not tg_tpl:
+        return routes
+    flat = _flatten_payload_for_templates(payload)
+    out: list[dict[str, Any]] = []
+    for r in routes:
+        nr = dict(r)
+        if title_tpl:
+            nr["title"] = _render_deal_template(title_tpl, flat)[:500]
+        if chat_tpl:
+            nr["body"] = _render_deal_template(chat_tpl, flat)
+            if len(nr["body"]) > 4000:
+                nr["body"] = nr["body"][:3997] + "..."
+        if tg_tpl:
+            nr["_telegram_html_override"] = _render_deal_template(tg_tpl, flat)
+        out.append(nr)
+    return out
+
+
 async def process_domain_event(db: AsyncSession, event: dict[str, Any]) -> int:
     """
     Build and persist notifications + deliveries for event.
     Also emits realtime and writes chat mirror message.
     Returns created notifications count.
     """
+    if event.get("type") == "deal.assigned":
+        await _enrich_deal_assigned_event(db, event)
     routes = _route_event(event)
+    if event.get("type") == "deal.assigned":
+        routes = await _apply_funnel_deal_templates(db, event, routes)
     created = 0
     for r in routes:
         prefs_row = (
@@ -192,6 +289,10 @@ async def process_domain_event(db: AsyncSession, event: dict[str, Any]) -> int:
         telegram_enabled = channels_cfg.get("telegram", False)
         email_enabled = channels_cfg.get("email", False)
 
+        n_payload = dict(event.get("payload") or {})
+        tg_ov = r.get("_telegram_html_override")
+        if tg_ov:
+            n_payload["telegramHtmlOverride"] = tg_ov
         n = _mk_notification(
             event_id=event["id"],
             recipient_id=r["recipient_id"],
@@ -201,7 +302,7 @@ async def process_domain_event(db: AsyncSession, event: dict[str, Any]) -> int:
             priority=r.get("priority", "normal"),
             entity_type=event.get("entityType"),
             entity_id=event.get("entityId"),
-            payload=event.get("payload") or {},
+            payload=n_payload,
         )
         db.add(n)
         await db.flush()

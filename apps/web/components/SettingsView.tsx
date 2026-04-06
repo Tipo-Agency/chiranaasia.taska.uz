@@ -10,6 +10,7 @@ import { AutomationSettings } from './settings/AutomationSettings';
 import DepartmentsView from './DepartmentsView';
 import SalesFunnelsSettings from './settings/SalesFunnelsSettings';
 import { DEFAULT_NOTIFICATION_PREFS } from '../constants';
+import { SYSTEM_ROLE_EMPLOYEE_ID } from '../constants/systemRoles';
 // Integrations are managed outside Settings now.
 import { ArchiveView, ARCHIVE_TAB_OPTIONS, type ArchiveTabId } from './settings/ArchiveView';
 import { FinanceSetupSettings } from './settings/FinanceSetupSettings';
@@ -406,6 +407,7 @@ const SettingsView: React.FC<SettingsViewProps> = ({
                   login,
                   password,
                   role: Role.EMPLOYEE,
+                  roleId: SYSTEM_ROLE_EMPLOYEE_ID,
                   mustChangePassword: true,
                 } as any;
                 onUpdateUsers([...(users || []), newUser]);

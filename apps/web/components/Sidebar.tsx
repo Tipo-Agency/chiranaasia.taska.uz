@@ -24,8 +24,9 @@ import {
   ShieldCheck,
   MessageCircle
 } from 'lucide-react';
-import { TableCollection, User, Role } from '../types';
+import { TableCollection, User } from '../types';
 import { LogoIcon, DynamicIcon } from './AppIcons';
+import { hasPermission } from '../utils/permissions';
 
 export interface SidebarProps {
   isOpen: boolean; // Mobile state
@@ -91,6 +92,8 @@ const Sidebar: React.FC<SidebarProps> = ({
       onClose(); // Close sidebar on mobile after click
   };
 
+  const can = (key: string) => hasPermission(currentUser, key);
+
   return (
     <>
       {/* Mobile Overlay */}
@@ -131,6 +134,7 @@ const Sidebar: React.FC<SidebarProps> = ({
         {/* Standard Links - Порядок согласно ТЗ */}
         <div className={`${isCollapsed ? 'px-2' : 'px-2'} py-1 space-y-0.5 mb-4 shrink-0`} style={{ overflow: 'visible' }}>
             {/* 1. Рабочий стол */}
+            {can('core.home') && (
             <div 
                 onClick={() => handleNav(() => onNavigate('home'))}
                 className={`flex items-center ${isCollapsed ? 'justify-center' : 'gap-2'} ${isCollapsed ? 'px-2' : 'px-3'} py-1.5 rounded cursor-pointer transition-colors ${currentView === 'home' ? 'bg-notion-hover dark:bg-[#252525] text-notion-text dark:text-white font-medium' : 'text-notion-text/70 dark:text-gray-400 hover:bg-notion-hover dark:hover:bg-[#252525] hover:text-notion-text dark:hover:text-gray-200'}`}
@@ -138,8 +142,10 @@ const Sidebar: React.FC<SidebarProps> = ({
             >
             <Home size={18} /> {!isCollapsed && <span className="text-sm">Рабочий стол</span>}
             </div>
+            )}
             
             {/* 2. Задачи */}
+            {can('core.tasks') && (
             <div 
                 onClick={() => handleNav(() => onNavigate('tasks'))}
                 className={`flex items-center ${isCollapsed ? 'justify-center' : 'gap-2'} ${isCollapsed ? 'px-2' : 'px-3'} py-1.5 rounded cursor-pointer transition-colors ${currentView === 'tasks' ? 'bg-notion-hover dark:bg-[#252525] text-notion-text dark:text-white font-medium' : 'text-notion-text/70 dark:text-gray-400 hover:bg-notion-hover dark:hover:bg-[#252525] hover:text-notion-text dark:hover:text-gray-200'}`}
@@ -147,8 +153,10 @@ const Sidebar: React.FC<SidebarProps> = ({
             >
                 <CheckSquare size={18} /> {!isCollapsed && <span className="text-sm">Задачи</span>}
             </div>
+            )}
 
             {/* 3. Воронка продаж */}
+            {can('crm.sales_funnel') && (
             <div 
                 onClick={() => handleNav(() => onNavigate('sales-funnel'))}
                 className={`flex items-center ${isCollapsed ? 'justify-center' : 'gap-2'} ${isCollapsed ? 'px-2' : 'px-3'} py-1.5 rounded cursor-pointer transition-colors ${currentView === 'sales-funnel' ? 'bg-notion-hover dark:bg-[#252525] text-notion-text dark:text-white font-medium' : 'text-notion-text/70 dark:text-gray-400 hover:bg-notion-hover dark:hover:bg-[#252525] hover:text-notion-text dark:hover:text-gray-200'}`}
@@ -156,17 +164,21 @@ const Sidebar: React.FC<SidebarProps> = ({
             >
                 <BarChart3 size={18} /> {!isCollapsed && <span className="text-sm">Воронка продаж</span>}
             </div>
+            )}
 
-            {/* 3.0. Переписка Instagram (Direct) */}
+            {/* 3.0. Диалоги (центр коммуникаций: Instagram, Telegram и др.) */}
+            {can('crm.client_chats') && (
             <div 
                 onClick={() => handleNav(() => onNavigate('client-chats'))}
                 className={`flex items-center ${isCollapsed ? 'justify-center' : 'gap-2'} ${isCollapsed ? 'px-2' : 'px-3'} py-1.5 rounded cursor-pointer transition-colors ${currentView === 'client-chats' ? 'bg-notion-hover dark:bg-[#252525] text-notion-text dark:text-white font-medium' : 'text-notion-text/70 dark:text-gray-400 hover:bg-notion-hover dark:hover:bg-[#252525] hover:text-notion-text dark:hover:text-gray-200'}`}
-                title={isCollapsed ? "Instagram" : ""}
+                title={isCollapsed ? "Диалоги" : ""}
             >
-                <Instagram size={18} /> {!isCollapsed && <span className="text-sm">Instagram</span>}
+                <MessageCircle size={18} /> {!isCollapsed && <span className="text-sm">Диалоги</span>}
             </div>
+            )}
 
             {/* 3.1. Клиенты и договора (под Воронка продаж) */}
+            {can('crm.clients') && (
             <div 
                 onClick={() => handleNav(() => onNavigate('clients'))}
                 className={`flex items-center ${isCollapsed ? 'justify-center' : 'gap-2'} ${isCollapsed ? 'px-2' : 'px-3'} py-1.5 rounded cursor-pointer transition-colors ${currentView === 'clients' ? 'bg-notion-hover dark:bg-[#252525] text-notion-text dark:text-white font-medium' : 'text-notion-text/70 dark:text-gray-400 hover:bg-notion-hover dark:hover:bg-[#252525] hover:text-notion-text dark:hover:text-gray-200'}`}
@@ -174,8 +186,10 @@ const Sidebar: React.FC<SidebarProps> = ({
             >
                 <Briefcase size={18} /> {!isCollapsed && <span className="text-sm">Клиенты и договора</span>}
             </div>
+            )}
 
             {/* 3.2. Склад */}
+            {can('org.inventory') && (
             <div 
                 onClick={() => handleNav(() => onNavigate('inventory'))}
                 className={`flex items-center ${isCollapsed ? 'justify-center' : 'gap-2'} ${isCollapsed ? 'px-2' : 'px-3'} py-1.5 rounded cursor-pointer transition-colors ${currentView === 'inventory' ? 'bg-notion-hover dark:bg-[#252525] text-notion-text dark:text-white font-medium' : 'text-notion-text/70 dark:text-gray-400 hover:bg-notion-hover dark:hover:bg-[#252525] hover:text-notion-text dark:hover:text-gray-200'}`}
@@ -183,8 +197,10 @@ const Sidebar: React.FC<SidebarProps> = ({
             >
                 <Layers size={18} /> {!isCollapsed && <span className="text-sm">Склад</span>}
             </div>
+            )}
 
             {/* 4. Финансовое планирование */}
+            {can('finance.finance') && (
             <div 
                 onClick={() => handleNav(() => onNavigate('finance'))}
                 className={`flex items-center ${isCollapsed ? 'justify-center' : 'gap-2'} ${isCollapsed ? 'px-2' : 'px-3'} py-1.5 rounded cursor-pointer transition-colors ${currentView === 'finance' ? 'bg-notion-hover dark:bg-[#252525] text-notion-text dark:text-white font-medium' : 'text-notion-text/70 dark:text-gray-400 hover:bg-notion-hover dark:hover:bg-[#252525] hover:text-notion-text dark:hover:text-gray-200'}`}
@@ -192,8 +208,10 @@ const Sidebar: React.FC<SidebarProps> = ({
             >
                 <Wallet size={18} /> {!isCollapsed && <span className="text-sm">Фин. планирование</span>}
             </div>
+            )}
 
             {/* 5. Бизнес-процессы */}
+            {can('org.bpm') && (
             <div 
                 onClick={() => handleNav(() => onNavigate('business-processes'))}
                 className={`flex items-center ${isCollapsed ? 'justify-center' : 'gap-2'} ${isCollapsed ? 'px-2' : 'px-3'} py-1.5 rounded cursor-pointer transition-colors ${currentView === 'business-processes' ? 'bg-notion-hover dark:bg-[#252525] text-notion-text dark:text-white font-medium' : 'text-notion-text/70 dark:text-gray-400 hover:bg-notion-hover dark:hover:bg-[#252525] hover:text-notion-text dark:hover:text-gray-200'}`}
@@ -201,17 +219,21 @@ const Sidebar: React.FC<SidebarProps> = ({
             >
                 <Network size={18} /> {!isCollapsed && <span className="text-sm">Бизнес-процессы</span>}
             </div>
+            )}
 
-            {/* 6. Встречи */}
-            <div 
+            {/* 6. Календарь */}
+            {can('core.meetings') && (
+              <div
                 onClick={() => handleNav(() => onNavigate('meetings'))}
                 className={`flex items-center ${isCollapsed ? 'justify-center' : 'gap-2'} ${isCollapsed ? 'px-2' : 'px-3'} py-1.5 rounded cursor-pointer transition-colors ${currentView === 'meetings' ? 'bg-notion-hover dark:bg-[#252525] text-notion-text dark:text-white font-medium' : 'text-notion-text/70 dark:text-gray-400 hover:bg-notion-hover dark:hover:bg-[#252525] hover:text-notion-text dark:hover:text-gray-200'}`}
-                title={isCollapsed ? "Встречи" : ""}
-            >
-                <Users size={18} /> {!isCollapsed && <span className="text-sm">Встречи</span>}
+                title={isCollapsed ? "Календарь" : ""}
+              >
+                <Users size={18} /> {!isCollapsed && <span className="text-sm">Календарь</span>}
             </div>
+            )}
 
             {/* 7. Документы */}
+            {can('core.docs') && (
             <div 
                 onClick={() => handleNav(() => onNavigate('docs'))}
                 className={`flex items-center ${isCollapsed ? 'justify-center' : 'gap-2'} ${isCollapsed ? 'px-2' : 'px-3'} py-1.5 rounded cursor-pointer transition-colors ${currentView === 'docs' ? 'bg-notion-hover dark:bg-[#252525] text-notion-text dark:text-white font-medium' : 'text-notion-text/70 dark:text-gray-400 hover:bg-notion-hover dark:hover:bg-[#252525] hover:text-notion-text dark:hover:text-gray-200'}`}
@@ -219,11 +241,12 @@ const Sidebar: React.FC<SidebarProps> = ({
             >
                 <FileText size={18} /> {!isCollapsed && <span className="text-sm">Документы</span>}
             </div>
+            )}
 
             {/* Чат на мобильной версии отключён (плохой UX). */}
 
-            {/* 8. Сотрудники (только админ) */}
-            {currentUser.role === Role.ADMIN && (
+            {/* 8. Сотрудники */}
+            {can('org.employees') && (
                 <div 
                     onClick={() => handleNav(() => onNavigate('employees'))}
                     className={`flex items-center ${isCollapsed ? 'justify-center' : 'gap-2'} ${isCollapsed ? 'px-2' : 'px-3'} py-1.5 rounded cursor-pointer transition-colors ${currentView === 'employees' ? 'bg-notion-hover dark:bg-[#252525] text-notion-text dark:text-white font-medium' : 'text-notion-text/70 dark:text-gray-400 hover:bg-notion-hover dark:hover:bg-[#252525] hover:text-notion-text dark:hover:text-gray-200'}`}
@@ -234,6 +257,7 @@ const Sidebar: React.FC<SidebarProps> = ({
             )}
 
             {/* 8.1. Аналитика и отчеты (под Сотрудники) */}
+            {can('analytics.analytics') && (
             <div 
                 onClick={() => handleNav(() => onNavigate('analytics'))}
                 className={`flex items-center ${isCollapsed ? 'justify-center' : 'gap-2'} ${isCollapsed ? 'px-2' : 'px-3'} py-1.5 rounded cursor-pointer transition-colors ${currentView === 'analytics' ? 'bg-notion-hover dark:bg-[#252525] text-notion-text dark:text-white font-medium' : 'text-notion-text/70 dark:text-gray-400 hover:bg-notion-hover dark:hover:bg-[#252525] hover:text-notion-text dark:hover:text-gray-200'}`}
@@ -241,9 +265,10 @@ const Sidebar: React.FC<SidebarProps> = ({
             >
                 <PieChart size={18} /> {!isCollapsed && <span className="text-sm">Аналитика и отчеты</span>}
             </div>
+            )}
 
-            {/* Админ-панель (только для администраторов) */}
-            {currentUser.role === Role.ADMIN && (
+            {/* Админ-панель */}
+            {can('admin.system') && (
                 <div 
                     onClick={() => handleNav(() => onNavigate('admin'))}
                     className={`flex items-center ${isCollapsed ? 'justify-center' : 'gap-2'} ${isCollapsed ? 'px-2' : 'px-3'} py-1.5 rounded cursor-pointer transition-colors ${currentView === 'admin' ? 'bg-notion-hover dark:bg-[#252525] text-notion-text dark:text-white font-medium' : 'text-notion-text/70 dark:text-gray-400 hover:bg-notion-hover dark:hover:bg-[#252525] hover:text-notion-text dark:hover:text-gray-200'}`}
@@ -257,7 +282,7 @@ const Sidebar: React.FC<SidebarProps> = ({
         {/* Tables List with Grouping */}
         <div className={`${isCollapsed ? 'px-2' : 'px-3'} flex-1 overflow-y-auto custom-scrollbar min-h-0`}>
             {/* Контент планы, Беклог, Функционал */}
-            {!isCollapsed && (
+            {!isCollapsed && can('crm.spaces') && (
               <div className="space-y-0.5 mb-3">
                 {/* Контент планы */}
                 <div 
@@ -291,7 +316,7 @@ const Sidebar: React.FC<SidebarProps> = ({
         </div>
 
         {/* Footer Settings */}
-        {currentUser.role === Role.ADMIN && (
+        {can('settings.general') && (
             <div className={`${isCollapsed ? 'p-2' : 'p-3'} mt-auto border-t border-notion-border dark:border-[#333] shrink-0 bg-white dark:bg-[#191919]`}>
                 <button 
                     onClick={() => { handleNav(() => onOpenSettings()); }}

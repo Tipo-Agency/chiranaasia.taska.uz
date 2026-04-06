@@ -22,6 +22,8 @@ def row_to_meeting(row):
         "type": row.type,
         "dealId": row.deal_id,
         "clientId": row.client_id,
+        "projectId": getattr(row, "project_id", None),
+        "shootPlanId": getattr(row, "shoot_plan_id", None),
         "recurrence": row.recurrence,
         "isArchived": row.is_archived or False,
     }
@@ -50,6 +52,10 @@ async def update_meetings(meetings: list[dict], db: AsyncSession = Depends(get_d
             existing.type = m.get("type", existing.type)
             existing.deal_id = m.get("dealId")
             existing.client_id = m.get("clientId")
+            if hasattr(existing, "project_id"):
+                existing.project_id = m.get("projectId")
+            if hasattr(existing, "shoot_plan_id"):
+                existing.shoot_plan_id = m.get("shootPlanId")
             existing.recurrence = m.get("recurrence", "none")
             existing.is_archived = m.get("isArchived", False)
             await db.flush()
@@ -80,6 +86,8 @@ async def update_meetings(meetings: list[dict], db: AsyncSession = Depends(get_d
                 type=m.get("type", "work"),
                 deal_id=m.get("dealId"),
                 client_id=m.get("clientId"),
+                project_id=m.get("projectId"),
+                shoot_plan_id=m.get("shootPlanId"),
                 recurrence=m.get("recurrence", "none"),
                 is_archived=m.get("isArchived", False),
             ))

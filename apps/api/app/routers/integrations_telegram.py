@@ -5,17 +5,21 @@ from __future__ import annotations
 import json
 import logging
 import secrets
+from datetime import UTC, datetime
 from typing import Any
 
 import httpx
 from fastapi import APIRouter, Depends, Header, HTTPException, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.auth import get_current_user_admin
+from app.auth import get_current_user, require_permission
 from app.config import get_settings
 from app.database import get_db
+from app.models.client import Deal
 from app.models.funnel import SalesFunnel
+from app.models.user import User
 from app.services.telegram_leads import process_telegram_update_dict, telegram_source_config
+from app.utils import row_to_deal
 
 log = logging.getLogger("uvicorn.error")
 
@@ -38,6 +42,68 @@ async def _call_telegram(token: str, method: str, data: dict[str, Any]) -> dict[
         return r.json()
     except Exception:
         return {"ok": False, "description": r.text[:500]}
+
+
+@router.post("/send")
+async def send_telegram_to_lead(
+    body: dict,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Ответ клиенту в Telegram: тело { dealId, text }. Использует botToken воронки сделки."""
+    deal_id = str(body.get("dealId") or "").strip()
+    text = (body.get("text") or "").strip()
+    if not deal_id or not text:
+        raise HTTPException(status_code=400, detail="dealId_and_text_required")
+
+    deal = await db.get(Deal, deal_id)
+    if not deal or deal.is_archived:
+        raise HTTPException(status_code=404, detail="deal_not_found")
+    if str(deal.source or "") != "telegram":
+        raise HTTPException(status_code=400, detail="deal_not_telegram")
+
+    chat_id = str(deal.telegram_chat_id or "").strip()
+    if not chat_id:
+        raise HTTPException(status_code=400, detail="no_telegram_chat_id")
+
+    funnel = await db.get(SalesFunnel, deal.funnel_id) if deal.funnel_id else None
+    if not funnel:
+        raise HTTPException(status_code=400, detail="no_funnel")
+
+    cfg = telegram_source_config(funnel)
+    if not cfg or cfg.get("enabled") is not True:
+        raise HTTPException(status_code=400, detail="telegram_disabled_for_funnel")
+    token = str(cfg.get("botToken") or "").strip()
+    if not token:
+        raise HTTPException(status_code=400, detail="no_bot_token")
+
+    url = f"https://api.telegram.org/bot{token}/sendMessage"
+    async with httpx.AsyncClient(timeout=35.0) as client:
+        r = await client.post(url, data={"chat_id": chat_id, "text": text[:4000]})
+    try:
+        data = r.json()
+    except Exception:
+        data = {"ok": False, "description": r.text[:500]}
+    if r.status_code >= 400 or not (isinstance(data, dict) and data.get("ok") is True):
+        err = data.get("description") if isinstance(data, dict) else str(data)
+        raise HTTPException(status_code=502, detail=f"telegram_send_failed:{err}")
+
+    comments = list(deal.comments or [])
+    now = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3] + "Z"
+    comments.append(
+        {
+            "id": f"tg-out-{int(datetime.now(UTC).timestamp() * 1000)}",
+            "text": text,
+            "authorId": current_user.id,
+            "createdAt": now,
+            "type": "telegram_out",
+        }
+    )
+    deal.comments = comments
+    deal.updated_at = now
+    await db.commit()
+    fresh = await db.get(Deal, deal_id)
+    return row_to_deal(fresh) if fresh else {"ok": True}
 
 
 @router.post("/webhook/{funnel_id}")
@@ -92,7 +158,7 @@ async def telegram_funnel_webhook(
 async def register_telegram_webhook(
     body: dict,
     db: AsyncSession = Depends(get_db),
-    _admin=Depends(get_current_user_admin),
+    _u=Depends(require_permission("settings.integrations")),
 ):
     """Generate secret_token, call setWebhook, save funnel.sources.telegram (useWebhook=true)."""
     settings = get_settings()
@@ -153,7 +219,7 @@ async def register_telegram_webhook(
 async def unregister_telegram_webhook(
     body: dict,
     db: AsyncSession = Depends(get_db),
-    _admin=Depends(get_current_user_admin),
+    _u=Depends(require_permission("settings.integrations")),
 ):
     """deleteWebhook and turn off useWebhook for the funnel."""
     funnel_id = str(body.get("funnelId") or "").strip()
@@ -185,7 +251,7 @@ async def unregister_telegram_webhook(
 async def telegram_webhook_status(
     funnelId: str,
     db: AsyncSession = Depends(get_db),
-    _admin=Depends(get_current_user_admin),
+    _u=Depends(require_permission("settings.integrations")),
 ):
     """Lightweight status for UI (no secrets)."""
     settings = get_settings()

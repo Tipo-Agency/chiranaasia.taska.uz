@@ -1,6 +1,5 @@
 import React from 'react';
 import { Client, Contract, OneTimeDeal, User } from '../../types';
-import { Card } from '../ui';
 import { Edit2, Phone, Plus } from 'lucide-react';
 
 interface ClientsTabProps {
@@ -27,53 +26,95 @@ export const ClientsTab: React.FC<ClientsTabProps> = ({
   }
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-      {clients.map(client => {
-        if (!client) return null;
-        const clientContracts = (contracts || []).filter(c => c && !c.isArchived && c.clientId === client.id);
-        const responsible = users.find((u) => u.id === client.responsibleUserId);
-        return (
-          <Card key={client.id} padding="lg" hover onClick={() => onEditClient(client)} className="relative flex flex-col h-full">
-            <div className="flex justify-between items-start mb-4">
-              <div className="pr-8">
-                <h3 className="text-lg font-bold text-gray-800 dark:text-gray-200 leading-tight mb-1">{client.name}</h3>
-                {client.contactPerson && <div className="text-sm text-gray-500 dark:text-gray-400">{client.contactPerson}</div>}
-              </div>
-              <button onClick={(e) => { e.stopPropagation(); onEditClient(client); }} className="text-gray-300 hover:text-blue-600 p-1">
-                <Edit2 size={16}/>
-              </button>
-            </div>
-            
-            <div className="space-y-2 mb-4 flex-1">
-              {client.phone && <div className="text-xs text-gray-600 dark:text-gray-400 flex items-center gap-2"><Phone size={12}/> {client.phone}</div>}
-              {responsible && (
-                <div className="text-xs text-gray-600 dark:text-gray-400">Ответственный: <span className="font-medium text-gray-800 dark:text-gray-200">{responsible.name}</span></div>
-              )}
-              {clientContracts.length > 0 ? (
-                <div className="mt-3 bg-gray-50 dark:bg-[#303030] rounded p-2">
-                  <div className="text-[10px] font-bold text-gray-400 uppercase mb-1">Договоры ({clientContracts.length})</div>
-                  {clientContracts.map(c => (
-                    <div key={c.id} className="flex justify-between items-center text-xs py-0.5 border-b border-gray-100 dark:border-gray-700 last:border-0 text-gray-700 dark:text-gray-300">
-                      <span className="truncate max-w-[120px]">{c.description}</span>
-                      <span className="font-medium text-green-700 dark:text-green-400">{c.amount.toLocaleString()} UZS</span>
+    <div className="bg-white dark:bg-[#252525] border border-gray-200 dark:border-[#333] rounded-xl shadow-sm overflow-hidden">
+      <div className="overflow-x-auto">
+        <table className="w-full text-left text-sm min-w-[720px]">
+          <thead className="bg-gray-50 dark:bg-[#202020] border-b border-gray-200 dark:border-[#333]">
+            <tr>
+              <th className="px-4 py-3 text-gray-600 dark:text-gray-400 font-semibold">Клиент</th>
+              <th className="px-4 py-3 text-gray-600 dark:text-gray-400 font-semibold">Контакт</th>
+              <th className="px-4 py-3 text-gray-600 dark:text-gray-400 font-semibold">Телефон</th>
+              <th className="px-4 py-3 text-gray-600 dark:text-gray-400 font-semibold">Ответственный</th>
+              <th className="px-4 py-3 text-gray-600 dark:text-gray-400 font-semibold">Договоры</th>
+              <th className="px-4 py-3 text-right text-gray-600 dark:text-gray-400 font-semibold w-28">Действия</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-100 dark:divide-[#333]">
+            {clients.map((client) => {
+              if (!client) return null;
+              const clientContracts = (contracts || []).filter(
+                (c) => c && !c.isArchived && c.clientId === client.id
+              );
+              const responsible = users.find((u) => u.id === client.responsibleUserId);
+              const contractsTotal = clientContracts.reduce((s, c) => s + (c.amount || 0), 0);
+              return (
+                <tr
+                  key={client.id}
+                  className="hover:bg-gray-50 dark:hover:bg-[#2a2a2a] transition-colors cursor-pointer"
+                  onClick={() => onEditClient(client)}
+                >
+                  <td className="px-4 py-3 font-medium text-gray-900 dark:text-gray-100 align-top">
+                    {client.name}
+                  </td>
+                  <td className="px-4 py-3 text-gray-600 dark:text-gray-400 align-top max-w-[200px]">
+                    {client.contactPerson || '—'}
+                  </td>
+                  <td className="px-4 py-3 text-gray-600 dark:text-gray-400 align-top whitespace-nowrap">
+                    {client.phone ? (
+                      <span className="inline-flex items-center gap-1">
+                        <Phone size={12} className="opacity-60 shrink-0" />
+                        {client.phone}
+                      </span>
+                    ) : (
+                      '—'
+                    )}
+                  </td>
+                  <td className="px-4 py-3 text-gray-600 dark:text-gray-400 align-top">
+                    {responsible?.name || '—'}
+                  </td>
+                  <td className="px-4 py-3 text-gray-700 dark:text-gray-300 align-top">
+                    <div className="text-xs">
+                      <span className="font-semibold tabular-nums">{clientContracts.length}</span>
+                      <span className="text-gray-500 dark:text-gray-500"> шт.</span>
+                      {contractsTotal > 0 && (
+                        <div className="text-[11px] text-green-700 dark:text-green-400 mt-0.5 tabular-nums">
+                          {contractsTotal.toLocaleString('ru-RU')} UZS
+                        </div>
+                      )}
                     </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="mt-3 text-xs text-gray-400 italic">Нет активных договоров</div>
-              )}
-            </div>
-            
-            <button 
-              onClick={(e) => { e.stopPropagation(); onCreateContract(client.id); }} 
-              className="w-full py-2 border border-dashed border-gray-200 dark:border-gray-600 rounded text-xs text-gray-500 dark:text-gray-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/30 transition-colors flex items-center justify-center gap-1"
-            >
-              <Plus size={14}/> Договор
-            </button>
-          </Card>
-        );
-      })}
+                  </td>
+                  <td className="px-4 py-3 text-right align-top">
+                    <div className="flex items-center justify-end gap-1">
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onEditClient(client);
+                        }}
+                        className="p-2 rounded-lg text-gray-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20"
+                        aria-label="Редактировать"
+                      >
+                        <Edit2 size={16} />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onCreateContract(client.id);
+                        }}
+                        className="inline-flex items-center gap-1 px-2 py-1.5 rounded-lg text-xs font-medium border border-dashed border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-400 hover:text-blue-600 hover:border-blue-400 dark:hover:border-blue-500"
+                      >
+                        <Plus size={14} />
+                        Договор
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 };
-

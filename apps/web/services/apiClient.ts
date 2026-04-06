@@ -134,6 +134,17 @@ export const authEndpoint = {
   updateAll: (users: unknown[]) => put<{ ok: boolean }>('/auth/users', users),
   login: (login: string, password: string) =>
     post<{ access_token: string; token_type: string; user: unknown }>('/auth/login', { login, password }),
+  getMe: () => get<unknown>('/auth/me'),
+  getPermissionsCatalog: () =>
+    get<{ groups: Array<{ id: string; label: string; items: Array<{ key: string; label: string }> }>; allKeys: string[] }>(
+      '/auth/permissions/catalog'
+    ),
+  getRoles: () => get<unknown[]>('/auth/roles'),
+  createRole: (body: { name: string; slug?: string; description?: string; permissions: string[] }) =>
+    post<{ id: string; ok: boolean }>('/auth/roles', body),
+  patchRole: (id: string, body: { name?: string; description?: string; permissions?: string[]; sort_order?: number }) =>
+    patch<{ ok: boolean }>(`/auth/roles/${encodeURIComponent(id)}`, body),
+  deleteRole: (id: string) => del<{ ok: boolean }>(`/auth/roles/${encodeURIComponent(id)}`),
 };
 
 // Tasks
@@ -321,6 +332,8 @@ export const integrationsSiteEndpoint = {
 };
 
 export const integrationsTelegramEndpoint = {
+  sendToLead: (body: { dealId: string; text: string }) =>
+    post<unknown>('/integrations/telegram/send', body),
   registerWebhook: (body: { funnelId: string }) =>
     post<{ ok: boolean; webhookUrl: string; webhookRegistered: boolean }>('/integrations/telegram/webhook/register', body),
   unregisterWebhook: (body: { funnelId: string }) => post<{ ok: boolean; webhookRegistered: boolean }>('/integrations/telegram/webhook/unregister', body),
@@ -428,6 +441,12 @@ export const weeklyPlansEndpoint = {
   deleteProtocol: (id: string) => del<{ ok: boolean }>(`/weekly-plans/protocols/${id}`),
 };
 
+// Calendar (iCal export for Google Calendar etc.)
+export const calendarEndpoint = {
+  ensureExportToken: (body?: { rotate?: boolean }) =>
+    post<{ ok: boolean; token: string }>('/calendar/export-token', body ?? {}),
+};
+
 // Meetings
 export const meetingsEndpoint = {
   getAll: () => get<unknown[]>('/meetings'),
@@ -438,6 +457,12 @@ export const meetingsEndpoint = {
 export const contentPostsEndpoint = {
   getAll: () => get<unknown[]>('/content-posts'),
   updateAll: (posts: unknown[]) => put<{ ok: boolean }>('/content-posts', posts),
+};
+
+// Shoot plans (content plan → calendar)
+export const shootPlansEndpoint = {
+  getAll: () => get<unknown[]>('/shoot-plans'),
+  updateAll: (plans: unknown[]) => put<{ ok: boolean }>('/shoot-plans', plans),
 };
 
 // Departments
@@ -526,5 +551,7 @@ export const funnelsEndpoint = {
 // Public content plan (no auth required)
 export const publicContentPlanEndpoint = {
   getByTableId: (tableId: string) =>
-    get<{ table: unknown | null; posts: unknown[] }>(`/tables/public/content-plan/${encodeURIComponent(tableId)}`),
+    get<{ table: unknown | null; posts: unknown[]; shootPlans?: unknown[] }>(
+      `/tables/public/content-plan/${encodeURIComponent(tableId)}`
+    ),
 };

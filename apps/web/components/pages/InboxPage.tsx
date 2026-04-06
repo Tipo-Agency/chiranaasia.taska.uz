@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { ActivityLog, User, Task, Deal, PurchaseRequest, Role } from '../../types';
+import { ActivityLog, User, Task, Deal, PurchaseRequest } from '../../types';
+import { hasPermission } from '../../utils/permissions';
 import { PageLayout } from '../ui/PageLayout';
 import { Container } from '../ui/Container';
 import { Button } from '../ui/Button';
@@ -68,7 +69,7 @@ export const InboxPage: React.FC<InboxPageProps> = ({
     });
 
     // Входящие заявки: админ, заявки на согласование
-    if (currentUser.role === Role.ADMIN) {
+    if (hasPermission(currentUser, 'finance.approve')) {
       purchaseRequests
         .filter(r => r && r.status === 'pending')
         .forEach(r => {

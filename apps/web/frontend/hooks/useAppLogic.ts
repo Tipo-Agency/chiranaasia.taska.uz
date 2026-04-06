@@ -12,7 +12,8 @@ import {
   notifyPurchaseRequestCreated,
   NotificationContext 
 } from '../../services/notificationService';
-import { Deal, Task, BusinessProcess, ProcessStep, Client, Contract, PurchaseRequest, Doc, Meeting, SalesFunnel, Role, InboxMessage, MessageAttachment, User, ContentPost, Project, TableCollection, Department, FinanceCategory, EmployeeInfo, OrgPosition, AutomationRule, StatusOption, PriorityOption } from '../../types';
+import { Deal, Task, BusinessProcess, ProcessStep, Client, Contract, PurchaseRequest, Doc, Meeting, SalesFunnel, InboxMessage, MessageAttachment, User, ContentPost, Project, TableCollection, Department, FinanceCategory, EmployeeInfo, OrgPosition, AutomationRule, StatusOption, PriorityOption, ShootPlan } from '../../types';
+import { hasPermission } from '../../utils/permissions';
 import { getStepsForInstance } from '../../utils/bpmDealFunnel';
 import { chatLocalService } from '../../services/chatLocalService';
 import { isFunnelDeal } from '../../utils/dealModel';
@@ -146,17 +147,19 @@ export const useAppLogic = () => {
   // Уровень 2: Загрузка данных модуля Content (lazy loading)
   const loadContentData = async () => {
       if (loadedModulesRef.current.has('content')) return; // Уже загружено
-      const [docs, folders, meetings, contentPosts] = await Promise.all([
+      const [docs, folders, meetings, contentPosts, shootPlans] = await Promise.all([
           api.docs.getAll(),
           api.folders.getAll(),
           api.meetings.getAll(),
           api.contentPosts.getAll(),
+          api.shootPlans.getAll(),
       ]);
       // Не фильтруем архивные элементы - они нужны для архива, фильтрация происходит в компонентах
       contentSlice.setters.setDocs(docs);
       contentSlice.setters.setFolders(folders);
       contentSlice.setters.setMeetings(meetings);
       contentSlice.setters.setContentPosts(contentPosts);
+      contentSlice.setters.setShootPlans(shootPlans as ShootPlan[]);
       loadedModulesRef.current.add('content');
   };
 
@@ -490,8 +493,14 @@ export const useAppLogic = () => {
           const activeTable = settingsSlice.state.tables.find(t => t.id === settingsSlice.state.activeTableId);
           if (activeTable?.type === 'content-plan') {
               try {
-                  const contentPosts = await api.contentPosts.getAll();
+                  const [contentPosts, shootPlans, meetings] = await Promise.all([
+                      api.contentPosts.getAll(),
+                      api.shootPlans.getAll(),
+                      api.meetings.getAll(),
+                  ]);
                   contentSlice.setters.setContentPosts(contentPosts);
+                  contentSlice.setters.setShootPlans(shootPlans as ShootPlan[]);
+                  contentSlice.setters.setMeetings(meetings as Meeting[]);
               } catch (error) {
                   console.error('Ошибка обновления контент-плана:', error);
               }
@@ -954,7 +963,7 @@ export const useAppLogic = () => {
       users: authSlice.state.users, currentUser: authSlice.state.currentUser, isProfileOpen: authSlice.state.isProfileOpen,
       tasks: taskSlice.state.tasks, projects: taskSlice.state.projects, statuses: taskSlice.state.statuses, priorities: taskSlice.state.priorities, isTaskModalOpen: taskSlice.state.isTaskModalOpen, editingTask: taskSlice.state.editingTask,
       clients: crmSlice.state.clients, contracts: crmSlice.state.contracts, oneTimeDeals: crmSlice.state.oneTimeDeals, accountsReceivable: crmSlice.state.accountsReceivable, employeeInfos: crmSlice.state.employeeInfos, deals: crmSlice.state.deals,
-      docs: contentSlice.state.docs, folders: contentSlice.state.folders, meetings: contentSlice.state.meetings, contentPosts: contentSlice.state.contentPosts, isDocModalOpen: contentSlice.state.isDocModalOpen, activeDocId: contentSlice.state.activeDocId, targetFolderId: contentSlice.state.targetFolderId, editingDoc: contentSlice.state.editingDoc,
+      docs: contentSlice.state.docs, folders: contentSlice.state.folders, meetings: contentSlice.state.meetings, contentPosts: contentSlice.state.contentPosts, shootPlans: contentSlice.state.shootPlans, isDocModalOpen: contentSlice.state.isDocModalOpen, activeDocId: contentSlice.state.activeDocId, targetFolderId: contentSlice.state.targetFolderId, editingDoc: contentSlice.state.editingDoc,
       departments: financeSlice.state.departments, financeCategories: financeSlice.state.financeCategories, funds: financeSlice.state.funds, financePlan: financeSlice.state.financePlan, purchaseRequests: financeSlice.state.purchaseRequests, financialPlanDocuments: financeSlice.state.financialPlanDocuments, financialPlannings: financeSlice.state.financialPlannings, bdr: financeSlice.state.bdr,
       orgPositions: bpmSlice.state.orgPositions, businessProcesses: bpmSlice.state.businessProcesses,
       warehouses: inventorySlice.state.warehouses, inventoryItems: inventorySlice.state.items, inventoryMovements: inventorySlice.state.movements, inventoryBalances: inventorySlice.state.balances, inventoryRevisions: inventorySlice.state.revisions,
@@ -1071,6 +1080,8 @@ export const useAppLogic = () => {
       updateMeetingSummary: contentSlice.actions.updateMeetingSummary,
       savePost: contentSlice.actions.savePost,
       deletePost: contentSlice.actions.deletePost,
+      saveShootPlan: contentSlice.actions.saveShootPlan,
+      deleteShootPlan: contentSlice.actions.deleteShootPlan,
       saveDoc: saveDocWrapper,
       saveDocContent: contentSlice.actions.saveDocContent,
       deleteDoc: contentSlice.actions.deleteDoc,
@@ -1097,7 +1108,7 @@ export const useAppLogic = () => {
             { context }
           ).catch(() => {});
           // Новая заявка на средства — отправляем системное сообщение первому администратору
-          const admins = authSlice.state.users.filter(u => u.role === Role.ADMIN);
+          const admins = authSlice.state.users.filter(u => hasPermission(u, 'finance.approve'));
           const admin = admins.find(u => u.id !== authSlice.state.currentUser!.id) || admins[0];
           if (admin) {
             chatLocalService.addSystemMessageForEntity({
@@ -1425,6 +1436,16 @@ export const useAppLogic = () => {
       },
       toggleDarkMode: settingsSlice.actions.toggleDarkMode, createTable: createTableWrapper, updateTable: settingsSlice.actions.updateTable, deleteTable: settingsSlice.actions.deleteTable, markAllRead: settingsSlice.actions.markAllRead, navigate: settingsSlice.actions.navigate, openSettings: settingsSlice.actions.openSettings, closeSettings: settingsSlice.actions.closeSettings, openCreateTable: settingsSlice.actions.openCreateTable, closeCreateTable: settingsSlice.actions.closeCreateTable, openEditTable: settingsSlice.actions.openEditTable, closeEditTable: settingsSlice.actions.closeEditTable, updateNotificationPrefs: settingsSlice.actions.updateNotificationPrefs, saveAutomationRule: settingsSlice.actions.saveAutomationRule, deleteAutomationRule: settingsSlice.actions.deleteAutomationRule, setActiveSpaceTab: settingsSlice.actions.setActiveSpaceTab,
       setActiveTableId: settingsSlice.setters.setActiveTableId, setCurrentView: settingsSlice.setters.setCurrentView, setViewMode: settingsSlice.setters.setViewMode, setSearchQuery: settingsSlice.setters.setSearchQuery, setSettingsActiveTab: settingsSlice.setters.setSettingsActiveTab,
+      /** Открыть контент-план и вкладку «Съёмки» (из календаря) */
+      openShootPlanFromCalendar: (tableId: string, shootPlanId?: string) => {
+        settingsSlice.setters.setActiveTableId(tableId);
+        settingsSlice.setters.setCurrentView('table');
+        window.setTimeout(() => {
+          window.dispatchEvent(
+            new CustomEvent('openContentPlanShoots', { detail: { tableId, shootPlanId } })
+          );
+        }, 0);
+      },
       loadMessages,
       sendMessage: async (payload: { text: string; attachments?: MessageAttachment[]; recipientId?: string | null }) => {
         const uid = authSlice.state.currentUser?.id;

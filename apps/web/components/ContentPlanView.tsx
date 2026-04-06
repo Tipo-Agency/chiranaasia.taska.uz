@@ -1,7 +1,8 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { ContentPost, Task, TableCollection } from '../types';
+import { ContentPost, Task, TableCollection, ShootPlan, User } from '../types';
+import { ShootPlansPanel } from './ShootPlansPanel';
 import { Calendar, X, FileText as FileTextIcon, Send, Youtube, Video, Image, FileText, Clock, List, LayoutGrid, KanbanSquare, Linkedin, Check, CheckSquare, ChevronLeft, ChevronRight, Trash2, Edit2, Instagram, CheckSquare2, Save, RefreshCw, MoreVertical } from 'lucide-react';
 import { DynamicIcon } from './AppIcons';
 import { ModulePageShell, ModulePageHeader, ModuleSegmentedControl, MODULE_PAGE_GUTTER, ModuleCreateIconButton } from './ui';
@@ -15,8 +16,12 @@ interface ContentPlanViewProps {
   tableId: string;
   tasks?: Task[];
   activeTable?: TableCollection;
+  users?: User[];
+  shootPlans?: ShootPlan[];
   onSavePost: (post: ContentPost) => void;
   onDeletePost: (id: string) => void;
+  onSaveShootPlan?: (plan: ShootPlan) => void;
+  onDeleteShootPlan?: (id: string) => void;
   onOpenTask?: (task: Task) => void;
   onCreateTask?: (task: Partial<Task>) => void;
 }
@@ -24,10 +29,14 @@ interface ContentPlanViewProps {
 const ContentPlanView: React.FC<ContentPlanViewProps> = ({ 
     posts, tableId, tasks = [], 
     activeTable,
+    users = [],
+    shootPlans = [],
     onSavePost, onDeletePost, 
+    onSaveShootPlan,
+    onDeleteShootPlan,
     onOpenTask, onCreateTask 
 }) => {
-  const [viewMode, setViewMode] = useState<'calendar' | 'table' | 'kanban' | 'gantt' | 'tasks'>('calendar');
+  const [viewMode, setViewMode] = useState<'calendar' | 'table' | 'kanban' | 'gantt' | 'tasks' | 'shoots'>('calendar');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingPost, setEditingPost] = useState<ContentPost | null>(null);
   /** Фильтр по формату в календаре: пост / рилс / сторис и т.д. */
@@ -96,6 +105,16 @@ const ContentPlanView: React.FC<ContentPlanViewProps> = ({
           clearInterval(interval);
           window.removeEventListener('focus', handleFocus);
       };
+  }, [tableId]);
+
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent<{ tableId?: string }>).detail;
+      if (detail?.tableId && detail.tableId !== tableId) return;
+      setViewMode('shoots');
+    };
+    window.addEventListener('openContentPlanShoots', handler as EventListener);
+    return () => window.removeEventListener('openContentPlanShoots', handler as EventListener);
   }, [tableId]);
 
   // DnD State
@@ -789,6 +808,7 @@ const ContentPlanView: React.FC<ContentPlanViewProps> = ({
                 { value: 'kanban', label: 'Доска' },
                 { value: 'gantt', label: 'Таймлайн' },
                 { value: 'tasks', label: 'Задачи' },
+                { value: 'shoots', label: 'Съёмки' },
               ]}
             />
           }
@@ -826,6 +846,16 @@ const ContentPlanView: React.FC<ContentPlanViewProps> = ({
         <div className={`${MODULE_PAGE_GUTTER} pb-20`}>
           {viewMode === 'calendar' && renderCalendar()}
           {viewMode === 'table' && renderTable()}
+          {viewMode === 'shoots' && onSaveShootPlan && onDeleteShootPlan && (
+            <ShootPlansPanel
+              tableId={tableId}
+              posts={posts}
+              users={users}
+              shootPlans={shootPlans}
+              onSave={onSaveShootPlan}
+              onDelete={onDeleteShootPlan}
+            />
+          )}
           {viewMode === 'kanban' && renderKanban()}
           {viewMode === 'gantt' && renderGantt()}
           {viewMode === 'tasks' && renderTasks()}

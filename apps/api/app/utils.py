@@ -30,12 +30,14 @@ def row_to_dict(row: Any, exclude: set = None) -> dict:
     return result
 
 
-def row_to_user(row) -> dict:
-    """Convert User model to frontend format."""
+def row_to_user(row, role=None, include_permissions: bool = False, include_calendar_export: bool = False) -> dict:
+    """Convert User model to frontend format. role — модель Role при наличии."""
+    from app.permissions import normalize_permissions
+
     d = {
         "id": row.id,
         "name": row.name,
-        "role": row.role,
+        "roleId": row.role_id,
         "avatar": row.avatar,
         "login": row.login,
         "email": row.email,
@@ -45,6 +47,32 @@ def row_to_user(row) -> dict:
         "isArchived": row.is_archived,
         "mustChangePassword": row.must_change_password,
     }
+    if role is not None:
+        d["roleSlug"] = getattr(role, "slug", None)
+        d["roleName"] = getattr(role, "name", None)
+        if include_permissions:
+            d["permissions"] = normalize_permissions(getattr(role, "permissions", None))
+        else:
+            d["permissions"] = []
+        # Совместимость со старым полем role (ADMIN / EMPLOYEE)
+        slug = getattr(role, "slug", None) or ""
+        d["role"] = "ADMIN" if slug == "admin" else "EMPLOYEE"
+    else:
+        d["roleSlug"] = None
+        d["roleName"] = None
+        d["permissions"] = []
+        d["role"] = "EMPLOYEE"
+    if include_calendar_export:
+        tok = getattr(row, "calendar_export_token", None)
+        d["calendarExportToken"] = tok
+        from app.config import get_settings
+
+        s = get_settings()
+        base = (s.PUBLIC_BASE_URL or "").rstrip("/")
+        if tok and base:
+            d["calendarExportUrl"] = f"{base}{s.API_PREFIX}/calendar/feed/{tok}.ics"
+        else:
+            d["calendarExportUrl"] = None
     return d
 
 

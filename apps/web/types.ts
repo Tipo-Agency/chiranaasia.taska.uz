@@ -26,10 +26,26 @@ export interface PriorityOption {
     updatedAt?: string;
 }
 
+export interface AppRole {
+  id: string;
+  name: string;
+  slug: string;
+  description?: string;
+  isSystem: boolean;
+  sortOrder: number;
+  permissions: string[];
+}
+
 export interface User {
   id: string;
   name: string;
-  role: Role;
+  /** Устарело: используйте roleName и permissions */
+  role?: Role;
+  roleId?: string;
+  roleSlug?: string;
+  roleName?: string;
+  /** Права текущего пользователя (после логина / /auth/me) */
+  permissions?: string[];
   avatar?: string;
   login?: string;
   email?: string;
@@ -40,6 +56,10 @@ export interface User {
   mustChangePassword?: boolean;
   isArchived?: boolean; // Архив (мягкое удаление)
   updatedAt?: string;
+  /** Секрет для подписки iCal (только у себя в /auth/me) */
+  calendarExportToken?: string | null;
+  /** Полный URL ленты .ics для Google Calendar, если задан PUBLIC_BASE_URL на сервере */
+  calendarExportUrl?: string | null;
 }
 
 export interface Client {
@@ -183,6 +203,15 @@ export interface FunnelSourceConfig {
   site?: SiteSourceConfig;
 }
 
+/** Шаблоны уведомлений по воронке (плейсхолдеры {{title}}, {{funnelName}}, {{stageLabel}}, {{contactName}} и др. из события) */
+export interface FunnelNotificationTemplates {
+  dealAssigned?: {
+    title?: string;
+    chatBody?: string;
+    telegramHtml?: string;
+  };
+}
+
 export interface SalesFunnel {
   id: string;
   name: string; // Название воронки (направление бизнеса)
@@ -192,6 +221,7 @@ export interface SalesFunnel {
   ownerUserId?: string;
   stages: FunnelStage[]; // Этапы воронки
   sources?: FunnelSourceConfig; // Настройки источников для воронки
+  notificationTemplates?: FunnelNotificationTemplates;
   createdAt?: string;
   updatedAt?: string;
   isArchived?: boolean; // Архив
@@ -430,13 +460,40 @@ export interface Meeting {
   time: string; // 'HH:mm'
   participantIds: string[];
   summary: string;
-  type: 'client' | 'work'; // Тип встречи: с клиентом или рабочая (планерка)
+  /** client — со сделкой; work — внутренняя; project — по проекту; shoot — план съёмки из контент-плана */
+  type: 'client' | 'work' | 'project' | 'shoot';
   dealId?: string; // ID сделки (обязательно для встреч с клиентами)
   clientId?: string; // ID клиента (необязательно, берется из сделки)
+  /** Для type=project — привязка к проекту */
+  projectId?: string;
+  /** Связь с планом съёмки (контент-план) */
+  shootPlanId?: string;
   recurrence?: 'none' | 'daily' | 'weekly' | 'monthly'; // Повторение (только для рабочих встреч)
   isArchived?: boolean; // Архив
   createdAt?: string;
   updatedAt?: string;
+}
+
+/** Позиция в плане съёмки: пост/рилс + ТЗ и референсы */
+export interface ShootPlanItem {
+  postId: string;
+  brief?: string;
+  referenceUrl?: string;
+  /** URL изображений (в т.ч. после загрузки в хранилище) */
+  referenceImages?: string[];
+}
+
+/** План съёмки по дате; синхронизируется с календарём (тип «съёмка») */
+export interface ShootPlan {
+  id: string;
+  tableId: string;
+  title: string;
+  date: string;
+  time: string;
+  participantIds: string[];
+  items: ShootPlanItem[];
+  meetingId?: string;
+  isArchived?: boolean;
 }
 
 export interface ContentPost {
@@ -523,6 +580,13 @@ export interface NotificationSetting {
 }
 
 export interface NotificationPreferences {
+    /** Цвета карточек в модуле «Календарь» (hex), настраиваются в разделе уведомлений */
+    calendarColors?: {
+        client?: string;
+        work?: string;
+        project?: string;
+        shoot?: string;
+    };
     channels?: {
         in_app?: boolean;
         chat?: boolean;

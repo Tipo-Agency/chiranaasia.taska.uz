@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { TableCollection, User, Role } from '../types';
+import { TableCollection, User } from '../types';
+import { hasPermission } from '../utils/permissions';
 import { DynamicIcon } from './AppIcons';
 import { Instagram, Archive, Layers, Edit2, Trash2 } from 'lucide-react';
 import { ModulePageShell, ModulePageHeader, ModuleSegmentedControl, MODULE_PAGE_GUTTER, ModuleCreateIconButton } from './ui';
@@ -80,7 +81,7 @@ export const SpacesTabsView: React.FC<SpacesTabsViewProps> = ({
           }
           controls={
             <>
-              {currentUser.role === Role.ADMIN && (
+              {hasPermission(currentUser, 'settings.general') && (
                 <ModuleCreateIconButton
                   accent="indigo"
                   label="Создать пространство"
@@ -106,7 +107,7 @@ export const SpacesTabsView: React.FC<SpacesTabsViewProps> = ({
               <p className="text-sm text-gray-400 dark:text-gray-500 mb-4">
                 Создайте первое пространство типа "{getTypeLabel(activeTab)}"
               </p>
-              {currentUser.role === Role.ADMIN && (
+              {hasPermission(currentUser, 'settings.general') && (
                 <ModuleCreateIconButton
                   accent="indigo"
                   label="Создать пространство"
@@ -141,7 +142,7 @@ export const SpacesTabsView: React.FC<SpacesTabsViewProps> = ({
                         </p>
                       </div>
                     </div>
-                    {currentUser.role === Role.ADMIN && (
+                    {hasPermission(currentUser, 'settings.general') && (
                       <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                         <button 
                           onClick={(e) => { e.stopPropagation(); onEditTable(table); }}
@@ -189,7 +190,7 @@ export const SpacesTabsView: React.FC<SpacesTabsViewProps> = ({
                         </p>
                       </div>
                     </div>
-                    {currentUser.role === Role.ADMIN && (
+                    {hasPermission(currentUser, 'settings.general') && (
                       <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                         <button 
                           onClick={(e) => { e.stopPropagation(); onEditTable(table); }}

@@ -1,7 +1,8 @@
 
 import React, { useState, useRef, useMemo, useEffect, useCallback } from 'react';
 import { TaskSelect } from './TaskSelect';
-import { FinanceCategory, Fund, FinancePlan, PurchaseRequest, Department, User, Role, FinancialPlanDocument, FinancialPlanning, Bdr } from '../types';
+import { FinanceCategory, Fund, FinancePlan, PurchaseRequest, Department, User, FinancialPlanDocument, FinancialPlanning, Bdr } from '../types';
+import { hasPermission } from '../utils/permissions';
 import { Wallet, Plus, X, Edit2, Trash2, PieChart, TrendingUp, DollarSign, Check, AlertCircle, Calendar, Settings, ArrowLeft, ArrowRight, Save, FileText, Clock, CheckCircle2, ChevronDown, Upload, Archive, RotateCcw } from 'lucide-react';
 import { Button, Card, ModulePageShell, ModulePageHeader, MODULE_PAGE_GUTTER, ModuleCreateDropdown, ModuleFilterIconButton, DateInput, ModuleSegmentedControl, SystemAlertDialog } from './ui';
 import { BankStatementsView, type BankStatementsViewHandle } from './finance/BankStatementsView';
@@ -36,7 +37,7 @@ const FinanceView: React.FC<FinanceViewProps> = ({
     onSaveRequest, onDeleteRequest,
     onSaveFinancialPlanDocument, onDeleteFinancialPlanDocument, onSaveFinancialPlanning, onDeleteFinancialPlanning
 }) => {
-  const [activeTab, setActiveTab] = useState<'planning' | 'requests' | 'plan' | 'statements' | 'bdr'>('planning');
+  const [activeTab, setActiveTab] = useState<'planning' | 'requests' | 'plan' | 'statements' | 'bdr'>('requests');
   
   // Состояния для детальных страниц
   const [selectedPlanning, setSelectedPlanning] = useState<FinancialPlanning | null>(null);
@@ -801,7 +802,7 @@ const FinanceView: React.FC<FinanceViewProps> = ({
     };
     
     const handleApprove = () => {
-      if (!onSaveFinancialPlanning || currentUser.role !== Role.ADMIN) return;
+      if (!onSaveFinancialPlanning || !hasPermission(currentUser, 'finance.approve')) return;
       if (confirm('Одобрить финансовое планирование?')) {
         const updated: FinancialPlanning = {
           ...selectedPlanning,
@@ -875,25 +876,25 @@ const FinanceView: React.FC<FinanceViewProps> = ({
                   type="button"
                   onClick={() => {
                     if (selectedPlanning.status === 'created') return handleConduct();
-                    if (selectedPlanning.status === 'conducted' && currentUser.role === Role.ADMIN) return handleApprove();
+                    if (selectedPlanning.status === 'conducted' && hasPermission(currentUser, 'finance.approve')) return handleApprove();
                   }}
-                  disabled={!(selectedPlanning.status === 'created' || (selectedPlanning.status === 'conducted' && currentUser.role === Role.ADMIN))}
+                  disabled={!(selectedPlanning.status === 'created' || (selectedPlanning.status === 'conducted' && hasPermission(currentUser, 'finance.approve')))}
                   className={`px-3 py-2 rounded-xl text-sm font-bold uppercase border transition-colors ${
-                    (selectedPlanning.status === 'created' || (selectedPlanning.status === 'conducted' && currentUser.role === Role.ADMIN))
+                    (selectedPlanning.status === 'created' || (selectedPlanning.status === 'conducted' && hasPermission(currentUser, 'finance.approve')))
                       ? 'cursor-pointer hover:opacity-90'
                       : 'cursor-default opacity-70'
                   } ${getStatusColor(selectedPlanning.status)} border-transparent`}
                   title={
                     selectedPlanning.status === 'created'
                       ? 'Нажмите, чтобы провести'
-                      : selectedPlanning.status === 'conducted' && currentUser.role === Role.ADMIN
+                      : selectedPlanning.status === 'conducted' && hasPermission(currentUser, 'finance.approve')
                       ? 'Нажмите, чтобы одобрить'
                       : 'Статус'
                   }
                 >
                   {selectedPlanning.status === 'created'
                     ? 'Провести'
-                    : selectedPlanning.status === 'conducted' && currentUser.role === Role.ADMIN
+                    : selectedPlanning.status === 'conducted' && hasPermission(currentUser, 'finance.approve')
                     ? 'Утвердить'
                     : getStatusLabel(selectedPlanning.status)}
                 </button>
@@ -1323,7 +1324,7 @@ const FinanceView: React.FC<FinanceViewProps> = ({
     };
     
     const handleApprove = () => {
-      if (!onSaveFinancialPlanDocument || currentUser.role !== Role.ADMIN) return;
+      if (!onSaveFinancialPlanDocument || !hasPermission(currentUser, 'finance.approve')) return;
       if (confirm('Утвердить финансовый план?')) {
         const updated: FinancialPlanDocument = {
           ...selectedPlanDoc,
@@ -1399,25 +1400,25 @@ const FinanceView: React.FC<FinanceViewProps> = ({
                   type="button"
                   onClick={() => {
                     if (selectedPlanDoc.status === 'created') return handleConduct();
-                    if (selectedPlanDoc.status === 'conducted' && currentUser.role === Role.ADMIN) return handleApprove();
+                    if (selectedPlanDoc.status === 'conducted' && hasPermission(currentUser, 'finance.approve')) return handleApprove();
                   }}
-                  disabled={!(selectedPlanDoc.status === 'created' || (selectedPlanDoc.status === 'conducted' && currentUser.role === Role.ADMIN))}
+                  disabled={!(selectedPlanDoc.status === 'created' || (selectedPlanDoc.status === 'conducted' && hasPermission(currentUser, 'finance.approve')))}
                   className={`px-3 py-2 rounded-xl text-sm font-bold uppercase border transition-colors ${
-                    (selectedPlanDoc.status === 'created' || (selectedPlanDoc.status === 'conducted' && currentUser.role === Role.ADMIN))
+                    (selectedPlanDoc.status === 'created' || (selectedPlanDoc.status === 'conducted' && hasPermission(currentUser, 'finance.approve')))
                       ? 'cursor-pointer hover:opacity-90'
                       : 'cursor-default opacity-70'
                   } ${getStatusColor(selectedPlanDoc.status)} border-transparent`}
                   title={
                     selectedPlanDoc.status === 'created'
                       ? 'Нажмите, чтобы провести'
-                      : selectedPlanDoc.status === 'conducted' && currentUser.role === Role.ADMIN
+                      : selectedPlanDoc.status === 'conducted' && hasPermission(currentUser, 'finance.approve')
                       ? 'Нажмите, чтобы утвердить'
                       : 'Статус'
                   }
                 >
                   {selectedPlanDoc.status === 'created'
                     ? 'Провести'
-                    : selectedPlanDoc.status === 'conducted' && currentUser.role === Role.ADMIN
+                    : selectedPlanDoc.status === 'conducted' && hasPermission(currentUser, 'finance.approve')
                     ? 'Утвердить'
                     : getStatusLabel(selectedPlanDoc.status)}
                 </button>
@@ -1740,7 +1741,7 @@ const FinanceView: React.FC<FinanceViewProps> = ({
                                             >
                                               <Edit2 size={14}/>
                                           </button>
-                                          {currentUser.role === Role.ADMIN && (
+                                          {hasPermission(currentUser, 'finance.approve') && (
                                               <button type="button" onClick={() => { if(confirm('Удалить?')) onDeleteRequest(req.id) }} className="text-gray-400 hover:text-red-600"><Trash2 size={14}/></button>
                                           )}
                                       </div>
@@ -1817,9 +1818,9 @@ const FinanceView: React.FC<FinanceViewProps> = ({
       { value: 'bdr' as const, label: 'БДР' },
       { value: 'requests' as const, label: 'Заявки' },
       { value: 'statements' as const, label: 'Выписки и сверка' },
-      ...(currentUser.role === Role.ADMIN ? [{ value: 'plan' as const, label: 'Финансовый план' }] : []),
+      ...(hasPermission(currentUser, 'finance.approve') ? [{ value: 'plan' as const, label: 'Финансовый план' }] : []),
     ],
-    [currentUser.role]
+    [currentUser.permissions]
   );
 
   const handleFinanceTabChange = (tabId: string) => {
@@ -1841,7 +1842,7 @@ const FinanceView: React.FC<FinanceViewProps> = ({
   };
 
   return (
-    <ModulePageShell>
+    <ModulePageShell className="flex-1 min-h-0 flex flex-col overflow-hidden">
       {!financeFullScreen && (
       <div className={`${MODULE_PAGE_GUTTER} pt-6 md:pt-8 pb-4 flex-shrink-0`}>
        <div className="mb-5 space-y-5">

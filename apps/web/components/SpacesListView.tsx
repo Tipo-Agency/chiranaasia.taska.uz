@@ -1,5 +1,6 @@
 import React from 'react';
-import { TableCollection, User, Role } from '../types';
+import { TableCollection, User } from '../types';
+import { hasPermission } from '../utils/permissions';
 import { DynamicIcon } from './AppIcons';
 import { ModulePageShell, ModulePageHeader, MODULE_PAGE_GUTTER } from './ui';
 import { Edit2, Trash2, Plus, ArrowLeft } from 'lucide-react';
@@ -18,7 +19,7 @@ interface SpacesListViewProps {
 const getTypeLabel = (type: string): string => {
   switch(type) {
     case 'content-plan': return 'Контент планы';
-    case 'meetings': return 'Встречи';
+    case 'meetings': return 'Календарь';
     case 'docs': return 'Документы';
     default: return '';
   }
@@ -106,7 +107,7 @@ export const SpacesListView: React.FC<SpacesListViewProps> = ({
                         </p>
                       </div>
                     </div>
-                    {currentUser.role === Role.ADMIN && (
+                    {hasPermission(currentUser, 'settings.general') && (
                       <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                         <button 
                           onClick={(e) => { e.stopPropagation(); onEditTable(table); }}

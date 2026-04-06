@@ -1,10 +1,11 @@
 
-import React, { useState, useEffect, useRef } from 'react';
-import { User, Role } from '../../types';
-import { Save, KeyRound, Trash2, Upload, User as UserIcon, Phone, AtSign, Mail, Send } from 'lucide-react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { User } from '../../types';
+import { Save, KeyRound, Trash2, Upload, User as UserIcon, Phone, AtSign, Mail, Send, Calendar, Copy, RefreshCw } from 'lucide-react';
 import { Button, Input, StandardModal } from '../ui';
 import { uploadAvatar } from '../../services/localStorageService';
 import { getDefaultAvatarForId } from '../../constants/avatars';
+import { api } from '../../backend/api';
 
 interface ProfileSettingsProps {
   currentUser: User;
@@ -28,7 +29,15 @@ export const ProfileSettings: React.FC<ProfileSettingsProps> = ({ currentUser, u
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
+  const [calendarBusy, setCalendarBusy] = useState(false);
   const avatarInputRef = useRef<HTMLInputElement>(null);
+
+  const calendarSubscribeUrl = useMemo(() => {
+    if (currentUser.calendarExportUrl) return currentUser.calendarExportUrl;
+    const t = currentUser.calendarExportToken;
+    if (!t || typeof window === 'undefined') return null;
+    return `${window.location.origin}/api/calendar/feed/${t}.ics`;
+  }, [currentUser.calendarExportUrl, currentUser.calendarExportToken]);
 
   useEffect(() => {
       setProfileName(currentUser.name);
@@ -122,6 +131,33 @@ export const ProfileSettings: React.FC<ProfileSettingsProps> = ({ currentUser, u
 
   const handleToggleMustChange = (id: string, next: boolean) => {
     onUpdateUsers(users.map((u) => (u.id === id ? { ...u, mustChangePassword: next } : u)));
+  };
+
+  const handleEnsureCalendarLink = async () => {
+    setCalendarBusy(true);
+    try {
+      await api.calendar.ensureExportToken({});
+      const me = (await api.users.getMe()) as User;
+      onUpdateProfile({ ...currentUser, ...me });
+    } catch {
+      alert('Не удалось получить ссылку для календаря. Проверьте сеть и авторизацию.');
+    } finally {
+      setCalendarBusy(false);
+    }
+  };
+
+  const handleRotateCalendarLink = async () => {
+    if (!confirm('Сгенерировать новую ссылку? Подписка в Google Calendar по старому URL перестанет обновляться.')) return;
+    setCalendarBusy(true);
+    try {
+      await api.calendar.ensureExportToken({ rotate: true });
+      const me = (await api.users.getMe()) as User;
+      onUpdateProfile({ ...currentUser, ...me });
+    } catch {
+      alert('Не удалось обновить ссылку.');
+    } finally {
+      setCalendarBusy(false);
+    }
   };
 
   const submitPasswordChange = () => {
@@ -246,6 +282,54 @@ export const ProfileSettings: React.FC<ProfileSettingsProps> = ({ currentUser, u
                             />
                         </div>
                     </div>
+                </div>
+
+                <div className="bg-gray-50 dark:bg-[#202020] p-5 rounded-xl border border-gray-200 dark:border-[#333] space-y-3">
+                  <div className="flex items-start gap-3">
+                    <Calendar className="text-teal-600 dark:text-teal-400 shrink-0 mt-0.5" size={20} />
+                    <div className="min-w-0 flex-1">
+                      <div className="text-sm font-bold text-gray-900 dark:text-white">Google Calendar</div>
+                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 leading-relaxed">
+                        Подписка по ссылке (iCal): события календаря, где вы участник, попадут в выбранный календарь Google. В Google: «Другие календари» → «Добавить» → «По URL» — вставьте ссылку ниже.
+                      </p>
+                      {calendarSubscribeUrl ? (
+                        <div className="mt-3 flex flex-col sm:flex-row gap-2">
+                          <input
+                            readOnly
+                            value={calendarSubscribeUrl}
+                            className="flex-1 min-w-0 border border-gray-200 dark:border-[#444] rounded-lg px-3 py-2 text-xs bg-white dark:bg-[#1a1a1a] text-gray-800 dark:text-gray-200 font-mono"
+                          />
+                          <div className="flex gap-2 shrink-0">
+                            <button
+                              type="button"
+                              onClick={() => navigator.clipboard?.writeText(calendarSubscribeUrl).catch(() => {})}
+                              className="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold bg-teal-600 hover:bg-teal-700 text-white"
+                            >
+                              <Copy size={14} /> Копировать
+                            </button>
+                            <button
+                              type="button"
+                              disabled={calendarBusy}
+                              onClick={() => void handleRotateCalendarLink()}
+                              className="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold border border-gray-300 dark:border-[#555] text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-[#333] disabled:opacity-50"
+                              title="Новый секретный URL"
+                            >
+                              <RefreshCw size={14} /> Новый URL
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <button
+                          type="button"
+                          disabled={calendarBusy}
+                          onClick={() => void handleEnsureCalendarLink()}
+                          className="mt-3 inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold bg-teal-600 hover:bg-teal-700 text-white disabled:opacity-50"
+                        >
+                          Получить ссылку для подписки
+                        </button>
+                      )}
+                    </div>
+                  </div>
                 </div>
 
                 <button type="submit" className="w-full px-6 py-3 bg-blue-600 text-white rounded-lg text-sm font-bold hover:bg-blue-700 shadow-sm flex items-center justify-center gap-2 transition-colors">

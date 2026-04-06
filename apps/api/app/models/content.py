@@ -45,10 +45,26 @@ class Meeting(Base):
     time = Column(String(10), nullable=False)
     participant_ids = Column(JSONB, default=list)
     summary = Column(Text, nullable=True)
-    type = Column(String(20), default="work")  # client, work
+    type = Column(String(20), default="work")  # client, work, project, shoot
     deal_id = Column(String(36), nullable=True)
     client_id = Column(String(36), nullable=True)
+    project_id = Column(String(36), nullable=True)
+    shoot_plan_id = Column(String(36), nullable=True)
     recurrence = Column(String(20), default="none")
+    is_archived = Column(Boolean, default=False)
+
+
+class ShootPlan(Base):
+    __tablename__ = "shoot_plans"
+
+    id = Column(String(36), primary_key=True, default=gen_id)
+    table_id = Column(String(36), nullable=False)
+    title = Column(String(500), nullable=False)
+    date = Column(String(50), nullable=False)
+    time = Column(String(10), nullable=False, default="10:00")
+    participant_ids = Column(JSONB, default=list)
+    items = Column(JSONB, default=list)  # [{postId, brief, referenceUrl, referenceImages: []}]
+    meeting_id = Column(String(36), nullable=True)
     is_archived = Column(Boolean, default=False)
 
 

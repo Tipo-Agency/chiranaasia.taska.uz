@@ -74,8 +74,29 @@ async def get_current_user(
     return user
 
 
-async def get_current_user_admin(current_user: User = Depends(get_current_user)) -> User:
-    """Require current user to have role ADMIN. For admin-only endpoints."""
-    if current_user.role != "ADMIN":
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin access required")
-    return current_user
+async def get_current_user_admin(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> User:
+    """Доступ к системной админке (admin.system или полный доступ)."""
+    from app.services.rbac import user_has_permission
+
+    if await user_has_permission(db, current_user, "admin.system"):
+        return current_user
+    raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin access required")
+
+
+def require_permission(permission: str):
+    """Depends(require_permission('access.users')) — проверка одного права."""
+
+    async def _dep(
+        current_user: User = Depends(get_current_user),
+        db: AsyncSession = Depends(get_db),
+    ) -> User:
+        from app.services.rbac import user_has_permission
+
+        if await user_has_permission(db, current_user, permission):
+            return current_user
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Permission denied")
+
+    return _dep

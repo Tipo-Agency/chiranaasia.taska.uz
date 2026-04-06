@@ -37,7 +37,7 @@ const BusinessProcessesView: React.FC<BusinessProcessesViewProps> = ({
   const [selectedProcessId, setSelectedProcessId] = useState<string | null>(null);
   /** Шаблоны = описания процессов; В работе = active + paused; Завершённые = completed */
   const [activeTab, setActiveTab] = useState<'templates' | 'running' | 'completed'>('templates');
-  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('list');
   const [startPickerOpen, setStartPickerOpen] = useState(false);
   const [selectedInstanceId, setSelectedInstanceId] = useState<string | null>(null);
   

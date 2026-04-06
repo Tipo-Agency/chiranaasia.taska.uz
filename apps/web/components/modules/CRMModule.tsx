@@ -24,44 +24,52 @@ interface CRMModuleProps {
 
 export const CRMModule: React.FC<CRMModuleProps> = ({ view, deals, clients, contracts, oneTimeDeals = [], accountsReceivable = [], users, salesFunnels = [], projects, tasks, meetings = [], currentUser, actions, autoOpenCreateModal = false }) => {
   if (view === 'sales-funnel') {
-      return <SalesFunnelView 
-        deals={deals} 
-        clients={clients} 
-        users={users}
-        projects={projects}
-        tasks={tasks}
-        meetings={meetings}
-        salesFunnels={salesFunnels}
-        currentUser={currentUser}
-        onSaveDeal={actions.saveDeal} 
-        onDeleteDeal={actions.deleteDeal}
-        onCreateTask={actions.openTaskModal ? (task) => actions.openTaskModal(task) : undefined}
-        onCreateClient={actions.saveClient}
-        onOpenTask={actions.openTaskModal}
-        onSaveMeeting={actions.saveMeeting}
-        onDeleteMeeting={actions.deleteMeeting}
-        onUpdateMeetingSummary={actions.updateMeetingSummary}
-        autoOpenCreateModal={autoOpenCreateModal}
-      />;
+      return (
+        <div className="h-full min-h-0 flex flex-col">
+          <SalesFunnelView 
+            deals={deals} 
+            clients={clients} 
+            users={users}
+            projects={projects}
+            tasks={tasks}
+            meetings={meetings}
+            salesFunnels={salesFunnels}
+            currentUser={currentUser}
+            onSaveDeal={actions.saveDeal} 
+            onDeleteDeal={actions.deleteDeal}
+            onCreateTask={actions.openTaskModal ? (task) => actions.openTaskModal(task) : undefined}
+            onCreateClient={actions.saveClient}
+            onOpenTask={actions.openTaskModal}
+            onSaveMeeting={actions.saveMeeting}
+            onDeleteMeeting={actions.deleteMeeting}
+            onUpdateMeetingSummary={actions.updateMeetingSummary}
+            autoOpenCreateModal={autoOpenCreateModal}
+          />
+        </div>
+      );
   }
   
   if (view === 'clients') {
-      return <ClientsView 
-        clients={clients} 
-        users={users}
-        contracts={contracts}
-        oneTimeDeals={oneTimeDeals}
-        accountsReceivable={accountsReceivable}
-        salesFunnels={salesFunnels}
-        onSaveClient={actions.saveClient} 
-        onDeleteClient={actions.deleteClient} 
-        onSaveContract={actions.saveContract} 
-        onDeleteContract={actions.deleteContract}
-        onSaveOneTimeDeal={actions.saveOneTimeDeal}
-        onDeleteOneTimeDeal={actions.deleteOneTimeDeal}
-        onSaveAccountsReceivable={actions.saveAccountsReceivable}
-        onDeleteAccountsReceivable={actions.deleteAccountsReceivable}
-      />;
+      return (
+        <div className="h-full min-h-0 flex flex-col">
+          <ClientsView 
+            clients={clients} 
+            users={users}
+            contracts={contracts}
+            oneTimeDeals={oneTimeDeals}
+            accountsReceivable={accountsReceivable}
+            salesFunnels={salesFunnels}
+            onSaveClient={actions.saveClient} 
+            onDeleteClient={actions.deleteClient} 
+            onSaveContract={actions.saveContract} 
+            onDeleteContract={actions.deleteContract}
+            onSaveOneTimeDeal={actions.saveOneTimeDeal}
+            onDeleteOneTimeDeal={actions.deleteOneTimeDeal}
+            onSaveAccountsReceivable={actions.saveAccountsReceivable}
+            onDeleteAccountsReceivable={actions.deleteAccountsReceivable}
+          />
+        </div>
+      );
   }
 
   return null;

@@ -29,6 +29,27 @@ export const useAuthLogic = (showNotification: (msg: string) => void) => {
       }
   }, [users, currentUser]);
 
+  // Подтянуть права роли после перезагрузки страницы (JWT в sessionStorage)
+  useEffect(() => {
+    if (!currentUser) return;
+    let cancelled = false;
+    const token = typeof window !== 'undefined' ? sessionStorage.getItem('access_token') : null;
+    if (!token) return;
+    (async () => {
+      try {
+        const me = (await api.users.getMe()) as User;
+        if (!cancelled && me?.id === currentUser.id) {
+          setCurrentUser(withAvatarFallback({ ...currentUser, ...me }));
+        }
+      } catch {
+        // ignore
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [currentUser?.id]);
+
   const login = (user: User) => {
     setCurrentUser(withAvatarFallback(user));
     storageService.setActiveUserId(user.id);
@@ -60,7 +81,15 @@ export const useAuthLogic = (showNotification: (msg: string) => void) => {
     }));
     // Фильтруем архивных пользователей перед установкой в state
     const activeUsers = usersWithTimestamp.filter(u => !u.isArchived);
-    setUsers(activeUsers.map(withAvatarFallback));
+    setUsers(
+      activeUsers.map((u) => {
+        const base = withAvatarFallback(u);
+        if (currentUser && u.id === currentUser.id && (!base.permissions?.length) && currentUser.permissions?.length) {
+          return { ...base, permissions: currentUser.permissions };
+        }
+        return base;
+      })
+    );
     // Сохраняем через API в локальное хранилище (всех, включая архивных)
     api.users.updateAll(usersWithTimestamp);
     // Refresh current user if data changed

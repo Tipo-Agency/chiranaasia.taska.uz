@@ -20,6 +20,7 @@ interface FinanceModuleProps {
 
 export const FinanceModule: React.FC<FinanceModuleProps> = ({ categories, funds = [], plan, requests, departments, users, currentUser, financialPlanDocuments = [], financialPlannings = [], bdr = null, actions }) => {
     return (
+        <div className="h-full min-h-0 flex flex-col">
         <FinanceView 
             categories={categories}
             funds={funds}
@@ -40,5 +41,6 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ categories, funds 
             onSaveFinancialPlanning={actions.saveFinancialPlanning}
             onDeleteFinancialPlanning={actions.deleteFinancialPlanning}
         />
+        </div>
     );
 };

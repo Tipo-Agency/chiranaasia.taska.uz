@@ -1,6 +1,6 @@
 
 import React, { useMemo, useState } from 'react';
-import { TableCollection, Task, User, Project, StatusOption, PriorityOption, Doc, Folder, Meeting, ContentPost, ViewMode, BusinessProcess, Client, Deal } from '../../types';
+import { TableCollection, Task, User, Project, StatusOption, PriorityOption, Doc, Folder, Meeting, ContentPost, ViewMode, BusinessProcess, Client, Deal, ShootPlan, NotificationPreferences } from '../../types';
 import type { AppActions } from '../../frontend/hooks/useAppLogic';
 import TableView from '../TableView';
 import KanbanBoard from '../KanbanBoard';
@@ -27,14 +27,16 @@ interface SpaceModuleProps {
   folders: Folder[];
   meetings: Meeting[];
   contentPosts: ContentPost[];
+  shootPlans?: ShootPlan[];
   businessProcesses?: BusinessProcess[];
   clients?: Client[];
   deals?: Deal[];
+  notificationPrefs?: NotificationPreferences;
   actions: AppActions;
 }
 
 export const SpaceModule: React.FC<SpaceModuleProps> = ({
-  activeTable, viewMode, tasks, users, currentUser, projects, statuses, priorities, tables, docs, folders, meetings, contentPosts, businessProcesses = [], clients = [], deals = [], actions
+  activeTable, viewMode, tasks, users, currentUser, projects, statuses, priorities, tables, docs, folders, meetings, contentPosts, shootPlans = [], businessProcesses = [], clients = [], deals = [], notificationPrefs, actions
 }) => {
   const isAggregator = activeTable?.isSystem && activeTable?.type === 'tasks';
 
@@ -404,8 +406,11 @@ export const SpaceModule: React.FC<SpaceModuleProps> = ({
             <div className="h-full flex flex-col min-h-0">
                 <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden px-6 pb-24 md:pb-32">
                 <MeetingsView 
-                    meetings={meetings} users={users} clients={clients} deals={deals} tableId={activeTable.id} showAll={activeTable.isSystem} tables={tables} 
-                    onSaveMeeting={actions.saveMeeting} onDeleteMeeting={actions.deleteMeeting}                     onUpdateSummary={actions.updateMeetingSummary} 
+                    meetings={meetings} users={users} projects={projects} clients={clients} deals={deals} tableId={activeTable.id} showAll={activeTable.isSystem} tables={tables} 
+                    onSaveMeeting={actions.saveMeeting} onDeleteMeeting={actions.deleteMeeting} onUpdateSummary={actions.updateMeetingSummary}
+                    notificationPrefs={notificationPrefs}
+                    shootPlans={shootPlans}
+                    onNavigateToShootPlan={actions.openShootPlanFromCalendar}
                 />
                 </div>
             </div>
@@ -418,7 +423,11 @@ export const SpaceModule: React.FC<SpaceModuleProps> = ({
                 <ContentPlanView 
                     posts={contentPosts} tableId={activeTable.id} tasks={tasks} 
                     activeTable={activeTable}
+                    users={users}
+                    shootPlans={shootPlans}
                     onSavePost={actions.savePost} onDeletePost={actions.deletePost} 
+                    onSaveShootPlan={actions.saveShootPlan}
+                    onDeleteShootPlan={actions.deleteShootPlan}
                     onOpenTask={actions.openTaskModal} onCreateTask={actions.openTaskModal} 
                 />
                 </div>

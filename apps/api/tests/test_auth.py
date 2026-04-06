@@ -6,6 +6,14 @@ def test_login_success(api_client):
     """POST /api/auth/login returns token for a valid user."""
     login = f"pytest_{uuid.uuid4().hex[:8]}"
     password = "pytest-pass-123"
+
+    admin_login = api_client.post(
+        "/api/auth/login",
+        json={"login": "demo", "password": ""},
+    )
+    assert admin_login.status_code == 200, admin_login.text
+    token = admin_login.json()["access_token"]
+
     create_resp = api_client.put(
         "/api/auth/users",
         json=[
@@ -16,6 +24,7 @@ def test_login_success(api_client):
                 "password": password,
             }
         ],
+        headers={"Authorization": f"Bearer {token}"},
     )
     assert create_resp.status_code == 200
 

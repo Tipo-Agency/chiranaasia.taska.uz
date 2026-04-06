@@ -181,7 +181,7 @@ const ClientsView: React.FC<ClientsViewProps> = ({
   };
 
   return (
-    <ModulePageShell>
+    <ModulePageShell className="flex-1 min-h-0 flex flex-col overflow-hidden">
       <div className={`${MODULE_PAGE_GUTTER} pt-6 md:pt-8 flex-shrink-0 space-y-5`}>
         <ClientsHeader
           salesFunnels={salesFunnels}
@@ -201,8 +201,9 @@ const ClientsView: React.FC<ClientsViewProps> = ({
         />
       </div>
 
-      <div className="flex-1 min-h-0 overflow-hidden">
-        <div className={`${MODULE_PAGE_GUTTER} mt-3 pb-24 md:pb-32 h-full overflow-y-auto overflow-x-hidden custom-scrollbar`}>
+      <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
+        <div className={`${MODULE_PAGE_GUTTER} mt-3 flex-1 min-h-0 flex flex-col overflow-hidden pb-4`}>
+          <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden custom-scrollbar">
           {activeTab === 'clients' && (
             <ClientsTab
               clients={filteredClients}
@@ -212,13 +213,13 @@ const ClientsView: React.FC<ClientsViewProps> = ({
               onCreateContract={handleOpenContractCreate}
             />
           )}
-                    {activeTab === 'contracts' && (
+          {activeTab === 'contracts' && (
             <ContractsTab
               contracts={filteredContracts}
               clients={clients}
-                                filters={contractFilters}
-                                showFilters={showFilters}
-                                onClearFilters={clearContractFilters}
+              filters={contractFilters}
+              showFilters={showFilters}
+              onClearFilters={clearContractFilters}
               onEditContract={handleOpenContractEdit}
             />
           )}
@@ -236,9 +237,10 @@ const ClientsView: React.FC<ClientsViewProps> = ({
               onOpenReceivable={handleOpenReceivableEdit}
               onDeleteReceivable={onDeleteAccountsReceivable}
             />
-                    )}
-                </div>
-            </div>
+          )}
+          </div>
+        </div>
+      </div>
             
       {/* Modals */}
       <ClientModal

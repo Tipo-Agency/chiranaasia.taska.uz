@@ -40,7 +40,7 @@ const ProfileModal: React.FC<ProfileModalProps> = ({ user, onSave, onClose, onOp
              />
              <h2 className="text-xl font-bold text-gray-900 dark:text-white">{user.name}</h2>
              <span className="px-3 py-1 bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 text-xs font-medium rounded-full mt-1 border border-blue-100 dark:border-blue-800">
-                 {user.role === Role.ADMIN ? 'Администратор' : 'Сотрудник'}
+                 {user.roleName || (user.role === Role.ADMIN ? 'Администратор' : 'Сотрудник')}
              </span>
           </div>
 

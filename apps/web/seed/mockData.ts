@@ -23,12 +23,12 @@ export function runSeed(): void {
 
   // Users: 5+ сотрудников (без avatar — отображаются инициалы на цветном фоне)
   localStoreService.setAll('users', [
-    { id: demoUserId, name: 'Демо', role: Role.ADMIN, login: 'demo', password: '' },
-    { id: 'u2', name: 'Анна Иванова', role: Role.EMPLOYEE, login: 'anna', email: 'anna@example.com' },
-    { id: 'u3', name: 'Пётр Сидоров', role: Role.EMPLOYEE, login: 'petr', email: 'petr@example.com' },
-    { id: 'u4', name: 'Мария Козлова', role: Role.EMPLOYEE, login: 'maria', email: 'maria@example.com' },
-    { id: 'u5', name: 'Иван Новиков', role: Role.EMPLOYEE, login: 'ivan', email: 'ivan@example.com' },
-    { id: 'u6', name: 'Елена Соколова', role: Role.EMPLOYEE, login: 'elena', email: 'elena@example.com' },
+    { id: demoUserId, name: 'Демо', role: Role.ADMIN, roleId: '00000000-0000-4000-8000-000000000001', roleName: 'Администратор', roleSlug: 'admin', permissions: ['system.full_access'], login: 'demo', password: '' },
+    { id: 'u2', name: 'Анна Иванова', role: Role.EMPLOYEE, roleId: '00000000-0000-4000-8000-000000000002', roleName: 'Сотрудник', roleSlug: 'employee', login: 'anna', email: 'anna@example.com' },
+    { id: 'u3', name: 'Пётр Сидоров', role: Role.EMPLOYEE, roleId: '00000000-0000-4000-8000-000000000002', roleName: 'Сотрудник', roleSlug: 'employee', login: 'petr', email: 'petr@example.com' },
+    { id: 'u4', name: 'Мария Козлова', role: Role.EMPLOYEE, roleId: '00000000-0000-4000-8000-000000000002', roleName: 'Сотрудник', roleSlug: 'employee', login: 'maria', email: 'maria@example.com' },
+    { id: 'u5', name: 'Иван Новиков', role: Role.EMPLOYEE, roleId: '00000000-0000-4000-8000-000000000002', roleName: 'Сотрудник', roleSlug: 'employee', login: 'ivan', email: 'ivan@example.com' },
+    { id: 'u6', name: 'Елена Соколова', role: Role.EMPLOYEE, roleId: '00000000-0000-4000-8000-000000000002', roleName: 'Сотрудник', roleSlug: 'employee', login: 'elena', email: 'elena@example.com' },
   ]);
 
   // Tables (страницы)

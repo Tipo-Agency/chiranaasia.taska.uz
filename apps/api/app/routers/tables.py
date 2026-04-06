@@ -4,12 +4,26 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
-from app.models.content import ContentPost
+from app.models.content import ContentPost, ShootPlan
 from app.models.settings import TableCollection
 from app.services.domain_events import log_entity_mutation
 from app.utils import row_to_table
 
 router = APIRouter(prefix="/tables", tags=["tables"])
+
+def _row_to_shoot_plan(row: ShootPlan) -> dict:
+    return {
+        "id": row.id,
+        "tableId": row.table_id,
+        "title": row.title,
+        "date": row.date,
+        "time": row.time,
+        "participantIds": row.participant_ids or [],
+        "items": row.items or [],
+        "meetingId": row.meeting_id,
+        "isArchived": row.is_archived or False,
+    }
+
 
 def _row_to_post(row: ContentPost) -> dict:
     return {
@@ -38,7 +52,11 @@ async def get_public_content_plan(table_id: str, db: AsyncSession = Depends(get_
         return {"table": None, "posts": []}
     posts_result = await db.execute(select(ContentPost).where(ContentPost.table_id == table_id))
     posts = [p for p in posts_result.scalars().all() if not (p.is_archived or False)]
-    return {"table": row_to_table(t), "posts": [_row_to_post(p) for p in posts]}
+    shoot_result = await db.execute(
+        select(ShootPlan).where(ShootPlan.table_id == table_id, ShootPlan.is_archived.is_(False))
+    )
+    shoot_plans = [_row_to_shoot_plan(sp) for sp in shoot_result.scalars().all()]
+    return {"table": row_to_table(t), "posts": [_row_to_post(p) for p in posts], "shootPlans": shoot_plans}
 
 
 @router.get("")

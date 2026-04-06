@@ -10,6 +10,9 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from sqlalchemy import select
 from app.database import AsyncSessionLocal
 from app.models.user import User
+
+ADMIN_ROLE_ID = "00000000-0000-4000-8000-000000000001"
+EMPLOYEE_ROLE_ID = "00000000-0000-4000-8000-000000000002"
 from app.models.task import Task, Project
 from app.models.settings import TableCollection, StatusOption, PriorityOption
 from app.models.notification import NotificationPreferences as NPrefModel, AutomationRule as ARModel
@@ -33,12 +36,12 @@ async def seed():
 
         # Users
         users = [
-            User(id=demo_user_id, name="Демо", role="ADMIN", login="demo", password_hash=None),
-            User(id="u2", name="Анна Иванова", role="EMPLOYEE", login="anna", email="anna@example.com"),
-            User(id="u3", name="Пётр Сидоров", role="EMPLOYEE", login="petr", email="petr@example.com"),
-            User(id="u4", name="Мария Козлова", role="EMPLOYEE", login="maria", email="maria@example.com"),
-            User(id="u5", name="Иван Новиков", role="EMPLOYEE", login="ivan", email="ivan@example.com"),
-            User(id="u6", name="Елена Соколова", role="EMPLOYEE", login="elena", email="elena@example.com"),
+            User(id=demo_user_id, name="Демо", role_id=ADMIN_ROLE_ID, login="demo", password_hash=None),
+            User(id="u2", name="Анна Иванова", role_id=EMPLOYEE_ROLE_ID, login="anna", email="anna@example.com"),
+            User(id="u3", name="Пётр Сидоров", role_id=EMPLOYEE_ROLE_ID, login="petr", email="petr@example.com"),
+            User(id="u4", name="Мария Козлова", role_id=EMPLOYEE_ROLE_ID, login="maria", email="maria@example.com"),
+            User(id="u5", name="Иван Новиков", role_id=EMPLOYEE_ROLE_ID, login="ivan", email="ivan@example.com"),
+            User(id="u6", name="Елена Соколова", role_id=EMPLOYEE_ROLE_ID, login="elena", email="elena@example.com"),
         ]
         for u in users:
             db.add(u)

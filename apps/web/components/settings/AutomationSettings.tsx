@@ -127,6 +127,15 @@ export const AutomationSettings: React.FC<AutomationSettingsProps> = ({
         });
     };
 
+    const defaultCalColors = { client: '#0ea5e9', work: '#8b5cf6', project: '#10b981', shoot: '#f97316' };
+    const calColors = { ...defaultCalColors, ...(notificationPrefs?.calendarColors || {}) };
+    const setCalColor = (key: keyof NonNullable<NotificationPreferences['calendarColors']>, hex: string) => {
+        onUpdatePrefs({
+            ...(notificationPrefs || safePrefs),
+            calendarColors: { ...calColors, [key]: hex },
+        });
+    };
+
     const getModuleTriggers = (module: AutomationRule['module']): { value: AutomationRule['trigger'], label: string }[] => {
         switch(module) {
             case 'tasks':
@@ -359,6 +368,36 @@ export const AutomationSettings: React.FC<AutomationSettingsProps> = ({
                                     placeholder="Asia/Tashkent"
                                     className="w-full border border-gray-300 dark:border-gray-600 rounded-xl px-3 py-2 text-sm bg-white dark:bg-[#252525] text-gray-900 dark:text-gray-100"
                                 />
+                            </div>
+                        </div>
+
+                        <div className="lg:col-span-2 bg-white dark:bg-[#252525] border border-gray-200 dark:border-[#333] rounded-2xl p-4 sm:p-6">
+                            <div className="text-sm font-bold text-gray-900 dark:text-white">Цвета в модуле «Календарь»</div>
+                            <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 mb-4">
+                                Карточки событий по типу: клиент, команда, проект, съёмка.
+                            </div>
+                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                                {(
+                                    [
+                                        { key: 'client' as const, label: 'С клиентом' },
+                                        { key: 'work' as const, label: 'Команда' },
+                                        { key: 'project' as const, label: 'Проект' },
+                                        { key: 'shoot' as const, label: 'Съёмка' },
+                                    ] as const
+                                ).map(({ key, label }) => (
+                                    <label key={key} className="block space-y-1">
+                                        <span className="text-[11px] font-bold text-gray-500 dark:text-gray-400">{label}</span>
+                                        <div className="flex items-center gap-2">
+                                            <input
+                                                type="color"
+                                                value={calColors[key]}
+                                                onChange={(e) => setCalColor(key, e.target.value)}
+                                                className="h-10 w-14 rounded border border-gray-200 dark:border-[#444] cursor-pointer bg-transparent"
+                                            />
+                                            <span className="text-xs font-mono text-gray-600 dark:text-gray-400">{calColors[key]}</span>
+                                        </div>
+                                    </label>
+                                ))}
                             </div>
                         </div>
 

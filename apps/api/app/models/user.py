@@ -1,7 +1,7 @@
 """User model."""
 import uuid
 
-from sqlalchemy import Boolean, Column, String
+from sqlalchemy import Boolean, Column, ForeignKey, String
 
 from app.database import Base
 
@@ -15,7 +15,7 @@ class User(Base):
 
     id = Column(String(36), primary_key=True, default=gen_id)
     name = Column(String(255), nullable=False)
-    role = Column(String(20), default="EMPLOYEE")  # ADMIN, EMPLOYEE
+    role_id = Column(String(36), ForeignKey("roles.id"), nullable=False)
     avatar = Column(String(500), nullable=True)
     login = Column(String(100), nullable=True, unique=True)
     email = Column(String(255), nullable=True)
@@ -25,3 +25,4 @@ class User(Base):
     password_hash = Column(String(255), nullable=True)
     must_change_password = Column(Boolean, default=False)
     is_archived = Column(Boolean, default=False)
+    calendar_export_token = Column(String(36), nullable=True, unique=True)

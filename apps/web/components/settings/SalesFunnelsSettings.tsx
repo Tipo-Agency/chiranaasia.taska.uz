@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { SalesFunnel, FunnelStage, NotificationPreferences, FunnelSourceConfig, User } from '../../types';
-import { Plus, X, Edit2, Trash2, GripVertical, Settings, Instagram, MessageSquare, Star, Globe } from 'lucide-react';
+import { SalesFunnel, FunnelStage, FunnelSourceConfig, User, NotificationPreferences } from '../../types';
+import { Plus, X, Edit2, Trash2, GripVertical, Settings, Instagram, MessageSquare, Star, Globe, Bell } from 'lucide-react';
 import { TaskSelect } from '../TaskSelect';
 import { api } from '../../backend/api';
 
@@ -56,7 +56,10 @@ const SalesFunnelsSettings: React.FC<SalesFunnelsSettingsProps> = ({ funnels, us
     const [funnelName, setFunnelName] = useState('');
     const [funnelColor, setFunnelColor] = useState<string>(FUNNEL_COLOR_OPTIONS[1]?.class || FUNNEL_COLOR_OPTIONS[0]?.class || 'bg-gray-200');
     const [stages, setStages] = useState<FunnelStage[]>([]);
-    const [activeTab, setActiveTab] = useState<'stages' | 'sources'>('stages');
+    const [activeTab, setActiveTab] = useState<'stages' | 'sources' | 'notifications'>('stages');
+    const [notifTitle, setNotifTitle] = useState('');
+    const [notifChat, setNotifChat] = useState('');
+    const [notifTg, setNotifTg] = useState('');
     // Источники
     const [instagramEnabled, setInstagramEnabled] = useState(false);
     const [instagramAccountId, setInstagramAccountId] = useState('');
@@ -103,6 +106,9 @@ const SalesFunnelsSettings: React.FC<SalesFunnelsSettingsProps> = ({ funnels, us
         setTelegramWebhookRegistered(false);
         setTelegramUseWebhook(false);
         setOwnerUserId('');
+        setNotifTitle('');
+        setNotifChat('');
+        setNotifTg('');
         setIsModalOpen(true);
     };
 
@@ -174,6 +180,10 @@ const SalesFunnelsSettings: React.FC<SalesFunnelsSettingsProps> = ({ funnels, us
             setSiteKeyLast4('');
         }
         setSiteNewApiKey(null);
+        const da = funnel.notificationTemplates?.dealAssigned;
+        setNotifTitle((da?.title || '').trim());
+        setNotifChat((da?.chatBody || '').trim());
+        setNotifTg((da?.telegramHtml || '').trim());
         setIsModalOpen(true);
 
         // Load actual key status from backend (source of truth)
@@ -275,6 +285,7 @@ const SalesFunnelsSettings: React.FC<SalesFunnelsSettingsProps> = ({ funnels, us
             } as any;
         }
 
+        const hasNotif = notifTitle.trim() || notifChat.trim() || notifTg.trim();
         const funnel: SalesFunnel = {
             id: editingFunnel?.id || `funnel-${Date.now()}`,
             name: funnelName.trim(),
@@ -282,6 +293,15 @@ const SalesFunnelsSettings: React.FC<SalesFunnelsSettingsProps> = ({ funnels, us
             ownerUserId: (ownerUserId || '').trim() || undefined,
             stages,
             sources: Object.keys(sources).length > 0 ? sources : undefined,
+            notificationTemplates: hasNotif
+                ? {
+                      dealAssigned: {
+                          title: notifTitle.trim() || undefined,
+                          chatBody: notifChat.trim() || undefined,
+                          telegramHtml: notifTg.trim() || undefined,
+                      },
+                  }
+                : {},
             createdAt: editingFunnel?.createdAt || new Date().toISOString(),
             updatedAt: new Date().toISOString(),
         };
@@ -307,6 +327,9 @@ const SalesFunnelsSettings: React.FC<SalesFunnelsSettingsProps> = ({ funnels, us
         setTelegramWebhookRegistered(false);
         setTelegramUseWebhook(false);
         setOwnerUserId('');
+        setNotifTitle('');
+        setNotifChat('');
+        setNotifTg('');
     };
 
     const handleRegisterTelegramWebhook = async () => {
@@ -505,6 +528,20 @@ const SalesFunnelsSettings: React.FC<SalesFunnelsSettingsProps> = ({ funnels, us
                                     <div className="flex items-center gap-2">
                                         <Settings size={16} />
                                         Источники лидов
+                                    </div>
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setActiveTab('notifications')}
+                                    className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+                                        activeTab === 'notifications'
+                                            ? 'border-blue-600 text-blue-600 dark:text-blue-400'
+                                            : 'border-transparent text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
+                                    }`}
+                                >
+                                    <div className="flex items-center gap-2">
+                                        <Bell size={16} />
+                                        Уведомления
                                     </div>
                                 </button>
                                 <button
@@ -944,6 +981,47 @@ const SalesFunnelsSettings: React.FC<SalesFunnelsSettingsProps> = ({ funnels, us
                                                 </div>
                                             )}
                                         </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            {activeTab === 'notifications' && (
+                                <div className="space-y-4">
+                                    <p className="text-xs text-gray-500 dark:text-gray-400 leading-relaxed">
+                                        Тексты для события «назначена сделка» в этой воронке. В фигурных скобках подставляются поля из уведомления, например{' '}
+                                        <span className="font-mono text-[11px] text-gray-700 dark:text-gray-300">
+                                            {'{{title}} {{funnelName}} {{stageLabel}} {{contactName}}'}
+                                        </span>
+                                        .
+                                    </p>
+                                    <div>
+                                        <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 mb-1">Заголовок</label>
+                                        <input
+                                            value={notifTitle}
+                                            onChange={(e) => setNotifTitle(e.target.value)}
+                                            className="w-full border border-gray-300 dark:border-gray-600 rounded px-3 py-2 text-sm bg-white dark:bg-[#333] text-gray-900 dark:text-gray-100 focus:ring-1 focus:ring-blue-500 outline-none"
+                                            placeholder="По умолчанию — из системы"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 mb-1">Текст в чате</label>
+                                        <textarea
+                                            value={notifChat}
+                                            onChange={(e) => setNotifChat(e.target.value)}
+                                            rows={3}
+                                            className="w-full border border-gray-300 dark:border-gray-600 rounded px-3 py-2 text-sm bg-white dark:bg-[#333] text-gray-900 dark:text-gray-100 focus:ring-1 focus:ring-blue-500 outline-none resize-y"
+                                            placeholder="Текст зеркала во внутреннем чате"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 mb-1">Telegram (HTML)</label>
+                                        <textarea
+                                            value={notifTg}
+                                            onChange={(e) => setNotifTg(e.target.value)}
+                                            rows={4}
+                                            className="w-full border border-gray-300 dark:border-gray-600 rounded px-3 py-2 text-sm bg-white dark:bg-[#333] text-gray-900 dark:text-gray-100 focus:ring-1 focus:ring-blue-500 outline-none resize-y font-mono text-[13px]"
+                                            placeholder="<b>Сделка</b> {{title}}"
+                                        />
                                     </div>
                                 </div>
                             )}

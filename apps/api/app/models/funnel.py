@@ -21,6 +21,7 @@ class SalesFunnel(Base):
     owner_user_id = Column(String(36), nullable=True)
     stages = Column(JSONB, default=list)
     sources = Column(JSONB, default=dict)
+    notification_templates = Column(JSONB, default=dict)
     created_at = Column(String(50), nullable=True)
     updated_at = Column(String(50), nullable=True)
     is_archived = Column(String(10), default="false")

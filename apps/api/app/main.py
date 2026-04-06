@@ -19,6 +19,7 @@ from app.routers import (
     auth,
     automation,
     bpm,
+    calendar_feed,
     clients,
     content_posts,
     deals,
@@ -40,6 +41,7 @@ from app.routers import (
     notifications,
     priorities,
     projects,
+    shoot_plans,
     statuses,
     system,
     tables,
@@ -165,6 +167,7 @@ app.include_router(auth.router, prefix=settings.API_PREFIX)
 app.include_router(system.router, prefix=settings.API_PREFIX)
 app.include_router(tasks.router, prefix=settings.API_PREFIX)
 app.include_router(projects.router, prefix=settings.API_PREFIX, tags=["projects"])
+app.include_router(shoot_plans.router, prefix=settings.API_PREFIX, tags=["shoot-plans"])
 app.include_router(tables.router, prefix=settings.API_PREFIX, tags=["tables"])
 app.include_router(activity.router, prefix=settings.API_PREFIX, tags=["activity"])
 app.include_router(messages.router, prefix=settings.API_PREFIX, tags=["messages"])
@@ -181,6 +184,7 @@ app.include_router(accounts_receivable.router, prefix=settings.API_PREFIX, tags=
 app.include_router(docs.router, prefix=settings.API_PREFIX, tags=["docs"])
 app.include_router(folders.router, prefix=settings.API_PREFIX, tags=["folders"])
 app.include_router(meetings.router, prefix=settings.API_PREFIX, tags=["meetings"])
+app.include_router(calendar_feed.router, prefix=settings.API_PREFIX, tags=["calendar"])
 app.include_router(content_posts.router, prefix=settings.API_PREFIX, tags=["content-posts"])
 app.include_router(departments.router, prefix=settings.API_PREFIX, tags=["departments"])
 app.include_router(finance.router, prefix=settings.API_PREFIX, tags=["finance"])

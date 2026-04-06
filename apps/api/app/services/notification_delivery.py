@@ -31,6 +31,18 @@ def _next_backoff_seconds(attempt: int) -> int:
     return 3600
 
 
+def _telegram_notification_html(n: Notification) -> tuple[str, str] | None:
+    """Шаблон из воронки (telegramHtmlOverride) или стандартное HTML для лида."""
+    p = n.payload if isinstance(n.payload, dict) else {}
+    ov = p.get("telegramHtmlOverride")
+    if isinstance(ov, str) and ov.strip():
+        text_out = ov.strip()
+        if len(text_out) > 4000:
+            text_out = text_out[:3997] + "..."
+        return text_out, "HTML"
+    return _telegram_deal_assigned_html(n)
+
+
 def _telegram_deal_assigned_html(n: Notification) -> tuple[str, str] | None:
     """Rich Telegram message with tap-to-call for site leads."""
     if n.type != "deal.assigned":
@@ -192,7 +204,7 @@ async def run_pending_deliveries(db: AsyncSession, limit: int = 100) -> dict:
                 d.last_error = "telegram_chat_id_missing"
                 failed += 1
             else:
-                tg = _telegram_deal_assigned_html(n)
+                tg = _telegram_notification_html(n)
                 if tg:
                     tg_text, tg_mode = tg
                     ok, err = _send_telegram(settings.TELEGRAM_BOT_TOKEN, str(chat_id), tg_text, tg_mode)

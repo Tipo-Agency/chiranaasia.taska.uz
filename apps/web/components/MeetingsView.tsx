@@ -1,8 +1,9 @@
 
 import React, { useState, useMemo } from 'react';
-import { Meeting, User, TableCollection, Client, Deal } from '../types';
+import { Meeting, User, TableCollection, Client, Deal, Project, NotificationPreferences, ShootPlan } from '../types';
 import {
   Calendar,
+  Camera,
   X,
   List,
   LayoutGrid,
@@ -13,6 +14,7 @@ import {
   Box,
   Briefcase,
   Building2,
+  Clapperboard,
   CalendarDays,
   ChevronLeft,
   ChevronRight,
@@ -25,6 +27,7 @@ import { DateInput } from './ui/DateInput';
 interface MeetingsViewProps {
   meetings: Meeting[];
   users: User[];
+  projects?: Project[];
   clients?: Client[];
   deals?: Deal[];
   tableId: string;
@@ -33,25 +36,61 @@ interface MeetingsViewProps {
   onSaveMeeting: (meeting: Meeting) => void;
   onDeleteMeeting?: (meetingId: string) => void;
   onUpdateSummary: (meetingId: string, summary: string) => void;
+  /** Цвета карточек из настроек уведомлений */
+  notificationPrefs?: NotificationPreferences;
+  /** Для перехода в контент-план → вкладка «Съёмки» */
+  shootPlans?: ShootPlan[];
+  onNavigateToShootPlan?: (tableId: string, shootPlanId: string) => void;
 }
 
-const MeetingsView: React.FC<MeetingsViewProps> = ({ meetings = [], users, clients = [], deals = [], tableId, showAll = false, tables = [], onSaveMeeting, onDeleteMeeting, onUpdateSummary }) => {
-  const [viewMode, setViewMode] = useState<'list' | 'calendar'>('list');
+const DEFAULT_CAL_COLORS = {
+  client: '#0ea5e9',
+  work: '#8b5cf6',
+  project: '#10b981',
+  shoot: '#f97316',
+};
+
+function meetingTypeKey(m: Meeting): 'client' | 'work' | 'project' | 'shoot' {
+  if (m.shootPlanId || m.type === 'shoot') return 'shoot';
+  if (m.projectId) return 'project';
+  if (m.type === 'client') return 'client';
+  return 'work';
+}
+
+const MeetingsView: React.FC<MeetingsViewProps> = ({
+  meetings = [],
+  users,
+  projects = [],
+  clients = [],
+  deals = [],
+  tableId,
+  showAll = false,
+  tables = [],
+  onSaveMeeting,
+  onDeleteMeeting,
+  onUpdateSummary,
+  notificationPrefs,
+  shootPlans = [],
+  onNavigateToShootPlan,
+}) => {
+  /** Календарь по умолчанию; отдельная вкладка «Съёмки» */
+  const [calendarTab, setCalendarTab] = useState<'calendar' | 'list' | 'shoots'>('calendar');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingMeeting, setEditingMeeting] = useState<Meeting | null>(null);
-  const [meetingTypeFilter, setMeetingTypeFilter] = useState<'all' | 'client' | 'work'>('all');
+  const [meetingTypeFilter, setMeetingTypeFilter] = useState<'all' | 'client' | 'work' | 'project' | 'shoot'>('all');
   const [calendarMonth, setCalendarMonth] = useState(() => {
     const t = new Date();
     return { month: t.getMonth(), year: t.getFullYear() };
   });
   
   // Form State
-  const [meetingType, setMeetingType] = useState<'client' | 'work'>('work');
+  const [meetingType, setMeetingType] = useState<'client' | 'work' | 'project'>('work'); // shoot только из планов съёмок
   const [title, setTitle] = useState('');
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
   const [time, setTime] = useState('10:00');
   const [recurrence, setRecurrence] = useState<'none' | 'daily' | 'weekly' | 'monthly'>('none');
   const [selectedDealId, setSelectedDealId] = useState<string>('');
+  const [selectedProjectId, setSelectedProjectId] = useState<string>('');
   const [selectedParticipants, setSelectedParticipants] = useState<string[]>([]);
 
   // DnD State
@@ -70,22 +109,33 @@ const MeetingsView: React.FC<MeetingsViewProps> = ({ meetings = [], users, clien
     return () => window.removeEventListener('openMeetingFromChat', handleOpenMeetingById as EventListener);
   }, [meetings]);
 
+  const calColors = useMemo(() => {
+    const c = notificationPrefs?.calendarColors || {};
+    return { ...DEFAULT_CAL_COLORS, ...c };
+  }, [notificationPrefs]);
+
+  const getTypeColor = (m: Meeting) => calColors[meetingTypeKey(m)];
+
   const filteredMeetings = useMemo(() => {
     let filtered = (meetings || [])
       .filter(m => !m.isArchived) // Исключаем архивные встречи
       .filter(m => showAll ? true : m.tableId === tableId)
-      .map(m => ({
-        ...m,
-        type: m.type || 'work' // Дефолтный тип для старых встреч
-      }));
+      .map((m) => {
+        let inferred: Meeting['type'];
+        if (m.shootPlanId || m.type === 'shoot') inferred = 'shoot';
+        else if (m.projectId) inferred = 'project';
+        else inferred = (m.type || 'work') as Meeting['type'];
+        return { ...m, type: inferred };
+      });
     
-    // Фильтр по типу
-    if (meetingTypeFilter !== 'all') {
+    if (calendarTab === 'shoots') {
+      filtered = filtered.filter((m) => m.type === 'shoot');
+    } else if (meetingTypeFilter !== 'all') {
       filtered = filtered.filter(m => m.type === meetingTypeFilter);
     }
     
     return filtered.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-  }, [meetings, tableId, showAll, meetingTypeFilter]);
+  }, [meetings, tableId, showAll, meetingTypeFilter, calendarTab]);
 
   const getTableName = (id: string) => tables.find(t => t.id === id)?.name || '';
 
@@ -97,18 +147,32 @@ const MeetingsView: React.FC<MeetingsViewProps> = ({ meetings = [], users, clien
       setTime('10:00');
       setRecurrence('none');
       setSelectedDealId('');
+      setSelectedProjectId('');
       setSelectedParticipants([]);
       setIsModalOpen(true);
   };
 
   const handleOpenEdit = (meeting: Meeting) => {
+      if (meetingTypeKey(meeting) === 'shoot' || meeting.shootPlanId) {
+        const sid = meeting.shootPlanId || '';
+        const plan = sid ? shootPlans.find((p) => p.id === sid) : undefined;
+        const targetTableId = plan?.tableId;
+        if (targetTableId && onNavigateToShootPlan && sid) {
+          onNavigateToShootPlan(targetTableId, sid);
+          return;
+        }
+        alert('План съёмки не найден. Откройте нужный контент-план → вкладка «Съёмки».');
+        return;
+      }
       setEditingMeeting(meeting);
-      setMeetingType(meeting.type || 'work');
+      const inferred: Meeting['type'] = meeting.projectId ? 'project' : (meeting.type || 'work');
+      setMeetingType(inferred);
       setTitle(meeting.title);
       setDate(normalizeDateForInput(meeting.date) || new Date().toISOString().split('T')[0]);
       setTime(meeting.time);
       setRecurrence(meeting.recurrence || 'none');
       setSelectedDealId(meeting.dealId || '');
+      setSelectedProjectId(meeting.projectId || '');
       setSelectedParticipants(meeting.participantIds || []);
       setIsModalOpen(true);
   };
@@ -123,6 +187,10 @@ const MeetingsView: React.FC<MeetingsViewProps> = ({ meetings = [], users, clien
       // Валидация для встреч с клиентами
       if (meetingType === 'client' && !selectedDealId) {
           alert('Выберите сделку для встречи');
+          return;
+      }
+      if (meetingType === 'project' && !selectedProjectId) {
+          alert('Выберите проект');
           return;
       }
       
@@ -141,6 +209,7 @@ const MeetingsView: React.FC<MeetingsViewProps> = ({ meetings = [], users, clien
               recurrence: meetingType === 'work' ? recurrence : 'none', // Повторение только для рабочих встреч
               dealId: meetingType === 'client' ? selectedDealId : undefined,
               clientId: meetingType === 'client' ? clientIdFromDeal : undefined,
+              projectId: meetingType === 'project' ? selectedProjectId : undefined,
               participantIds: selectedParticipants
           });
       } else {
@@ -155,6 +224,7 @@ const MeetingsView: React.FC<MeetingsViewProps> = ({ meetings = [], users, clien
               recurrence: meetingType === 'work' ? recurrence : 'none',
               dealId: meetingType === 'client' ? selectedDealId : undefined,
               clientId: meetingType === 'client' ? clientIdFromDeal : undefined,
+              projectId: meetingType === 'project' ? selectedProjectId : undefined,
               participantIds: selectedParticipants,
               summary: '',
               isArchived: false
@@ -166,6 +236,7 @@ const MeetingsView: React.FC<MeetingsViewProps> = ({ meetings = [], users, clien
       setTitle('');
       setSelectedParticipants([]);
       setSelectedDealId('');
+      setSelectedProjectId('');
       setRecurrence('none');
       setMeetingType('work');
   };
@@ -323,7 +394,14 @@ const MeetingsView: React.FC<MeetingsViewProps> = ({ meetings = [], users, clien
                                     <div className="space-y-1.5">
                                         {dayMeetings.map(m => {
                                           const pCount = (m.participantIds || []).length;
-                                          const typeShort = m.type === 'client' ? 'Клиент' : 'Рабочая';
+                                          const typeShort =
+                                            m.type === 'client'
+                                              ? 'Клиент'
+                                              : m.type === 'project'
+                                                ? 'Проект'
+                                                : m.type === 'shoot'
+                                                  ? 'Съёмка'
+                                                  : 'Команда';
                                           return (
                                             <div 
                                                 key={m.id} 
@@ -331,6 +409,7 @@ const MeetingsView: React.FC<MeetingsViewProps> = ({ meetings = [], users, clien
                                                 onDragStart={(e) => onDragStart(e, m.id)}
                                                 onClick={(e) => { e.stopPropagation(); handleOpenEdit(m); }}
                                                 className="bg-white dark:bg-teal-950/55 text-teal-950 dark:text-teal-50 px-2 py-1.5 rounded-xl border border-teal-200/90 dark:border-teal-800 cursor-pointer shadow-sm hover:border-teal-500 dark:hover:border-teal-500 hover:shadow transition-all" 
+                                                style={{ borderLeftWidth: 3, borderLeftColor: getTypeColor(m) }}
                                                 title={`${m.time} — ${m.title}`}
                                             >
                                                 <div className="text-[11px] font-bold text-teal-700 dark:text-teal-200 tabular-nums">{m.time}</div>
@@ -362,56 +441,65 @@ const MeetingsView: React.FC<MeetingsViewProps> = ({ meetings = [], users, clien
           <ModulePageHeader
             accent="teal"
             icon={<CalendarDays size={24} strokeWidth={2} />}
-            title="Встречи"
-            description="Планирование, календарь и итоги переговоров"
+            title="Календарь"
+            description="Встречи, планёрки и события по проектам — в списке и в календаре"
             tabs={
-              <ModuleSegmentedControl
+              calendarTab === 'calendar' ? (
+              <ModuleSegmentedControl<'all' | 'client' | 'work' | 'project' | 'shoot'>
                 variant="neutral"
                 value={meetingTypeFilter}
-                onChange={(v) => setMeetingTypeFilter(v)}
+                onChange={setMeetingTypeFilter}
                 options={[
                   { value: 'all', label: 'Все' },
                   { value: 'client', label: 'С клиентами' },
-                  { value: 'work', label: 'Рабочие' },
+                  { value: 'work', label: 'Команда' },
+                  { value: 'project', label: 'Проекты' },
+                  { value: 'shoot', label: 'Съёмки' },
                 ]}
               />
+              ) : (
+                <span className="text-xs text-gray-500 dark:text-gray-400">
+                  {calendarTab === 'shoots' ? 'Только планы съёмок из контент-плана' : 'Все типы событий'}
+                </span>
+              )
             }
             controls={
               <>
-                <ModuleSegmentedControl
+                <ModuleSegmentedControl<'calendar' | 'list' | 'shoots'>
                   variant="accent"
                   accent="teal"
-                  value={viewMode}
-                  onChange={(v) => setViewMode(v)}
+                  value={calendarTab}
+                  onChange={setCalendarTab}
                   options={[
-                    { value: 'list', label: 'Список', icon: <List size={16} /> },
                     { value: 'calendar', label: 'Календарь', icon: <LayoutGrid size={16} /> },
+                    { value: 'list', label: 'Список', icon: <List size={16} /> },
+                    { value: 'shoots', label: 'Съёмки', icon: <Clapperboard size={16} /> },
                   ]}
                 />
-                <ModuleCreateIconButton accent="teal" label="Новая встреча" onClick={handleOpenCreate} />
+                <ModuleCreateIconButton accent="teal" label="Новое событие" onClick={handleOpenCreate} />
               </>
             }
             actions={
-              <ModuleCreateIconButton accent="teal" label="Новая встреча" onClick={handleOpenCreate} />
+              <ModuleCreateIconButton accent="teal" label="Новое событие" onClick={handleOpenCreate} />
             }
           />
         </div>
       </div>
       <div className="flex-1 min-h-0 overflow-hidden">
         <div className={`${MODULE_PAGE_GUTTER} pb-20 h-full overflow-y-auto custom-scrollbar`}>
-      {viewMode === 'calendar' ? renderCalendar() : (
+      {calendarTab === 'list' ? (
         <div className="grid gap-4">
             {filteredMeetings.length === 0 ? (
                 <div className="rounded-2xl border-2 border-dashed border-gray-200 dark:border-[#333] bg-white dark:bg-[#1a1a1a] px-8 py-16 text-center">
                     <CalendarDays className="mx-auto text-gray-300 dark:text-gray-600 mb-4" size={48} strokeWidth={1.25} />
-                    <p className="text-gray-800 dark:text-gray-200 font-semibold text-lg">Нет встреч по фильтру</p>
-                    <p className="text-gray-500 dark:text-gray-400 text-sm mt-2 max-w-md mx-auto">Создайте встречу с клиентом или планёрку с командой — всё будет в списке и в календаре.</p>
+                    <p className="text-gray-800 dark:text-gray-200 font-semibold text-lg">Нет событий по фильтру</p>
+                    <p className="text-gray-500 dark:text-gray-400 text-sm mt-2 max-w-md mx-auto">Добавьте встречу с клиентом, планёрку или событие по проекту (например съёмку).</p>
                     <button
                       type="button"
                       onClick={handleOpenCreate}
                       className="mt-6 inline-flex items-center gap-2 rounded-xl bg-teal-600 hover:bg-teal-700 text-white text-sm font-semibold px-5 py-2.5 shadow-sm"
                     >
-                      <Calendar size={16} /> Запланировать встречу
+                      <Calendar size={16} /> Запланировать
                     </button>
                 </div>
             ) : (
@@ -423,6 +511,7 @@ const MeetingsView: React.FC<MeetingsViewProps> = ({ meetings = [], users, clien
                     <div
                       key={meeting.id}
                       className="group relative overflow-hidden rounded-2xl border border-gray-200 dark:border-[#333] bg-white dark:bg-[#1a1a1a] shadow-sm transition-all hover:shadow-md hover:border-teal-300/60 dark:hover:border-teal-800"
+                      style={{ borderLeftWidth: 4, borderLeftColor: getTypeColor(meeting) }}
                     >
                         {showAll && (
                             <div className="absolute top-3 right-3 z-10 text-[10px] bg-gray-100/95 dark:bg-[#252525] text-gray-600 dark:text-gray-300 px-2 py-1 rounded-lg flex items-center gap-1 border border-gray-200 dark:border-[#444]">
@@ -441,10 +530,14 @@ const MeetingsView: React.FC<MeetingsViewProps> = ({ meetings = [], users, clien
                                     <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-wide ${
                                       meeting.type === 'client'
                                         ? 'bg-sky-100 text-sky-800 dark:bg-sky-900/40 dark:text-sky-200'
+                                        : meeting.type === 'project'
+                                          ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-200'
+                                        : meeting.type === 'shoot'
+                                          ? 'bg-orange-100 text-orange-900 dark:bg-orange-900/40 dark:text-orange-200'
                                         : 'bg-violet-100 text-violet-800 dark:bg-violet-900/40 dark:text-violet-200'
                                     }`}>
-                                    {meeting.type === 'client' ? <Briefcase size={12} /> : <Building2 size={12} />}
-                                    {meeting.type === 'client' ? 'С клиентом' : 'Рабочая'}
+                                    {meeting.type === 'client' ? <Briefcase size={12} /> : meeting.type === 'project' ? <Clapperboard size={12} /> : meeting.type === 'shoot' ? <Camera size={12} /> : <Building2 size={12} />}
+                                    {meeting.type === 'client' ? 'С клиентом' : meeting.type === 'project' ? 'Проект' : meeting.type === 'shoot' ? 'Съёмка' : 'Команда'}
                                     </span>
                                     {meeting.recurrence && meeting.recurrence !== 'none' && (
                                         <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 dark:bg-amber-950/40 text-amber-800 dark:text-amber-200 px-2 py-0.5 text-[11px] font-medium">
@@ -458,6 +551,11 @@ const MeetingsView: React.FC<MeetingsViewProps> = ({ meetings = [], users, clien
                                 {meeting.type === 'client' && meeting.dealId && (
                                         <span className="inline-block mb-2 text-xs bg-sky-50 dark:bg-sky-900/40 text-sky-700 dark:text-sky-200 px-2 py-1 rounded-lg border border-sky-100 dark:border-sky-800">
                                             Сделка: {deals.find(d => d.id === meeting.dealId)?.title || '—'}
+                                        </span>
+                                    )}
+                                {meeting.type === 'project' && meeting.projectId && (
+                                        <span className="inline-block mb-2 text-xs bg-emerald-50 dark:bg-emerald-900/40 text-emerald-800 dark:text-emerald-200 px-2 py-1 rounded-lg border border-emerald-100 dark:border-emerald-800">
+                                            Проект: {projects.find((p) => p.id === meeting.projectId)?.name || '—'}
                                         </span>
                                     )}
                                 <div className="flex flex-wrap items-center gap-2 text-sm text-gray-600 dark:text-gray-300">
@@ -510,6 +608,8 @@ const MeetingsView: React.FC<MeetingsViewProps> = ({ meetings = [], users, clien
                 })
             )}
         </div>
+      ) : (
+        renderCalendar()
       )}
         </div>
       </div>
@@ -524,9 +624,9 @@ const MeetingsView: React.FC<MeetingsViewProps> = ({ meetings = [], users, clien
                 <div className="px-5 py-4 border-b border-gray-100 dark:border-[#333] flex justify-between items-start gap-3 shrink-0 bg-gradient-to-r from-teal-50/50 to-white dark:from-teal-950/20 dark:to-[#252525]">
                     <div>
                       <h3 className="text-lg font-bold text-gray-900 dark:text-white leading-tight">
-                        {editingMeeting ? 'Редактировать встречу' : 'Новая встреча'}
+                        {editingMeeting ? 'Редактировать событие' : 'Новое событие'}
                       </h3>
-                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Заполните поля ниже — список участников прокручивается отдельно при необходимости.</p>
+                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Встреча, планёрка или событие по проекту — укажите участников и время.</p>
                     </div>
                     <button type="button" onClick={() => setIsModalOpen(false)} className="text-gray-400 hover:text-gray-700 dark:hover:text-white p-2 rounded-xl hover:bg-gray-100 dark:hover:bg-[#333] shrink-0" aria-label="Закрыть">
                       <X size={20} />
@@ -537,7 +637,7 @@ const MeetingsView: React.FC<MeetingsViewProps> = ({ meetings = [], users, clien
                     <div className="flex-1 min-h-0 overflow-y-auto custom-scrollbar px-5 py-5 space-y-4">
                         <div>
                             <label className="block text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-2">Тип</label>
-                            <div className="grid grid-cols-2 gap-2">
+                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                                 <button
                                     type="button"
                                     onClick={() => {
@@ -568,6 +668,21 @@ const MeetingsView: React.FC<MeetingsViewProps> = ({ meetings = [], users, clien
                                     <Briefcase size={17} />
                                     <span className="font-medium">С клиентом</span>
                                 </button>
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setMeetingType('project');
+                                        setRecurrence('none');
+                                    }}
+                                    className={`px-3 py-2.5 rounded-xl border-2 transition-all flex items-center gap-2 text-sm ${
+                                        meetingType === 'project'
+                                            ? 'border-teal-500 bg-teal-50 dark:bg-teal-950/40 text-teal-900 dark:text-teal-100'
+                                            : 'border-gray-200 dark:border-[#444] bg-white dark:bg-[#1e1e1e] text-gray-700 dark:text-gray-300'
+                                    }`}
+                                >
+                                    <Clapperboard size={17} />
+                                    <span className="font-medium">Проект</span>
+                                </button>
                             </div>
                         </div>
 
@@ -592,6 +707,24 @@ const MeetingsView: React.FC<MeetingsViewProps> = ({ meetings = [], users, clien
                             </div>
                         )}
 
+                        {meetingType === 'project' && (
+                            <div>
+                                <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1.5">Проект <span className="text-red-500">*</span></label>
+                                <TaskSelect
+                                    value={selectedProjectId}
+                                    onChange={setSelectedProjectId}
+                                    options={[
+                                        { value: '', label: 'Выберите проект' },
+                                        ...(projects || []).filter((p) => !p.isArchived).map((p) => ({
+                                            value: p.id,
+                                            label: p.name,
+                                        })),
+                                    ]}
+                                    className="w-full"
+                                />
+                            </div>
+                        )}
+
                         <div>
                             <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1.5">Тема</label>
                             <input 
@@ -600,7 +733,13 @@ const MeetingsView: React.FC<MeetingsViewProps> = ({ meetings = [], users, clien
                                 value={title} 
                                 onChange={e => setTitle(e.target.value)} 
                                 className="w-full bg-white dark:bg-[#1e1e1e] text-gray-900 dark:text-gray-100 border border-gray-300 dark:border-[#444] rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-teal-500/40 focus:border-teal-500 outline-none" 
-                                placeholder={meetingType === 'client' ? 'Например: Презентация проекта' : 'Например: Планёрка команды'}
+                                placeholder={
+                                    meetingType === 'client'
+                                        ? 'Например: Презентация проекта'
+                                        : meetingType === 'project'
+                                          ? 'Например: Съёмка, монтаж, сдача этапа'
+                                          : 'Например: Планёрка команды'
+                                }
                             />
                         </div>
                         
@@ -682,7 +821,7 @@ const MeetingsView: React.FC<MeetingsViewProps> = ({ meetings = [], users, clien
                             type="submit" 
                             className="px-5 py-2.5 text-sm font-semibold bg-teal-600 text-white hover:bg-teal-700 rounded-xl shadow-sm"
                         >
-                            {editingMeeting ? 'Сохранить' : 'Создать встречу'}
+                            {editingMeeting ? 'Сохранить' : 'Создать'}
                         </button>
                     </div>
                 </form>

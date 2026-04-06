@@ -1,6 +1,9 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { Project, Role, Task, User, StatusOption, PriorityOption, NotificationPreferences, AutomationRule, TableCollection, Deal } from '../types';
+import { Project, Role, Task, User, StatusOption, PriorityOption, NotificationPreferences, AutomationRule, TableCollection, Deal, AppRole } from '../types';
+import { authEndpoint } from '../services/apiClient';
+import { hasPermission } from '../utils/permissions';
+import { SYSTEM_ROLE_EMPLOYEE_ID } from '../constants/systemRoles';
 import { Trash2, Plus, User as UserIcon, Briefcase, Bot, Save, Archive, KeyRound, List, BarChart2, Pencil, CheckSquare, FileText, Users, Zap, Layout, Bell, Play, Mail, Phone, Camera, Send, Link, Server, AtSign, MessageSquare, Instagram, Layers, Settings } from 'lucide-react';
 import { ModulePageHeader } from './ui/ModulePageHeader';
 import { storageService } from '../services/storageService';
@@ -57,7 +60,14 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
   const [newUserEmail, setNewUserEmail] = useState('');
   const [newUserLogin, setNewUserLogin] = useState('');
   const [newUserPassword, setNewUserPassword] = useState('123456');
-  const [newUserRole, setNewUserRole] = useState<Role>(Role.EMPLOYEE);
+  const [newUserRoleId, setNewUserRoleId] = useState(SYSTEM_ROLE_EMPLOYEE_ID);
+  const [accessSubTab, setAccessSubTab] = useState<'users' | 'roles'>('users');
+  const [roleList, setRoleList] = useState<AppRole[]>([]);
+  const [permGroups, setPermGroups] = useState<Array<{ id: string; label: string; items: Array<{ key: string; label: string }> }>>([]);
+  const [editingRole, setEditingRole] = useState<AppRole | null>(null);
+  const [editRolePerms, setEditRolePerms] = useState<string[]>([]);
+  const [newRoleName, setNewRoleName] = useState('');
+  const [roleBusy, setRoleBusy] = useState(false);
   
   const [profileName, setProfileName] = useState('');
   const [profileEmail, setProfileEmail] = useState('');
@@ -127,6 +137,49 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
       }
   }, [currentUser]);
 
+  useEffect(() => {
+    if (activeTab !== 'users' || !currentUser) return;
+    if (!hasPermission(currentUser, 'access.users') && !hasPermission(currentUser, 'access.roles')) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const list = await authEndpoint.getRoles();
+        if (!cancelled) setRoleList((list || []) as AppRole[]);
+      } catch {
+        if (!cancelled) setRoleList([]);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [activeTab, currentUser]);
+
+  useEffect(() => {
+    if (activeTab !== 'users' || accessSubTab !== 'roles' || !currentUser) return;
+    if (!hasPermission(currentUser, 'access.roles')) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const c = await authEndpoint.getPermissionsCatalog();
+        if (!cancelled) setPermGroups(c.groups || []);
+      } catch {
+        if (!cancelled) setPermGroups([]);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [activeTab, accessSubTab, currentUser]);
+
+  useEffect(() => {
+    if (activeTab !== 'users' || !currentUser) return;
+    if (hasPermission(currentUser, 'access.users')) {
+      setAccessSubTab('users');
+    } else if (hasPermission(currentUser, 'access.roles')) {
+      setAccessSubTab('roles');
+    }
+  }, [activeTab, currentUser]);
+
   const archivedTasks = tasks.filter(t => t.isArchived);
 
   const activeProjects = useMemo(() => projects.filter((p) => !p.isArchived), [projects]);
@@ -183,14 +236,17 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
 
     const passwordToSet = (newUserPassword || '123456').trim();
     
+    const picked = roleList.find((r) => r.id === newUserRoleId);
     const newUser: User = {
         id: `u-${Date.now()}`,
         name: newUserName,
         email: newUserEmail,
         login: newUserLogin,
-        // Передаём пароль в открытом виде — бэкенд сам захеширует
         password: passwordToSet,
-        role: newUserRole,
+        roleId: newUserRoleId,
+        roleName: picked?.name,
+        roleSlug: picked?.slug,
+        role: picked?.slug === 'admin' ? Role.ADMIN : Role.EMPLOYEE,
         avatar: getRandomDefaultAvatar(),
         mustChangePassword: true
     };
@@ -349,7 +405,10 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                 <TabButton id="profile" label="Мой профиль" icon={<UserIcon size={16}/>} />
                 
                 <div className="text-xs font-bold text-gray-400 dark:text-gray-600 px-3 mt-6 mb-2 uppercase">Система</div>
-                <TabButton id="users" label="Пользователи" icon={<Users size={16}/>} />
+                {currentUser &&
+                  (hasPermission(currentUser, 'access.users') || hasPermission(currentUser, 'access.roles')) && (
+                    <TabButton id="users" label="Пользователи и роли" icon={<Users size={16} />} />
+                  )}
                 <TabButton id="pages" label="Страницы" icon={<Layout size={16}/>} />
                 <TabButton id="projects" label="Модули" icon={<Briefcase size={16}/>} />
                 
@@ -380,7 +439,9 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                             </div>
                             <div>
                                 <h3 className="font-bold text-2xl text-gray-900 dark:text-white">{currentUser.name}</h3>
-                                <p className="text-sm text-gray-500 dark:text-gray-400 uppercase font-medium">{currentUser.role}</p>
+                                <p className="text-sm text-gray-500 dark:text-gray-400 uppercase font-medium">
+                                  {currentUser.roleName || currentUser.role}
+                                </p>
                             </div>
                         </div>
                         <form onSubmit={handleSaveProfile} className="space-y-6">
@@ -645,33 +706,332 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                     </div>
                 )}
 
-                {activeTab === 'users' && (
-                    <div className="space-y-8">
-                        <div className="bg-gray-50 dark:bg-[#202020] p-6 rounded-xl border border-gray-200 dark:border-[#333]">
-                            <h3 className="text-base font-bold text-gray-800 dark:text-white mb-4">Добавить пользователя</h3>
-                            <form onSubmit={handleAddUser} className="space-y-4">
-                                <input value={newUserName} onChange={e => setNewUserName(e.target.value)} placeholder="Имя Фамилия" className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-4 py-2 text-sm bg-white dark:bg-[#252525] text-gray-900 dark:text-gray-100" />
-                                <input value={newUserLogin} onChange={e => setNewUserLogin(e.target.value)} placeholder="Логин (Обязательно)" className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-4 py-2 text-sm bg-white dark:bg-[#252525] text-gray-900 dark:text-gray-100" />
-                                <button type="submit" className="px-6 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 text-sm shadow-sm">Создать</button>
-                            </form>
+                {activeTab === 'users' && currentUser && (
+                    <div className="space-y-6">
+                        <div className="flex gap-2 border-b border-gray-200 dark:border-[#333] pb-2">
+                            {hasPermission(currentUser, 'access.users') && (
+                                <button
+                                    type="button"
+                                    onClick={() => setAccessSubTab('users')}
+                                    className={`px-3 py-1.5 rounded-lg text-sm font-medium ${
+                                        accessSubTab === 'users'
+                                            ? 'bg-[#3337AD] text-white'
+                                            : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-[#252525]'
+                                    }`}
+                                >
+                                    Пользователи
+                                </button>
+                            )}
+                            {hasPermission(currentUser, 'access.roles') && (
+                                <button
+                                    type="button"
+                                    onClick={() => setAccessSubTab('roles')}
+                                    className={`px-3 py-1.5 rounded-lg text-sm font-medium ${
+                                        accessSubTab === 'roles'
+                                            ? 'bg-[#3337AD] text-white'
+                                            : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-[#252525]'
+                                    }`}
+                                >
+                                    Роли и доступ
+                                </button>
+                            )}
                         </div>
-                        <div className="space-y-3">
-                            {users.map(user => (
-                                <div key={user.id} className="flex items-center justify-between p-4 bg-white dark:bg-[#252525] border border-gray-200 dark:border-[#333] rounded-xl">
-                                    <div className="flex items-center gap-4">
-                                        <img src={user.avatar} className="w-10 h-10 rounded-full object-cover object-center" alt="" />
+
+                        {accessSubTab === 'users' && hasPermission(currentUser, 'access.users') && (
+                            <div className="space-y-8">
+                                <div className="bg-gray-50 dark:bg-[#202020] p-6 rounded-xl border border-gray-200 dark:border-[#333]">
+                                    <h3 className="text-base font-bold text-gray-800 dark:text-white mb-4">Добавить пользователя</h3>
+                                    <form onSubmit={handleAddUser} className="space-y-4">
+                                        <input
+                                            value={newUserName}
+                                            onChange={(e) => setNewUserName(e.target.value)}
+                                            placeholder="Имя Фамилия"
+                                            className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-4 py-2 text-sm bg-white dark:bg-[#252525] text-gray-900 dark:text-gray-100"
+                                        />
+                                        <input
+                                            value={newUserLogin}
+                                            onChange={(e) => setNewUserLogin(e.target.value)}
+                                            placeholder="Логин (обязательно)"
+                                            className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-4 py-2 text-sm bg-white dark:bg-[#252525] text-gray-900 dark:text-gray-100"
+                                        />
                                         <div>
-                                            <div className="font-bold text-sm text-gray-900 dark:text-white">{user.name}</div>
-                                            <div className="text-xs text-gray-500">{user.login}</div>
+                                            <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 uppercase mb-1">Роль</label>
+                                            <select
+                                                value={newUserRoleId}
+                                                onChange={(e) => setNewUserRoleId(e.target.value)}
+                                                className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-4 py-2 text-sm bg-white dark:bg-[#252525] text-gray-900 dark:text-gray-100"
+                                            >
+                                                {roleList.map((r) => (
+                                                    <option key={r.id} value={r.id}>
+                                                        {r.name}
+                                                    </option>
+                                                ))}
+                                            </select>
                                         </div>
-                                    </div>
-                                    <div className="flex items-center gap-2">
-                                        <button onClick={() => handleResetPassword(user.id)} className="p-2 text-gray-400 hover:text-orange-500 rounded-lg"><KeyRound size={18}/></button>
-                                        <button onClick={() => handleDeleteUser(user.id)} className="p-2 text-gray-400 hover:text-red-500 rounded-lg"><Trash2 size={18}/></button>
+                                        <button
+                                            type="submit"
+                                            className="px-6 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 text-sm shadow-sm"
+                                        >
+                                            Создать
+                                        </button>
+                                    </form>
+                                </div>
+                                <div className="space-y-3">
+                                    {users.map((user) => (
+                                        <div
+                                            key={user.id}
+                                            className="flex flex-wrap items-center justify-between gap-3 p-4 bg-white dark:bg-[#252525] border border-gray-200 dark:border-[#333] rounded-xl"
+                                        >
+                                            <div className="flex items-center gap-4 min-w-0">
+                                                <img
+                                                    src={user.avatar}
+                                                    className="w-10 h-10 rounded-full object-cover object-center shrink-0"
+                                                    alt=""
+                                                />
+                                                <div className="min-w-0">
+                                                    <div className="font-bold text-sm text-gray-900 dark:text-white truncate">{user.name}</div>
+                                                    <div className="text-xs text-gray-500 truncate">{user.login}</div>
+                                                    <div className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">{user.roleName || '—'}</div>
+                                                </div>
+                                            </div>
+                                            <div className="flex flex-wrap items-center gap-2">
+                                                <select
+                                                    value={user.roleId || ''}
+                                                    onChange={(e) => {
+                                                        const rid = e.target.value;
+                                                        const meta = roleList.find((x) => x.id === rid);
+                                                        onUpdateUsers(
+                                                            users.map((u) =>
+                                                                u.id === user.id
+                                                                    ? {
+                                                                          ...u,
+                                                                          roleId: rid,
+                                                                          roleName: meta?.name,
+                                                                          roleSlug: meta?.slug,
+                                                                          role: meta?.slug === 'admin' ? Role.ADMIN : Role.EMPLOYEE,
+                                                                      }
+                                                                    : u
+                                                            )
+                                                        );
+                                                    }}
+                                                    className="text-xs border border-gray-300 dark:border-[#444] rounded-lg px-2 py-1.5 bg-white dark:bg-[#1f1f1f] text-gray-900 dark:text-gray-100 max-w-[200px]"
+                                                >
+                                                    {roleList.map((r) => (
+                                                        <option key={r.id} value={r.id}>
+                                                            {r.name}
+                                                        </option>
+                                                    ))}
+                                                </select>
+                                                <button
+                                                    onClick={() => handleResetPassword(user.id)}
+                                                    className="p-2 text-gray-400 hover:text-orange-500 rounded-lg"
+                                                >
+                                                    <KeyRound size={18} />
+                                                </button>
+                                                <button
+                                                    onClick={() => handleDeleteUser(user.id)}
+                                                    className="p-2 text-gray-400 hover:text-red-500 rounded-lg"
+                                                >
+                                                    <Trash2 size={18} />
+                                                </button>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
+                        {accessSubTab === 'roles' && hasPermission(currentUser, 'access.roles') && (
+                            <div className="space-y-6">
+                                <div className="p-4 rounded-xl border border-gray-200 dark:border-[#333] bg-gray-50 dark:bg-[#202020]">
+                                    <h3 className="text-sm font-bold text-gray-800 dark:text-white mb-3">Новая роль</h3>
+                                    <div className="flex flex-wrap gap-2">
+                                        <input
+                                            value={newRoleName}
+                                            onChange={(e) => setNewRoleName(e.target.value)}
+                                            placeholder="Название (например, Менеджер продаж)"
+                                            className="flex-1 min-w-[200px] border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-[#252525] text-gray-900 dark:text-gray-100"
+                                        />
+                                        <button
+                                            type="button"
+                                            disabled={roleBusy || !newRoleName.trim()}
+                                            onClick={async () => {
+                                                setRoleBusy(true);
+                                                try {
+                                                    await authEndpoint.createRole({
+                                                        name: newRoleName.trim(),
+                                                        permissions: [],
+                                                    });
+                                                    setNewRoleName('');
+                                                    const list = await authEndpoint.getRoles();
+                                                    setRoleList((list || []) as AppRole[]);
+                                                    setAlertState({
+                                                        open: true,
+                                                        title: 'Готово',
+                                                        message: 'Роль создана. Откройте её и настройте доступы.',
+                                                    });
+                                                } catch (e: unknown) {
+                                                    setAlertState({
+                                                        open: true,
+                                                        title: 'Ошибка',
+                                                        message: e instanceof Error ? e.message : 'Не удалось создать роль',
+                                                    });
+                                                } finally {
+                                                    setRoleBusy(false);
+                                                }
+                                            }}
+                                            className="px-4 py-2 bg-[#3337AD] text-white rounded-lg text-sm font-medium disabled:opacity-50"
+                                        >
+                                            Создать роль
+                                        </button>
                                     </div>
                                 </div>
-                            ))}
-                        </div>
+                                <div className="space-y-2">
+                                    {roleList.map((r) => (
+                                        <div
+                                            key={r.id}
+                                            className="flex flex-wrap items-center justify-between gap-2 p-3 rounded-lg border border-gray-200 dark:border-[#333] bg-white dark:bg-[#252525]"
+                                        >
+                                            <div>
+                                                <div className="font-semibold text-sm text-gray-900 dark:text-white">{r.name}</div>
+                                                <div className="text-xs text-gray-500">{r.slug}</div>
+                                                {r.isSystem && (
+                                                    <span className="text-[10px] uppercase tracking-wide text-amber-600 dark:text-amber-400/90">
+                                                        Системная
+                                                    </span>
+                                                )}
+                                            </div>
+                                            <div className="flex gap-2">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        setEditingRole(r);
+                                                        setEditRolePerms([...(r.permissions || [])]);
+                                                    }}
+                                                    className="px-3 py-1.5 text-xs rounded-lg border border-gray-200 dark:border-[#444] hover:bg-gray-50 dark:hover:bg-[#333]"
+                                                >
+                                                    Права доступа
+                                                </button>
+                                                {!r.isSystem && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => {
+                                                            setConfirmState({
+                                                                open: true,
+                                                                title: 'Удалить роль?',
+                                                                message: 'Только если на роль никто не назначен.',
+                                                                onConfirm: async () => {
+                                                                    try {
+                                                                        await authEndpoint.deleteRole(r.id);
+                                                                        const list = await authEndpoint.getRoles();
+                                                                        setRoleList((list || []) as AppRole[]);
+                                                                    } catch (e: unknown) {
+                                                                        setAlertState({
+                                                                            open: true,
+                                                                            title: 'Ошибка',
+                                                                            message:
+                                                                                e instanceof Error
+                                                                                    ? e.message
+                                                                                    : 'Не удалось удалить',
+                                                                        });
+                                                                    }
+                                                                    setConfirmState({
+                                                                        open: false,
+                                                                        title: '',
+                                                                        message: '',
+                                                                    });
+                                                                },
+                                                            });
+                                                        }}
+                                                        className="px-3 py-1.5 text-xs rounded-lg text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20"
+                                                    >
+                                                        Удалить
+                                                    </button>
+                                                )}
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
+                        {editingRole && (
+                            <div
+                                className="fixed inset-0 z-[240] bg-black/40 flex items-center justify-center p-4"
+                                onClick={() => setEditingRole(null)}
+                            >
+                                <div
+                                    className="w-full max-w-lg max-h-[85vh] overflow-y-auto rounded-xl border border-gray-200 dark:border-[#444] bg-white dark:bg-[#252525] shadow-2xl p-4"
+                                    onClick={(e) => e.stopPropagation()}
+                                >
+                                    <h4 className="font-semibold text-gray-900 dark:text-white mb-1">{editingRole.name}</h4>
+                                    <p className="text-xs text-gray-500 mb-4">Отметьте разделы и действия, доступные этой роли.</p>
+                                    <div className="space-y-4">
+                                        {permGroups.map((g) => (
+                                            <div key={g.id}>
+                                                <div className="text-xs font-bold text-gray-400 uppercase mb-2">{g.label}</div>
+                                                <div className="space-y-2 pl-1">
+                                                    {g.items.map((it) => (
+                                                        <label
+                                                            key={it.key}
+                                                            className="flex items-start gap-2 text-sm text-gray-800 dark:text-gray-200 cursor-pointer"
+                                                        >
+                                                            <input
+                                                                type="checkbox"
+                                                                className="mt-1 rounded border-gray-300"
+                                                                checked={editRolePerms.includes(it.key)}
+                                                                onChange={() => {
+                                                                    setEditRolePerms((prev) =>
+                                                                        prev.includes(it.key)
+                                                                            ? prev.filter((x) => x !== it.key)
+                                                                            : [...prev, it.key]
+                                                                    );
+                                                                }}
+                                                            />
+                                                            <span>{it.label}</span>
+                                                        </label>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                    <div className="flex justify-end gap-2 mt-6">
+                                        <button
+                                            type="button"
+                                            onClick={() => setEditingRole(null)}
+                                            className="px-3 py-2 rounded-lg border border-gray-200 dark:border-[#444] text-sm"
+                                        >
+                                            Отмена
+                                        </button>
+                                        <button
+                                            type="button"
+                                            disabled={roleBusy}
+                                            onClick={async () => {
+                                                setRoleBusy(true);
+                                                try {
+                                                    await authEndpoint.patchRole(editingRole.id, { permissions: editRolePerms });
+                                                    const list = await authEndpoint.getRoles();
+                                                    setRoleList((list || []) as AppRole[]);
+                                                    setEditingRole(null);
+                                                    setAlertState({ open: true, title: 'Сохранено', message: 'Права роли обновлены.' });
+                                                } catch (e: unknown) {
+                                                    setAlertState({
+                                                        open: true,
+                                                        title: 'Ошибка',
+                                                        message: e instanceof Error ? e.message : 'Не удалось сохранить',
+                                                    });
+                                                } finally {
+                                                    setRoleBusy(false);
+                                                }
+                                            }}
+                                            className="px-4 py-2 rounded-lg bg-[#3337AD] text-white text-sm font-medium disabled:opacity-50"
+                                        >
+                                            Сохранить
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
                     </div>
                 )}
                 

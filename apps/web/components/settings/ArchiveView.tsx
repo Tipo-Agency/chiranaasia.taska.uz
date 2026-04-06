@@ -62,7 +62,7 @@ export const ARCHIVE_TAB_OPTIONS: Array<{ id: ArchiveTabId; label: string }> = [
   { id: 'contracts', label: 'Договоры' },
   { id: 'docs', label: 'Документы' },
   { id: 'posts', label: 'Посты' },
-  { id: 'meetings', label: 'Встречи' },
+  { id: 'meetings', label: 'Календарь' },
 ];
 
 /**

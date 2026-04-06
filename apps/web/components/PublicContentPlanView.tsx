@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { ContentPost, TableCollection } from '../types';
-import { Calendar, Instagram, Send, Youtube, Linkedin } from 'lucide-react';
+import { ContentPost, TableCollection, ShootPlan } from '../types';
+import { Calendar, Instagram, Send, Youtube, Linkedin, Clapperboard } from 'lucide-react';
 import { api } from '../backend/api';
 import { ModulePageShell, ModulePageHeader, ModuleSegmentedControl, MODULE_PAGE_GUTTER } from './ui';
 
@@ -10,6 +10,7 @@ interface PublicContentPlanViewProps {
 
 const PublicContentPlanView: React.FC<PublicContentPlanViewProps> = ({ tableId }) => {
   const [posts, setPosts] = useState<ContentPost[]>([]);
+  const [shootPlans, setShootPlans] = useState<ShootPlan[]>([]);
   const [table, setTable] = useState<TableCollection | null>(null);
   const [loading, setLoading] = useState(true);
   const [viewMode, setViewMode] = useState<'calendar' | 'table' | 'gantt'>('calendar');
@@ -26,8 +27,10 @@ const PublicContentPlanView: React.FC<PublicContentPlanViewProps> = ({ tableId }
         const res = await api.publicContentPlan.getByTableId(tableId);
         const t = (res.table || null) as TableCollection | null;
         const p = (res.posts || []) as ContentPost[];
+        const sp = (res.shootPlans || []) as ShootPlan[];
         setTable(t);
         setPosts(p);
+        setShootPlans(sp);
       } catch (err) {
         console.error('Ошибка загрузки данных:', err);
       } finally {
@@ -174,6 +177,51 @@ const PublicContentPlanView: React.FC<PublicContentPlanViewProps> = ({ tableId }
             { value: 'gantt', label: 'Таймлайн' },
           ]}
         />
+
+        {shootPlans.length > 0 && (
+          <div className="bg-white dark:bg-[#252525] rounded-lg shadow-sm border border-gray-200 dark:border-[#333] overflow-hidden">
+            <div className="px-4 py-3 border-b border-gray-100 dark:border-[#333] flex items-center gap-2">
+              <Clapperboard size={18} className="text-orange-500 shrink-0" />
+              <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Планы съёмки</h3>
+              <span className="text-xs text-gray-500 dark:text-gray-400">только для этого контент-плана</span>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm text-left min-w-[480px]">
+                <thead className="bg-gray-50 dark:bg-[#202020] text-gray-600 dark:text-gray-400 text-xs uppercase tracking-wide">
+                  <tr>
+                    <th className="px-4 py-2 font-semibold">Дата</th>
+                    <th className="px-4 py-2 font-semibold">Название</th>
+                    <th className="px-4 py-2 font-semibold">Позиций</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100 dark:divide-[#333]">
+                  {[...shootPlans]
+                    .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+                    .map((plan) => (
+                      <tr key={plan.id} className="hover:bg-gray-50 dark:hover:bg-[#2a2a2a]">
+                        <td className="px-4 py-2.5 text-gray-800 dark:text-gray-200 whitespace-nowrap">
+                          {plan.date
+                            ? new Date(plan.date).toLocaleDateString('ru-RU', {
+                                day: '2-digit',
+                                month: '2-digit',
+                                year: 'numeric',
+                              }).replace(/\//g, '.')
+                            : '—'}
+                          {plan.time ? ` · ${plan.time}` : ''}
+                        </td>
+                        <td className="px-4 py-2.5 font-medium text-gray-900 dark:text-white">
+                          {plan.title || 'Съёмка'}
+                        </td>
+                        <td className="px-4 py-2.5 text-gray-600 dark:text-gray-400">
+                          {(plan.items || []).length}
+                        </td>
+                      </tr>
+                    ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
 
         {/* Format filter */}
         <div className="flex flex-wrap items-center gap-2 text-xs">
