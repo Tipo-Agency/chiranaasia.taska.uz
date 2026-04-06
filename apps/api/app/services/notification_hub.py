@@ -169,7 +169,7 @@ def _route_event(event: dict[str, Any]) -> list[dict[str, Any]]:
 def _flatten_payload_for_templates(payload: dict[str, Any]) -> dict[str, str]:
     out: dict[str, str] = {}
     for k, v in payload.items():
-        if isinstance(v, (bool, int, float)):
+        if isinstance(v, bool | int | float):
             out[k] = str(v)
         elif v is None:
             out[k] = ""

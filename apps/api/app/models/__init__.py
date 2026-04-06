@@ -26,12 +26,12 @@ from app.models.notification import (
     NotificationEvent,
     NotificationPreferences,
 )
+from app.models.role import Role
 from app.models.settings import ActivityLog, InboxMessage, PriorityOption, StatusOption, TableCollection
 from app.models.site_integration import SiteIntegrationKey
 from app.models.system_log import SystemLog
 from app.models.task import Project, Task
 from app.models.telegram_integration import TelegramIntegrationState
-from app.models.role import Role
 from app.models.user import User
 from app.models.weekly_plan import Protocol, WeeklyPlan
 

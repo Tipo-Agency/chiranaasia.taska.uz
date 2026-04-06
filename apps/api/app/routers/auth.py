@@ -11,8 +11,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth import (
     create_access_token,
-    get_password_hash,
     get_current_user,
+    get_password_hash,
     require_permission,
     verify_password,
 )
