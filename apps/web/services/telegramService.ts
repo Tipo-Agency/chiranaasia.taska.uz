@@ -1,7 +1,6 @@
 
-import { TelegramButtonConfig, Deal, Comment, NotificationPreferences, SalesFunnel } from "../types";
+import { TelegramButtonConfig, Deal } from "../types";
 import { storageService } from "./storageService";
-import { api } from "../backend/api";
 import { devLog, devWarn } from "../utils/devLog";
 
 // --- EMPLOYEE BOT (Notifications, Automation) ---
@@ -128,122 +127,20 @@ export const getUserTelegramChatId = (user: { telegramUserId?: string } | null |
 // --- CLIENT BOT (Leads, Chat) ---
 
 export const sendClientMessage = async (chatId: string, text: string) => {
-  const botToken = storageService.getClientBotToken();
-  if (!chatId || !botToken) return false;
-
-  const url = `https://api.telegram.org/bot${botToken}/sendMessage`;
-  try {
-    await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ chat_id: chatId, text }),
-    });
-    return true;
-  } catch (error) {
-    devWarn('[TELEGRAM CLIENT] Send failed', error);
-    return false;
-  }
+  // Deprecated: sending to clients should be done server-side (bot token must not be in browser).
+  // Keep as stub for legacy UI paths.
+  void chatId;
+  void text;
+  return false;
 };
 
 export const pollTelegramUpdates = async (): Promise<{
   newDeals: Deal[];
   newMessages: { dealId: string; text: string; username: string }[];
 }> => {
-  const result = { newDeals: [] as Deal[], newMessages: [] as { dealId: string; text: string; username: string }[] };
-
-  const botToken = storageService.getClientBotToken();
-  const employeeBotToken = storageService.getEmployeeBotToken();
-
-  if (
-    !botToken ||
-    !botToken.trim() ||
-    botToken === employeeBotToken ||
-    (employeeBotToken && employeeBotToken.trim() && !botToken)
-  ) {
-    devWarn(
-      '[TELEGRAM POLLING] Off: set a separate client bot token (must differ from employee bot; server uses getUpdates for employee bot).'
-    );
-    return result;
-  }
-
-  try {
-    const offset = storageService.getLastTelegramUpdateId() + 1;
-    const url = `https://api.telegram.org/bot${botToken}/getUpdates?offset=${offset}&limit=20`;
-
-    const response = await fetch(url);
-    const data = await response.json();
-
-    if (data.ok && data.result.length > 0) {
-      let lastUpdateId = offset - 1;
-      const existingDeals = (await api.deals.getAll()) as Deal[];
-
-      for (const update of data.result) {
-        lastUpdateId = update.update_id;
-
-        if (update.message && update.message.chat.type === 'private') {
-          const text = update.message.text || '[Вложение]';
-          const chatId = String(update.message.chat.id);
-          const username = update.message.from.username
-            ? `@${update.message.from.username}`
-            : update.message.from.first_name;
-
-          const existingDeal = existingDeals.find((d) => d.telegramChatId === chatId);
-
-          if (existingDeal) {
-            result.newMessages.push({
-              dealId: existingDeal.id,
-              text,
-              username,
-            });
-          } else {
-            const notificationPrefs = (await api.notificationPrefs.get()) as NotificationPreferences;
-            const defaultFunnelId = notificationPrefs?.defaultFunnelId;
-
-            let stageId = 'new';
-            const funnelId = defaultFunnelId;
-            if (defaultFunnelId) {
-              const funnels = (await api.funnels.getAll()) as SalesFunnel[];
-              const defaultFunnel = funnels.find((f) => f.id === defaultFunnelId);
-              if (defaultFunnel && defaultFunnel.stages.length > 0) {
-                stageId = defaultFunnel.stages[0].id;
-              }
-            }
-
-            const deal: Deal = {
-              id: `lead-tg-${update.update_id}`,
-              title: `Лид: ${username}`,
-              contactName: username,
-              amount: 0,
-              currency: 'UZS',
-              stage: stageId,
-              funnelId,
-              source: 'telegram',
-              telegramChatId: chatId,
-              telegramUsername: username,
-              assigneeId: '',
-              createdAt: new Date().toISOString(),
-              notes: text,
-              comments: [
-                {
-                  id: `cm-${Date.now()}`,
-                  text,
-                  authorId: 'telegram_user',
-                  createdAt: new Date().toISOString(),
-                  type: 'telegram_in',
-                },
-              ],
-            };
-            result.newDeals.push(deal);
-          }
-        }
-      }
-
-      storageService.setLastTelegramUpdateId(lastUpdateId);
-    }
-  } catch (e) {
-    devWarn('[TELEGRAM POLLING] Error:', e);
-  }
-  return result;
+  // Deprecated: Telegram intake moved to backend (server-side polling).
+  // Frontend should not use Telegram bot tokens in browser.
+  return { newDeals: [], newMessages: [] };
 };
 
 // --- Форматирование сообщений для Telegram ---

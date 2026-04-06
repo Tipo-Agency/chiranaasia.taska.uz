@@ -160,11 +160,27 @@ export interface TelegramSourceConfig {
   botToken?: string; // Токен Telegram бота для этой воронки
   webhookUrl?: string; // URL вебхука для получения сообщений
   lastSyncAt?: string; // Время последней синхронизации
+  /** Сервер: лиды через HTTPS webhook (без getUpdates polling) */
+  useWebhook?: boolean;
+  webhookRegistered?: boolean;
+  /** Приходит с API без секрета — только флаг */
+  webhookSecretSet?: boolean;
+}
+
+export interface SiteSourceConfig {
+  enabled: boolean;
+  /** Default stage id for new website leads */
+  defaultStageId?: string;
+  /** Default assignee for new website leads (overrides funnel owner) */
+  defaultAssigneeId?: string;
+  /** Last 4 chars of active API key (display only) */
+  keyLast4?: string;
 }
 
 export interface FunnelSourceConfig {
   instagram?: InstagramSourceConfig;
   telegram?: TelegramSourceConfig;
+  site?: SiteSourceConfig;
 }
 
 export interface SalesFunnel {
@@ -172,6 +188,8 @@ export interface SalesFunnel {
   name: string; // Название воронки (направление бизнеса)
   /** Цвет самой воронки (бейдж/акцент), отдельно от цветов этапов */
   color?: string;
+  /** Ответственный за воронку (дефолтный assignee для новых лидов) */
+  ownerUserId?: string;
   stages: FunnelStage[]; // Этапы воронки
   sources?: FunnelSourceConfig; // Настройки источников для воронки
   createdAt?: string;

@@ -77,9 +77,10 @@ export const AdminView: React.FC = () => {
   );
 };
 
-function DbTab({ onAuthError }: { onAuthError: (msg: string) => void }) {
+function DbTab({ onAuthError }: { onAuthError: (msg: string | null) => void }) {
   const [tables, setTables] = useState<Array<{ name: string; row_count?: number }>>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [selectedTable, setSelectedTable] = useState<string | null>(null);
   const [tableData, setTableData] = useState<{ columns: string[]; rows: Record<string, unknown>[]; total: number } | null>(null);
   const [tableLoading, setTableLoading] = useState(false);
@@ -88,6 +89,7 @@ function DbTab({ onAuthError }: { onAuthError: (msg: string) => void }) {
 
   const loadTables = async () => {
     setLoading(true);
+    setLoadError(null);
     onAuthError(null);
     try {
       const data = await adminEndpoint.getTables();
@@ -96,6 +98,7 @@ function DbTab({ onAuthError }: { onAuthError: (msg: string) => void }) {
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : 'Ошибка загрузки';
       if (String(msg).includes('401') || String(msg).includes('403')) onAuthError(msg);
+      else setLoadError(msg);
     } finally {
       setLoading(false);
     }
@@ -141,6 +144,15 @@ function DbTab({ onAuthError }: { onAuthError: (msg: string) => void }) {
           Обновить
         </button>
       </div>
+      {loadError && (
+        <div className="p-3 rounded-xl bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 text-sm text-amber-900 dark:text-amber-100">
+          <p className="font-medium">Не удалось загрузить список таблиц</p>
+          <p className="mt-1 text-xs break-all opacity-90">{loadError}</p>
+          <p className="mt-2 text-xs opacity-80">
+            Часто это недоступный API (проверьте бэкенд, переменную VITE_API_URL и вкладку «Сеть» в инструментах разработчика).
+          </p>
+        </div>
+      )}
       <div className="flex gap-4">
         <ul className="w-56 border border-gray-200 dark:border-[#333] rounded-xl overflow-hidden bg-gray-50 dark:bg-[#252525] max-h-[60vh] overflow-y-auto">
           {tables.map((t) => (
@@ -228,7 +240,7 @@ function DbTab({ onAuthError }: { onAuthError: (msg: string) => void }) {
   );
 }
 
-function ErrorsTab({ onAuthError }: { onAuthError: (msg: string) => void }) {
+function ErrorsTab({ onAuthError }: { onAuthError: (msg: string | null) => void }) {
   const [logs, setLogs] = useState<Array<{ id: number; created_at: string; level: string; message: string; path?: string }>>([]);
   const [loading, setLoading] = useState(true);
   const [levelFilter, setLevelFilter] = useState('');
@@ -310,7 +322,7 @@ function ErrorsTab({ onAuthError }: { onAuthError: (msg: string) => void }) {
   );
 }
 
-function LoadTab({ onAuthError }: { onAuthError: (msg: string) => void }) {
+function LoadTab({ onAuthError }: { onAuthError: (msg: string | null) => void }) {
   const [health, setHealth] = useState<{ status: string; db: string; db_error?: string; version?: string } | null>(null);
   const [stats, setStats] = useState<{ tables: Array<{ table_name: string; row_count: number }>; db_size_mb?: number } | null>(null);
   const [loading, setLoading] = useState(true);
@@ -400,8 +412,9 @@ function LoadTab({ onAuthError }: { onAuthError: (msg: string) => void }) {
   );
 }
 
-function RedisTab({ onAuthError }: { onAuthError: (msg: string) => void }) {
+function RedisTab({ onAuthError }: { onAuthError: (msg: string | null) => void }) {
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [monitor, setMonitor] = useState<{
     redis_ok: boolean;
     redis_error?: string;
@@ -441,6 +454,8 @@ function RedisTab({ onAuthError }: { onAuthError: (msg: string) => void }) {
 
   const load = async () => {
     setLoading(true);
+    setLoadError(null);
+    onAuthError(null);
     try {
       const [data, failed] = await Promise.all([
         adminEndpoint.getRedisMonitor(),
@@ -449,7 +464,9 @@ function RedisTab({ onAuthError }: { onAuthError: (msg: string) => void }) {
       setMonitor(data);
       setFailedRows(failed || []);
     } catch (e) {
-      if (String(e).includes('401') || String(e).includes('403')) onAuthError(String(e));
+      const s = String(e);
+      if (s.includes('401') || s.includes('403')) onAuthError(s);
+      else setLoadError(s);
     } finally {
       setLoading(false);
     }
@@ -475,6 +492,16 @@ function RedisTab({ onAuthError }: { onAuthError: (msg: string) => void }) {
           Обновить
         </button>
       </div>
+
+      {loadError && (
+        <div className="p-3 rounded-xl bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 text-sm text-amber-900 dark:text-amber-100">
+          <p className="font-medium">Запрос к API админки не выполнен</p>
+          <p className="mt-1 text-xs break-all opacity-90">{loadError}</p>
+          <p className="mt-2 text-xs opacity-80">
+            Пока запрос падает, блок ниже пустой — это не значит, что Redis «выключен», сначала убедитесь, что отвечает бэкенд и эндпоинт <code className="font-mono">/api/admin/redis/monitor</code>.
+          </p>
+        </div>
+      )}
 
       {loading && !monitor ? (
         <div className="flex items-center gap-2 text-gray-500">
@@ -704,13 +731,15 @@ function RedisTab({ onAuthError }: { onAuthError: (msg: string) => void }) {
           </div>
         </>
       ) : (
-        <p className="text-sm text-gray-500">Нет данных мониторинга.</p>
+        <p className="text-sm text-gray-500">
+          {loadError ? 'Данные мониторинга не загружены из‑за ошибки выше.' : 'Нет данных мониторинга.'}
+        </p>
       )}
     </div>
   );
 }
 
-function TestsTab({ onAuthError }: { onAuthError: (msg: string) => void }) {
+function TestsTab({ onAuthError }: { onAuthError: (msg: string | null) => void }) {
   const [running, setRunning] = useState(false);
   const [result, setResult] = useState<{ ok: boolean; output: string; exit_code: number } | null>(null);
 
@@ -759,7 +788,7 @@ function TestsTab({ onAuthError }: { onAuthError: (msg: string) => void }) {
   );
 }
 
-function BotTab({ onAuthError }: { onAuthError: (msg: string) => void }) {
+function BotTab({ onAuthError }: { onAuthError: (msg: string | null) => void }) {
   const [status, setStatus] = useState<{
     telegram_configured: boolean;
     group_chat_id?: string;

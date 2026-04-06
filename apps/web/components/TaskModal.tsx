@@ -1,5 +1,7 @@
 
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useLayoutEffect, useRef, useMemo } from 'react';
+import { createPortal } from 'react-dom';
+import { computeAnchoredDropdownPosition } from '../utils/floatingDropdownPosition';
 import { Project, Task, User, StatusOption, PriorityOption, TableCollection, TaskAttachment, Doc } from '../types';
 import { X, Calendar as CalendarIcon, Users, Tag, Plus, CheckCircle2, Archive, AlignLeft, Paperclip, Send, File as FileIcon, Image as ImageIcon, MessageSquare, Download, Flag, Link as LinkIcon, Check, ChevronDown, Folder, ExternalLink, FileText, User as UserIcon, ListTree } from 'lucide-react';
 import { DynamicIcon } from './AppIcons';
@@ -54,6 +56,7 @@ const TaskModal: React.FC<TaskModalProps> = ({
   const activeStatuses = useMemo(() => statuses.filter((s) => !s.isArchived), [statuses]);
   const activePriorities = useMemo(() => priorities.filter((p) => !p.isArchived), [priorities]);
   const activeProjects = useMemo(() => projects.filter((p) => !p.isArchived), [projects]);
+  const activeUsers = useMemo(() => users.filter((u) => !u.isArchived), [users]);
 
   const hideChat = taskType === 'idea' || taskType === 'feature';
   // Fields
@@ -85,7 +88,8 @@ const TaskModal: React.FC<TaskModalProps> = ({
   const [isCloseConfirmOpen, setIsCloseConfirmOpen] = useState(false);
   const [isParentTaskModalOpen, setIsParentTaskModalOpen] = useState(false);
   const [parentTaskSearch, setParentTaskSearch] = useState('');
-  const assigneeDropdownRef = useRef<HTMLDivElement>(null);
+  const assigneeTriggerRef = useRef<HTMLDivElement>(null);
+  const assigneeMenuRef = useRef<HTMLDivElement>(null);
   const [currentTask, setCurrentTask] = useState<Partial<Task> | null>(task);
   const [previewFile, setPreviewFile] = useState<{ url: string; name: string; type: string } | null>(null);
   
@@ -397,17 +401,39 @@ const TaskModal: React.FC<TaskModalProps> = ({
   };
 
   // Закрытие выпадающего списка при клике вне его
+  const [assigneeMenuPos, setAssigneeMenuPos] = useState({ top: 0, left: 0, maxHeight: 256 });
+
+  const updateAssigneeMenuPosition = () => {
+      if (!assigneeTriggerRef.current) return;
+      const rect = assigneeTriggerRef.current.getBoundingClientRect();
+      const pos = computeAnchoredDropdownPosition(rect, { minWidth: Math.max(rect.width, 256) });
+      setAssigneeMenuPos({ top: pos.top, left: pos.left, maxHeight: pos.maxHeight });
+  };
+
+  useLayoutEffect(() => {
+      if (isAssigneeDropdownOpen) updateAssigneeMenuPosition();
+  }, [isAssigneeDropdownOpen]);
+
   useEffect(() => {
       const handleClickOutside = (event: MouseEvent) => {
-          if (assigneeDropdownRef.current && !assigneeDropdownRef.current.contains(event.target as Node)) {
-              setIsAssigneeDropdownOpen(false);
-          }
+          const t = event.target as Node;
+          if (assigneeTriggerRef.current?.contains(t) || assigneeMenuRef.current?.contains(t)) return;
+          setIsAssigneeDropdownOpen(false);
       };
       if (isAssigneeDropdownOpen) {
-          document.addEventListener('mousedown', handleClickOutside);
+          document.addEventListener('mousedown', handleClickOutside, true);
       }
+      return () => document.removeEventListener('mousedown', handleClickOutside, true);
+  }, [isAssigneeDropdownOpen]);
+
+  useEffect(() => {
+      if (!isAssigneeDropdownOpen) return;
+      const onScrollResize = () => updateAssigneeMenuPosition();
+      window.addEventListener('scroll', onScrollResize, true);
+      window.addEventListener('resize', onScrollResize);
       return () => {
-          document.removeEventListener('mousedown', handleClickOutside);
+          window.removeEventListener('scroll', onScrollResize, true);
+          window.removeEventListener('resize', onScrollResize);
       };
   }, [isAssigneeDropdownOpen]);
 
@@ -433,54 +459,87 @@ const TaskModal: React.FC<TaskModalProps> = ({
     getColor: (name: string) => string
   }) => {
     const [isOpen, setIsOpen] = useState(false);
-    const containerRef = useRef<HTMLDivElement>(null);
-    const selectedOption = options.find(o => o.name === value);
+    const triggerRef = useRef<HTMLDivElement>(null);
+    const menuRef = useRef<HTMLDivElement>(null);
+    const [menuPos, setMenuPos] = useState({ top: 0, left: 0, minWidth: 0, maxHeight: 256 });
     const colorClass = getColor(value);
+
+    const updateMenuPos = () => {
+        if (!triggerRef.current) return;
+        const rect = triggerRef.current.getBoundingClientRect();
+        const pos = computeAnchoredDropdownPosition(rect, { minWidth: rect.width });
+        setMenuPos({ top: pos.top, left: pos.left, minWidth: pos.minWidth, maxHeight: pos.maxHeight });
+    };
+
+    useLayoutEffect(() => {
+        if (isOpen) updateMenuPos();
+    }, [isOpen]);
 
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
-            if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
-                setIsOpen(false);
-            }
+            const t = event.target as Node;
+            if (triggerRef.current?.contains(t) || menuRef.current?.contains(t)) return;
+            setIsOpen(false);
         };
-        if (isOpen) {
-            document.addEventListener('mousedown', handleClickOutside);
-        }
+        if (isOpen) document.addEventListener('mousedown', handleClickOutside, true);
+        return () => document.removeEventListener('mousedown', handleClickOutside, true);
+    }, [isOpen]);
+
+    useEffect(() => {
+        if (!isOpen) return;
+        const onScrollResize = () => updateMenuPos();
+        window.addEventListener('scroll', onScrollResize, true);
+        window.addEventListener('resize', onScrollResize);
         return () => {
-            document.removeEventListener('mousedown', handleClickOutside);
+            window.removeEventListener('scroll', onScrollResize, true);
+            window.removeEventListener('resize', onScrollResize);
         };
     }, [isOpen]);
 
+    const menu = isOpen ? (
+        <div
+            ref={menuRef}
+            className="fixed bg-white dark:bg-[#252525] border border-gray-200 dark:border-[#333] rounded-lg shadow-xl z-[520] overflow-y-auto custom-scrollbar p-1"
+            style={{
+                top: menuPos.top,
+                left: menuPos.left,
+                minWidth: menuPos.minWidth,
+                maxHeight: menuPos.maxHeight,
+            }}
+            onClick={(e) => e.stopPropagation()}
+            onMouseDown={(e) => e.preventDefault()}
+        >
+            {options.map(opt => {
+                const optColor = getColor(opt.name);
+                return (
+                    <div 
+                        key={opt.id}
+                        onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); }}
+                        onClick={() => {
+                            onChange(opt.name);
+                            setIsOpen(false);
+                        }}
+                        className="flex items-center gap-2 px-2.5 py-1.5 hover:bg-gray-50 dark:hover:bg-[#303030] rounded-md cursor-pointer transition-colors whitespace-nowrap"
+                    >
+                        <span className={`text-xs font-medium ${optColor} px-1.5 py-0.5 rounded inline-block`}>{opt.name}</span>
+                        {opt.name === value && <Check size={14} className="text-blue-500 dark:text-blue-400 flex-shrink-0 ml-auto"/>}
+                    </div>
+                );
+            })}
+        </div>
+    ) : null;
+
     return (
-        <div className="relative flex-1" ref={containerRef}>
+        <div className="relative flex-1 min-w-0">
             <div 
+                ref={triggerRef}
                 onClick={() => setIsOpen(!isOpen)}
                 className={`h-8 min-h-8 max-h-8 px-2.5 py-0 rounded-md text-xs font-medium cursor-pointer transition-all flex items-center justify-between ${colorClass}`}
             >
                 <span className="truncate">{value || 'Не выбрано'}</span>
                 <ChevronDown size={14} className={`ml-1.5 shrink-0 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
             </div>
-            
-            {isOpen && (
-                <div className="absolute top-full left-0 mt-1 w-auto min-w-full bg-white dark:bg-[#252525] border border-gray-200 dark:border-[#333] rounded-lg shadow-xl z-50 max-h-64 overflow-y-auto custom-scrollbar p-1">
-                    {options.map(opt => {
-                        const optColor = getColor(opt.name);
-                        return (
-                            <div 
-                                key={opt.id}
-                                onClick={() => {
-                                    onChange(opt.name);
-                                    setIsOpen(false);
-                                }}
-                                className="flex items-center gap-2 px-2.5 py-1.5 hover:bg-gray-50 dark:hover:bg-[#303030] rounded-md cursor-pointer transition-colors whitespace-nowrap"
-                            >
-                                <span className={`text-xs font-medium ${optColor} px-1.5 py-0.5 rounded inline-block`}>{opt.name}</span>
-                                {opt.name === value && <Check size={14} className="text-blue-500 dark:text-blue-400 flex-shrink-0 ml-auto"/>}
-                            </div>
-                        );
-                    })}
-                </div>
-            )}
+            {typeof document !== 'undefined' && menu && createPortal(menu, document.body)}
         </div>
     );
   };
@@ -495,7 +554,10 @@ const TaskModal: React.FC<TaskModalProps> = ({
     const [isOpen, setIsOpen] = useState(false);
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
     const [newProjectName, setNewProjectName] = useState('');
-    const containerRef = useRef<HTMLDivElement>(null);
+    const moduleRowRef = useRef<HTMLDivElement>(null);
+    const moduleTriggerRef = useRef<HTMLDivElement>(null);
+    const moduleMenuRef = useRef<HTMLDivElement>(null);
+    const [moduleMenuPos, setModuleMenuPos] = useState({ top: 0, left: 0, minWidth: 0, maxHeight: 256 });
     const selectedProject = options.find(p => p.id === value);
 
     // Функция для получения цвета модуля (как в TableView)
@@ -517,17 +579,35 @@ const TaskModal: React.FC<TaskModalProps> = ({
         return `text-${baseColor}-600 dark:text-${baseColor}-400 bg-${baseColor}-50 dark:bg-${baseColor}-900/20 border border-${baseColor}-100 dark:border-${baseColor}-800`;
     };
 
+    const updateModuleMenuPos = () => {
+        if (!moduleTriggerRef.current) return;
+        const rect = moduleTriggerRef.current.getBoundingClientRect();
+        const pos = computeAnchoredDropdownPosition(rect, { minWidth: rect.width });
+        setModuleMenuPos({ top: pos.top, left: pos.left, minWidth: pos.minWidth, maxHeight: pos.maxHeight });
+    };
+
+    useLayoutEffect(() => {
+        if (isOpen) updateModuleMenuPos();
+    }, [isOpen]);
+
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
-            if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
-                setIsOpen(false);
-            }
+            const t = event.target as Node;
+            if (moduleRowRef.current?.contains(t) || moduleMenuRef.current?.contains(t)) return;
+            setIsOpen(false);
         };
-        if (isOpen) {
-            document.addEventListener('mousedown', handleClickOutside);
-        }
+        if (isOpen) document.addEventListener('mousedown', handleClickOutside, true);
+        return () => document.removeEventListener('mousedown', handleClickOutside, true);
+    }, [isOpen]);
+
+    useEffect(() => {
+        if (!isOpen) return;
+        const onScrollResize = () => updateModuleMenuPos();
+        window.addEventListener('scroll', onScrollResize, true);
+        window.addEventListener('resize', onScrollResize);
         return () => {
-            document.removeEventListener('mousedown', handleClickOutside);
+            window.removeEventListener('scroll', onScrollResize, true);
+            window.removeEventListener('resize', onScrollResize);
         };
     }, [isOpen]);
 
@@ -545,11 +625,62 @@ const TaskModal: React.FC<TaskModalProps> = ({
         }, 120);
     };
 
-    return (
-        <div className="relative flex-1 flex gap-2" ref={containerRef}>
+    const moduleMenu = isOpen ? (
+        <div
+            ref={moduleMenuRef}
+            className="fixed bg-white dark:bg-[#252525] border border-gray-200 dark:border-[#333] rounded-lg shadow-xl z-[520] overflow-y-auto custom-scrollbar p-1"
+            style={{
+                top: moduleMenuPos.top,
+                left: moduleMenuPos.left,
+                minWidth: moduleMenuPos.minWidth,
+                maxHeight: moduleMenuPos.maxHeight,
+            }}
+            onClick={(e) => e.stopPropagation()}
+            onMouseDown={(e) => e.preventDefault()}
+        >
             <div 
+                onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); }}
+                onClick={() => {
+                    onChange('');
+                    setIsOpen(false);
+                }}
+                className="px-2.5 py-1.5 hover:bg-gray-50 dark:hover:bg-[#303030] rounded-md cursor-pointer transition-colors text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap"
+            >
+                Без модуля
+            </div>
+            {options.map(project => {
+                const projectColor = resolveProjectColor(project.color);
+                return (
+                    <div 
+                        key={project.id}
+                        onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); }}
+                        onClick={() => {
+                            onChange(project.id);
+                            setIsOpen(false);
+                        }}
+                        className="flex items-center gap-2 px-2.5 py-1.5 hover:bg-gray-50 dark:hover:bg-[#303030] rounded-md cursor-pointer transition-colors whitespace-nowrap"
+                    >
+                        {project.icon && (
+                            <DynamicIcon 
+                                name={project.icon} 
+                                className={project.color || 'text-gray-500'} 
+                                size={14} 
+                            />
+                        )}
+                        <span className={`text-xs font-medium ${projectColor} px-1.5 py-0.5 rounded inline-block flex-1`}>{project.name}</span>
+                        {project.id === value && <Check size={14} className="text-blue-500 dark:text-blue-400 flex-shrink-0"/>}
+                    </div>
+                );
+            })}
+        </div>
+    ) : null;
+
+    return (
+        <div className="relative flex-1 flex gap-2 min-w-0" ref={moduleRowRef}>
+            <div 
+                ref={moduleTriggerRef}
                 onClick={() => setIsOpen(!isOpen)}
-                className="flex-1 h-8 min-h-8 max-h-8 px-2.5 py-0 rounded-md text-xs font-medium cursor-pointer transition-all flex items-center gap-1.5 bg-gray-50 dark:bg-[#252525] border border-gray-200 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-[#303030]"
+                className="flex-1 min-w-0 h-8 min-h-8 max-h-8 px-2.5 py-0 rounded-md text-xs font-medium cursor-pointer transition-all flex items-center gap-1.5 bg-gray-50 dark:bg-[#252525] border border-gray-200 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-[#303030]"
             >
                 {selectedProject ? (
                     <>
@@ -581,42 +712,7 @@ const TaskModal: React.FC<TaskModalProps> = ({
                 <Plus size={16}/>
             </button>
             
-            {isOpen && (
-                <div className="absolute top-full left-0 mt-1 w-auto min-w-full bg-white dark:bg-[#252525] border border-gray-200 dark:border-[#333] rounded-lg shadow-xl z-50 max-h-64 overflow-y-auto custom-scrollbar p-1">
-                    <div 
-                        onClick={() => {
-                            onChange('');
-                            setIsOpen(false);
-                        }}
-                        className="px-2.5 py-1.5 hover:bg-gray-50 dark:hover:bg-[#303030] rounded-md cursor-pointer transition-colors text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap"
-                    >
-                        Без модуля
-                    </div>
-                    {options.map(project => {
-                        const projectColor = resolveProjectColor(project.color);
-                        return (
-                            <div 
-                                key={project.id}
-                                onClick={() => {
-                                    onChange(project.id);
-                                    setIsOpen(false);
-                                }}
-                                className="flex items-center gap-2 px-2.5 py-1.5 hover:bg-gray-50 dark:hover:bg-[#303030] rounded-md cursor-pointer transition-colors whitespace-nowrap"
-                            >
-                                {project.icon && (
-                                    <DynamicIcon 
-                                        name={project.icon} 
-                                        className={project.color || 'text-gray-500'} 
-                                        size={14} 
-                                    />
-                                )}
-                                <span className={`text-xs font-medium ${projectColor} px-1.5 py-0.5 rounded inline-block flex-1`}>{project.name}</span>
-                                {project.id === value && <Check size={14} className="text-blue-500 dark:text-blue-400 flex-shrink-0"/>}
-                            </div>
-                        );
-                    })}
-                </div>
-            )}
+            {typeof document !== 'undefined' && moduleMenu && createPortal(moduleMenu, document.body)}
 
             {isCreateModalOpen && (
                 <div
@@ -740,8 +836,9 @@ const TaskModal: React.FC<TaskModalProps> = ({
                     {/* Assignee Multiple */}
                     <div className="flex items-center gap-3 md:gap-4 min-h-8">
                         <div className="w-28 min-w-[7rem] shrink-0 pr-2 text-[10px] font-semibold text-gray-500 dark:text-gray-400 uppercase flex items-center gap-2"><Users size={14} className="shrink-0 text-gray-400" strokeWidth={2} /> Исполнители</div>
-                        <div className="flex-1 relative" ref={assigneeDropdownRef}>
+                        <div className="flex-1 min-w-0">
                             <div 
+                                ref={assigneeTriggerRef}
                                 onClick={() => setIsAssigneeDropdownOpen(!isAssigneeDropdownOpen)}
                                 className="flex items-center gap-1.5 cursor-pointer bg-gray-50 dark:bg-[#252525] border border-gray-200 dark:border-gray-700 rounded-md px-2.5 py-0 h-8 min-h-8 max-h-8 hover:bg-gray-100 dark:hover:bg-[#303030] transition-colors"
                             >
@@ -764,12 +861,22 @@ const TaskModal: React.FC<TaskModalProps> = ({
                                 <Plus size={14} className="text-gray-400 ml-auto shrink-0" />
                             </div>
                             
-                            {/* Custom Dropdown */}
-                            {isAssigneeDropdownOpen && (
-                                <div className="absolute top-full left-0 mt-1 w-full sm:w-64 bg-white dark:bg-[#252525] border border-gray-200 dark:border-gray-700 rounded-lg shadow-xl z-20 p-2 max-h-64 overflow-y-auto custom-scrollbar">
-                                    {users.map(u => (
+                            {typeof document !== 'undefined' && isAssigneeDropdownOpen && createPortal(
+                                <div
+                                    ref={assigneeMenuRef}
+                                    className="fixed w-64 min-w-[16rem] bg-white dark:bg-[#252525] border border-gray-200 dark:border-gray-700 rounded-lg shadow-xl z-[520] p-2 overflow-y-auto custom-scrollbar"
+                                    style={{
+                                        top: assigneeMenuPos.top,
+                                        left: assigneeMenuPos.left,
+                                        maxHeight: assigneeMenuPos.maxHeight,
+                                    }}
+                                    onClick={(e) => e.stopPropagation()}
+                                    onMouseDown={(e) => e.preventDefault()}
+                                >
+                                    {activeUsers.map(u => (
                                         <div 
                                             key={u.id} 
+                                            onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); }}
                                             onClick={() => {
                                                 toggleAssignee(u.id);
                                             }} 
@@ -778,11 +885,12 @@ const TaskModal: React.FC<TaskModalProps> = ({
                                             <div className={`w-5 h-5 border-2 rounded flex items-center justify-center transition-colors ${assigneeIds.includes(u.id) ? 'bg-blue-600 border-blue-600' : 'border-gray-300 dark:border-gray-500 bg-white dark:bg-[#252525]'}`}>
                                                 {assigneeIds.includes(u.id) && <CheckCircle2 size={12} className="text-white" />}
                                             </div>
-                                            <img src={u.avatar} className="w-8 h-8 rounded-full border border-gray-200 dark:border-gray-600 object-cover object-center" />
+                                            <img src={u.avatar} className="w-8 h-8 rounded-full border border-gray-200 dark:border-gray-600 object-cover object-center" alt="" />
                                             <span className="text-sm font-medium text-gray-800 dark:text-gray-200 flex-1 truncate">{u.name}</span>
                                         </div>
                                     ))}
-                                </div>
+                                </div>,
+                                document.body
                             )}
                         </div>
                     </div>

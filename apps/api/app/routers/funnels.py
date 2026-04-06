@@ -10,13 +10,52 @@ from app.services.domain_events import log_entity_mutation
 router = APIRouter(prefix="/funnels", tags=["funnels"])
 
 
+def _merge_telegram_sources(old: dict | None, new: dict | None) -> dict:
+    if not isinstance(new, dict):
+        return old if isinstance(old, dict) else {}
+    if not isinstance(old, dict):
+        old = {}
+    merged = {**old, **new}
+    if "webhookSecret" not in new and old.get("webhookSecret"):
+        merged["webhookSecret"] = old["webhookSecret"]
+    return merged
+
+
+def _merge_sources(existing: dict | None, incoming: dict | None) -> dict:
+    if not isinstance(incoming, dict):
+        return existing if isinstance(existing, dict) else {}
+    if not isinstance(existing, dict):
+        existing = {}
+    merged = {**existing, **incoming}
+    if isinstance(existing.get("telegram"), dict) and isinstance(incoming.get("telegram"), dict):
+        merged["telegram"] = _merge_telegram_sources(existing.get("telegram"), incoming.get("telegram"))
+    return merged
+
+
+def _sanitize_sources(sources) -> dict:
+    if not isinstance(sources, dict):
+        return {}
+    out: dict = {}
+    for k, v in sources.items():
+        if k == "telegram" and isinstance(v, dict):
+            tv = {**v}
+            if "webhookSecret" in tv:
+                del tv["webhookSecret"]
+                tv["webhookSecretSet"] = True
+            out[k] = tv
+        else:
+            out[k] = v
+    return out
+
+
 def row_to_funnel(row):
     return {
         "id": row.id,
         "name": row.name,
         "color": row.color,
+        "ownerUserId": getattr(row, "owner_user_id", None),
         "stages": row.stages or [],
-        "sources": row.sources or {},
+        "sources": _sanitize_sources(row.sources or {}),
         "createdAt": row.created_at,
         "updatedAt": row.updated_at,
         "isArchived": str(row.is_archived).lower() == "true" if row.is_archived else False,
@@ -40,8 +79,9 @@ async def update_funnels(funnels: list[dict], db: AsyncSession = Depends(get_db)
         if existing:
             existing.name = f.get("name", existing.name)
             existing.color = f.get("color", existing.color)
+            existing.owner_user_id = f.get("ownerUserId", getattr(existing, "owner_user_id", None))
             existing.stages = f.get("stages", existing.stages or [])
-            existing.sources = f.get("sources", existing.sources or {})
+            existing.sources = _merge_sources(existing.sources or {}, f.get("sources", existing.sources or {}))
             existing.created_at = f.get("createdAt")
             existing.updated_at = f.get("updatedAt")
             existing.is_archived = "true" if f.get("isArchived") else "false"
@@ -50,6 +90,7 @@ async def update_funnels(funnels: list[dict], db: AsyncSession = Depends(get_db)
                 id=fid,
                 name=f.get("name", ""),
                 color=f.get("color"),
+                owner_user_id=f.get("ownerUserId"),
                 stages=f.get("stages", []),
                 sources=f.get("sources", {}),
                 created_at=f.get("createdAt"),
@@ -78,6 +119,7 @@ async def create_funnel(funnel: dict, db: AsyncSession = Depends(get_db)):
         id=fid,
         name=funnel.get("name", "Новая воронка"),
         color=funnel.get("color"),
+        owner_user_id=funnel.get("ownerUserId"),
         stages=funnel.get("stages", []),
         sources=funnel.get("sources", {}),
         created_at=now,
@@ -115,10 +157,12 @@ async def update_funnel(funnel_id: str, updates: dict, db: AsyncSession = Depend
         f.name = updates["name"]
     if "color" in updates:
         f.color = updates["color"]
+    if "ownerUserId" in updates:
+        f.owner_user_id = updates["ownerUserId"]
     if "stages" in updates:
         f.stages = updates["stages"]
     if "sources" in updates:
-        f.sources = updates["sources"]
+        f.sources = _merge_sources(f.sources or {}, updates["sources"])
     if "isArchived" in updates:
         f.is_archived = "true" if updates["isArchived"] else "false"
     from datetime import datetime

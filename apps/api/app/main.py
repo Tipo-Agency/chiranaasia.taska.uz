@@ -29,6 +29,8 @@ from app.routers import (
     folders,
     funnels,
     integrations_meta,
+    integrations_site,
+    integrations_telegram,
     inventory,
     meetings,
     messages,
@@ -46,6 +48,7 @@ from app.routers import (
 )
 from app.services.notification_delivery import run_pending_deliveries
 from app.services.notification_retention import run_notification_retention
+from app.services.telegram_leads import poll_all_funnels
 
 settings = get_settings()
 
@@ -94,18 +97,36 @@ async def lifespan(app: FastAPI):
                 logging.getLogger("uvicorn.error").warning("Retention loop error: %s", ex)
             await asyncio.sleep(max(60, settings.NOTIFICATIONS_RETENTION_INTERVAL_SECONDS))
 
+    async def _telegram_leads_loop():
+        while not stop_flag["stop"]:
+            try:
+                async with AsyncSessionLocal() as session:
+                    n = await poll_all_funnels(session)
+                    if n:
+                        logging.getLogger("uvicorn.error").info("Telegram leads: processed=%s", n)
+                    await session.commit()
+            except Exception as ex:
+                logging.getLogger("uvicorn.error").warning("Telegram leads loop error: %s", ex)
+            await asyncio.sleep(max(2, int(settings.TELEGRAM_LEADS_POLL_INTERVAL_SECONDS or 5)))
+
     delivery_task = asyncio.create_task(_delivery_loop())
     retention_task = asyncio.create_task(_retention_loop())
+    telegram_task = asyncio.create_task(_telegram_leads_loop())
     yield
     stop_flag["stop"] = True
     delivery_task.cancel()
     retention_task.cancel()
+    telegram_task.cancel()
     try:
         await delivery_task
     except Exception:
         pass
     try:
         await retention_task
+    except Exception:
+        pass
+    try:
+        await telegram_task
     except Exception:
         pass
 
@@ -128,6 +149,8 @@ app.add_middleware(
 # Meta webhooks: без /api — URL как в кабинете Meta (например /webhook/meta)
 app.include_router(meta_webhook.router)
 app.include_router(integrations_meta.router, prefix=settings.API_PREFIX)
+app.include_router(integrations_site.router, prefix=settings.API_PREFIX)
+app.include_router(integrations_telegram.router, prefix=settings.API_PREFIX)
 
 # Routers (prefix already in router)
 app.include_router(admin.router, prefix=settings.API_PREFIX)

@@ -1,6 +1,7 @@
 
-import React, { useRef, useState, useEffect } from 'react';
+import React, { useRef, useState, useEffect, useLayoutEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
+import { computeAnchoredDropdownPosition } from '../utils/floatingDropdownPosition';
 import { Project, Role, Task, User, StatusOption, PriorityOption, TableCollection, BusinessProcess } from '../types';
 import { Trash2, Layout, AlertCircle, ChevronDown, Check, Network, TrendingUp, FileText, Archive, Layers, Plus, CheckCircle2 as CheckIcon } from 'lucide-react';
 import { normalizeDateForInput, isOverdue } from '../utils/dateUtils';
@@ -63,7 +64,12 @@ const CustomSelect = ({ value, options, onChange, type }: { value: string, optio
     const [isOpen, setIsOpen] = useState(false);
     const containerRef = useRef<HTMLDivElement>(null);
     const dropdownRef = useRef<HTMLDivElement>(null);
-    const [dropdownStyle, setDropdownStyle] = useState<{ top: number; left: number; minWidth: number }>({ top: 0, left: 0, minWidth: 0 });
+    const [dropdownStyle, setDropdownStyle] = useState<{ top: number; left: number; minWidth: number; maxHeight: number }>({
+        top: 0,
+        left: 0,
+        minWidth: 0,
+        maxHeight: 256,
+    });
 
     const selectedOption = options.find(o => (type === 'project' ? o.id : o.name) === value);
     const label = selectedOption ? selectedOption.name : (type === 'project' ? 'Без модуля' : value);
@@ -72,11 +78,17 @@ const CustomSelect = ({ value, options, onChange, type }: { value: string, optio
     const updatePosition = () => {
         if (containerRef.current) {
             const rect = containerRef.current.getBoundingClientRect();
-            setDropdownStyle({ top: rect.bottom + 4, left: rect.left, minWidth: rect.width });
+            const pos = computeAnchoredDropdownPosition(rect, { minWidth: rect.width });
+            setDropdownStyle({
+                top: pos.top,
+                left: pos.left,
+                minWidth: pos.minWidth,
+                maxHeight: pos.maxHeight,
+            });
         }
     };
 
-    useEffect(() => {
+    useLayoutEffect(() => {
         if (isOpen) updatePosition();
     }, [isOpen]);
 
@@ -106,8 +118,13 @@ const CustomSelect = ({ value, options, onChange, type }: { value: string, optio
     const dropdownContent = isOpen ? (
         <div
             ref={dropdownRef}
-            className="fixed bg-white dark:bg-[#252525] border border-gray-200 dark:border-[#333] rounded-lg shadow-xl z-[9999] max-h-64 overflow-y-auto custom-scrollbar p-1.5"
-            style={{ top: dropdownStyle.top, left: dropdownStyle.left, minWidth: dropdownStyle.minWidth }}
+            className="fixed bg-white dark:bg-[#252525] border border-gray-200 dark:border-[#333] rounded-lg shadow-xl z-[9999] overflow-y-auto custom-scrollbar p-1.5"
+            style={{
+                top: dropdownStyle.top,
+                left: dropdownStyle.left,
+                minWidth: dropdownStyle.minWidth,
+                maxHeight: dropdownStyle.maxHeight,
+            }}
             onClick={(e) => { e.stopPropagation(); e.preventDefault(); }}
             onMouseDown={(e) => { e.stopPropagation(); e.preventDefault(); }}
         >
@@ -187,7 +204,12 @@ const AssigneeCell: React.FC<{ task: Task, users: User[], onUpdate: (assigneeIds
     const [isOpen, setIsOpen] = useState(false);
     const containerRef = useRef<HTMLDivElement>(null);
     const dropdownRef = useRef<HTMLDivElement>(null);
-    const [dropdownStyle, setDropdownStyle] = useState<{ top: number; left: number }>({ top: 0, left: 0 });
+    const [dropdownStyle, setDropdownStyle] = useState<{ top: number; left: number; maxHeight: number }>({
+        top: 0,
+        left: 0,
+        maxHeight: 256,
+    });
+    const activeUsers = useMemo(() => users.filter((u) => !u.isArchived), [users]);
 
     const assignees = task.assigneeIds && task.assigneeIds.length > 0 
         ? task.assigneeIds.map(uid => users.find(u => u.id === uid)).filter(Boolean) as User[]
@@ -212,11 +234,12 @@ const AssigneeCell: React.FC<{ task: Task, users: User[], onUpdate: (assigneeIds
     const updatePosition = () => {
         if (containerRef.current) {
             const rect = containerRef.current.getBoundingClientRect();
-            setDropdownStyle({ top: rect.bottom + 4, left: rect.left });
+            const pos = computeAnchoredDropdownPosition(rect, { minWidth: Math.max(rect.width, 256) });
+            setDropdownStyle({ top: pos.top, left: pos.left, maxHeight: pos.maxHeight });
         }
     };
 
-    useEffect(() => {
+    useLayoutEffect(() => {
         if (isOpen) updatePosition();
     }, [isOpen]);
 
@@ -244,10 +267,10 @@ const AssigneeCell: React.FC<{ task: Task, users: User[], onUpdate: (assigneeIds
     const dropdownContent = isOpen ? (
         <div
             ref={dropdownRef}
-            className="fixed w-64 bg-white dark:bg-[#252525] border border-gray-200 dark:border-gray-700 rounded-lg shadow-xl z-[9999] p-2 max-h-64 overflow-y-auto custom-scrollbar"
-            style={{ top: dropdownStyle.top, left: dropdownStyle.left }}
+            className="fixed w-64 min-w-[16rem] bg-white dark:bg-[#252525] border border-gray-200 dark:border-gray-700 rounded-lg shadow-xl z-[9999] p-2 overflow-y-auto custom-scrollbar"
+            style={{ top: dropdownStyle.top, left: dropdownStyle.left, maxHeight: dropdownStyle.maxHeight }}
         >
-            {users.map(u => {
+            {activeUsers.map(u => {
                 const currentIds = task.assigneeIds && task.assigneeIds.length > 0 
                     ? task.assigneeIds
                     : task.assigneeId 
@@ -346,6 +369,10 @@ const TableView: React.FC<TableViewProps> = ({
       if (!task.processId) return null;
       return businessProcesses.find(p => p.id === task.processId)?.title || null;
   };
+
+  const activeStatuses = useMemo(() => statuses.filter((s) => !s.isArchived), [statuses]);
+  const activePriorities = useMemo(() => priorities.filter((p) => !p.isArchived), [priorities]);
+  const activeProjects = useMemo(() => projects.filter((p) => !p.isArchived), [projects]);
 
   const getTaskSource = (task: Task) => {
       // Используем entityType для определения источника
@@ -460,7 +487,7 @@ const TableView: React.FC<TableViewProps> = ({
                           >
                               <CustomSelect 
                                   value={task.status} 
-                                  options={statuses} 
+                                  options={activeStatuses} 
                                   type="status" 
                                   onChange={(val) => {
                                       onUpdateTask(task.id, { status: val });
@@ -481,7 +508,7 @@ const TableView: React.FC<TableViewProps> = ({
                           <td className="py-3 px-4 align-middle" onClick={(e) => e.stopPropagation()}>
                               <CustomSelect 
                                   value={task.priority} 
-                                  options={priorities} 
+                                  options={activePriorities} 
                                   type="priority" 
                                   onChange={(val) => onUpdateTask(task.id, { priority: val })} 
                               />
@@ -491,7 +518,7 @@ const TableView: React.FC<TableViewProps> = ({
                           <td className="py-3 px-4 align-middle" onClick={(e) => e.stopPropagation()}>
                               <CustomSelect 
                                   value={task.projectId || ''} 
-                                  options={projects} 
+                                  options={activeProjects} 
                                   type="project" 
                                   onChange={(val) => onUpdateTask(task.id, { projectId: val || null })} 
                               />

@@ -21,6 +21,9 @@ class Settings(BaseSettings):
     # API prefix
     API_PREFIX: str = "/api"
 
+    # Public HTTPS origin for Telegram webhooks (e.g. https://tipa.taska.uz). No trailing slash.
+    PUBLIC_BASE_URL: str = ""
+
     # Optional: Telegram alerts on CRITICAL errors (chat_id for employee notifications group)
     TELEGRAM_ALERT_CHAT_ID: str = ""
     TELEGRAM_EMPLOYEE_BOT_TOKEN: str = ""
@@ -49,6 +52,10 @@ class Settings(BaseSettings):
     SMTP_USE_TLS: bool = True
     NOTIFICATIONS_RETENTION_DAYS: int = 90
     NOTIFICATIONS_RETENTION_INTERVAL_SECONDS: int = 3600
+
+    # Telegram lead intake (server-side polling)
+    TELEGRAM_LEADS_POLL_INTERVAL_SECONDS: int = 5
+    TELEGRAM_LEADS_POLL_LIMIT: int = 50
 
     class Config:
         env_file = ".env"

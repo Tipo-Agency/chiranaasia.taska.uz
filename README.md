@@ -12,8 +12,10 @@
 ## С чего читать документацию
 
 1. **README.md** (этот файл) — структура репо, запуск, тесты, лимиты, деплой.
-2. **[`docs/README.md`](docs/README.md)** — деплой, секреты, troubleshooting, быстрый старт.
-3. **[`docs/CLIENT.md`](docs/CLIENT.md)** — кратко для передачи заказчику (развёртывание, без внутренних деталей).
+2. **[`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)** — как устроены БД, Redis, уведомления и задержки в чате/Telegram.
+3. **[`docs/API-OVERVIEW.md`](docs/API-OVERVIEW.md)** — обзор API и точек интеграции.
+4. **[`docs/README.md`](docs/README.md)** — индекс документации, деплой, секреты, troubleshooting, быстрый старт.
+5. **[`docs/CLIENT.md`](docs/CLIENT.md)** — кратко для передачи заказчику (развёртывание, без внутренних деталей).
 
 ## Папка .auto-claude
 

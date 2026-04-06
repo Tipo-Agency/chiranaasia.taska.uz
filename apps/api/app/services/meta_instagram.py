@@ -285,7 +285,13 @@ async def process_instagram_webhook(db: AsyncSession, body: dict[str, Any]) -> i
 
             # Новый диалог → новая сделка
             funnel_id, stage_id = await _default_funnel_stage(db)
-            assignee_id = await _first_assignee_id(db)
+            assignee_id = None
+            if funnel_id:
+                funnel = await db.get(SalesFunnel, funnel_id)
+                if funnel and getattr(funnel, "owner_user_id", None):
+                    assignee_id = funnel.owner_user_id
+            if not assignee_id:
+                assignee_id = await _first_assignee_id(db)
             did = str(uuid.uuid4())
             title = f"Instagram · {customer_psid[-8:]}"
             now = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3] + "Z"
@@ -320,12 +326,18 @@ async def process_instagram_webhook(db: AsyncSession, body: dict[str, Any]) -> i
             try:
                 await emit_domain_event(
                     db,
-                    event_type="deal.created",
+                    event_type="deal.assigned",
                     org_id="default",
                     entity_type="deal",
                     entity_id=did,
                     source="meta-webhook",
-                    payload={"title": title, "source": "instagram"},
+                    payload={
+                        "dealId": did,
+                        "title": title,
+                        "source": "instagram",
+                        "assigneeId": assignee_id,
+                        "actorName": "Instagram",
+                    },
                 )
             except Exception as exc:
                 log.warning(

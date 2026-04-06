@@ -33,6 +33,8 @@ import {
   inventoryEndpoint,
   funnelsEndpoint,
   integrationsMetaEndpoint,
+  integrationsSiteEndpoint,
+  integrationsTelegramEndpoint,
   publicContentPlanEndpoint,
 } from "../services/apiClient";
 
@@ -73,6 +75,8 @@ export const api = {
   funnels: funnelsEndpoint,
 
   integrationsMeta: integrationsMetaEndpoint,
+  integrationsSite: integrationsSiteEndpoint,
+  integrationsTelegram: integrationsTelegramEndpoint,
 
   publicContentPlan: publicContentPlanEndpoint,
 };

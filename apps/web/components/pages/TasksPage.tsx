@@ -82,8 +82,10 @@ export const TasksPage: React.FC<TasksPageProps> = ({
     );
   }, [tasks]);
 
+  const activeUsers = useMemo(() => users.filter((u) => !u.isArchived), [users]);
   const activeStatuses = useMemo(() => statuses.filter((s) => !s.isArchived), [statuses]);
   const activePriorities = useMemo(() => priorities.filter((p) => !p.isArchived), [priorities]);
+  const activeProjects = useMemo(() => projects.filter((p) => !p.isArchived), [projects]);
 
   // Логика фильтрации источника
   const matchesSource = useCallback((task: Task, source: string): boolean => {
@@ -147,7 +149,7 @@ export const TasksPage: React.FC<TasksPageProps> = ({
       onChange: setFilterAssignee,
       options: [
         { value: '', label: 'Все исполнители' },
-        ...users.map(u => ({ value: u.id, label: u.name }))
+        ...activeUsers.map(u => ({ value: u.id, label: u.name }))
       ]
     },
     {
@@ -156,7 +158,7 @@ export const TasksPage: React.FC<TasksPageProps> = ({
       onChange: setFilterProject,
       options: [
         { value: '', label: 'Все модули' },
-        ...projects.map(p => ({ value: p.id, label: p.name }))
+        ...activeProjects.map(p => ({ value: p.id, label: p.name }))
       ]
     },
     {
@@ -183,7 +185,7 @@ export const TasksPage: React.FC<TasksPageProps> = ({
         { value: 'show', label: 'Показать' }
       ]
     }
-  ], [filterStatus, filterPriority, filterAssignee, filterProject, filterSource, hideCompleted, activeStatuses, activePriorities, users, projects, uniqueSources]);
+  ], [filterStatus, filterPriority, filterAssignee, filterProject, filterSource, hideCompleted, activeStatuses, activePriorities, activeUsers, activeProjects, uniqueSources]);
 
   const hasActiveFilters = useMemo(() =>
     !!filterStatus || !!filterPriority || !!filterAssignee || !!filterProject || !!filterSource || hideCompleted !== 'hide'

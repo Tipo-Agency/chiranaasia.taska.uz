@@ -315,6 +315,26 @@ export const integrationsMetaEndpoint = {
     post<unknown>('/integrations/meta/instagram/send', body),
 };
 
+export const integrationsSiteEndpoint = {
+  rotateKey: (body: { funnelId: string }) => post<{ ok: boolean; funnelId: string; apiKey: string; keyLast4: string }>('/integrations/site/keys/rotate', body),
+  keyStatus: (funnelId: string) => get<{ ok: boolean; funnelId: string; active: boolean; keyLast4?: string | null }>(`/integrations/site/keys/status?funnel_id=${encodeURIComponent(funnelId)}`),
+};
+
+export const integrationsTelegramEndpoint = {
+  registerWebhook: (body: { funnelId: string }) =>
+    post<{ ok: boolean; webhookUrl: string; webhookRegistered: boolean }>('/integrations/telegram/webhook/register', body),
+  unregisterWebhook: (body: { funnelId: string }) => post<{ ok: boolean; webhookRegistered: boolean }>('/integrations/telegram/webhook/unregister', body),
+  webhookStatus: (funnelId: string) =>
+    get<{
+      ok: boolean;
+      funnelId: string;
+      webhookUrl: string;
+      webhookRegistered: boolean;
+      useWebhook: boolean;
+      webhookSecretSet: boolean;
+    }>(`/integrations/telegram/webhook/status?funnelId=${encodeURIComponent(funnelId)}`),
+};
+
 export const contractsEndpoint = {
   getAll: async () => {
     const all = await get<unknown[]>('/deals');

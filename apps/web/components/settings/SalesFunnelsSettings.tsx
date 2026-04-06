@@ -1,7 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { SalesFunnel, FunnelStage, NotificationPreferences, FunnelSourceConfig, User } from '../../types';
-import { Plus, X, Edit2, Trash2, GripVertical, Settings, Instagram, MessageSquare, Star } from 'lucide-react';
+import { Plus, X, Edit2, Trash2, GripVertical, Settings, Instagram, MessageSquare, Star, Globe } from 'lucide-react';
 import { TaskSelect } from '../TaskSelect';
+import { api } from '../../backend/api';
 
 interface SalesFunnelsSettingsProps {
     funnels: SalesFunnel[];
@@ -63,6 +64,15 @@ const SalesFunnelsSettings: React.FC<SalesFunnelsSettingsProps> = ({ funnels, us
     const [instagramPageId, setInstagramPageId] = useState('');
     const [telegramEnabled, setTelegramEnabled] = useState(false);
     const [telegramBotToken, setTelegramBotToken] = useState('');
+    const [siteEnabled, setSiteEnabled] = useState(false);
+    const [siteDefaultStageId, setSiteDefaultStageId] = useState('');
+    const [siteDefaultAssigneeId, setSiteDefaultAssigneeId] = useState('');
+    const [siteKeyLast4, setSiteKeyLast4] = useState('');
+    const [siteNewApiKey, setSiteNewApiKey] = useState<string | null>(null);
+    const [telegramWebhookUrl, setTelegramWebhookUrl] = useState('');
+    const [telegramWebhookRegistered, setTelegramWebhookRegistered] = useState(false);
+    const [telegramUseWebhook, setTelegramUseWebhook] = useState(false);
+    const [ownerUserId, setOwnerUserId] = useState('');
     const lastCreateRequestRef = useRef<number>(createRequested || 0);
 
     const handleOpenCreate = () => {
@@ -84,6 +94,15 @@ const SalesFunnelsSettings: React.FC<SalesFunnelsSettingsProps> = ({ funnels, us
         setInstagramPageId('');
         setTelegramEnabled(false);
         setTelegramBotToken('');
+        setSiteEnabled(false);
+        setSiteDefaultStageId('');
+        setSiteDefaultAssigneeId('');
+        setSiteKeyLast4('');
+        setSiteNewApiKey(null);
+        setTelegramWebhookUrl('');
+        setTelegramWebhookRegistered(false);
+        setTelegramUseWebhook(false);
+        setOwnerUserId('');
         setIsModalOpen(true);
     };
 
@@ -103,6 +122,7 @@ const SalesFunnelsSettings: React.FC<SalesFunnelsSettingsProps> = ({ funnels, us
         setFunnelColor(funnel.color || FUNNEL_COLOR_OPTIONS[1]?.class || FUNNEL_COLOR_OPTIONS[0]?.class || 'bg-gray-200');
         setStages([...funnel.stages]);
         setActiveTab('stages');
+        setOwnerUserId(funnel.ownerUserId || '');
         // Загрузка настроек источников
         if (funnel.sources) {
             if (funnel.sources.instagram) {
@@ -119,9 +139,25 @@ const SalesFunnelsSettings: React.FC<SalesFunnelsSettingsProps> = ({ funnels, us
             if (funnel.sources.telegram) {
                 setTelegramEnabled(funnel.sources.telegram.enabled || false);
                 setTelegramBotToken(funnel.sources.telegram.botToken || '');
+                setTelegramUseWebhook(Boolean(funnel.sources.telegram.useWebhook));
+                setTelegramWebhookRegistered(Boolean(funnel.sources.telegram.webhookRegistered));
             } else {
                 setTelegramEnabled(false);
                 setTelegramBotToken('');
+                setTelegramUseWebhook(false);
+                setTelegramWebhookRegistered(false);
+            }
+            if ((funnel.sources as any).site) {
+                const site = (funnel.sources as any).site || {};
+                setSiteEnabled(Boolean(site.enabled));
+                setSiteDefaultStageId(String(site.defaultStageId || ''));
+                setSiteDefaultAssigneeId(String(site.defaultAssigneeId || ''));
+                setSiteKeyLast4(String(site.keyLast4 || ''));
+            } else {
+                setSiteEnabled(false);
+                setSiteDefaultStageId('');
+                setSiteDefaultAssigneeId('');
+                setSiteKeyLast4('');
             }
         } else {
             setInstagramEnabled(false);
@@ -130,8 +166,35 @@ const SalesFunnelsSettings: React.FC<SalesFunnelsSettingsProps> = ({ funnels, us
             setInstagramPageId('');
             setTelegramEnabled(false);
             setTelegramBotToken('');
+            setTelegramUseWebhook(false);
+            setTelegramWebhookRegistered(false);
+            setSiteEnabled(false);
+            setSiteDefaultStageId('');
+            setSiteDefaultAssigneeId('');
+            setSiteKeyLast4('');
         }
+        setSiteNewApiKey(null);
         setIsModalOpen(true);
+
+        // Load actual key status from backend (source of truth)
+        try {
+            void api.integrationsSite.keyStatus(funnel.id).then((res: any) => {
+                if (res && res.ok) setSiteKeyLast4(String(res.keyLast4 || ''));
+            });
+        } catch {
+            // ignore
+        }
+        try {
+            void api.integrationsTelegram.webhookStatus(funnel.id).then((res: any) => {
+                if (res && res.ok) {
+                    setTelegramWebhookUrl(String(res.webhookUrl || ''));
+                    setTelegramWebhookRegistered(Boolean(res.webhookRegistered));
+                    setTelegramUseWebhook(Boolean(res.useWebhook));
+                }
+            });
+        } catch {
+            // ignore
+        }
     };
 
     const handleAddStage = () => {
@@ -198,13 +261,25 @@ const SalesFunnelsSettings: React.FC<SalesFunnelsSettingsProps> = ({ funnels, us
                 enabled: true,
                 botToken: telegramBotToken.trim(),
                 lastSyncAt: editingFunnel?.sources?.telegram?.lastSyncAt,
+                useWebhook: telegramUseWebhook,
+                webhookRegistered: telegramWebhookRegistered,
             };
+        }
+
+        if (siteEnabled) {
+            sources.site = {
+                enabled: true,
+                defaultStageId: (siteDefaultStageId || '').trim() || undefined,
+                defaultAssigneeId: (siteDefaultAssigneeId || '').trim() || undefined,
+                keyLast4: (siteKeyLast4 || '').trim() || undefined,
+            } as any;
         }
 
         const funnel: SalesFunnel = {
             id: editingFunnel?.id || `funnel-${Date.now()}`,
             name: funnelName.trim(),
             color: funnelColor || undefined,
+            ownerUserId: (ownerUserId || '').trim() || undefined,
             stages,
             sources: Object.keys(sources).length > 0 ? sources : undefined,
             createdAt: editingFunnel?.createdAt || new Date().toISOString(),
@@ -223,6 +298,74 @@ const SalesFunnelsSettings: React.FC<SalesFunnelsSettingsProps> = ({ funnels, us
         setInstagramPageId('');
         setTelegramEnabled(false);
         setTelegramBotToken('');
+        setSiteEnabled(false);
+        setSiteDefaultStageId('');
+        setSiteDefaultAssigneeId('');
+        setSiteKeyLast4('');
+        setSiteNewApiKey(null);
+        setTelegramWebhookUrl('');
+        setTelegramWebhookRegistered(false);
+        setTelegramUseWebhook(false);
+        setOwnerUserId('');
+    };
+
+    const handleRegisterTelegramWebhook = async () => {
+        const fid = editingFunnel?.id;
+        if (!fid) {
+            alert('Сначала сохраните воронку, затем откройте её снова и подключите webhook.');
+            return;
+        }
+        if (!telegramBotToken.trim()) {
+            alert('Введите токен бота и сохраните воронку.');
+            return;
+        }
+        try {
+            const res = await api.integrationsTelegram.registerWebhook({ funnelId: fid });
+            if (res?.ok) {
+                setTelegramWebhookRegistered(true);
+                setTelegramUseWebhook(true);
+                if (res.webhookUrl) setTelegramWebhookUrl(String(res.webhookUrl));
+                alert('Webhook подключён: Telegram шлёт лиды сразу на сервер (без опроса getUpdates).');
+            }
+        } catch (e: any) {
+            alert(
+                e?.message ||
+                    'Не удалось зарегистрировать webhook. На сервере нужен PUBLIC_BASE_URL (https://…) и доступен HTTPS.'
+            );
+        }
+    };
+
+    const handleUnregisterTelegramWebhook = async () => {
+        const fid = editingFunnel?.id;
+        if (!fid) return;
+        try {
+            await api.integrationsTelegram.unregisterWebhook({ funnelId: fid });
+            setTelegramWebhookRegistered(false);
+            setTelegramUseWebhook(false);
+            void api.integrationsTelegram.webhookStatus(fid).then((res: any) => {
+                if (res && res.ok) setTelegramWebhookUrl(String(res.webhookUrl || ''));
+            });
+            alert('Webhook отключён. Снова используется фоновый polling getUpdates.');
+        } catch (e: any) {
+            alert(e?.message || 'Не удалось отключить webhook');
+        }
+    };
+
+    const handleRotateSiteKey = async () => {
+        if (!editingFunnel?.id) {
+            alert('Сначала сохраните воронку, затем можно сгенерировать ключ для сайта.');
+            return;
+        }
+        try {
+            const res = await api.integrationsSite.rotateKey({ funnelId: editingFunnel.id });
+            if (res?.apiKey) {
+                setSiteNewApiKey(res.apiKey);
+                setSiteKeyLast4(res.keyLast4 || '');
+                setSiteEnabled(true);
+            }
+        } catch (e: any) {
+            alert(e?.message || 'Не удалось сгенерировать ключ');
+        }
     };
 
     const handleBackdrop = (e: React.MouseEvent) => {
@@ -515,6 +658,29 @@ const SalesFunnelsSettings: React.FC<SalesFunnelsSettingsProps> = ({ funnels, us
 
                             {activeTab === 'sources' && (
                                 <div className="space-y-6">
+                                    {/* Ответственный за воронку */}
+                                    <div className="border border-gray-200 dark:border-[#333] rounded-lg p-4">
+                                        <div className="flex items-center gap-3 mb-3">
+                                            <Star size={20} className="text-amber-500" />
+                                            <div>
+                                                <h4 className="font-semibold text-gray-800 dark:text-white">Ответственный за воронку</h4>
+                                                <p className="text-xs text-gray-500 dark:text-gray-400">
+                                                    Будет назначаться по умолчанию на новые лиды (если источник не переопределяет)
+                                                </p>
+                                            </div>
+                                        </div>
+                                        <select
+                                            value={ownerUserId}
+                                            onChange={(e) => setOwnerUserId(e.target.value)}
+                                            className="w-full border border-gray-300 dark:border-gray-600 rounded px-3 py-2 text-sm bg-white dark:bg-[#333] text-gray-900 dark:text-gray-100 focus:ring-1 focus:ring-blue-500 outline-none"
+                                        >
+                                            <option value="">Не назначать автоматически</option>
+                                            {users.filter((u) => !u.isArchived).map((u) => (
+                                                <option key={u.id} value={u.id}>{u.name}</option>
+                                            ))}
+                                        </select>
+                                    </div>
+
                                     {/* Instagram источник */}
                                     <div className="border border-gray-200 dark:border-[#333] rounded-lg p-4">
                                         <div className="flex items-center justify-between mb-4">
@@ -639,8 +805,145 @@ const SalesFunnelsSettings: React.FC<SalesFunnelsSettingsProps> = ({ funnels, us
                                                         Бот будет автоматически получать сообщения и создавать лиды в этой воронке.
                                                     </p>
                                                 </div>
+                                                {editingFunnel?.id && (
+                                                    <div className="space-y-2 pt-2 border-t border-gray-200 dark:border-[#333]">
+                                                        <p className="text-xs text-gray-600 dark:text-gray-400">
+                                                            Режим:{' '}
+                                                            <span className="font-semibold">
+                                                                {telegramUseWebhook ? 'Webhook (мгновенно)' : 'Polling (фоновый опрос)'}
+                                                            </span>
+                                                        </p>
+                                                        {telegramWebhookUrl ? (
+                                                            <p className="text-[10px] text-gray-500 dark:text-gray-500 break-all font-mono">
+                                                                {telegramWebhookUrl}
+                                                            </p>
+                                                        ) : null}
+                                                        <div className="flex flex-wrap gap-2">
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => void handleRegisterTelegramWebhook()}
+                                                                className="text-xs px-3 py-1.5 rounded bg-emerald-600 text-white hover:bg-emerald-700"
+                                                            >
+                                                                Подключить webhook
+                                                            </button>
+                                                            {telegramWebhookRegistered ? (
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => void handleUnregisterTelegramWebhook()}
+                                                                    className="text-xs px-3 py-1.5 rounded border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200"
+                                                                >
+                                                                    Отключить webhook
+                                                                </button>
+                                                            ) : null}
+                                                        </div>
+                                                        <p className="text-[10px] text-gray-500 dark:text-gray-500">
+                                                            Webhook нужен публичный HTTPS и переменная PUBLIC_BASE_URL на API. После смены токена нажмите «Подключить webhook» снова.
+                                                        </p>
+                                                    </div>
+                                                )}
                                             </div>
                                         )}
+                                    </div>
+
+                                    {/* Site источник */}
+                                    <div className="border border-gray-200 dark:border-[#333] rounded-lg p-4">
+                                        <div className="flex items-center justify-between mb-4">
+                                            <div className="flex items-center gap-3">
+                                                <Globe size={20} className="text-emerald-600" />
+                                                <div>
+                                                    <h4 className="font-semibold text-gray-800 dark:text-white">Сайт</h4>
+                                                    <p className="text-xs text-gray-500 dark:text-gray-400">
+                                                        Приём лидов с внешних сайтов по API-ключу (X-Api-Key)
+                                                    </p>
+                                                </div>
+                                            </div>
+                                            <label className="relative inline-flex items-center cursor-pointer">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={siteEnabled}
+                                                    onChange={e => setSiteEnabled(e.target.checked)}
+                                                    className="sr-only peer"
+                                                />
+                                                <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-emerald-300 dark:peer-focus:ring-emerald-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-emerald-600"></div>
+                                            </label>
+                                        </div>
+
+                                        <div className="space-y-3 mt-4 pt-4 border-t border-gray-200 dark:border-[#333]">
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                                <div>
+                                                    <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 mb-1">
+                                                        Стадия по умолчанию
+                                                    </label>
+                                                    <select
+                                                        value={siteDefaultStageId}
+                                                        onChange={(e) => setSiteDefaultStageId(e.target.value)}
+                                                        className="w-full border border-gray-300 dark:border-gray-600 rounded px-3 py-2 text-sm bg-white dark:bg-[#333] text-gray-900 dark:text-gray-100 focus:ring-1 focus:ring-emerald-500 outline-none"
+                                                    >
+                                                        <option value="">Первая стадия воронки</option>
+                                                        {stages.map((s) => (
+                                                            <option key={s.id} value={s.id}>{s.label}</option>
+                                                        ))}
+                                                    </select>
+                                                </div>
+                                                <div>
+                                                    <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 mb-1">
+                                                        Ответственный (переопределение)
+                                                    </label>
+                                                    <select
+                                                        value={siteDefaultAssigneeId}
+                                                        onChange={(e) => setSiteDefaultAssigneeId(e.target.value)}
+                                                        className="w-full border border-gray-300 dark:border-gray-600 rounded px-3 py-2 text-sm bg-white dark:bg-[#333] text-gray-900 dark:text-gray-100 focus:ring-1 focus:ring-emerald-500 outline-none"
+                                                    >
+                                                        <option value="">Ответственный воронки</option>
+                                                        {users.filter((u) => !u.isArchived).map((u) => (
+                                                            <option key={u.id} value={u.id}>{u.name}</option>
+                                                        ))}
+                                                    </select>
+                                                </div>
+                                            </div>
+
+                                            <div className="flex items-center justify-between gap-3">
+                                                <div className="text-xs text-gray-500 dark:text-gray-400">
+                                                    {siteKeyLast4 ? (
+                                                        <span>Активный ключ: ****{siteKeyLast4}</span>
+                                                    ) : (
+                                                        <span>Ключ ещё не сгенерирован</span>
+                                                    )}
+                                                </div>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => void handleRotateSiteKey()}
+                                                    className="px-3 py-2 rounded-lg text-xs font-semibold bg-emerald-600 hover:bg-emerald-700 text-white"
+                                                >
+                                                    Сгенерировать ключ
+                                                </button>
+                                            </div>
+
+                                            {siteNewApiKey && (
+                                                <div className="bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 rounded p-3">
+                                                    <p className="text-xs text-emerald-800 dark:text-emerald-300 font-semibold mb-2">
+                                                        Новый API-ключ (показывается один раз)
+                                                    </p>
+                                                    <div className="flex items-center gap-2">
+                                                        <input
+                                                            readOnly
+                                                            value={siteNewApiKey}
+                                                            className="flex-1 border border-emerald-300 dark:border-emerald-700 rounded px-3 py-2 text-xs bg-white dark:bg-[#222] text-gray-900 dark:text-gray-100"
+                                                        />
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => navigator.clipboard?.writeText(siteNewApiKey).catch(() => {})}
+                                                            className="px-3 py-2 rounded-lg text-xs font-semibold bg-emerald-700 hover:bg-emerald-800 text-white"
+                                                        >
+                                                            Скопировать
+                                                        </button>
+                                                    </div>
+                                                    <p className="text-xs text-emerald-700 dark:text-emerald-300 mt-2">
+                                                        Endpoint: <span className="font-mono">POST /api/integrations/site/leads</span> + заголовок <span className="font-mono">X-Api-Key</span>
+                                                    </p>
+                                                </div>
+                                            )}
+                                        </div>
                                     </div>
                                 </div>
                             )}

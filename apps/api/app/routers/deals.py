@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
 from app.models.client import Deal
+from app.models.funnel import SalesFunnel
 from app.services.domain_events import emit_domain_event, log_entity_mutation
 from app.utils import row_to_deal
 
@@ -178,6 +179,12 @@ async def create_deal(deal: dict, db: AsyncSession = Depends(get_db)):
     did = deal.get("id") or str(uuid.uuid4())
     def str_val(v):
         return str(v) if v is not None else None
+    funnel_id = deal.get("funnelId")
+    assignee_id = deal.get("assigneeId", "")
+    if (not assignee_id) and funnel_id:
+        funnel = await db.get(SalesFunnel, funnel_id)
+        if funnel and getattr(funnel, "owner_user_id", None):
+            assignee_id = funnel.owner_user_id
     db.add(Deal(
         id=did,
         title=deal.get("title", "Новая сделка"),
@@ -186,11 +193,11 @@ async def create_deal(deal: dict, db: AsyncSession = Depends(get_db)):
         amount=str_val(deal.get("amount")) or "0",
         currency=deal.get("currency", "UZS"),
         stage=deal.get("stage", "new"),
-        funnel_id=deal.get("funnelId"),
+        funnel_id=funnel_id,
         source=deal.get("source"),
         telegram_chat_id=deal.get("telegramChatId"),
         telegram_username=deal.get("telegramUsername"),
-        assignee_id=deal.get("assigneeId", ""),
+        assignee_id=assignee_id or "",
         created_at=deal.get("createdAt", datetime.utcnow().isoformat()),
         notes=deal.get("notes"),
         project_id=deal.get("projectId"),
@@ -198,7 +205,7 @@ async def create_deal(deal: dict, db: AsyncSession = Depends(get_db)):
         is_archived=False,
     ))
     await db.flush()
-    assignee = deal.get("assigneeId")
+    assignee = assignee_id
     if assignee:
         await emit_domain_event(
             db,
@@ -212,6 +219,7 @@ async def create_deal(deal: dict, db: AsyncSession = Depends(get_db)):
                 "dealId": did,
                 "title": deal.get("title", "Новая сделка"),
                 "assigneeId": assignee,
+                "actorName": deal.get("actorName"),
             },
         )
     await db.commit()
