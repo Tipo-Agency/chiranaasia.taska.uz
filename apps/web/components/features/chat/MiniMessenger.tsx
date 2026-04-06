@@ -124,13 +124,18 @@ export const MiniMessenger: React.FC<MiniMessengerProps> = ({
         .filter(Boolean)
         .map((m: any) => {
           const toId = m.recipientId == null ? TO_ALL_ID : String(m.recipientId);
+          const rawSender = String(m.senderId || '');
+          // API кладёт системные уведомления как sender "system", лента «Система» — __system__
+          const fromId =
+            rawSender === 'system' ? SYSTEM_CHAT_SENDER_ID : rawSender;
           return {
             id: String(m.id),
-            fromId: String(m.senderId || ''),
+            fromId,
             toId,
             text: String(m.text || ''),
             createdAt: String(m.createdAt || new Date().toISOString()),
             read: typeof m.read === 'boolean' ? m.read : undefined,
+            isSystem: rawSender === 'system' || fromId === SYSTEM_CHAT_SENDER_ID,
           };
         });
 

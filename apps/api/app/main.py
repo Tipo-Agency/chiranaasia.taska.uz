@@ -72,6 +72,13 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         print(f"Migration warning: {e}", file=sys.stderr)
 
+    try:
+        from app.services.event_bus import ensure_redis_stream_and_group
+
+        await ensure_redis_stream_and_group()
+    except Exception as e:
+        print(f"Redis stream init warning: {e}", file=sys.stderr)
+
     stop_flag = {"stop": False}
 
     async def _delivery_loop():

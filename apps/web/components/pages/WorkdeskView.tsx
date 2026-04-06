@@ -1,6 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Tabs } from '../ui/Tabs';
-import { MiniMessenger } from '../features/chat/MiniMessenger';
 import { WeeklyPlansView, type WeeklyPlansViewHandle } from '../documents/WeeklyPlansView';
 import { StatsCards } from '../features/home/StatsCards';
 import { Calendar, CheckSquare, Briefcase, FileText, Network, X, Save } from 'lucide-react';
@@ -9,7 +8,7 @@ import { ModuleCreateDropdown } from '../ui/ModuleCreateDropdown';
 import { ModulePageHeader, ModulePageShell, MODULE_PAGE_GUTTER } from '../ui';
 import { DateInput } from '../ui/DateInput';
 
-type WorkdeskTab = 'chat' | 'weekly' | 'tasks' | 'deals' | 'meetings' | 'analytics';
+type WorkdeskTab = 'dashboard' | 'weekly' | 'tasks' | 'deals' | 'meetings' | 'analytics';
 
 interface WorkdeskViewProps {
   currentUser: User;
@@ -54,9 +53,7 @@ export const WorkdeskView: React.FC<WorkdeskViewProps> = ({
   onCreateEntity,
   onUpdateEntity,
 }) => {
-  // На мобильной версии чат не нужен (плохой UX) — стартуем с задач.
-  // На десктопе можно оставлять чат.
-  const [activeTab, setActiveTab] = useState<WorkdeskTab>('tasks');
+  const [activeTab, setActiveTab] = useState<WorkdeskTab>('dashboard');
   const weeklyPlansRef = useRef<WeeklyPlansViewHandle>(null);
   const [editingDeal, setEditingDeal] = useState<Deal | null>(null);
   const [editingMeeting, setEditingMeeting] = useState<Meeting | null>(null);
@@ -143,11 +140,6 @@ export const WorkdeskView: React.FC<WorkdeskViewProps> = ({
     [processTemplates]
   );
 
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    const isDesktop = window.matchMedia?.('(min-width: 768px)')?.matches; // md breakpoint
-    if (isDesktop) setActiveTab('chat');
-  }, []);
 
   return (
     <ModulePageShell>
@@ -157,11 +149,10 @@ export const WorkdeskView: React.FC<WorkdeskViewProps> = ({
             accent="indigo"
             icon={<div />}
             title="Рабочий стол"
-            tabs={
+                tabs={
               <Tabs
                 tabs={[
-                  // Чат скрываем на мобилке
-                  { id: 'chat', label: 'Чат', className: 'hidden md:flex' },
+                  { id: 'dashboard', label: 'Дашборд' },
                   { id: 'weekly', label: 'Планы' },
                   { id: 'tasks', label: 'Задачи' },
                   { id: 'deals', label: 'Сделки' },
@@ -227,26 +218,39 @@ export const WorkdeskView: React.FC<WorkdeskViewProps> = ({
 
       <div className="flex-1 min-h-0 overflow-hidden">
         <div className={`${MODULE_PAGE_GUTTER} mt-3 pb-24 md:pb-32 h-full overflow-y-auto overflow-x-hidden custom-scrollbar space-y-4`}>
-          {activeTab === 'chat' && (
-            <div className="hidden md:block h-[min(74vh,780px)]">
-              <MiniMessenger
-                users={users}
-                currentUser={currentUser}
-                docs={docs}
-                tasks={tasks}
+          {activeTab === 'dashboard' && (
+            <div className="space-y-4">
+              <StatsCards
                 deals={deals}
-                meetings={meetings}
-                onOpenTask={onOpenTask}
-                onOpenDeal={(deal) => setEditingDeal(deal)}
-                onOpenMeeting={(meeting) => setEditingMeeting(meeting)}
-                onOpenDeals={onNavigateToDeals}
-                onOpenMeetings={onNavigateToMeetings}
-                onOpenDocument={onOpenDocument}
-                onCreateEntity={onCreateEntity}
-                onUpdateEntity={onUpdateEntity}
-                processTemplates={processTemplates}
-                onStartProcessTemplate={onStartProcessTemplate}
+                financePlan={financePlan || null}
+                tasks={tasks}
+                currentUser={currentUser}
+                accountsReceivable={accountsReceivable}
               />
+              <div className="bg-white dark:bg-[#252525] rounded-2xl border border-gray-200 dark:border-[#333] p-4 space-y-3">
+                <h3 className="font-semibold text-gray-900 dark:text-white">Сводка</h3>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs">
+                  <div className="rounded-xl border border-gray-200 dark:border-[#333] p-3">
+                    <p className="text-gray-500">Открытые задачи</p>
+                    <p className="font-semibold text-gray-900 dark:text-white">{tasksOpen}</p>
+                  </div>
+                  <div className="rounded-xl border border-gray-200 dark:border-[#333] p-3">
+                    <p className="text-gray-500">Закрытые задачи</p>
+                    <p className="font-semibold text-gray-900 dark:text-white">{tasksDone}</p>
+                  </div>
+                  <div className="rounded-xl border border-gray-200 dark:border-[#333] p-3">
+                    <p className="text-gray-500">Сделок в работе</p>
+                    <p className="font-semibold text-gray-900 dark:text-white">{myDeals.filter((d) => d.stage !== 'won' && d.stage !== 'lost').length}</p>
+                  </div>
+                  <div className="rounded-xl border border-gray-200 dark:border-[#333] p-3">
+                    <p className="text-gray-500">Встреч на неделе</p>
+                    <p className="font-semibold text-gray-900 dark:text-white">{meetingsThisWeek}</p>
+                  </div>
+                </div>
+                <p className="text-xs text-gray-500 dark:text-gray-400">
+                  Чат с коллегами и системная лента — кнопка «Чат» внизу справа на экране.
+                </p>
+              </div>
             </div>
           )}
 

@@ -270,17 +270,18 @@ function MainApp() {
                 </div>
             )}
 
-            {/* Кнопка чата справа внизу — только десктоп и планшет */}
-            {state.currentView !== 'home' && (
-              <button
-                type="button"
-                onClick={() => setChatPanelOpen(true)}
-                className="hidden md:flex fixed bottom-6 right-6 z-40 w-14 h-14 rounded-full bg-[#3337AD] text-white shadow-lg hover:bg-[#292b8a] items-center justify-center"
-                title="Чат"
-              >
-                <MessageCircle size={24} />
-              </button>
-            )}
+            {/* Кнопка чата справа внизу — десктоп/планшет, в т.ч. на главной (рабочий стол) */}
+            <button
+              type="button"
+              onClick={() => {
+                setChatOpenToSystemFeed(false);
+                setChatPanelOpen(true);
+              }}
+              className="hidden md:flex fixed bottom-6 right-6 z-40 w-14 h-14 rounded-full bg-[#3337AD] text-white shadow-lg hover:bg-[#292b8a] items-center justify-center"
+              title="Чат"
+            >
+              <MessageCircle size={24} />
+            </button>
 
             {/* Чат в модальном окне (десктоп) */}
             {chatPanelOpen && (

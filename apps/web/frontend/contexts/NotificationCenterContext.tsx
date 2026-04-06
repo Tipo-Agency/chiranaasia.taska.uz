@@ -42,6 +42,16 @@ export function NotificationCenterProvider({
       const typed = (list || []) as SystemNotificationItem[];
       setNotifications(typed);
       setUnreadCount(typed.filter((n) => !n.isRead).length);
+      // Дублируем в локальную ленту «Система» с тем же id, что и при WS — без повторов
+      for (const n of typed) {
+        if (!n?.id) continue;
+        chatLocalService.addSystemFeedMessage({
+          id: `notif-${n.id}`,
+          targetUserId: userId,
+          text: `${n.title}: ${n.body}`,
+          createdAt: n.createdAt,
+        });
+      }
     } catch {
       /* ignore */
     }
@@ -109,6 +119,7 @@ export function NotificationCenterProvider({
               ]);
               setUnreadCount((prev) => prev + 1);
               chatLocalService.addSystemFeedMessage({
+                id: `notif-${data.notification.id}`,
                 targetUserId: userId,
                 text: `${data.notification.title}: ${data.notification.body}`,
               });

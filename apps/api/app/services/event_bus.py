@@ -44,6 +44,28 @@ def _serialize_event(event: dict[str, Any]) -> dict[str, str]:
     return payload
 
 
+async def ensure_redis_stream_and_group() -> None:
+    """
+    Создаёт Redis Stream для доменных событий и consumer group (для будущих воркеров / мониторинга).
+    Без Redis приложение работает: события пишутся в Postgres и обрабатываются синхронно.
+    """
+    settings = get_settings()
+    redis = await _get_redis()
+    if redis is None:
+        logger.warning("Redis недоступен: события только в БД, без stream.")
+        return
+    name = settings.REDIS_EVENTS_STREAM
+    group = "taska_domain_events"
+    try:
+        await redis.xgroup_create(name, group, id="0", mkstream=True)
+        logger.info("Redis stream %s + group %s OK", name, group)
+    except Exception as exc:
+        err = str(exc)
+        if "BUSYGROUP" in err or "already exists" in err.lower():
+            return
+        logger.warning("Redis xgroup_create: %s", exc)
+
+
 async def publish_domain_event(event: dict[str, Any]) -> tuple[bool, str | None]:
     """
     Publish canonical event to Redis stream.

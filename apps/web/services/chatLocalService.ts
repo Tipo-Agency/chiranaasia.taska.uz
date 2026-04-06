@@ -89,6 +89,14 @@ export const chatLocalService = {
       createdAt: input.createdAt || new Date().toISOString(),
       ...input,
     };
+    if (input.id) {
+      const idx = all.findIndex((m) => m.id === input.id);
+      if (idx >= 0) {
+        all[idx] = { ...all[idx], ...msg };
+        writeAll(all);
+        return all[idx];
+      }
+    }
     all.push(msg);
     writeAll(all);
     return msg;
@@ -113,15 +121,20 @@ export const chatLocalService = {
 
   /** Лента «Система»: уведомления о задачах, сделках и т.д. с прикреплённой сущностью */
   addSystemFeedMessage(opts: {
+    /** Стабильный id (например notif-uuid) — чтобы не дублировать с WS и при refresh */
+    id?: string;
     targetUserId: string;
     text: string;
+    createdAt?: string;
     entityType?: ChatEntityType;
     entityId?: string;
   }) {
     return chatLocalService.addMessage({
+      id: opts.id,
       fromId: SYSTEM_CHAT_SENDER_ID,
       toId: opts.targetUserId,
       text: opts.text,
+      createdAt: opts.createdAt,
       isSystem: true,
       entityType: opts.entityType,
       entityId: opts.entityId,
