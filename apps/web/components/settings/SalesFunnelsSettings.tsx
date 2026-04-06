@@ -915,7 +915,7 @@ const SalesFunnelsSettings: React.FC<SalesFunnelsSettingsProps> = ({ funnels, us
                                                     onClick={() => void handleRotateSiteKey()}
                                                     className="px-3 py-2 rounded-lg text-xs font-semibold bg-emerald-600 hover:bg-emerald-700 text-white"
                                                 >
-                                                    Сгенерировать ключ
+                                                    Сгенерировать новый ключ
                                                 </button>
                                             </div>
 

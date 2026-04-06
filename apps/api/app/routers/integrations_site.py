@@ -12,7 +12,7 @@ from fastapi import APIRouter, Depends, Header, HTTPException
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.auth import get_current_user_admin
+from app.auth import get_current_user
 from app.database import get_db
 from app.models.client import Deal
 from app.models.funnel import SalesFunnel
@@ -62,7 +62,7 @@ def _pick_default_assignee_id(funnel: SalesFunnel) -> str | None:
 async def rotate_site_key(
     body: dict,
     db: AsyncSession = Depends(get_db),
-    _admin=Depends(get_current_user_admin),
+    current_user=Depends(get_current_user),
 ):
     """Rotate / create API key for a funnel. Returns plaintext key once."""
     funnel_id = str(body.get("funnelId") or "").strip()
@@ -72,6 +72,8 @@ async def rotate_site_key(
     funnel = await db.get(SalesFunnel, funnel_id)
     if not funnel:
         raise HTTPException(status_code=404, detail="funnel_not_found")
+    if not (getattr(current_user, "role", None) == "ADMIN" or getattr(funnel, "owner_user_id", None) == getattr(current_user, "id", None)):
+        raise HTTPException(status_code=403, detail="forbidden")
 
     # Deactivate existing key (if any)
     existing = (
@@ -107,9 +109,14 @@ async def rotate_site_key(
 async def site_key_status(
     funnel_id: str,
     db: AsyncSession = Depends(get_db),
-    _admin=Depends(get_current_user_admin),
+    current_user=Depends(get_current_user),
 ):
     """Return active key info for funnel (no plaintext key)."""
+    funnel = await db.get(SalesFunnel, funnel_id)
+    if not funnel:
+        raise HTTPException(status_code=404, detail="funnel_not_found")
+    if not (getattr(current_user, "role", None) == "ADMIN" or getattr(funnel, "owner_user_id", None) == getattr(current_user, "id", None)):
+        raise HTTPException(status_code=403, detail="forbidden")
     row = (
         await db.execute(
             select(SiteIntegrationKey).where(
