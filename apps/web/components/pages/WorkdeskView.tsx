@@ -2,13 +2,50 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Tabs } from '../ui/Tabs';
 import { WeeklyPlansView, type WeeklyPlansViewHandle } from '../documents/WeeklyPlansView';
 import { StatsCards } from '../features/home/StatsCards';
-import { Calendar, CheckSquare, Briefcase, FileText, Network, X, Save } from 'lucide-react';
+import {
+  Calendar,
+  CheckSquare,
+  Briefcase,
+  FileText,
+  Network,
+  X,
+  Save,
+  AlertCircle,
+  CalendarClock,
+  Layers,
+  Megaphone,
+  Zap,
+} from 'lucide-react';
 import { Deal, FinancePlan, Meeting, Task, User, Doc, BusinessProcess } from '../../types';
+import { getDealDisplayTitle, isFunnelDeal } from '../../utils/dealModel';
 import { ModuleCreateDropdown } from '../ui/ModuleCreateDropdown';
 import { ModulePageHeader, ModulePageShell, MODULE_PAGE_GUTTER } from '../ui';
 import { DateInput } from '../ui/DateInput';
 
 type WorkdeskTab = 'dashboard' | 'weekly' | 'tasks' | 'deals' | 'meetings' | 'analytics';
+
+const TASK_DONE_STATUSES = ['Выполнено', 'Done', 'Завершено'];
+
+const SOURCE_LABEL: Record<string, string> = {
+  instagram: 'Instagram',
+  telegram: 'Telegram',
+  site: 'Сайт',
+  manual: 'Вручную',
+  recommendation: 'Рекомендация',
+  vk: 'VK',
+  unknown: 'Не указан',
+};
+
+function sourceLabel(s?: string): string {
+  if (!s) return SOURCE_LABEL.unknown;
+  return SOURCE_LABEL[s] || s;
+}
+
+function taskOverdue(t: Task): boolean {
+  if (!t.endDate) return false;
+  const end = new Date(t.endDate.length <= 10 ? `${t.endDate}T23:59:59` : t.endDate);
+  return end < new Date();
+}
 
 interface WorkdeskViewProps {
   currentUser: User;
@@ -89,11 +126,22 @@ export const WorkdeskView: React.FC<WorkdeskViewProps> = ({
         (t) =>
           !t.isArchived &&
           (t.assigneeId === currentUser.id || t.assigneeIds?.includes(currentUser.id)) &&
-          ['Выполнено', 'Done', 'Завершено'].includes(t.status)
+          TASK_DONE_STATUSES.includes(t.status)
       ).length,
     [tasks, currentUser.id]
   );
-  const tasksOpen = Math.max(myTasks.length - tasksDone, 0);
+  const myOpenTasksCount = useMemo(
+    () =>
+      tasks.filter(
+        (t) =>
+          !t.isArchived &&
+          t.entityType !== 'idea' &&
+          t.entityType !== 'feature' &&
+          (t.assigneeId === currentUser.id || t.assigneeIds?.includes(currentUser.id)) &&
+          !TASK_DONE_STATUSES.includes(t.status)
+      ).length,
+    [tasks, currentUser.id]
+  );
   const wonDealsAmount = useMemo(
     () =>
       deals
@@ -139,6 +187,81 @@ export const WorkdeskView: React.FC<WorkdeskViewProps> = ({
     () => processTemplates.filter((process) => !process.isArchived && !process.systemKey),
     [processTemplates]
   );
+
+  const myFunnelDeals = useMemo(
+    () =>
+      deals.filter((d) => !d.isArchived && d.assigneeId === currentUser.id && isFunnelDeal(d)),
+    [deals, currentUser.id]
+  );
+
+  const myPipelineDeals = useMemo(
+    () => myFunnelDeals.filter((d) => d.stage !== 'won' && d.stage !== 'lost'),
+    [myFunnelDeals]
+  );
+
+  const pipelineAmountSum = useMemo(
+    () => myPipelineDeals.reduce((s, d) => s + (Number(d.amount) || 0), 0),
+    [myPipelineDeals]
+  );
+
+  const stageBreakdown = useMemo(() => {
+    const map = new Map<string, number>();
+    myPipelineDeals.forEach((d) => {
+      const k = String(d.stage || '—');
+      map.set(k, (map.get(k) || 0) + 1);
+    });
+    return [...map.entries()].sort((a, b) => b[1] - a[1]);
+  }, [myPipelineDeals]);
+
+  const sourceBreakdown = useMemo(() => {
+    const map = new Map<string, number>();
+    myPipelineDeals.forEach((d) => {
+      const k = d.source || 'unknown';
+      map.set(k, (map.get(k) || 0) + 1);
+    });
+    return [...map.entries()].sort((a, b) => b[1] - a[1]);
+  }, [myPipelineDeals]);
+
+  const urgentTasks = useMemo(() => {
+    const mine = tasks.filter(
+      (t) =>
+        !t.isArchived &&
+        t.entityType !== 'idea' &&
+        t.entityType !== 'feature' &&
+        (t.assigneeId === currentUser.id || t.assigneeIds?.includes(currentUser.id)) &&
+        !TASK_DONE_STATUSES.includes(t.status)
+    );
+    return [...mine]
+      .sort((a, b) => {
+        const ao = a.endDate ? new Date(a.endDate.length <= 10 ? `${a.endDate}T00:00:00` : a.endDate).getTime() : Number.POSITIVE_INFINITY;
+        const bo = b.endDate ? new Date(b.endDate.length <= 10 ? `${b.endDate}T00:00:00` : b.endDate).getTime() : Number.POSITIVE_INFINITY;
+        return ao - bo;
+      })
+      .slice(0, 6);
+  }, [tasks, currentUser.id]);
+
+  const recentFunnelDeals = useMemo(
+    () =>
+      [...myFunnelDeals]
+        .sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''))
+        .slice(0, 8),
+    [myFunnelDeals]
+  );
+
+  const upcomingMeetingsBoard = useMemo(() => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const horizon = new Date(today);
+    horizon.setDate(horizon.getDate() + 14);
+    return myMeetings
+      .filter((m) => {
+        if (!m.date) return false;
+        const d = new Date(`${m.date}T12:00:00`);
+        return d >= today && d <= horizon;
+      })
+      .sort((a, b) => `${a.date}T${a.time || '00:00'}`.localeCompare(`${b.date}T${b.time || '00:00'}`))
+      .slice(0, 6);
+  }, [myMeetings]);
 
 
   return (
@@ -232,24 +355,208 @@ export const WorkdeskView: React.FC<WorkdeskViewProps> = ({
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs">
                   <div className="rounded-xl border border-gray-200 dark:border-[#333] p-3">
                     <p className="text-gray-500">Открытые задачи</p>
-                    <p className="font-semibold text-gray-900 dark:text-white">{tasksOpen}</p>
+                    <p className="font-semibold text-gray-900 dark:text-white">{myOpenTasksCount}</p>
                   </div>
                   <div className="rounded-xl border border-gray-200 dark:border-[#333] p-3">
                     <p className="text-gray-500">Закрытые задачи</p>
                     <p className="font-semibold text-gray-900 dark:text-white">{tasksDone}</p>
                   </div>
                   <div className="rounded-xl border border-gray-200 dark:border-[#333] p-3">
-                    <p className="text-gray-500">Сделок в работе</p>
-                    <p className="font-semibold text-gray-900 dark:text-white">{myDeals.filter((d) => d.stage !== 'won' && d.stage !== 'lost').length}</p>
+                    <p className="text-gray-500">Сделок в работе (CRM)</p>
+                    <p className="font-semibold text-gray-900 dark:text-white">{myPipelineDeals.length}</p>
                   </div>
                   <div className="rounded-xl border border-gray-200 dark:border-[#333] p-3">
                     <p className="text-gray-500">Встреч на неделе</p>
                     <p className="font-semibold text-gray-900 dark:text-white">{meetingsThisWeek}</p>
                   </div>
                 </div>
+                <div className="rounded-xl border border-indigo-200/60 dark:border-indigo-800/40 bg-indigo-50/50 dark:bg-indigo-950/20 px-3 py-2 flex flex-wrap items-center justify-between gap-2 text-xs">
+                  <span className="text-gray-600 dark:text-gray-300">
+                    Сумма активных сделок в воронке (на вас)
+                  </span>
+                  <span className="font-semibold text-indigo-800 dark:text-indigo-200 tabular-nums">
+                    {pipelineAmountSum.toLocaleString('ru-RU')} UZS
+                  </span>
+                </div>
                 <p className="text-xs text-gray-500 dark:text-gray-400">
                   Чат с коллегами и системная лента — кнопка «Чат» внизу справа на экране.
                 </p>
+              </div>
+
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                <div className="bg-white dark:bg-[#252525] rounded-2xl border border-gray-200 dark:border-[#333] p-4 space-y-3">
+                  <div className="flex items-center gap-2">
+                    <Layers className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
+                    <h3 className="font-semibold text-gray-900 dark:text-white">Воронка по этапам</h3>
+                    <span className="text-xs text-gray-400 dark:text-gray-500">({myPipelineDeals.length} шт.)</span>
+                  </div>
+                  {stageBreakdown.length === 0 ? (
+                    <p className="text-sm text-gray-500 dark:text-gray-400">Нет активных CRM-сделок на вас.</p>
+                  ) : (
+                    <ul className="space-y-2">
+                      {stageBreakdown.map(([stage, n]) => (
+                        <li key={stage} className="flex items-center justify-between gap-2 text-sm">
+                          <span className="text-gray-700 dark:text-gray-200 truncate">{stage}</span>
+                          <span className="shrink-0 font-semibold tabular-nums text-gray-900 dark:text-white">{n}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+
+                <div className="bg-white dark:bg-[#252525] rounded-2xl border border-gray-200 dark:border-[#333] p-4 space-y-3">
+                  <div className="flex items-center gap-2">
+                    <Megaphone className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                    <h3 className="font-semibold text-gray-900 dark:text-white">Источники лидов</h3>
+                    <span className="text-xs text-gray-400 dark:text-gray-500">(активные сделки)</span>
+                  </div>
+                  {sourceBreakdown.length === 0 ? (
+                    <p className="text-sm text-gray-500 dark:text-gray-400">Нет данных по источникам.</p>
+                  ) : (
+                    <ul className="space-y-2">
+                      {sourceBreakdown.map(([src, n]) => (
+                        <li key={src} className="flex items-center justify-between gap-2 text-sm">
+                          <span className="text-gray-700 dark:text-gray-200">{sourceLabel(src)}</span>
+                          <span className="shrink-0 font-semibold tabular-nums text-gray-900 dark:text-white">{n}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                <div className="bg-white dark:bg-[#252525] rounded-2xl border border-gray-200 dark:border-[#333] p-4 space-y-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      <Zap className="w-4 h-4 text-amber-600 dark:text-amber-400" />
+                      <h3 className="font-semibold text-gray-900 dark:text-white">Ближайшие дедлайны задач</h3>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={onNavigateToTasks}
+                      className="text-xs text-[#3337AD] hover:underline shrink-0"
+                    >
+                      Все задачи
+                    </button>
+                  </div>
+                  {urgentTasks.length === 0 ? (
+                    <p className="text-sm text-gray-500 dark:text-gray-400">Открытых задач нет.</p>
+                  ) : (
+                    <ul className="space-y-2">
+                      {urgentTasks.map((t) => (
+                        <li key={t.id}>
+                          <button
+                            type="button"
+                            onClick={() => onOpenTask(t)}
+                            className="w-full text-left rounded-xl border border-gray-200 dark:border-[#333] px-3 py-2 hover:bg-gray-50 dark:hover:bg-[#2a2a2a] transition-colors"
+                          >
+                            <div className="flex items-start justify-between gap-2">
+                              <span className="text-sm font-medium text-gray-900 dark:text-white line-clamp-2">
+                                {t.title || 'Без названия'}
+                              </span>
+                              {taskOverdue(t) ? (
+                                <AlertCircle className="w-4 h-4 shrink-0 text-red-500" aria-hidden />
+                              ) : null}
+                            </div>
+                            <div className="mt-1 text-[11px] text-gray-500 dark:text-gray-400 flex flex-wrap gap-x-2 gap-y-0.5">
+                              <span>{t.priority || '—'}</span>
+                              <span>·</span>
+                              <span className={taskOverdue(t) ? 'text-red-600 dark:text-red-400 font-medium' : ''}>
+                                до {t.endDate || '—'}
+                              </span>
+                            </div>
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+
+                <div className="bg-white dark:bg-[#252525] rounded-2xl border border-gray-200 dark:border-[#333] p-4 space-y-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      <CalendarClock className="w-4 h-4 text-violet-600 dark:text-violet-400" />
+                      <h3 className="font-semibold text-gray-900 dark:text-white">Ближайшие встречи</h3>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={onNavigateToMeetings}
+                      className="text-xs text-[#3337AD] hover:underline shrink-0"
+                    >
+                      Календарь
+                    </button>
+                  </div>
+                  {upcomingMeetingsBoard.length === 0 ? (
+                    <p className="text-sm text-gray-500 dark:text-gray-400">Нет встреч на ближайшие 2 недели.</p>
+                  ) : (
+                    <ul className="space-y-2">
+                      {upcomingMeetingsBoard.map((m) => (
+                        <li
+                          key={m.id}
+                          className="rounded-xl border border-gray-200 dark:border-[#333] px-3 py-2 text-sm"
+                        >
+                          <div className="font-medium text-gray-900 dark:text-white">{m.title || 'Встреча'}</div>
+                          <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                            {m.date || '—'} {m.time ? `· ${m.time}` : ''}
+                          </div>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              </div>
+
+              <div className="bg-white dark:bg-[#252525] rounded-2xl border border-gray-200 dark:border-[#333] p-4 space-y-3">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <Briefcase className="w-4 h-4 text-green-600 dark:text-green-400" />
+                    <h3 className="font-semibold text-gray-900 dark:text-white">Недавние сделки (CRM)</h3>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={onNavigateToDeals}
+                    className="text-xs text-[#3337AD] hover:underline"
+                  >
+                    Воронка
+                  </button>
+                </div>
+                {recentFunnelDeals.length === 0 ? (
+                  <p className="text-sm text-gray-500 dark:text-gray-400">Нет сделок в воронке на вас.</p>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm text-left">
+                      <thead>
+                        <tr className="text-[11px] uppercase text-gray-500 dark:text-gray-400 border-b border-gray-200 dark:border-[#333]">
+                          <th className="py-2 pr-2 font-medium">Сделка</th>
+                          <th className="py-2 pr-2 font-medium">Этап</th>
+                          <th className="py-2 pr-2 font-medium">Источник</th>
+                          <th className="py-2 pr-2 font-medium text-right">Сумма</th>
+                          <th className="py-2 font-medium">Создана</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {recentFunnelDeals.map((d) => (
+                          <tr key={d.id} className="border-b border-gray-100 dark:border-[#333]/60">
+                            <td className="py-2 pr-2 text-gray-900 dark:text-white max-w-[200px] truncate">
+                              {getDealDisplayTitle(d)}
+                            </td>
+                            <td className="py-2 pr-2 text-gray-600 dark:text-gray-300">{d.stage || '—'}</td>
+                            <td className="py-2 pr-2 text-gray-600 dark:text-gray-300">{sourceLabel(d.source)}</td>
+                            <td className="py-2 pr-2 text-right tabular-nums text-gray-900 dark:text-white">
+                              {(Number(d.amount) || 0).toLocaleString('ru-RU')} {d.currency || ''}
+                            </td>
+                            <td className="py-2 text-gray-500 dark:text-gray-400 whitespace-nowrap">
+                              {d.createdAt
+                                ? new Date(d.createdAt).toLocaleDateString('ru-RU')
+                                : '—'}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
               </div>
             </div>
           )}
@@ -433,7 +740,7 @@ export const WorkdeskView: React.FC<WorkdeskViewProps> = ({
               <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs">
                 <div className="rounded-xl border border-gray-200 dark:border-[#333] p-3">
                   <p className="text-gray-500">Открытые задачи</p>
-                  <p className="font-semibold text-gray-900 dark:text-white">{tasksOpen}</p>
+                  <p className="font-semibold text-gray-900 dark:text-white">{myOpenTasksCount}</p>
                 </div>
                 <div className="rounded-xl border border-gray-200 dark:border-[#333] p-3">
                   <p className="text-gray-500">Закрытые задачи</p>
