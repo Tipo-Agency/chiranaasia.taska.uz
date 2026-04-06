@@ -5,7 +5,7 @@ import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 
 revision = "024_shoot_plans"
-down_revision = "023_funnel_notifications_meeting_project_cal_feed"
+down_revision = "023_funnel_ntf_meet_cal"
 branch_labels = None
 depends_on = None
 

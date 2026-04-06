@@ -1,9 +1,12 @@
-"""Funnel notification templates, meeting project_id, user calendar export token."""
+"""Funnel notification templates, meeting project_id, user calendar export token.
+
+Revision id must fit alembic_version.version_num (VARCHAR(32) in PostgreSQL default).
+"""
 
 from alembic import op
 import sqlalchemy as sa
 
-revision = "023_funnel_notifications_meeting_project_cal_feed"
+revision = "023_funnel_ntf_meet_cal"
 down_revision = "022_roles_rbac"
 branch_labels = None
 depends_on = None
