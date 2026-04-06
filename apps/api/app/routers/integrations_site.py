@@ -75,32 +75,34 @@ async def rotate_site_key(
     if not (getattr(current_user, "role", None) == "ADMIN" or getattr(funnel, "owner_user_id", None) == getattr(current_user, "id", None)):
         raise HTTPException(status_code=403, detail="forbidden")
 
-    # Deactivate existing key (if any)
+    # NOTE: funnel_id has a UNIQUE index — keep one row per funnel and update it on rotate.
     existing = (
         await db.execute(
             select(SiteIntegrationKey).where(
                 SiteIntegrationKey.funnel_id == funnel_id,
-                SiteIntegrationKey.is_active.is_(True),
             )
         )
     ).scalar_one_or_none()
-    if existing:
-        existing.is_active = False
-        existing.rotated_at = datetime.utcnow()
-        await db.flush()
 
     api_key = secrets.token_urlsafe(32)
     key_hash = _sha256_hex(api_key)
     last4 = api_key[-4:] if len(api_key) >= 4 else api_key
-    row = SiteIntegrationKey(
-        id=str(uuid.uuid4()),
-        funnel_id=funnel_id,
-        api_key_hash=key_hash,
-        key_last4=last4,
-        is_active=True,
-        rotated_at=None,
-    )
-    db.add(row)
+    if existing:
+        existing.api_key_hash = key_hash
+        existing.key_last4 = last4
+        existing.is_active = True
+        existing.rotated_at = datetime.utcnow()
+        await db.flush()
+    else:
+        row = SiteIntegrationKey(
+            id=str(uuid.uuid4()),
+            funnel_id=funnel_id,
+            api_key_hash=key_hash,
+            key_last4=last4,
+            is_active=True,
+            rotated_at=None,
+        )
+        db.add(row)
     await db.commit()
     return {"ok": True, "funnelId": funnel_id, "apiKey": api_key, "keyLast4": last4}
 
