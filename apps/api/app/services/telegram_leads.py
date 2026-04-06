@@ -188,6 +188,7 @@ async def process_private_message_for_funnel(
                     "title": title,
                     "assigneeId": assignee_id,
                     "actorName": "Telegram",
+                    "funnelName": funnel.name,
                 },
             )
         except Exception as exc:

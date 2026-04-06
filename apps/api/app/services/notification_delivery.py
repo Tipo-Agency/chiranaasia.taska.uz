@@ -1,8 +1,10 @@
 """Best-effort delivery worker helpers (telegram/email placeholders)."""
 from __future__ import annotations
 
+import html
 import json
 import smtplib
+import urllib.parse
 from datetime import UTC, datetime, timedelta
 from email.message import EmailMessage
 
@@ -29,12 +31,59 @@ def _next_backoff_seconds(attempt: int) -> int:
     return 3600
 
 
-def _send_telegram(token: str, chat_id: str, text: str) -> tuple[bool, str | None]:
+def _telegram_deal_assigned_html(n: Notification) -> tuple[str, str] | None:
+    """Rich Telegram message with tap-to-call for site leads."""
+    if n.type != "deal.assigned":
+        return None
+    p = n.payload if isinstance(n.payload, dict) else {}
+    if not (p.get("leadSource") == "site" or p.get("phone") or p.get("funnelName")):
+        return None
+
+    parts: list[str] = [f"<b>{html.escape(n.title)}</b>", ""]
+    actor = html.escape(str(p.get("actorName") or "Система"))
+    t = html.escape(str(p.get("title") or ""))
+    parts.append(f"{actor} назначил вам сделку: «{t}»")
+
+    if p.get("funnelName"):
+        parts.append(f"Воронка: {html.escape(str(p.get('funnelName')))}")
+    if p.get("stageLabel"):
+        parts.append(f"Этап: {html.escape(str(p.get('stageLabel')))}")
+    if p.get("contactName"):
+        parts.append(f"Имя: {html.escape(str(p.get('contactName')))}")
+
+    phone = str(p.get("phone") or "").strip()
+    if phone:
+        href = "".join(c for c in phone if c.isdigit() or c == "+")
+        if href and not href.startswith("+"):
+            href = "+" + href.replace("+", "")
+        safe_href = urllib.parse.quote(href, safe="+") if href else ""
+        if safe_href:
+            parts.append(f'Телефон: <a href="tel:{safe_href}">{html.escape(phone)}</a>')
+        else:
+            parts.append(f"Телефон: {html.escape(phone)}")
+
+    if p.get("email"):
+        em = str(p.get("email")).strip()
+        if em:
+            parts.append(f'Email: <a href="mailto:{html.escape(em)}">{html.escape(em)}</a>')
+
+    if p.get("message"):
+        parts.append(f"Сообщение: {html.escape(str(p.get('message')))[:800]}")
+
+    text_out = "\n".join(parts)
+    if len(text_out) > 4000:
+        text_out = text_out[:3997] + "..."
+    return text_out, "HTML"
+
+
+def _send_telegram(token: str, chat_id: str, text: str, parse_mode: str | None = None) -> tuple[bool, str | None]:
     try:
-        import urllib.parse
         import urllib.request
 
-        payload = urllib.parse.urlencode({"chat_id": chat_id, "text": text}).encode()
+        data: dict[str, str] = {"chat_id": str(chat_id), "text": text}
+        if parse_mode:
+            data["parse_mode"] = parse_mode
+        payload = urllib.parse.urlencode(data).encode()
         req = urllib.request.Request(
             f"https://api.telegram.org/bot{token}/sendMessage",
             data=payload,
@@ -143,11 +192,16 @@ async def run_pending_deliveries(db: AsyncSession, limit: int = 100) -> dict:
                 d.last_error = "telegram_chat_id_missing"
                 failed += 1
             else:
-                ok, err = _send_telegram(
-                    settings.TELEGRAM_BOT_TOKEN,
-                    str(chat_id),
-                    f"{n.title}\n\n{n.body}",
-                )
+                tg = _telegram_deal_assigned_html(n)
+                if tg:
+                    tg_text, tg_mode = tg
+                    ok, err = _send_telegram(settings.TELEGRAM_BOT_TOKEN, str(chat_id), tg_text, tg_mode)
+                else:
+                    ok, err = _send_telegram(
+                        settings.TELEGRAM_BOT_TOKEN,
+                        str(chat_id),
+                        f"{n.title}\n\n{n.body}",
+                    )
                 if ok:
                     d.status = "sent"
                     d.delivered_at = now

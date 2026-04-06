@@ -286,6 +286,7 @@ async def process_instagram_webhook(db: AsyncSession, body: dict[str, Any]) -> i
             # Новый диалог → новая сделка
             funnel_id, stage_id = await _default_funnel_stage(db)
             assignee_id = None
+            funnel = None
             if funnel_id:
                 funnel = await db.get(SalesFunnel, funnel_id)
                 if funnel and getattr(funnel, "owner_user_id", None):
@@ -337,6 +338,7 @@ async def process_instagram_webhook(db: AsyncSession, body: dict[str, Any]) -> i
                         "source": "instagram",
                         "assigneeId": assignee_id,
                         "actorName": "Instagram",
+                        "funnelName": funnel.name if funnel else None,
                     },
                 )
             except Exception as exc:

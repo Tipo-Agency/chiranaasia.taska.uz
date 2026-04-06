@@ -47,6 +47,16 @@ def _pick_default_stage_id(funnel: SalesFunnel) -> str:
     return "new"
 
 
+def _stage_label(funnel: SalesFunnel, stage_id: str) -> str:
+    stages = funnel.stages or []
+    if isinstance(stages, list):
+        for s in stages:
+            if isinstance(s, dict) and str(s.get("id") or "") == str(stage_id):
+                lab = s.get("label")
+                return str(lab) if lab is not None else str(stage_id)
+    return str(stage_id)
+
+
 def _pick_default_assignee_id(funnel: SalesFunnel) -> str | None:
     sources = funnel.sources or {}
     site = sources.get("site") if isinstance(sources, dict) else None
@@ -192,11 +202,12 @@ async def create_lead_from_site(
 
     deal_id = str(uuid.uuid4())
     assignee_id = _pick_default_assignee_id(funnel) or ""
+    stage_id = _pick_default_stage_id(funnel)
     deal = Deal(
         id=deal_id,
         title=title[:500],
         funnel_id=key_row.funnel_id,
-        stage=_pick_default_stage_id(funnel),
+        stage=stage_id,
         source="site",
         contact_name=name[:255] if name else None,
         assignee_id=assignee_id,
@@ -222,6 +233,14 @@ async def create_lead_from_site(
                 "title": deal.title,
                 "assigneeId": assignee_id,
                 "actorName": "Сайт",
+                "leadSource": "site",
+                "funnelId": funnel.id,
+                "funnelName": funnel.name,
+                "stageLabel": _stage_label(funnel, stage_id),
+                "contactName": name or None,
+                "phone": phone or None,
+                "email": email or None,
+                "message": message or None,
             },
         )
     await db.commit()

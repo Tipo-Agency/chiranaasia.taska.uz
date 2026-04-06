@@ -15,6 +15,40 @@ from app.services.notifications_realtime import realtime_hub
 SYSTEM_SENDER_ID = "system"
 
 
+def _format_deal_assigned_body(payload: dict[str, Any]) -> str:
+    """Human-readable assignment text for in-app/chat/email (plain text)."""
+    actor = str(payload.get("actorName") or "Система")
+    title = str(payload.get("title") or "Без названия")
+    head = f'{actor} назначил вам сделку: "{title}"'
+
+    lines: list[str] = []
+    fn = payload.get("funnelName")
+    if fn:
+        lines.append(f"Воронка: {fn}")
+    sl = payload.get("stageLabel")
+    if sl:
+        lines.append(f"Этап: {sl}")
+    cn = payload.get("contactName")
+    if cn:
+        lines.append(f"Имя: {cn}")
+    ph = payload.get("phone")
+    if ph:
+        lines.append(f"Телефон: {ph}")
+    em = payload.get("email")
+    if em:
+        lines.append(f"Email: {em}")
+    msg = payload.get("message")
+    if msg:
+        m = str(msg).strip()
+        if len(m) > 600:
+            m = m[:597] + "..."
+        lines.append(f"Сообщение: {m}")
+
+    if not lines:
+        return head
+    return head + "\n\n" + "\n".join(lines)
+
+
 def _mk_notification(
     *,
     event_id: str,
@@ -91,11 +125,14 @@ def _route_event(event: dict[str, Any]) -> list[dict[str, Any]]:
     elif et == "deal.assigned":
         uid = payload.get("assigneeId")
         if uid:
+            body = _format_deal_assigned_body(payload)
+            if len(body) > 1990:
+                body = body[:1987] + "..."
             routes.append(
                 {
                     "recipient_id": uid,
                     "title": "Новая сделка",
-                    "body": f'{actor_name} назначил вам сделку: "{payload.get("title") or "Без названия"}"',
+                    "body": body,
                     "priority": "high",
                 }
             )
