@@ -59,7 +59,7 @@ const DepartmentsView: React.FC<DepartmentsViewProps> = ({ departments, users, o
 
   return (
     <ModulePageShell>
-      <div className={`${MODULE_PAGE_GUTTER} max-w-5xl pt-8 pb-4 flex-shrink-0`}>
+      <div className={`${MODULE_PAGE_GUTTER} pt-8 pb-4 flex-shrink-0`}>
             <ModulePageHeader
               icon={<GitFork size={24} strokeWidth={2} />}
               title="Подразделения"
@@ -71,7 +71,7 @@ const DepartmentsView: React.FC<DepartmentsViewProps> = ({ departments, users, o
             />
        </div>
        <div className="flex-1 overflow-y-auto custom-scrollbar min-h-0">
-         <div className={`${MODULE_PAGE_GUTTER} max-w-5xl pb-20`}>
+         <div className={`${MODULE_PAGE_GUTTER} pb-20`}>
        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
            {departments.filter(dep => !dep.isArchived).map(dep => {
                const head = users.find(u => u.id === dep.headId);

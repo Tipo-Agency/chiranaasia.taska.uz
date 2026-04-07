@@ -640,7 +640,7 @@ const BusinessProcessesView: React.FC<BusinessProcessesViewProps> = ({
       return (
           <div className="h-full flex flex-col min-h-0 bg-white dark:bg-[#191919]">
               <div className="border-b border-gray-200 dark:border-[#333] bg-white dark:bg-[#252525] px-6 py-4 flex-shrink-0">
-                  <div className="max-w-7xl mx-auto flex items-center justify-between">
+                  <div className={`${MODULE_PAGE_GUTTER} flex items-center justify-between`}>
                       <div className="flex items-center gap-4">
                           <button
                               onClick={() => setSelectedInstanceId(null)}
@@ -664,7 +664,7 @@ const BusinessProcessesView: React.FC<BusinessProcessesViewProps> = ({
                   </div>
               </div>
               <div className="flex-1 overflow-y-auto custom-scrollbar min-h-0">
-                  <div className="max-w-7xl mx-auto px-6 py-6">
+                  <div className={`${MODULE_PAGE_GUTTER} ${MODULE_PAGE_TOP_PAD} py-6`}>
                       {process.description && (
                           <div className="mb-6 p-4 bg-gray-50 dark:bg-[#2a2a2a] border border-gray-200 dark:border-[#333] rounded-xl">
                               <h3 className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase mb-2">О процессе</h3>
@@ -795,7 +795,7 @@ const BusinessProcessesView: React.FC<BusinessProcessesViewProps> = ({
           <div className="h-full flex flex-col min-h-0 bg-white dark:bg-[#191919]">
               {/* Header */}
               <div className="border-b border-gray-200 dark:border-[#333] bg-white dark:bg-[#252525] px-6 py-4 flex-shrink-0">
-                  <div className="max-w-7xl mx-auto flex items-center justify-between">
+                  <div className={`${MODULE_PAGE_GUTTER} flex items-center justify-between`}>
                       <div className="flex items-center gap-4">
                           <button
                               onClick={() => setSelectedProcessId(null)}
@@ -839,7 +839,7 @@ const BusinessProcessesView: React.FC<BusinessProcessesViewProps> = ({
 
               {/* Content */}
               <div className="flex-1 overflow-y-auto custom-scrollbar min-h-0">
-                  <div className="max-w-7xl mx-auto px-6 py-6">
+                  <div className={`${MODULE_PAGE_GUTTER} ${MODULE_PAGE_TOP_PAD} py-6`}>
                       {/* Process Steps Overview - Схема */}
                       <div className="mb-6 bg-white dark:bg-[#252525] border border-gray-200 dark:border-[#333] rounded-xl p-6 shadow-sm">
                           <h2 className="text-sm font-bold text-gray-500 dark:text-gray-400 uppercase mb-4">Схема процесса</h2>
@@ -1243,7 +1243,7 @@ const BusinessProcessesView: React.FC<BusinessProcessesViewProps> = ({
           <div className="h-full flex flex-col min-h-0 bg-white dark:bg-[#191919]">
               {/* Header */}
               <div className="border-b border-gray-200 dark:border-[#333] bg-white dark:bg-[#252525] px-6 py-4 flex-shrink-0">
-                  <div className="max-w-7xl mx-auto flex items-center justify-between">
+                  <div className={`${MODULE_PAGE_GUTTER} flex items-center justify-between`}>
                       <div className="flex items-center gap-4">
                           <button
                               onClick={() => setSelectedInstanceId(null)}
@@ -1268,7 +1268,7 @@ const BusinessProcessesView: React.FC<BusinessProcessesViewProps> = ({
 
               {/* Content */}
               <div className="flex-1 overflow-y-auto custom-scrollbar min-h-0">
-                  <div className="max-w-7xl mx-auto px-6 py-6">
+                  <div className={`${MODULE_PAGE_GUTTER} ${MODULE_PAGE_TOP_PAD} py-6`}>
                       {/* Выбор ветки при варианте */}
                       {inst.pendingBranchSelection && onCompleteProcessStepWithBranch && (() => {
                           const step = (processVersion || process).steps.find(s => s.id === inst.pendingBranchSelection!.stepId);
