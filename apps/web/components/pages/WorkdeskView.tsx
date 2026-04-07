@@ -8,6 +8,7 @@ import {
   FileText,
   Network,
   LayoutDashboard,
+  Users,
   X,
   Save,
   AlertCircle,
