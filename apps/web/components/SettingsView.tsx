@@ -1,8 +1,8 @@
 
-import React, { useState, useEffect, useMemo, lazy, Suspense } from 'react';
+import React, { useState, useEffect, useMemo, useLayoutEffect, lazy, Suspense } from 'react';
 import { Project, Role, Task, User, StatusOption, PriorityOption, NotificationPreferences, AutomationRule, TableCollection, Deal, Department, FinanceCategory, Fund, SalesFunnel, Doc, ContentPost, EmployeeInfo, Client, Contract, BusinessProcess, Meeting, Warehouse, OrgPosition } from '../types';
 import { User as UserIcon, Briefcase, Archive, Users, Building2, Wallet, TrendingUp, PiggyBank, ShieldAlert, Settings, BellRing, Zap, Package, ArrowLeft, Plus, ShieldCheck } from 'lucide-react';
-import { Button, Input, ModuleFilterIconButton, ModulePageHeader, ModulePageShell, ModuleSegmentedControl, MODULE_PAGE_GUTTER, StandardModal } from './ui';
+import { Button, Input, ModuleCreateIconButton, ModuleFilterIconButton, ModulePageShell, MODULE_PAGE_GUTTER, MODULE_PAGE_TOP_PAD, StandardModal } from './ui';
 import { ProfileSettings } from './settings/ProfileSettings';
 import { StructureSettings } from './settings/StructureSettings';
 import { SpaceSettings } from './settings/SpaceSettings';
@@ -17,6 +17,7 @@ import { FinanceSetupSettings } from './settings/FinanceSetupSettings';
 import { TasksSetupSettings } from './settings/TasksSetupSettings';
 import { hasPermission } from '../utils/permissions';
 import { RouteFallback } from './ui/RouteFallback';
+import { useAppToolbar } from '../contexts/AppToolbarContext';
 
 const AdminViewLazy = lazy(() => import('./admin/AdminView').then((m) => ({ default: m.AdminView })));
 
@@ -127,6 +128,7 @@ const SettingsView: React.FC<SettingsViewProps> = ({
   employeeInfos = [], deals = [], clients = [], contracts = [], meetings = [], businessProcesses = [], orgPositions = [],
   notificationPrefs, onClose: _onClose
 }) => {
+  const { setLeading, setModule } = useAppToolbar();
   const settingsTabs = useMemo(() => {
     const t = [...SETTINGS_TABS_BASE];
     if (currentUser && hasPermission(currentUser, 'admin.system')) {
@@ -163,106 +165,117 @@ const SettingsView: React.FC<SettingsViewProps> = ({
     setActiveTab((prev) => normalizeTab(prev));
   }, []);
 
+  useLayoutEffect(() => {
+    const activeBox = 'bg-slate-100 text-slate-800 dark:bg-slate-800/40 dark:text-slate-100';
+    const idleBox = 'text-gray-600 dark:text-gray-400';
+    const leadingTabs = showArchiveScreen
+      ? ARCHIVE_TAB_OPTIONS.map((t) => ({ id: t.id as string, label: t.label }))
+      : settingsTabs.map((t) => ({ id: t.id, label: t.label }));
+    const selectedId = showArchiveScreen ? archiveTab : activeTab;
+
+    setLeading(
+      <div className="flex items-center gap-0.5 sm:gap-1 shrink-0 flex-wrap sm:flex-nowrap" role="tablist" aria-label="Настройки">
+        {leadingTabs.map((t) => {
+          const active = selectedId === t.id;
+          return (
+            <button
+              key={t.id}
+              type="button"
+              role="tab"
+              aria-selected={active}
+              onClick={() => {
+                if (showArchiveScreen) setArchiveTab(t.id as ArchiveTabId);
+                else setActiveTab(t.id);
+              }}
+              className={`px-2 sm:px-2.5 py-1 rounded-lg text-[11px] sm:text-xs font-medium whitespace-nowrap shrink-0 transition-colors ${
+                active ? activeBox : `${idleBox} hover:bg-gray-100 dark:hover:bg-[#252525]`
+              }`}
+            >
+              {t.label}
+            </button>
+          );
+        })}
+      </div>
+    );
+
+    const canCreate =
+      !showArchiveScreen &&
+      (activeTab === 'users' || activeTab === 'structure' || activeTab === 'finance-setup' || activeTab === 'sales-funnels');
+
+    setModule(
+      <div className="flex items-center gap-1.5 shrink-0">
+        {showArchiveScreen ? (
+          <>
+            <ModuleFilterIconButton
+              accent="slate"
+              size="sm"
+              active={archiveShowFilters || !!archiveQuery.trim()}
+              activeCount={archiveQuery.trim() ? 1 : 0}
+              onClick={() => setArchiveShowFilters((v) => !v)}
+              label="Фильтры"
+            />
+            <button
+              type="button"
+              onClick={() => {
+                setShowArchiveScreen(false);
+                setArchiveShowFilters(false);
+                setArchiveQuery('');
+              }}
+              className="inline-flex items-center justify-center w-9 h-9 rounded-lg border border-gray-200 dark:border-[#333] bg-white dark:bg-[#1a1a1a] text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-[#252525]"
+              title="Назад"
+              aria-label="Назад"
+            >
+              <ArrowLeft size={16} />
+            </button>
+          </>
+        ) : (
+          <>
+            <ModuleCreateIconButton
+              accent="slate"
+              size="sm"
+              label={activeTab === 'users' ? 'Создать' : 'Создание доступно не во всех вкладках'}
+              disabled={!canCreate}
+              onClick={() => {
+                if (!canCreate) return;
+                if (activeTab === 'users') setCreateUserOpen(true);
+                if (activeTab === 'structure') setStructureCreatePickerOpen(true);
+                if (activeTab === 'finance-setup') setFinanceCreatePickerOpen(true);
+                if (activeTab === 'sales-funnels') setSalesFunnelsCreateRequested((x) => x + 1);
+              }}
+            />
+            <button
+              type="button"
+              onClick={() => setShowArchiveScreen(true)}
+              className="inline-flex items-center justify-center w-9 h-9 rounded-lg border border-gray-200 dark:border-[#333] bg-white dark:bg-[#1a1a1a] text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-[#252525]"
+              title="Архив"
+              aria-label="Архив"
+            >
+              <Archive size={16} />
+            </button>
+          </>
+        )}
+      </div>
+    );
+
+    return () => {
+      setLeading(null);
+      setModule(null);
+    };
+  }, [
+    showArchiveScreen,
+    archiveTab,
+    activeTab,
+    settingsTabs,
+    archiveShowFilters,
+    archiveQuery,
+    setLeading,
+    setModule,
+  ]);
+
   return (
     <ModulePageShell>
-      <div className={`${MODULE_PAGE_GUTTER} pt-6 md:pt-8 flex-shrink-0`}>
-        <div className="mb-5">
-          <ModulePageHeader
-            accent="slate"
-            icon={<Settings size={24} strokeWidth={2} />}
-            title="Настройки"
-            description=" "
-            tabs={
-              showArchiveScreen ? (
-                <ModuleSegmentedControl
-                  variant="neutral"
-                  value={archiveTab}
-                  onChange={(v) => setArchiveTab(v as ArchiveTabId)}
-                  options={ARCHIVE_TAB_OPTIONS.map((t) => ({ value: t.id, label: t.label }))}
-                />
-              ) : (
-                <ModuleSegmentedControl
-                  variant="neutral"
-                  value={activeTab}
-                  onChange={(v) => setActiveTab(v)}
-                  options={settingsTabs.map((t) => ({
-                    value: t.id,
-                    label: t.label,
-                    icon: t.icon,
-                  }))}
-                />
-              )
-            }
-            controls={
-              showArchiveScreen ? (
-                <>
-                  <ModuleFilterIconButton
-                    accent="slate"
-                    active={archiveShowFilters || !!archiveQuery.trim()}
-                    activeCount={archiveQuery.trim() ? 1 : 0}
-                    onClick={() => setArchiveShowFilters((v) => !v)}
-                    label="Фильтры"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setShowArchiveScreen(false);
-                      setArchiveShowFilters(false);
-                      setArchiveQuery('');
-                    }}
-                    className="inline-flex items-center justify-center w-11 h-11 rounded-xl border border-gray-200 dark:border-[#333] bg-white dark:bg-[#1a1a1a] text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-[#252525]"
-                    title="Назад"
-                    aria-label="Назад"
-                  >
-                    <ArrowLeft size={18} />
-                  </button>
-                </>
-              ) : (
-                <>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (activeTab === 'users') setCreateUserOpen(true);
-                      if (activeTab === 'structure') setStructureCreatePickerOpen(true);
-                      if (activeTab === 'finance-setup') setFinanceCreatePickerOpen(true);
-                      if (activeTab === 'sales-funnels') setSalesFunnelsCreateRequested((x) => x + 1);
-                    }}
-                    className={`inline-flex items-center justify-center w-11 h-11 rounded-xl border border-gray-200 dark:border-[#333] bg-white dark:bg-[#1a1a1a] text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-[#252525] ${
-                      activeTab === 'users' || activeTab === 'structure' || activeTab === 'finance-setup' || activeTab === 'sales-funnels'
-                        ? ''
-                        : 'opacity-50 cursor-not-allowed'
-                    }`}
-                    title={activeTab === 'users' ? 'Создать' : 'Создание доступно не во всех вкладках'}
-                    aria-label="Создать"
-                    disabled={
-                      !(
-                        activeTab === 'users' ||
-                        activeTab === 'structure' ||
-                        activeTab === 'finance-setup' ||
-                        activeTab === 'sales-funnels'
-                      )
-                    }
-                  >
-                    <Plus size={18} />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setShowArchiveScreen(true)}
-                    className="inline-flex items-center justify-center w-11 h-11 rounded-xl border border-gray-200 dark:border-[#333] bg-white dark:bg-[#1a1a1a] text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-[#252525]"
-                    title="Архив"
-                    aria-label="Архив"
-                  >
-                    <Archive size={18} />
-                  </button>
-                </>
-              )
-            }
-          />
-        </div>
-      </div>
-
       <div className="flex-1 min-h-0 overflow-hidden">
-        <div className={`${MODULE_PAGE_GUTTER} mt-3 pb-24 md:pb-32 h-full overflow-y-auto overflow-x-hidden custom-scrollbar`}>
+        <div className={`${MODULE_PAGE_GUTTER} ${MODULE_PAGE_TOP_PAD} pb-24 md:pb-32 h-full overflow-y-auto overflow-x-hidden custom-scrollbar`}>
           {showArchiveScreen ? (
             <div className="space-y-3">
               {archiveShowFilters && (
