@@ -21,12 +21,12 @@ export const ModuleCreateIconButton: React.FC<ModuleCreateIconButtonProps> = ({
   className = '',
   type = 'button',
   disabled,
-  size = 'md',
+  size = 'sm',
   ...rest
 }) => {
   const fab = MODULE_ACCENTS[accent].fab;
-  const dim = size === 'sm' ? 'w-9 h-9 rounded-lg' : 'w-11 h-11 rounded-xl';
-  const iconSize = size === 'sm' ? 18 : 22;
+  const dim = size === 'sm' ? 'w-8 h-8 rounded-lg' : 'w-11 h-11 rounded-xl';
+  const iconSize = size === 'sm' ? 16 : 22;
   const stroke = size === 'sm' ? 2.25 : 2.5;
   return (
     <button
