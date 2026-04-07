@@ -4,7 +4,13 @@ import { createPortal } from 'react-dom';
 import { ContentPost, Task, TableCollection, ShootPlan, User } from '../types';
 import { ShootPlansPanel } from './ShootPlansPanel';
 import { Calendar, X, FileText as FileTextIcon, Send, Youtube, Video, Image, FileText, Clock, List, LayoutGrid, KanbanSquare, Linkedin, Check, CheckSquare, ChevronLeft, ChevronRight, Trash2, Edit2, Instagram, CheckSquare2, Save, RefreshCw, MoreVertical } from 'lucide-react';
-import { ModulePageShell, ModuleSegmentedControl, MODULE_PAGE_GUTTER, ModuleCreateIconButton } from './ui';
+import {
+  ModulePageShell,
+  ModuleSegmentedControl,
+  MODULE_PAGE_GUTTER,
+  ModuleCreateIconButton,
+  APP_TOOLBAR_MODULE_CLUSTER,
+} from './ui';
 import { useAppToolbar } from '../contexts/AppToolbarContext';
 import { TaskSelect } from './TaskSelect';
 import { api } from '../backend/api';
@@ -158,7 +164,8 @@ const ContentPlanView: React.FC<ContentPlanViewProps> = ({
     setLeading(
       <ModuleSegmentedControl
         size="sm"
-        variant="neutral"
+        variant="accent"
+        accent="indigo"
         value={viewMode}
         onChange={setViewMode}
         options={[
@@ -172,7 +179,7 @@ const ContentPlanView: React.FC<ContentPlanViewProps> = ({
       />
     );
     setModule(
-      <div className="flex items-center gap-1.5 shrink-0 flex-wrap justify-end">
+      <div className={APP_TOOLBAR_MODULE_CLUSTER}>
         <button
           type="button"
           onClick={refreshData}

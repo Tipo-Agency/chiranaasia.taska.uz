@@ -11,16 +11,14 @@ import {
   MessageCircle,
   Package,
 } from 'lucide-react';
-import { User, TableCollection } from '../types';
+import { User } from '../types';
 import { hasPermission } from '../utils/permissions';
-import { DynamicIcon } from './AppIcons';
 import { getDefaultAvatarForId } from '../constants/avatars';
 import { useAppToolbar } from '../contexts/AppToolbarContext';
 
 export interface AppHeaderProps {
   darkMode: boolean;
   currentView: string;
-  activeTable?: TableCollection;
   currentUser: User;
   searchQuery: string;
   onToggleDarkMode: () => void;
@@ -30,14 +28,12 @@ export interface AppHeaderProps {
   onOpenSystemChat?: () => void;
   onOpenSettings: (tab: string) => void;
   onLogout: () => void;
-  onEditTable: () => void;
   onMobileMenuToggle: () => void;
 }
 
 export const AppHeader: React.FC<AppHeaderProps> = ({
   darkMode,
   currentView,
-  activeTable,
   currentUser,
   searchQuery,
   onToggleDarkMode,
@@ -46,7 +42,6 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
   onOpenSystemChat,
   onOpenSettings,
   onLogout,
-  onEditTable,
   onMobileMenuToggle,
 }) => {
   const { leading, module } = useAppToolbar();
@@ -71,18 +66,6 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
     };
   }, [showUserDropdown]);
 
-  const tableIconSlot =
-    currentView === 'table' && activeTable ? (
-      <button
-        type="button"
-        onClick={onEditTable}
-        title={activeTable.name}
-        className="h-8 w-8 rounded-xl bg-indigo-100 dark:bg-indigo-900/30 flex items-center justify-center shrink-0 text-indigo-700 dark:text-indigo-300 hover:opacity-90"
-      >
-        <DynamicIcon name={activeTable.icon} className={`${activeTable.color} shrink-0`} />
-      </button>
-    ) : null;
-
   return (
     <div className="h-12 border-b border-gray-200 dark:border-[#333] flex items-center gap-2 px-2 md:px-3 bg-white/95 dark:bg-[#191919]/95 backdrop-blur shrink-0 z-[40] min-w-0">
       <button
@@ -95,7 +78,6 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
       </button>
 
       <div className="flex-1 min-w-0 flex items-center gap-1.5 overflow-x-auto scrollbar-none py-0.5">
-        {tableIconSlot}
         {leading}
       </div>
 

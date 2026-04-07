@@ -123,5 +123,11 @@ export const MODULE_ACCENTS: Record<
  */
 export const MODULE_PAGE_GUTTER = 'w-full px-4 sm:px-6';
 
+/**
+ * Правая группа в AppHeader: фильтр, «+», переключатели вида — единый шаг `gap-2`.
+ */
+export const APP_TOOLBAR_MODULE_CLUSTER =
+  'flex items-center gap-2 shrink-0 flex-wrap justify-end';
+
 /** Отступ контента от нижней границы верхней панели — как горизонтальный gutter (px-4 / sm:px-6). */
 export const MODULE_PAGE_TOP_PAD = 'pt-4 sm:pt-6';

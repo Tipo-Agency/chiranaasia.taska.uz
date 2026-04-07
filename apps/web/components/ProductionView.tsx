@@ -2,7 +2,7 @@ import React, { useLayoutEffect, useMemo, useState } from 'react';
 import { BarChart3, ClipboardList, Factory, LayoutDashboard } from 'lucide-react';
 import type { Department, User } from '../types';
 import { ModuleCreateDropdown, ModuleFilterIconButton, ModulePageShell } from './ui';
-import { MODULE_PAGE_GUTTER, MODULE_PAGE_TOP_PAD } from './ui/moduleAccent';
+import { MODULE_PAGE_GUTTER, MODULE_PAGE_TOP_PAD, APP_TOOLBAR_MODULE_CLUSTER } from './ui/moduleAccent';
 import { useAppToolbar } from '../contexts/AppToolbarContext';
 import { useProductionStore } from './production/useProductionStore';
 import { ProductionMonitorPanel } from './production/ProductionMonitorPanel';
@@ -62,7 +62,7 @@ export default function ProductionView({ users, departments, currentUser }: Prod
     );
 
     setModule(
-      <div className="flex items-center gap-1.5 shrink-0 flex-wrap justify-end">
+      <div className={APP_TOOLBAR_MODULE_CLUSTER}>
         <ModuleFilterIconButton
           accent="emerald"
           size="sm"

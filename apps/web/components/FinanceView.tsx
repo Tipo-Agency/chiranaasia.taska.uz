@@ -4,7 +4,18 @@ import { TaskSelect } from './TaskSelect';
 import { FinanceCategory, Fund, FinancePlan, PurchaseRequest, Department, User, FinancialPlanDocument, FinancialPlanning, Bdr } from '../types';
 import { hasPermission } from '../utils/permissions';
 import { Plus, X, Edit2, Trash2, PieChart, TrendingUp, DollarSign, Check, AlertCircle, Calendar, Settings, ArrowLeft, ArrowRight, Save, FileText, Clock, CheckCircle2, ChevronDown, Upload, Archive, RotateCcw } from 'lucide-react';
-import { Button, ModulePageShell, MODULE_PAGE_GUTTER, MODULE_PAGE_TOP_PAD, ModuleCreateDropdown, ModuleFilterIconButton, DateInput, ModuleSegmentedControl, SystemAlertDialog } from './ui';
+import {
+  Button,
+  ModulePageShell,
+  MODULE_PAGE_GUTTER,
+  MODULE_PAGE_TOP_PAD,
+  ModuleCreateDropdown,
+  ModuleFilterIconButton,
+  DateInput,
+  ModuleSegmentedControl,
+  SystemAlertDialog,
+  APP_TOOLBAR_MODULE_CLUSTER,
+} from './ui';
 import { useAppToolbar } from '../contexts/AppToolbarContext';
 import { BankStatementsView, type BankStatementsViewHandle } from './finance/BankStatementsView';
 import { BdrView } from './finance/BdrView';
@@ -1832,7 +1843,7 @@ const FinanceView: React.FC<FinanceViewProps> = ({
       </div>
     );
     setModule(
-      <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap justify-end shrink-0">
+      <div className={APP_TOOLBAR_MODULE_CLUSTER}>
         {activeTab === 'planning' && planningSubView === 'list' && (
           <ModuleFilterIconButton
             accent="emerald"

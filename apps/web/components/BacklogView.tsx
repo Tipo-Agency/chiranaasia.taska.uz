@@ -2,7 +2,14 @@ import React, { useMemo, useState, useLayoutEffect } from 'react';
 import { Task, User, StatusOption, TableCollection } from '../types';
 import { Archive, Trash2, Edit2, Play } from 'lucide-react';
 import { TaskSelect } from './TaskSelect';
-import { ModulePageShell, MODULE_PAGE_GUTTER, ModuleCreateIconButton, ModuleFilterIconButton, ToolbarModuleLabel } from './ui';
+import {
+  ModulePageShell,
+  MODULE_PAGE_GUTTER,
+  ModuleCreateIconButton,
+  ModuleFilterIconButton,
+  ToolbarModuleLabel,
+  APP_TOOLBAR_MODULE_CLUSTER,
+} from './ui';
 import { TaskBadgeInline } from './ui/TaskBadgeInline';
 import { useAppToolbar } from '../contexts/AppToolbarContext';
 
@@ -69,10 +76,10 @@ const BacklogView: React.FC<BacklogViewProps> = ({
 
   useLayoutEffect(() => {
     setLeading(
-      <ToolbarModuleLabel>Идеи</ToolbarModuleLabel>
+      <ToolbarModuleLabel accent="orange">Идеи</ToolbarModuleLabel>
     );
     setModule(
-      <div className="flex items-center gap-1.5 shrink-0 flex-wrap justify-end">
+      <div className={APP_TOOLBAR_MODULE_CLUSTER}>
         <ModuleFilterIconButton
           accent="orange"
           size="sm"

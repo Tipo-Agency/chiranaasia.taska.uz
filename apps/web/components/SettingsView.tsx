@@ -2,7 +2,16 @@
 import React, { useState, useEffect, useMemo, useLayoutEffect, lazy, Suspense } from 'react';
 import { Project, Task, User, StatusOption, PriorityOption, NotificationPreferences, AutomationRule, TableCollection, Deal, Department, FinanceCategory, Fund, SalesFunnel, Doc, ContentPost, EmployeeInfo, Client, Contract, BusinessProcess, Meeting, Warehouse, OrgPosition } from '../types';
 import { User as UserIcon, Briefcase, Archive, Users, Building2, Wallet, TrendingUp, PiggyBank, ShieldAlert, Settings, BellRing, Zap, Package, ArrowLeft, ShieldCheck, Receipt } from 'lucide-react';
-import { Input, ModuleCreateDropdown, ModuleCreateIconButton, ModuleFilterIconButton, ModulePageShell, MODULE_PAGE_GUTTER, MODULE_PAGE_TOP_PAD } from './ui';
+import {
+  Input,
+  ModuleCreateDropdown,
+  ModuleCreateIconButton,
+  ModuleFilterIconButton,
+  ModulePageShell,
+  MODULE_PAGE_GUTTER,
+  MODULE_PAGE_TOP_PAD,
+  APP_TOOLBAR_MODULE_CLUSTER,
+} from './ui';
 import { ProfileSettings } from './settings/ProfileSettings';
 import { AccessSettings } from './settings/AccessSettings';
 import { StructureSettings } from './settings/StructureSettings';
@@ -199,7 +208,7 @@ const SettingsView: React.FC<SettingsViewProps> = ({
       (activeTab === 'users' || activeTab === 'structure' || activeTab === 'finance-setup' || activeTab === 'sales-funnels');
 
     setModule(
-      <div className="flex items-center gap-1.5 shrink-0">
+      <div className={APP_TOOLBAR_MODULE_CLUSTER}>
         {showArchiveScreen ? (
           <>
             <ModuleFilterIconButton

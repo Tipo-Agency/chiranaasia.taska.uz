@@ -2,7 +2,15 @@ import React, { useState, useMemo, useLayoutEffect, useCallback } from 'react';
 import { Task, User, StatusOption, Project } from '../types';
 import { Trash2, Edit2, Play, Layers, Folder } from 'lucide-react';
 import { TaskSelect } from './TaskSelect';
-import { ModulePageShell, MODULE_PAGE_GUTTER, ModuleCreateDropdown, ModuleCreateIconButton, ModuleFilterIconButton, ToolbarModuleLabel } from './ui';
+import {
+  ModulePageShell,
+  MODULE_PAGE_GUTTER,
+  ModuleCreateDropdown,
+  ModuleCreateIconButton,
+  ModuleFilterIconButton,
+  ToolbarModuleLabel,
+  APP_TOOLBAR_MODULE_CLUSTER,
+} from './ui';
 import { TaskBadgeInline } from './ui/TaskBadgeInline';
 import { useAppToolbar } from '../contexts/AppToolbarContext';
 
@@ -87,9 +95,9 @@ const FunctionalityView: React.FC<FunctionalityViewProps> = ({
   }, [onCreateProject]);
 
   useLayoutEffect(() => {
-    setLeading(<ToolbarModuleLabel>Функционал</ToolbarModuleLabel>);
+    setLeading(<ToolbarModuleLabel accent="sky">Функционал</ToolbarModuleLabel>);
     setModule(
-      <div className="flex items-center gap-1.5 shrink-0 flex-wrap justify-end">
+      <div className={APP_TOOLBAR_MODULE_CLUSTER}>
         <ModuleFilterIconButton
           accent="sky"
           size="sm"

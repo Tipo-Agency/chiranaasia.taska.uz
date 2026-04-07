@@ -3,7 +3,13 @@ import { TableCollection, User } from '../types';
 import { hasPermission } from '../utils/permissions';
 import { DynamicIcon } from './AppIcons';
 import { Instagram, Archive, Layers, Edit2, Trash2 } from 'lucide-react';
-import { ModulePageShell, MODULE_PAGE_GUTTER, MODULE_PAGE_TOP_PAD, ModuleCreateIconButton } from './ui';
+import {
+  ModulePageShell,
+  MODULE_PAGE_GUTTER,
+  MODULE_PAGE_TOP_PAD,
+  ModuleCreateIconButton,
+  APP_TOOLBAR_MODULE_CLUSTER,
+} from './ui';
 import { useAppToolbar } from '../contexts/AppToolbarContext';
 
 type SpaceType = 'content-plan' | 'backlog' | 'functionality';
@@ -102,14 +108,8 @@ export const SpacesTabsView: React.FC<SpacesTabsViewProps> = ({
       </div>
     );
     setModule(
-      <div className="flex items-center gap-1.5 shrink-0">
-        <span
-          className="text-[11px] text-gray-500 dark:text-gray-400 tabular-nums hidden sm:inline"
-          title={`${getTypeLabel(activeTab)}: ${currentSpaces.length}`}
-        >
-          {currentSpaces.length}
-        </span>
-        <div className="flex items-center rounded-lg border border-gray-200 dark:border-[#333] p-0.5 gap-0.5">
+      <div className={APP_TOOLBAR_MODULE_CLUSTER}>
+        <div className="flex items-center rounded-lg border border-gray-200 dark:border-[#333] p-0.5 gap-0.5 shrink-0">
           <button
             type="button"
             aria-pressed={viewMode === 'grid'}
@@ -139,6 +139,12 @@ export const SpacesTabsView: React.FC<SpacesTabsViewProps> = ({
             onClick={() => onCreateTable(activeTab)}
           />
         )}
+        <span
+          className="text-[11px] text-gray-500 dark:text-gray-400 tabular-nums hidden sm:inline shrink-0"
+          title={`${getTypeLabel(activeTab)}: ${currentSpaces.length}`}
+        >
+          {currentSpaces.length}
+        </span>
       </div>
     );
     return () => {

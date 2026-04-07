@@ -57,7 +57,7 @@ export function ModuleSegmentedControl<T extends string>({
           const activeClass =
             variant === 'accent'
               ? activeAccent
-              : 'bg-gray-900 dark:bg-white text-white dark:text-gray-900 shadow-sm';
+              : 'bg-gray-900 dark:bg-[#3337AD] text-white shadow-sm';
           return (
             <button
               key={String(opt.value)}

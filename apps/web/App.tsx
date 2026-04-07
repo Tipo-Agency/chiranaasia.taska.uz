@@ -223,10 +223,6 @@ function MainApp() {
     return <LoginView users={state.users} onLogin={user => { actions.login(user); }} />;
   }
 
-  const handleOpenEditCurrentTable = () => {
-      if (state.activeTable) actions.openEditTable(state.activeTable);
-  };
-
   const handleSelectTable = (tableId: string) => {
       actions.setActiveTableId(tableId);
       actions.setCurrentView('table');
@@ -285,7 +281,6 @@ function MainApp() {
             <AppHeader
               darkMode={state.darkMode}
               currentView={state.currentView}
-              activeTable={state.activeTable}
               currentUser={state.currentUser}
               searchQuery={state.searchQuery}
               onToggleDarkMode={actions.toggleDarkMode}
@@ -298,7 +293,6 @@ function MainApp() {
               }}
               onOpenSettings={(tab?: string) => { actions.openSettings(tab || 'users'); }}
               onLogout={actions.logout}
-              onEditTable={handleOpenEditCurrentTable}
               onMobileMenuToggle={() => setIsMobileMenuOpen(true)}
             />
 

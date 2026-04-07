@@ -15,7 +15,7 @@ import {
 } from 'lucide-react';
 import { TaskSelect } from './TaskSelect';
 import { normalizeDateForInput, compareDates, getTodayLocalDate } from '../utils/dateUtils';
-import { ModulePageShell, MODULE_PAGE_GUTTER, SystemConfirmDialog } from './ui';
+import { ModulePageShell, MODULE_PAGE_GUTTER, SystemConfirmDialog, APP_TOOLBAR_MODULE_CLUSTER } from './ui';
 import { ModuleCreateDropdown } from './ui/ModuleCreateDropdown';
 import { ModuleSelectDropdown } from './ui/ModuleSelectDropdown';
 import { useAppToolbar } from '../contexts/AppToolbarContext';
@@ -452,20 +452,20 @@ const MeetingsView: React.FC<MeetingsViewProps> = ({
       const monthLabel = new Date(currentYear, currentMonth, 1).toLocaleString('ru-RU', { month: 'long', year: 'numeric' });
 
       return (
-          <div className="overflow-hidden">
-              <div className="flex flex-col sm:flex-row sm:flex-wrap items-stretch sm:items-center justify-between gap-3 border-b border-gray-100 dark:border-[#333] bg-gradient-to-r from-teal-50/90 to-cyan-50/80 dark:from-teal-950/40 dark:to-cyan-950/30 px-4 sm:px-5 py-3 sm:py-4">
+          <div className="rounded-xl border border-gray-200 dark:border-[#3f3f3f] bg-white dark:bg-[#323232] shadow-sm overflow-hidden">
+              <div className="flex flex-col sm:flex-row sm:flex-wrap items-stretch sm:items-center justify-between gap-3 border-b border-gray-200/80 dark:border-[#3f3f3f] bg-gray-50/90 dark:bg-[#2c2c2c] px-4 sm:px-5 py-3 sm:py-4">
                   <div className="flex items-center justify-between sm:justify-start gap-2 min-w-0 flex-1">
                     <button
                       type="button"
                       onClick={() => shiftCalendarMonth(-1)}
-                      className="p-2 rounded-xl border border-teal-200/80 dark:border-teal-800 bg-white/80 dark:bg-[#1a1a1a] text-teal-700 dark:text-teal-300 hover:bg-teal-50 dark:hover:bg-teal-950/50 transition-colors shrink-0"
+                      className="p-2 rounded-xl border border-gray-200 dark:border-[#454545] bg-white dark:bg-[#383838] text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-[#444444] transition-colors shrink-0"
                       title="Предыдущий месяц"
                       aria-label="Предыдущий месяц"
                     >
                       <ChevronLeft size={20} />
                     </button>
                     <div className="flex items-center gap-2 min-w-0 flex-1 justify-center sm:justify-start">
-                      <CalendarDays className="text-teal-600 dark:text-teal-400 shrink-0 hidden sm:block" size={22} />
+                      <CalendarDays className="text-gray-500 dark:text-gray-400 shrink-0 hidden sm:block" size={22} />
                       <span className="capitalize font-semibold text-gray-900 dark:text-white text-base truncate text-center sm:text-left">
                         {monthLabel}
                       </span>
@@ -473,7 +473,7 @@ const MeetingsView: React.FC<MeetingsViewProps> = ({
                     <button
                       type="button"
                       onClick={() => shiftCalendarMonth(1)}
-                      className="p-2 rounded-xl border border-teal-200/80 dark:border-teal-800 bg-white/80 dark:bg-[#1a1a1a] text-teal-700 dark:text-teal-300 hover:bg-teal-50 dark:hover:bg-teal-950/50 transition-colors shrink-0"
+                      className="p-2 rounded-xl border border-gray-200 dark:border-[#454545] bg-white dark:bg-[#383838] text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-[#444444] transition-colors shrink-0"
                       title="Следующий месяц"
                       aria-label="Следующий месяц"
                     >
@@ -491,12 +491,12 @@ const MeetingsView: React.FC<MeetingsViewProps> = ({
                   </div>
                   <p className="text-[11px] text-gray-600 dark:text-gray-400 text-center sm:text-right w-full sm:w-auto sm:max-w-[220px]">Перетащите карточку на другой день, чтобы перенести</p>
               </div>
-              <div className="grid grid-cols-7 border-b border-gray-200 dark:border-[#333] bg-gray-50 dark:bg-[#252525]">
+              <div className="grid grid-cols-7 border-b border-gray-200 dark:border-[#3f3f3f] bg-gray-50 dark:bg-[#2c2c2c]">
                   {['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'].map(d => (
                       <div key={d} className="p-2.5 text-center text-[11px] font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">{d}</div>
                   ))}
               </div>
-              <div className="grid grid-cols-7 bg-white dark:bg-[#141414]">
+              <div className="grid grid-cols-7 bg-white dark:bg-[#303030]">
                   {days.map((day, idx) => {
                       let dateStr = '';
                       if (day) {
@@ -530,7 +530,7 @@ const MeetingsView: React.FC<MeetingsViewProps> = ({
                                   }
                                 : undefined
                             }
-                            className={`min-h-[128px] border-r border-b border-gray-100 dark:border-[#2a2a2a] p-1.5 transition-colors ${!day ? 'bg-gray-50/40 dark:bg-[#0f0f0f]' : 'hover:bg-gray-50/70 dark:hover:bg-white/5 cursor-pointer'}`}
+                            className={`min-h-[128px] border-r border-b border-gray-100 dark:border-[#3a3a3a] p-1.5 transition-colors ${!day ? 'bg-gray-50/40 dark:bg-[#2e2e2e]' : 'hover:bg-gray-50/70 dark:hover:bg-[#3a3a3a] cursor-pointer'}`}
                             onDragOver={day ? onDragOver : undefined}
                             onDrop={day ? (e) => onDrop(e, dateStr) : undefined}
                             onClick={day ? () => openCreateFlowForDate(dateStr) : undefined}
@@ -563,14 +563,14 @@ const MeetingsView: React.FC<MeetingsViewProps> = ({
                                                 draggable
                                                 onDragStart={(e) => onDragStart(e, m.id)}
                                                 onClick={(e) => { e.stopPropagation(); handleOpenEdit(m); }}
-                                                className="bg-white dark:bg-[#1a1a1a] text-gray-900 dark:text-gray-100 px-2 py-1.5 rounded-xl border border-gray-200/90 dark:border-[#333] cursor-pointer shadow-sm hover:border-gray-300 dark:hover:border-[#444] hover:shadow transition-all" 
+                                                className="bg-white dark:bg-[#383838] text-gray-900 dark:text-gray-100 px-2 py-1.5 rounded-xl border border-gray-200/90 dark:border-[#484848] cursor-pointer shadow-sm hover:border-gray-300 dark:hover:border-[#555] hover:shadow transition-all" 
                                                 style={{ borderLeftWidth: 3, borderLeftColor: getTypeColor(m) }}
                                                 title={`${m.time} — ${m.title}`}
                                             >
                                                 <div className="text-[11px] font-bold text-gray-700 dark:text-gray-200 tabular-nums">{m.time}</div>
                                                 <div className="text-[11px] font-semibold leading-snug line-clamp-2 mt-0.5">{m.title}</div>
                                                 <div className="flex flex-wrap items-center gap-1 mt-1">
-                                                  <span className="text-[9px] uppercase tracking-wide font-semibold px-1 py-0.5 rounded bg-gray-100 dark:bg-[#252525] text-gray-700 dark:text-gray-200">{typeShort}</span>
+                                                  <span className="text-[9px] uppercase tracking-wide font-semibold px-1 py-0.5 rounded bg-gray-100 dark:bg-[#2f2f2f] text-gray-700 dark:text-gray-200">{typeShort}</span>
                                                   {pCount > 0 && (
                                                     <span className="text-[9px] text-gray-600 dark:text-gray-400">{pCount} уч.</span>
                                                   )}
@@ -602,7 +602,7 @@ const MeetingsView: React.FC<MeetingsViewProps> = ({
 
   useLayoutEffect(() => {
     setModule(
-      <div className="flex items-center gap-2 shrink-0">
+      <div className={APP_TOOLBAR_MODULE_CLUSTER}>
         <ModuleSelectDropdown
           accent="teal"
           size="xs"

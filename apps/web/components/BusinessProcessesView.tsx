@@ -15,6 +15,7 @@ import {
   MODULE_PAGE_GUTTER,
   MODULE_PAGE_TOP_PAD,
   SystemAlertDialog,
+  APP_TOOLBAR_MODULE_CLUSTER,
 } from './ui';
 import { useAppToolbar } from '../contexts/AppToolbarContext';
 
@@ -466,7 +467,7 @@ const BusinessProcessesView: React.FC<BusinessProcessesViewProps> = ({
       </div>
     );
     setModule(
-      <div className="flex items-center gap-1.5 shrink-0 flex-wrap justify-end">
+      <div className={APP_TOOLBAR_MODULE_CLUSTER}>
         <ModuleFilterIconButton
           accent="indigo"
           size="sm"
@@ -474,6 +475,26 @@ const BusinessProcessesView: React.FC<BusinessProcessesViewProps> = ({
           activeCount={bpmSearchQuery.trim() ? 1 : 0}
           label="Поиск по списку"
           onClick={() => setBpmListFilterOpen((o) => !o)}
+        />
+        <ModuleCreateDropdown
+          accent="indigo"
+          buttonSize="sm"
+          items={[
+            {
+              id: 'template',
+              label: 'Шаблон процесса',
+              icon: Layers3,
+              onClick: handleOpenCreate,
+              iconClassName: 'text-indigo-600 dark:text-indigo-400',
+            },
+            {
+              id: 'start-process',
+              label: 'Запустить процесс…',
+              icon: Play,
+              onClick: () => setStartPickerOpen(true),
+              iconClassName: 'text-emerald-600 dark:text-emerald-400',
+            },
+          ]}
         />
         <div className="flex items-center gap-0.5 shrink-0" role="tablist" aria-label="Вид списка">
           {(
@@ -496,26 +517,6 @@ const BusinessProcessesView: React.FC<BusinessProcessesViewProps> = ({
             </button>
           ))}
         </div>
-        <ModuleCreateDropdown
-          accent="indigo"
-          buttonSize="sm"
-          items={[
-            {
-              id: 'template',
-              label: 'Шаблон процесса',
-              icon: Layers3,
-              onClick: handleOpenCreate,
-              iconClassName: 'text-indigo-600 dark:text-indigo-400',
-            },
-            {
-              id: 'start-process',
-              label: 'Запустить процесс…',
-              icon: Play,
-              onClick: () => setStartPickerOpen(true),
-              iconClassName: 'text-emerald-600 dark:text-emerald-400',
-            },
-          ]}
-        />
       </div>
     );
     return () => {

@@ -17,7 +17,14 @@ import {
   BusinessProcess,
   ViewMode,
 } from '../../types';
-import { ModulePageShell, MODULE_PAGE_GUTTER, MODULE_PAGE_TOP_PAD, ModuleFilterIconButton, ModuleCreateIconButton } from '../ui';
+import {
+  ModulePageShell,
+  MODULE_PAGE_GUTTER,
+  MODULE_PAGE_TOP_PAD,
+  ModuleFilterIconButton,
+  ModuleCreateIconButton,
+  APP_TOOLBAR_MODULE_CLUSTER,
+} from '../ui';
 import { TasksFilters } from '../features/tasks';
 import { useAppToolbar } from '../../contexts/AppToolbarContext';
 import TableView from '../TableView';
@@ -234,7 +241,7 @@ export const TasksPage: React.FC<TasksPageProps> = ({
       </div>
     );
     setModule(
-      <div className="flex items-center gap-1 shrink-0">
+      <div className={APP_TOOLBAR_MODULE_CLUSTER}>
         <ModuleFilterIconButton
           accent="indigo"
           size="sm"

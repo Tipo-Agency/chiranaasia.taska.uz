@@ -18,7 +18,7 @@ import {
 import { Deal, FinancePlan, Meeting, Task, User, Doc, type BusinessProcess, SalesFunnel } from '../../types';
 import { getDealDisplayTitle, isFunnelDeal } from '../../utils/dealModel';
 import { ModuleCreateDropdown } from '../ui/ModuleCreateDropdown';
-import { ModulePageShell, MODULE_PAGE_GUTTER, MODULE_PAGE_TOP_PAD } from '../ui';
+import { ModulePageShell, MODULE_PAGE_GUTTER, MODULE_PAGE_TOP_PAD, APP_TOOLBAR_MODULE_CLUSTER } from '../ui';
 import { useAppToolbar } from '../../contexts/AppToolbarContext';
 import { DateInput } from '../ui/DateInput';
 import { getTodayLocalDate, normalizeDateForInput, parseLocalDate } from '../../utils/dateUtils';
@@ -345,6 +345,7 @@ export const WorkdeskView: React.FC<WorkdeskViewProps> = ({
       </div>
     );
     setModule(
+      <div className={APP_TOOLBAR_MODULE_CLUSTER}>
       <ModuleCreateDropdown
         accent="indigo"
         label="Создать"
@@ -422,6 +423,7 @@ export const WorkdeskView: React.FC<WorkdeskViewProps> = ({
           },
         ]}
       />
+      </div>
     );
     return () => {
       setLeading(null);

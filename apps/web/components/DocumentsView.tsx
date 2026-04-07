@@ -8,6 +8,7 @@ import {
   ModulePageShell,
   ModuleSegmentedControl,
   MODULE_PAGE_GUTTER,
+  APP_TOOLBAR_MODULE_CLUSTER,
 } from './ui';
 import { useAppToolbar } from '../contexts/AppToolbarContext';
 import { FilePreviewModal } from './FilePreviewModal';
@@ -61,7 +62,7 @@ const DocumentsView: React.FC<DocumentsViewProps> = ({
     onUpdateTask,
     onDeleteAttachment
 }) => {
-  const { setModule } = useAppToolbar();
+  const { setLeading, setModule } = useAppToolbar();
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('list');
   const [folderPath, setFolderPath] = useState<string[]>([]);
   const [docSection, setDocSection] = useState<'docs' | 'attachments' | 'weekly' | 'protocols'>('docs');
@@ -319,21 +320,25 @@ const DocumentsView: React.FC<DocumentsViewProps> = ({
   ];
 
   useLayoutEffect(() => {
+    if (docSection === 'docs') {
+      setLeading(
+        <ModuleSegmentedControl
+          size="sm"
+          variant="accent"
+          accent="indigo"
+          value={viewMode}
+          onChange={(v) => setViewMode(v)}
+          options={[
+            { value: 'grid', label: 'Плитка' },
+            { value: 'list', label: 'Список' },
+          ]}
+        />
+      );
+    } else {
+      setLeading(null);
+    }
     setModule(
-      <div className="flex items-center gap-2 shrink-0">
-        {docSection === 'docs' && (
-          <ModuleSegmentedControl
-            size="sm"
-            variant="accent"
-            accent="slate"
-            value={viewMode}
-            onChange={(v) => setViewMode(v)}
-            options={[
-              { value: 'grid', label: 'Плитка' },
-              { value: 'list', label: 'Список' },
-            ]}
-          />
-        )}
+      <div className={APP_TOOLBAR_MODULE_CLUSTER}>
         {(docSection === 'weekly' || docSection === 'protocols') && (
           <ModuleFilterIconButton
             active={false}
@@ -379,8 +384,11 @@ const DocumentsView: React.FC<DocumentsViewProps> = ({
         />
       </div>
     );
-    return () => setModule(null);
-  }, [docSection, viewMode, currentFolderId, setModule, onAddDoc]);
+    return () => {
+      setLeading(null);
+      setModule(null);
+    };
+  }, [docSection, viewMode, currentFolderId, setLeading, setModule, onAddDoc]);
 
   return (
     <>
@@ -533,9 +541,10 @@ const DocumentsView: React.FC<DocumentsViewProps> = ({
                </div>
            ) : (
                // LIST VIEW (TABLE)
-               <div className="overflow-hidden">
-                   <table className="w-full text-left text-sm">
-                       <thead className="bg-gray-50 dark:bg-[#252525] border-b border-gray-200 dark:border-[#333] text-gray-500 dark:text-gray-400">
+               <div className="rounded-xl border border-gray-200 dark:border-[#3f3f3f] bg-white dark:bg-[#323232] shadow-sm overflow-hidden">
+                   <div className="overflow-x-auto">
+                   <table className="w-full min-w-full text-left text-sm">
+                       <thead className="bg-gray-50 dark:bg-[#2c2c2c] border-b border-gray-200 dark:border-[#3f3f3f] text-gray-500 dark:text-gray-400">
                            <tr>
                                <th className="px-4 py-3 font-semibold w-12"></th>
                                <th className="px-4 py-3 font-semibold">Название</th>
@@ -545,7 +554,7 @@ const DocumentsView: React.FC<DocumentsViewProps> = ({
                                <th className="px-4 py-3 w-24 text-right"></th>
                            </tr>
                        </thead>
-                       <tbody className="divide-y divide-gray-100 dark:divide-[#333]">
+                       <tbody className="divide-y divide-gray-100 dark:divide-[#3f3f3f] bg-white dark:bg-[#323232]">
                            {!currentFolderId &&
                              systemFolderCards.map((sys) => {
                                const Icon = sys.icon;
@@ -556,7 +565,7 @@ const DocumentsView: React.FC<DocumentsViewProps> = ({
                                      setDocSection(sys.id);
                                      setFolderPath([]);
                                    }}
-                                   className="hover:bg-gray-50 dark:hover:bg-[#252525] cursor-pointer group bg-indigo-50/40 dark:bg-indigo-950/15"
+                                   className="hover:bg-gray-50 dark:hover:bg-[#3a3a3a] cursor-pointer group bg-indigo-50/40 dark:bg-indigo-950/20"
                                  >
                                    <td className="px-4 py-3 text-center text-indigo-600 dark:text-indigo-400">
                                      <Icon size={18} />
@@ -576,7 +585,7 @@ const DocumentsView: React.FC<DocumentsViewProps> = ({
                              })}
                            {/* Folders first in List View */}
                            {visibleFolders.map(folder => (
-                               <tr key={folder.id} onClick={() => handleFolderClick(folder.id)} className="hover:bg-gray-50 dark:hover:bg-[#252525] cursor-pointer group">
+                               <tr key={folder.id} onClick={() => handleFolderClick(folder.id)} className="hover:bg-gray-50 dark:hover:bg-[#3a3a3a] cursor-pointer group">
                                    <td className="px-4 py-3 text-center text-blue-500">
                                        <FolderIcon size={18} fill="currentColor" className="opacity-20"/>
                                    </td>
@@ -622,7 +631,7 @@ const DocumentsView: React.FC<DocumentsViewProps> = ({
 
                            {visibleDocs.map(doc => {
                                return (
-                                   <tr key={doc.id} onClick={() => onOpenDoc(doc)} className="hover:bg-gray-50 dark:hover:bg-[#252525] cursor-pointer group">
+                                   <tr key={doc.id} onClick={() => onOpenDoc(doc)} className="hover:bg-gray-50 dark:hover:bg-[#3a3a3a] cursor-pointer group">
                                        <td className="px-4 py-3 text-center text-gray-400">
                                             {doc.type === 'internal' ? <FileText size={16} /> : <ExternalLink size={16} />}
                                        </td>
@@ -655,6 +664,7 @@ const DocumentsView: React.FC<DocumentsViewProps> = ({
                            )}
                        </tbody>
                    </table>
+                   </div>
                </div>
            )}
             </>

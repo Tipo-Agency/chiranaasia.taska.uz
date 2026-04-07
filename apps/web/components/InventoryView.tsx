@@ -16,6 +16,7 @@ import {
   MODULE_PAGE_TOP_PAD,
   SystemAlertDialog,
   SystemConfirmDialog,
+  APP_TOOLBAR_MODULE_CLUSTER,
 } from './ui';
 import { StandardModal } from './ui/StandardModal';
 import { useAppToolbar } from '../contexts/AppToolbarContext';
@@ -425,7 +426,7 @@ const InventoryView: React.FC<InventoryViewProps> = ({
       </div>
     );
     setModule(
-      <div className="flex items-center gap-1.5 shrink-0">
+      <div className={APP_TOOLBAR_MODULE_CLUSTER}>
         <ModuleFilterIconButton
           accent="emerald"
           size="sm"

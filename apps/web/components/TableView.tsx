@@ -428,10 +428,10 @@ const TableView: React.FC<TableViewProps> = ({
 
   return (
     <div className="h-full flex flex-col">
-      <div className="bg-white dark:bg-[#252525] border border-gray-200 dark:border-[#333] rounded-xl shadow-sm overflow-hidden flex-1 flex flex-col min-h-0">
+      <div className="bg-white dark:bg-[#323232] border border-gray-200 dark:border-[#3f3f3f] rounded-xl shadow-sm overflow-hidden flex-1 flex flex-col min-h-0">
         <div className="flex-1 overflow-auto custom-scrollbar min-h-0">
           <table className="min-w-full text-left text-sm border-collapse">
-            <thead className="sticky top-0 bg-gray-50 dark:bg-[#202020] z-10 border-b border-gray-200 dark:border-[#333]">
+            <thead className="sticky top-0 bg-gray-50 dark:bg-[#2c2c2c] z-10 border-b border-gray-200 dark:border-[#3f3f3f]">
               <tr>
                 <th className="py-3 px-4 font-semibold text-xs text-gray-600 dark:text-gray-400 whitespace-nowrap" style={{ width: '200px', minWidth: '200px' }}>Задача</th>
                 {isAggregator && <th className="py-3 px-4 font-semibold text-xs text-gray-600 dark:text-gray-400 whitespace-nowrap" style={{ width: '96px', minWidth: '96px' }}>Источник</th>}
@@ -443,11 +443,11 @@ const TableView: React.FC<TableViewProps> = ({
                 {hasPermission(currentUser, 'settings.general') && <th className="py-3 px-4 w-10"></th>}
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100 dark:divide-[#333] bg-white dark:bg-[#252525]">
+            <tbody className="divide-y divide-gray-100 dark:divide-[#3f3f3f] bg-white dark:bg-[#323232]">
               {tasks.map(task => {
                   const source = isAggregator ? getTaskSource(task) : null;
                   return (
-                      <tr key={task.id} className="hover:bg-gray-50 dark:hover:bg-[#2a2a2a] group transition-colors">
+                      <tr key={task.id} className="hover:bg-gray-50 dark:hover:bg-[#3a3a3a] group transition-colors">
                           {/* Задача */}
                           <td className="py-3 px-4 align-middle">
                               <div className="font-medium text-gray-800 dark:text-gray-200 cursor-pointer hover:text-blue-600 dark:hover:text-blue-400 truncate transition-colors max-w-[180px]" onClick={() => onOpenTask(task)}>
