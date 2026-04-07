@@ -16,6 +16,7 @@ import { InboxPage } from './pages/InboxPage';
 import TableView from './TableView'; // Needed for Global Search
 import { SpacesTabsView } from './SpacesTabsView';
 import { MiniMessenger } from './features/chat/MiniMessenger';
+import { ClientChatsPage } from './pages/ClientChatsPage';
 import { PageLayout } from './ui/PageLayout';
 import { Container } from './ui/Container';
 import { RouteFallback } from './ui/RouteFallback';
@@ -24,6 +25,7 @@ import {
   updateEntityFromChat as updateEntityFromChatBridge,
   startBusinessProcessFromTemplate as startBusinessProcessFromTemplateBridge,
 } from '../utils/miniMessengerBridge';
+import { getChatDefaultTab, type ChatMainTab } from '../utils/chatPreference';
 
 /** Тяжёлые экраны подгружаются отдельными чанками (меньше initial JS). */
 const SettingsViewLazy = lazy(() => import('./SettingsView'));
@@ -35,6 +37,7 @@ const FinanceModuleLazy = lazy(() => import('./modules/FinanceModule').then((m) 
 const HRModuleLazy = lazy(() => import('./modules/HRModule').then((m) => ({ default: m.HRModule })));
 const MeetingsModuleLazy = lazy(() => import('./modules/MeetingsModule').then((m) => ({ default: m.MeetingsModule })));
 const DocumentsModuleLazy = lazy(() => import('./modules/DocumentsModule').then((m) => ({ default: m.DocumentsModule })));
+const ProductionViewLazy = lazy(() => import('./ProductionView'));
 
 interface AppRouterProps {
   currentView: string;
@@ -88,6 +91,11 @@ interface AppRouterProps {
 
 export const AppRouter: React.FC<AppRouterProps> = (props) => {
   const { currentView, activeTable, actions } = props;
+  const [chatMainTab, setChatMainTab] = React.useState<ChatMainTab>(() => getChatDefaultTab(props.currentUser.id));
+
+  React.useEffect(() => {
+    setChatMainTab(getChatDefaultTab(props.currentUser.id));
+  }, [props.currentUser.id]);
 
   const messengerBridgeDeps = {
     currentUser: props.currentUser,
@@ -306,36 +314,80 @@ export const AppRouter: React.FC<AppRouterProps> = (props) => {
       return (
           <PageLayout>
               <Container safeArea className="py-4 h-full flex flex-col min-h-0 max-w-6xl mx-auto w-full">
-                  <div className="flex-1 min-h-[70vh]">
-                      <MiniMessenger
-                        users={props.users}
-                        currentUser={props.currentUser}
-                        docs={props.docs}
-                        tasks={props.allTasks}
-                        deals={props.deals}
-                        meetings={props.meetings}
-                        onOpenTask={actions.openTaskModal}
-                        onOpenDocument={props.actions.handleDocClick}
-                        onOpenDocumentsModule={() => props.actions.setCurrentView('docs')}
-                        onOpenDeals={() => props.actions.setCurrentView('sales-funnel')}
-                        onOpenDeal={(deal) => {
-                          props.actions.setCurrentView('sales-funnel');
-                          window.setTimeout(() => {
-                            window.dispatchEvent(new CustomEvent('openDealFromChat', { detail: { dealId: deal.id } }));
-                          }, 0);
-                        }}
-                        onOpenMeetings={() => props.actions.setCurrentView('meetings')}
-                        onOpenMeeting={(meeting) => {
-                          props.actions.setCurrentView('meetings');
-                          window.setTimeout(() => {
-                            window.dispatchEvent(new CustomEvent('openMeetingFromChat', { detail: { meetingId: meeting.id } }));
-                          }, 0);
-                        }}
-                        onCreateEntity={createEntityFromChat}
-                        onUpdateEntity={updateEntityFromChat}
-                        processTemplates={props.businessProcesses}
-                        onStartProcessTemplate={startBusinessProcessFromTemplate}
-                      />
+                  <div className="flex-1 min-h-[70vh] flex flex-col min-h-0">
+                    <div className="flex items-center gap-1.5 px-3 py-2 border border-gray-200/90 dark:border-[#333] rounded-xl bg-white/70 dark:bg-[#252525]/90 backdrop-blur-sm shrink-0 mb-3">
+                      <button
+                        type="button"
+                        onClick={() => setChatMainTab('team')}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
+                          chatMainTab === 'team'
+                            ? 'bg-[#3337AD] text-white'
+                            : 'bg-white/70 dark:bg-[#1f1f1f]/60 text-gray-600 dark:text-gray-300 border border-gray-200/70 dark:border-[#3a3a3a] hover:border-[#3337AD]/40'
+                        }`}
+                      >
+                        Сотрудники
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setChatMainTab('clients')}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
+                          chatMainTab === 'clients'
+                            ? 'bg-[#3337AD] text-white'
+                            : 'bg-white/70 dark:bg-[#1f1f1f]/60 text-gray-600 dark:text-gray-300 border border-gray-200/70 dark:border-[#3a3a3a] hover:border-[#3337AD]/40'
+                        }`}
+                      >
+                        Клиенты
+                      </button>
+                    </div>
+
+                    <div className="flex-1 min-h-0">
+                      {chatMainTab === 'team' ? (
+                        <MiniMessenger
+                          users={props.users}
+                          currentUser={props.currentUser}
+                          docs={props.docs}
+                          tasks={props.allTasks}
+                          deals={props.deals}
+                          meetings={props.meetings}
+                          onOpenTask={actions.openTaskModal}
+                          onOpenDocument={props.actions.handleDocClick}
+                          onOpenDocumentsModule={() => props.actions.setCurrentView('docs')}
+                          onOpenDeals={() => props.actions.setCurrentView('sales-funnel')}
+                          onOpenDeal={(deal) => {
+                            props.actions.setCurrentView('sales-funnel');
+                            window.setTimeout(() => {
+                              window.dispatchEvent(new CustomEvent('openDealFromChat', { detail: { dealId: deal.id } }));
+                            }, 0);
+                          }}
+                          onOpenMeetings={() => props.actions.setCurrentView('meetings')}
+                          onOpenMeeting={(meeting) => {
+                            props.actions.setCurrentView('meetings');
+                            window.setTimeout(() => {
+                              window.dispatchEvent(new CustomEvent('openMeetingFromChat', { detail: { meetingId: meeting.id } }));
+                            }, 0);
+                          }}
+                          onCreateEntity={createEntityFromChat}
+                          onUpdateEntity={updateEntityFromChat}
+                          processTemplates={props.businessProcesses}
+                          onStartProcessTemplate={startBusinessProcessFromTemplate}
+                        />
+                      ) : (
+                        <ClientChatsPage
+                          layout="embedded"
+                          deals={props.deals}
+                          users={props.users}
+                          currentUser={props.currentUser}
+                          salesFunnels={props.salesFunnels}
+                          onSaveDeal={props.actions.saveDeal}
+                          onOpenInFunnel={(deal) => {
+                            props.actions.setCurrentView('sales-funnel');
+                            window.setTimeout(() => {
+                              window.dispatchEvent(new CustomEvent('openDealFromChat', { detail: { dealId: deal.id } }));
+                            }, 0);
+                          }}
+                        />
+                      )}
+                    </div>
                   </div>
               </Container>
           </PageLayout>
@@ -503,6 +555,14 @@ export const AppRouter: React.FC<AppRouterProps> = (props) => {
           />
         </Suspense>
       );
+  }
+
+  if (view === 'production') {
+    return (
+      <Suspense fallback={<RouteFallback />}>
+        <ProductionViewLazy users={props.users} currentUser={props.currentUser} />
+      </Suspense>
+    );
   }
 
   if (view === 'inventory') {

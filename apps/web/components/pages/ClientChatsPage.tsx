@@ -14,6 +14,8 @@ interface ClientChatsPageProps {
   onSaveDeal: (deal: Deal) => void;
   /** Открыть ту же сделку в воронке (карточка CRM) */
   onOpenInFunnel?: (deal: Deal) => void;
+  /** Если используется внутри модального/встроенного контейнера (без внешнего PageLayout) */
+  layout?: 'page' | 'embedded';
 }
 
 /** Фильтр списка диалогов по каналу привлечения */
@@ -102,6 +104,7 @@ export const ClientChatsPage: React.FC<ClientChatsPageProps> = ({
   salesFunnels = [],
   onSaveDeal,
   onOpenInFunnel,
+  layout = 'page',
 }) => {
   const [channelFilter, setChannelFilter] = useState<ChannelFilter>('all');
 
@@ -235,9 +238,12 @@ export const ClientChatsPage: React.FC<ClientChatsPageProps> = ({
     { id: 'other', label: 'Прочее' },
   ];
 
-  return (
-    <PageLayout className="flex-1 min-h-0" contentClassName="flex flex-1 flex-col min-h-0 overflow-hidden p-0">
-      <div className="flex flex-1 min-h-0 gap-0 border-t border-gray-200 dark:border-[#333] bg-white dark:bg-[#191919]">
+  const content = (
+    <div
+      className={`flex flex-1 min-h-0 gap-0 bg-white dark:bg-[#191919] ${
+        layout === 'page' ? 'border-t border-gray-200 dark:border-[#333]' : ''
+      }`}
+    >
         <aside className="w-full max-w-[100vw] sm:w-[min(100%,340px)] shrink-0 border-r border-gray-200 dark:border-[#333] flex flex-col min-h-0 bg-gray-50/80 dark:bg-[#141414]">
           <div className="shrink-0 px-3 py-3 border-b border-gray-200 dark:border-[#333]">
             <div className="flex items-center gap-2 mb-2">
@@ -440,6 +446,15 @@ export const ClientChatsPage: React.FC<ClientChatsPageProps> = ({
           )}
         </section>
       </div>
+  );
+
+  if (layout === 'embedded') {
+    return content;
+  }
+
+  return (
+    <PageLayout className="flex-1 min-h-0" contentClassName="flex flex-1 flex-col min-h-0 overflow-hidden p-0">
+      {content}
     </PageLayout>
   );
 };

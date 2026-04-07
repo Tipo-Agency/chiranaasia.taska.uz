@@ -10,16 +10,52 @@ interface TasksSetupSettingsProps {
   onUpdatePriorities: (priorities: PriorityOption[]) => void;
 }
 
-const COLOR_PRESETS: { label: string; value: string }[] = [
-  { label: 'Серый', value: 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-700' },
-  { label: 'Синий', value: 'bg-blue-500 dark:bg-blue-600 text-white border border-blue-600 dark:border-blue-500' },
-  { label: 'Фиолетовый', value: 'bg-purple-500 dark:bg-purple-600 text-white border border-purple-600 dark:border-purple-500' },
-  { label: 'Жёлтый', value: 'bg-amber-500 dark:bg-amber-600 text-white border border-amber-600 dark:border-amber-500' },
-  { label: 'Зелёный', value: 'bg-emerald-500 dark:bg-emerald-600 text-white border border-emerald-600 dark:border-emerald-500' },
-  { label: 'Красный', value: 'bg-rose-500 dark:bg-rose-600 text-white border border-rose-600 dark:border-rose-500' },
-  { label: 'Низкий (зел.)', value: 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-700' },
-  { label: 'Средний (жёлт.)', value: 'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300 border border-amber-300 dark:border-amber-700' },
-  { label: 'Высокий (красн.)', value: 'bg-rose-100 dark:bg-rose-900/40 text-rose-700 dark:text-rose-300 border border-rose-300 dark:border-rose-700' },
+const COLOR_PRESETS: { label: string; value: string; swatch: string }[] = [
+  {
+    label: 'Серый',
+    value: 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-700',
+    swatch: 'bg-gray-300 dark:bg-gray-600',
+  },
+  {
+    label: 'Синий',
+    value: 'bg-blue-100 dark:bg-blue-900/35 text-blue-800 dark:text-blue-200 border border-blue-200 dark:border-blue-800/60',
+    swatch: 'bg-blue-400 dark:bg-blue-500',
+  },
+  {
+    label: 'Фиолетовый',
+    value: 'bg-violet-100 dark:bg-violet-900/35 text-violet-800 dark:text-violet-200 border border-violet-200 dark:border-violet-800/60',
+    swatch: 'bg-violet-400 dark:bg-violet-500',
+  },
+  {
+    label: 'Жёлтый',
+    value: 'bg-amber-100 dark:bg-amber-900/35 text-amber-800 dark:text-amber-200 border border-amber-200 dark:border-amber-800/60',
+    swatch: 'bg-amber-400 dark:bg-amber-500',
+  },
+  {
+    label: 'Зелёный',
+    value: 'bg-emerald-100 dark:bg-emerald-900/35 text-emerald-800 dark:text-emerald-200 border border-emerald-200 dark:border-emerald-800/60',
+    swatch: 'bg-emerald-400 dark:bg-emerald-500',
+  },
+  {
+    label: 'Красный',
+    value: 'bg-rose-100 dark:bg-rose-900/35 text-rose-800 dark:text-rose-200 border border-rose-200 dark:border-rose-800/60',
+    swatch: 'bg-rose-400 dark:bg-rose-500',
+  },
+  {
+    label: 'Низкий (зел.)',
+    value: 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-700',
+    swatch: 'bg-emerald-400 dark:bg-emerald-500',
+  },
+  {
+    label: 'Средний (жёлт.)',
+    value: 'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300 border border-amber-300 dark:border-amber-700',
+    swatch: 'bg-amber-400 dark:bg-amber-500',
+  },
+  {
+    label: 'Высокий (красн.)',
+    value: 'bg-rose-100 dark:bg-rose-900/40 text-rose-700 dark:text-rose-300 border border-rose-300 dark:border-rose-700',
+    swatch: 'bg-rose-400 dark:bg-rose-500',
+  },
 ];
 
 export const TasksSetupSettings: React.FC<TasksSetupSettingsProps> = ({
@@ -261,17 +297,29 @@ export const TasksSetupSettings: React.FC<TasksSetupSettingsProps> = ({
               </div>
               <div>
                 <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 mb-1">Цвет</label>
-                <select
-                  value={statusColor}
-                  onChange={(e) => setStatusColor(e.target.value)}
-                  className="w-full border border-gray-300 dark:border-gray-600 rounded px-3 py-2 text-sm bg-white dark:bg-[#333] text-gray-900 dark:text-gray-100"
-                >
-                  {COLOR_PRESETS.slice(0, 6).map((c) => (
-                    <option key={c.label} value={c.value}>
-                      {c.label}
-                    </option>
-                  ))}
-                </select>
+                <div className="grid grid-cols-2 gap-2">
+                  {COLOR_PRESETS.slice(0, 6).map((c) => {
+                    const active = statusColor === c.value;
+                    return (
+                      <button
+                        key={c.label}
+                        type="button"
+                        onClick={() => setStatusColor(c.value)}
+                        className={`flex items-center gap-2 px-3 py-2 rounded-lg border text-sm transition-colors ${
+                          active
+                            ? 'border-gray-900 dark:border-white bg-gray-50 dark:bg-[#1f1f1f]'
+                            : 'border-gray-200 dark:border-[#444] hover:bg-gray-50 dark:hover:bg-[#303030]'
+                        }`}
+                      >
+                        <span
+                          className={`w-4 h-4 rounded-full ${c.swatch} ring-1 ring-black/10 dark:ring-white/10`}
+                          aria-hidden="true"
+                        />
+                        <span className="text-xs font-semibold text-gray-700 dark:text-gray-200">{c.label}</span>
+                      </button>
+                    );
+                  })}
+                </div>
                 <div className="mt-2">
                   <span className={`inline-flex items-center px-2 py-1 rounded-md text-xs font-semibold ${statusColor}`}>
                     {statusName.trim() || 'Пример'}
@@ -322,17 +370,29 @@ export const TasksSetupSettings: React.FC<TasksSetupSettingsProps> = ({
               </div>
               <div>
                 <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 mb-1">Цвет</label>
-                <select
-                  value={priorityColor}
-                  onChange={(e) => setPriorityColor(e.target.value)}
-                  className="w-full border border-gray-300 dark:border-gray-600 rounded px-3 py-2 text-sm bg-white dark:bg-[#333] text-gray-900 dark:text-gray-100"
-                >
-                  {COLOR_PRESETS.slice(6).map((c) => (
-                    <option key={c.label} value={c.value}>
-                      {c.label}
-                    </option>
-                  ))}
-                </select>
+                <div className="grid grid-cols-1 gap-2">
+                  {COLOR_PRESETS.slice(6).map((c) => {
+                    const active = priorityColor === c.value;
+                    return (
+                      <button
+                        key={c.label}
+                        type="button"
+                        onClick={() => setPriorityColor(c.value)}
+                        className={`flex items-center gap-2 px-3 py-2 rounded-lg border text-sm transition-colors ${
+                          active
+                            ? 'border-gray-900 dark:border-white bg-gray-50 dark:bg-[#1f1f1f]'
+                            : 'border-gray-200 dark:border-[#444] hover:bg-gray-50 dark:hover:bg-[#303030]'
+                        }`}
+                      >
+                        <span
+                          className={`w-4 h-4 rounded-full ${c.swatch} ring-1 ring-black/10 dark:ring-white/10`}
+                          aria-hidden="true"
+                        />
+                        <span className="text-xs font-semibold text-gray-700 dark:text-gray-200">{c.label}</span>
+                      </button>
+                    );
+                  })}
+                </div>
                 <div className="mt-2">
                   <span className={`inline-flex items-center px-2 py-1 rounded-md text-xs font-semibold ${priorityColor}`}>
                     {priorityName.trim() || 'Пример'}

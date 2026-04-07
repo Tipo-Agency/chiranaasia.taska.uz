@@ -14,6 +14,7 @@ import SettingsModal from './components/SettingsModal';
 import CreateTableModal from './components/CreateTableModal';
 import PublicContentPlanView from './components/PublicContentPlanView';
 import { MiniMessenger } from './components/features/chat/MiniMessenger';
+import { ClientChatsPage } from './components/pages/ClientChatsPage';
 import { ChatFloatingButton } from './components/features/chat/ChatFloatingButton';
 import { useAppLogic } from './frontend/hooks/useAppLogic';
 import { NotificationCenterProvider, useNotificationCenter } from './frontend/contexts/NotificationCenterContext';
@@ -24,6 +25,7 @@ import {
   updateEntityFromChat as updateEntityFromChatBridge,
   startBusinessProcessFromTemplate as startBusinessProcessFromTemplateBridge,
 } from './utils/miniMessengerBridge';
+import { getChatDefaultTab, setChatDefaultTab, type ChatMainTab } from './utils/chatPreference';
 
 /** Синхронно из pathname — чтобы не монтировать useAppLogic на публичной странице (избегаем React #310). */
 function getPublicContentPlanIdFromPath(): string | null {
@@ -42,6 +44,7 @@ function MainApp() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [chatPanelOpen, setChatPanelOpen] = useState(false);
   const [chatOpenToSystemFeed, setChatOpenToSystemFeed] = useState(false);
+  const [chatMainTab, setChatMainTab] = useState<ChatMainTab>('team');
   const deepLinkHandledRef = useRef(false);
   const [mustChangePwdOpen, setMustChangePwdOpen] = useState(false);
   const [mustChangePwdDraft, setMustChangePwdDraft] = useState('');
@@ -98,6 +101,12 @@ function MainApp() {
     }
     setMustChangePwdOpen(true);
   }, [state.currentUser?.id, state.currentUser?.mustChangePassword]);
+
+  useEffect(() => {
+    const u = state.currentUser;
+    if (!u) return;
+    setChatMainTab(getChatDefaultTab(u.id));
+  }, [state.currentUser?.id]);
 
   /** До любого return: иначе при смене isLoading / login React #310 (число хуков). */
   const createEntityFromChat = useCallback(
@@ -284,6 +293,7 @@ function MainApp() {
               onSearchFocus={() => { if(state.currentView !== 'search') actions.setCurrentView('search'); }}
               onOpenSystemChat={() => {
                 setChatOpenToSystemFeed(true);
+                setChatMainTab('team');
                 setChatPanelOpen(true);
               }}
               onOpenSettings={(tab?: string) => { actions.openSettings(tab || 'users'); }}
@@ -312,51 +322,112 @@ function MainApp() {
                   className="flex flex-col flex-1 min-h-0 w-full md:flex-none md:max-w-5xl md:max-h-[min(720px,92vh)] md:h-[min(640px,90vh)] h-full md:rounded-2xl shadow-2xl overflow-hidden bg-white dark:bg-[#252525] border-0 md:border border-gray-200/90 dark:border-[#333]"
                   onClick={e => e.stopPropagation()}
                 >
-                  <MiniMessenger
-                    users={state.users}
-                    currentUser={state.currentUser}
-                    docs={state.docs}
-                    tasks={myTasks}
-                    deals={myDeals}
-                    meetings={myMeetings}
-                    onOpenDocument={(doc) => {
-                      actions.handleDocClick(doc);
-                      setChatPanelOpen(false);
-                    }}
-                    onOpenTask={(task) => {
-                      actions.openTaskModal(task);
-                      setChatPanelOpen(false);
-                    }}
-                    onOpenDeals={() => {
-                      actions.setCurrentView('sales-funnel');
-                      setChatPanelOpen(false);
-                    }}
-                    onOpenDeal={(deal) => {
-                      actions.setCurrentView('sales-funnel');
-                      window.setTimeout(() => {
-                        window.dispatchEvent(new CustomEvent('openDealFromChat', { detail: { dealId: deal.id } }));
-                      }, 0);
-                      setChatPanelOpen(false);
-                    }}
-                    onOpenMeetings={() => {
-                      actions.setCurrentView('meetings');
-                      setChatPanelOpen(false);
-                    }}
-                    onOpenMeeting={(meeting) => {
-                      actions.setCurrentView('meetings');
-                      window.setTimeout(() => {
-                        window.dispatchEvent(new CustomEvent('openMeetingFromChat', { detail: { meetingId: meeting.id } }));
-                      }, 0);
-                      setChatPanelOpen(false);
-                    }}
-                    onCreateEntity={createEntityFromChat}
-                    processTemplates={state.businessProcesses}
-                    onStartProcessTemplate={onStartProcessTemplate}
-                    initialOpenSystemFeed={chatOpenToSystemFeed}
-                    onConsumedInitialSystemFeed={() => setChatOpenToSystemFeed(false)}
-                    onUpdateEntity={updateEntityFromChat}
-                    onClose={() => setChatPanelOpen(false)}
-                  />
+                  <div className="flex items-center gap-1.5 px-3 py-2 border-b border-gray-200/80 dark:border-[#333] bg-white/70 dark:bg-[#252525]/90 backdrop-blur-sm shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => setChatMainTab('team')}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
+                        chatMainTab === 'team'
+                          ? 'bg-[#3337AD] text-white'
+                          : 'bg-white/70 dark:bg-[#1f1f1f]/60 text-gray-600 dark:text-gray-300 border border-gray-200/70 dark:border-[#3a3a3a] hover:border-[#3337AD]/40'
+                      }`}
+                    >
+                      Сотрудники
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setChatOpenToSystemFeed(false);
+                        setChatMainTab('clients');
+                      }}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
+                        chatMainTab === 'clients'
+                          ? 'bg-[#3337AD] text-white'
+                          : 'bg-white/70 dark:bg-[#1f1f1f]/60 text-gray-600 dark:text-gray-300 border border-gray-200/70 dark:border-[#3a3a3a] hover:border-[#3337AD]/40'
+                      }`}
+                    >
+                      Клиенты
+                    </button>
+                    <div className="flex-1" />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (!state.currentUser) return;
+                        setChatDefaultTab(state.currentUser.id, chatMainTab);
+                      }}
+                      className="text-[11px] font-semibold text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 px-2 py-1 rounded-lg hover:bg-gray-100 dark:hover:bg-[#333] transition-colors"
+                      title="Сделать вкладку основной"
+                    >
+                      По умолчанию
+                    </button>
+                  </div>
+
+                  <div className="flex-1 min-h-0">
+                    {chatMainTab === 'team' ? (
+                      <MiniMessenger
+                        className="h-full min-h-0 rounded-none border-0 shadow-none"
+                        users={state.users}
+                        currentUser={state.currentUser}
+                        docs={state.docs}
+                        tasks={myTasks}
+                        deals={myDeals}
+                        meetings={myMeetings}
+                        onOpenDocument={(doc) => {
+                          actions.handleDocClick(doc);
+                          setChatPanelOpen(false);
+                        }}
+                        onOpenTask={(task) => {
+                          actions.openTaskModal(task);
+                          setChatPanelOpen(false);
+                        }}
+                        onOpenDeals={() => {
+                          actions.setCurrentView('sales-funnel');
+                          setChatPanelOpen(false);
+                        }}
+                        onOpenDeal={(deal) => {
+                          actions.setCurrentView('sales-funnel');
+                          window.setTimeout(() => {
+                            window.dispatchEvent(new CustomEvent('openDealFromChat', { detail: { dealId: deal.id } }));
+                          }, 0);
+                          setChatPanelOpen(false);
+                        }}
+                        onOpenMeetings={() => {
+                          actions.setCurrentView('meetings');
+                          setChatPanelOpen(false);
+                        }}
+                        onOpenMeeting={(meeting) => {
+                          actions.setCurrentView('meetings');
+                          window.setTimeout(() => {
+                            window.dispatchEvent(new CustomEvent('openMeetingFromChat', { detail: { meetingId: meeting.id } }));
+                          }, 0);
+                          setChatPanelOpen(false);
+                        }}
+                        onCreateEntity={createEntityFromChat}
+                        processTemplates={state.businessProcesses}
+                        onStartProcessTemplate={onStartProcessTemplate}
+                        initialOpenSystemFeed={chatOpenToSystemFeed}
+                        onConsumedInitialSystemFeed={() => setChatOpenToSystemFeed(false)}
+                        onUpdateEntity={updateEntityFromChat}
+                        onClose={() => setChatPanelOpen(false)}
+                      />
+                    ) : (
+                      <ClientChatsPage
+                        layout="embedded"
+                        deals={state.deals}
+                        users={state.users}
+                        currentUser={state.currentUser}
+                        salesFunnels={state.salesFunnels}
+                        onSaveDeal={actions.saveDeal}
+                        onOpenInFunnel={(deal) => {
+                          actions.setCurrentView('sales-funnel');
+                          window.setTimeout(() => {
+                            window.dispatchEvent(new CustomEvent('openDealFromChat', { detail: { dealId: deal.id } }));
+                          }, 0);
+                          setChatPanelOpen(false);
+                        }}
+                      />
+                    )}
+                  </div>
                 </div>
               </div>
             )}
@@ -422,6 +493,7 @@ function MainApp() {
               hidden={state.currentView === 'chat' || chatPanelOpen}
               onOpen={() => {
                 setChatOpenToSystemFeed(false);
+                if (state.currentUser) setChatMainTab(getChatDefaultTab(state.currentUser.id));
                 setChatPanelOpen(true);
               }}
             />
@@ -610,7 +682,6 @@ class AppErrorBoundary extends React.Component<
 
   componentDidCatch(error: unknown) {
     // Keep console output: helps debugging production issues (minified React errors).
-    // eslint-disable-next-line no-console
     console.error('App crashed:', error);
   }
 

@@ -385,7 +385,9 @@ export const StructureSettings: React.FC<{
                     }`}
                     title={c}
                   >
-                    {renderColorDot(c)}
+                    <div className="w-7 h-7 rounded-full bg-white dark:bg-[#1f1f1f] border border-black/5 dark:border-white/10 flex items-center justify-center">
+                      {renderColorDot(c)}
+                    </div>
                   </button>
                 ))}
 
@@ -397,7 +399,9 @@ export const StructureSettings: React.FC<{
                   }`}
                   title="Кастомный"
                 >
-                  <div className="w-6 h-6 rounded-full" style={{ backgroundColor: projectCustomColor }} />
+                  <div className="w-7 h-7 rounded-full bg-white dark:bg-[#1f1f1f] border border-black/5 dark:border-white/10 flex items-center justify-center">
+                    <div className="w-6 h-6 rounded-full" style={{ backgroundColor: projectCustomColor }} />
+                  </div>
                 </button>
               </div>
 

@@ -12,7 +12,7 @@ export const useSettingsLogic = (showNotification: (msg: string) => void) => {
   const [automationRules, setAutomationRules] = useState<AutomationRule[]>([]);
   
   // UI Global State
-  const [currentView, setCurrentView] = useState<'home' | 'tasks' | 'inbox' | 'search' | 'table' | 'doc-editor' | 'clients' | 'employees' | 'sales-funnel' | 'client-chats' | 'finance' | 'business-processes' | 'analytics' | 'settings' | 'spaces' | 'meetings' | 'docs' | 'inventory' | 'chat' | 'admin'>('home');
+  const [currentView, setCurrentView] = useState<'home' | 'tasks' | 'inbox' | 'search' | 'table' | 'doc-editor' | 'clients' | 'employees' | 'sales-funnel' | 'client-chats' | 'finance' | 'business-processes' | 'production' | 'analytics' | 'settings' | 'spaces' | 'meetings' | 'docs' | 'inventory' | 'chat' | 'admin'>('home');
   const [activeTableId, setActiveTableId] = useState<string>('');
   const [viewMode, setViewMode] = useState<ViewMode>(ViewMode.TABLE);
   const [searchQuery, setSearchQuery] = useState('');
@@ -131,6 +131,7 @@ export const useSettingsLogic = (showNotification: (msg: string) => void) => {
       | 'client-chats'
       | 'finance'
       | 'business-processes'
+      | 'production'
       | 'analytics'
       | 'spaces'
       | 'meetings'
@@ -181,6 +182,10 @@ export const useSettingsLogic = (showNotification: (msg: string) => void) => {
     }
     if (view === 'business-processes') {
       setCurrentView('business-processes');
+      return;
+    }
+    if (view === 'production') {
+      setCurrentView('production');
       return;
     }
     if (view === 'spaces') {

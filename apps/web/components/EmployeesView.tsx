@@ -263,7 +263,9 @@ const EmployeesView: React.FC<EmployeesViewProps> = ({
 
   const renderOrgChart = () => {
       // Create hierarchy
-      const roots = activeOrgPositions.filter(p => !p.managerPositionId || !activeOrgPositions.find(op => op.id === p.managerPositionId));
+      const roots = activeOrgPositions
+        .filter((p) => !p.managerPositionId || !activeOrgPositions.find((op) => op.id === p.managerPositionId))
+        .sort((a, b) => (a.order || 0) - (b.order || 0));
       
       const renderNode = (node: OrgPosition, level: number = 0) => {
           // Получаем детей и сортируем по order (меньше = левее)
@@ -354,12 +356,14 @@ const EmployeesView: React.FC<EmployeesViewProps> = ({
       };
 
       return (
-          <div className="overflow-x-auto pb-8">
+          <div className="overflow-x-auto overflow-y-hidden pb-8">
               {roots.length === 0 ? (
                   <div className="text-center py-12 text-gray-400 dark:text-gray-500">Оргсхема пуста. Добавьте первую должность.</div>
               ) : (
-                  <div className="flex items-start justify-center gap-4 min-h-[400px]">
-                      {roots.map(root => renderNode(root))}
+                  <div className="min-w-max w-fit mx-auto px-6 sm:px-10">
+                      <div className="flex items-start justify-start gap-6 min-h-[400px]">
+                          {roots.map((root) => renderNode(root))}
+                      </div>
                   </div>
               )}
           </div>

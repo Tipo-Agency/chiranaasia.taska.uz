@@ -6,6 +6,7 @@ import { Button, Input, StandardModal } from '../ui';
 import { uploadAvatar } from '../../services/localStorageService';
 import { getDefaultAvatarForId } from '../../constants/avatars';
 import { api } from '../../backend/api';
+import { getChatDefaultTab, setChatDefaultTab, type ChatMainTab } from '../../utils/chatPreference';
 
 interface ProfileSettingsProps {
   currentUser: User;
@@ -24,6 +25,7 @@ export const ProfileSettings: React.FC<ProfileSettingsProps> = ({ currentUser, u
   const [profilePhone, setProfilePhone] = useState(currentUser.phone || '');
   const [profileTelegram, setProfileTelegram] = useState(currentUser.telegram || '');
   const [profileAvatar, setProfileAvatar] = useState(currentUser.avatar || '');
+  const [defaultChatTab, setDefaultChatTab] = useState<ChatMainTab>(() => getChatDefaultTab(currentUser.id));
   
   const [passwordModalOpen, setPasswordModalOpen] = useState(false);
   const [newPassword, setNewPassword] = useState('');
@@ -46,6 +48,7 @@ export const ProfileSettings: React.FC<ProfileSettingsProps> = ({ currentUser, u
       setProfilePhone(currentUser.phone || '');
       setProfileTelegram(currentUser.telegram || '');
       setProfileAvatar(currentUser.avatar || '');
+      setDefaultChatTab(getChatDefaultTab(currentUser.id));
   }, [currentUser]);
 
   const handleSaveProfile = async (e: React.FormEvent) => {
@@ -281,6 +284,45 @@ export const ProfileSettings: React.FC<ProfileSettingsProps> = ({ currentUser, u
                                 placeholder="@username"
                             />
                         </div>
+                    </div>
+                </div>
+
+                <div className="space-y-3">
+                    <div>
+                        <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 uppercase mb-1">Основной чат по умолчанию</label>
+                        <div className="flex items-center gap-1.5">
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setDefaultChatTab('team');
+                                    setChatDefaultTab(currentUser.id, 'team');
+                                }}
+                                className={`px-3 h-9 rounded-lg text-sm font-semibold transition-colors ${
+                                    defaultChatTab === 'team'
+                                        ? 'bg-[#3337AD] text-white'
+                                        : 'bg-white dark:bg-[#252525] text-gray-700 dark:text-gray-200 border border-gray-300 dark:border-[#333] hover:border-[#3337AD]/40'
+                                }`}
+                            >
+                                Сотрудники
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setDefaultChatTab('clients');
+                                    setChatDefaultTab(currentUser.id, 'clients');
+                                }}
+                                className={`px-3 h-9 rounded-lg text-sm font-semibold transition-colors ${
+                                    defaultChatTab === 'clients'
+                                        ? 'bg-[#3337AD] text-white'
+                                        : 'bg-white dark:bg-[#252525] text-gray-700 dark:text-gray-200 border border-gray-300 dark:border-[#333] hover:border-[#3337AD]/40'
+                                }`}
+                            >
+                                Клиенты
+                            </button>
+                        </div>
+                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
+                            Эта вкладка будет открываться первой в чате.
+                        </p>
                     </div>
                 </div>
 

@@ -4,6 +4,7 @@ import { Project, Role, Task, User, StatusOption, PriorityOption, NotificationPr
 import { User as UserIcon, Briefcase, Archive, Users, Building2, Wallet, TrendingUp, PiggyBank, ShieldAlert, Settings, BellRing, Zap, Package, ArrowLeft, Plus, ShieldCheck } from 'lucide-react';
 import { Button, Input, ModuleCreateIconButton, ModuleFilterIconButton, ModulePageShell, MODULE_PAGE_GUTTER, MODULE_PAGE_TOP_PAD, StandardModal } from './ui';
 import { ProfileSettings } from './settings/ProfileSettings';
+import { AccessSettings } from './settings/AccessSettings';
 import { StructureSettings } from './settings/StructureSettings';
 import { SpaceSettings } from './settings/SpaceSettings';
 import { AutomationSettings } from './settings/AutomationSettings';
@@ -339,7 +340,7 @@ const SettingsView: React.FC<SettingsViewProps> = ({
           ) : (
             <>
               {activeTab === 'profile' && currentUser && <ProfileSettings activeTab="profile" currentUser={currentUser} users={users} onUpdateProfile={onUpdateProfile!} onUpdateUsers={onUpdateUsers} />}
-              {activeTab === 'users' && <ProfileSettings activeTab="users" currentUser={currentUser!} users={users} onUpdateProfile={onUpdateProfile!} onUpdateUsers={onUpdateUsers} />}
+              {activeTab === 'users' && currentUser && <AccessSettings currentUser={currentUser} users={users} onUpdateUsers={onUpdateUsers} />}
               {activeTab === 'tasks' && (
                 <TasksSetupSettings
                   statuses={statuses}

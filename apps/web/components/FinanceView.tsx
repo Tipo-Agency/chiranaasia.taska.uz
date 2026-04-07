@@ -87,6 +87,36 @@ const FinanceView: React.FC<FinanceViewProps> = ({
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
   }, []);
 
+  type PayrollRow = { base: number; bonus: number; deduction: number; advance: number };
+  const [payrollPeriod, setPayrollPeriod] = useState<string>(currentPeriod);
+  const [payrollByUserId, setPayrollByUserId] = useState<Record<string, PayrollRow>>({});
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(`finance_payroll:${payrollPeriod}`) || '';
+      const parsed = raw ? (JSON.parse(raw) as Record<string, PayrollRow>) : {};
+      setPayrollByUserId(parsed || {});
+    } catch {
+      setPayrollByUserId({});
+    }
+  }, [payrollPeriod]);
+
+  const persistPayroll = useCallback((next: Record<string, PayrollRow>) => {
+    setPayrollByUserId(next);
+    try {
+      localStorage.setItem(`finance_payroll:${payrollPeriod}`, JSON.stringify(next));
+    } catch {
+      // ignore
+    }
+  }, [payrollPeriod]);
+
+  const computePayroll = useCallback((r: PayrollRow | undefined) => {
+    const row: PayrollRow = r || { base: 0, bonus: 0, deduction: 0, advance: 0 };
+    const gross = (row.base || 0) + (row.bonus || 0);
+    const net = gross - (row.deduction || 0) - (row.advance || 0);
+    return { gross, net };
+  }, []);
+
   const getDefaultRangeForMonth = useCallback((yyyyMm: string) => {
     const d = new Date(`${yyyyMm}-01T00:00:00`);
     const start = new Date(d.getFullYear(), d.getMonth(), 1);
@@ -1185,6 +1215,106 @@ const FinanceView: React.FC<FinanceViewProps> = ({
     );
   };
 
+  const renderPayrollTab = () => {
+    const staff = users.filter((u) => !u.isArchived);
+    const totals = staff.reduce(
+      (acc, u) => {
+        const r = payrollByUserId[u.id];
+        const row: PayrollRow = r || { base: 0, bonus: 0, deduction: 0, advance: 0 };
+        const { gross, net } = computePayroll(row);
+        acc.base += row.base || 0;
+        acc.bonus += row.bonus || 0;
+        acc.deduction += row.deduction || 0;
+        acc.advance += row.advance || 0;
+        acc.gross += gross;
+        acc.net += net;
+        return acc;
+      },
+      { base: 0, bonus: 0, deduction: 0, advance: 0, gross: 0, net: 0 }
+    );
+
+    return (
+      <div className="space-y-3">
+        <div className="bg-white dark:bg-[#252525] border border-gray-200 dark:border-[#333] rounded-2xl p-4">
+          <div className="flex flex-wrap items-end justify-between gap-3">
+            <div className="min-w-0">
+              <div className="text-sm font-semibold text-gray-900 dark:text-white">Расчёт зарплаты</div>
+              <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Сохраняется локально по месяцам.</div>
+            </div>
+            <div className="flex items-center gap-2">
+              <label className="text-xs font-semibold text-gray-600 dark:text-gray-400">Месяц</label>
+              <input
+                type="month"
+                value={payrollPeriod}
+                onChange={(e) => setPayrollPeriod(e.target.value)}
+                className="h-9 rounded-lg border border-gray-200 dark:border-[#333] bg-white dark:bg-[#1a1a1a] px-3 text-sm text-gray-900 dark:text-gray-100"
+              />
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white dark:bg-[#252525] border border-gray-200 dark:border-[#333] rounded-2xl overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-gray-50 dark:bg-[#202020] text-xs text-gray-600 dark:text-gray-400">
+                <tr>
+                  <th className="text-left px-4 py-3 font-semibold">Сотрудник</th>
+                  <th className="text-right px-4 py-3 font-semibold">Оклад</th>
+                  <th className="text-right px-4 py-3 font-semibold">Бонус</th>
+                  <th className="text-right px-4 py-3 font-semibold">Штраф</th>
+                  <th className="text-right px-4 py-3 font-semibold">Аванс</th>
+                  <th className="text-right px-4 py-3 font-semibold">К выплате</th>
+                </tr>
+              </thead>
+              <tbody>
+                {staff.map((u) => {
+                  const r = payrollByUserId[u.id] || { base: 0, bonus: 0, deduction: 0, advance: 0 };
+                  const { net } = computePayroll(r);
+                  const setField = (k: keyof PayrollRow, v: number) => {
+                    persistPayroll({
+                      ...payrollByUserId,
+                      [u.id]: { ...r, [k]: Number.isFinite(v) ? v : 0 },
+                    });
+                  };
+                  return (
+                    <tr key={u.id} className="border-t border-gray-100 dark:border-[#333]">
+                      <td className="px-4 py-3">
+                        <div className="font-medium text-gray-900 dark:text-white">{u.name}</div>
+                        <div className="text-xs text-gray-500 dark:text-gray-400">{u.roleName || u.roleSlug || '—'}</div>
+                      </td>
+                      {(['base', 'bonus', 'deduction', 'advance'] as Array<keyof PayrollRow>).map((k) => (
+                        <td key={k} className="px-4 py-3">
+                          <input
+                            type="number"
+                            inputMode="numeric"
+                            value={String(r[k] ?? 0)}
+                            onChange={(e) => setField(k, Number(e.target.value || 0))}
+                            className="w-28 ml-auto block h-9 text-right rounded-lg border border-gray-200 dark:border-[#333] bg-white dark:bg-[#1a1a1a] px-2 text-sm text-gray-900 dark:text-gray-100 [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none [-moz-appearance:textfield]"
+                          />
+                        </td>
+                      ))}
+                      <td className="px-4 py-3 text-right font-semibold text-gray-900 dark:text-white">{net.toLocaleString('ru-RU')}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+              <tfoot className="bg-gray-50 dark:bg-[#202020] border-t border-gray-200 dark:border-[#333]">
+                <tr className="text-sm">
+                  <td className="px-4 py-3 font-semibold text-gray-700 dark:text-gray-200">Итого</td>
+                  <td className="px-4 py-3 text-right font-semibold">{totals.base.toLocaleString('ru-RU')}</td>
+                  <td className="px-4 py-3 text-right font-semibold">{totals.bonus.toLocaleString('ru-RU')}</td>
+                  <td className="px-4 py-3 text-right font-semibold">{totals.deduction.toLocaleString('ru-RU')}</td>
+                  <td className="px-4 py-3 text-right font-semibold">{totals.advance.toLocaleString('ru-RU')}</td>
+                  <td className="px-4 py-3 text-right font-bold text-gray-900 dark:text-white">{totals.net.toLocaleString('ru-RU')}</td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   // --- Render Plan Detail ---
   const renderPlanDetail = () => {
     if (!selectedPlanDoc) return null;
@@ -1758,6 +1888,7 @@ const FinanceView: React.FC<FinanceViewProps> = ({
       { value: 'planning' as const, label: 'Планирование' },
       { value: 'bdr' as const, label: 'БДР' },
       { value: 'requests' as const, label: 'Заявки' },
+      { value: 'payroll' as const, label: 'ЗП' },
       { value: 'statements' as const, label: 'Выписки и сверка' },
       ...(hasPermission(currentUser, 'finance.approve') ? [{ value: 'plan' as const, label: 'Финансовый план' }] : []),
     ],
@@ -1777,6 +1908,8 @@ const FinanceView: React.FC<FinanceViewProps> = ({
       setActiveTab('statements');
     } else if (tabId === 'bdr') {
       setActiveTab('bdr');
+    } else if (tabId === 'payroll') {
+      setActiveTab('payroll');
     } else {
       setActiveTab('requests');
     }
@@ -2020,6 +2153,7 @@ const FinanceView: React.FC<FinanceViewProps> = ({
              <BdrView bdr={bdr ?? null} onLoadBdr={onLoadBdr} onSaveBdr={onSaveBdr} />
            )}
            {activeTab === 'requests' && renderRequestsTab()}
+           {activeTab === 'payroll' && renderPayrollTab()}
            {activeTab === 'statements' && <BankStatementsView ref={bankStatementsRef} />}
            {activeTab === 'plan' && planSubView === 'list' && renderPlanList()}
            {activeTab === 'plan' && planSubView === 'detail' && selectedPlanDoc && renderPlanDetail()}

@@ -91,9 +91,9 @@ export const COLOR_OPTIONS = [
 
 export const DEFAULT_STATUSES: StatusOption[] = [
     { id: 's1', name: 'Не начато', color: 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-700' },
-    { id: 's2', name: 'В работе', color: 'bg-blue-500 dark:bg-blue-600 text-white border border-blue-600 dark:border-blue-500' },
-    { id: 's3', name: 'На проверке', color: 'bg-amber-500 dark:bg-amber-600 text-white border border-amber-600 dark:border-amber-500' },
-    { id: 's4', name: 'Выполнено', color: 'bg-emerald-500 dark:bg-emerald-600 text-white border border-emerald-600 dark:border-emerald-500' },
+    { id: 's2', name: 'В работе', color: 'bg-blue-100 dark:bg-blue-900/35 text-blue-800 dark:text-blue-200 border border-blue-200 dark:border-blue-800/60' },
+    { id: 's3', name: 'На проверке', color: 'bg-amber-100 dark:bg-amber-900/35 text-amber-800 dark:text-amber-200 border border-amber-200 dark:border-amber-800/60' },
+    { id: 's4', name: 'Выполнено', color: 'bg-emerald-100 dark:bg-emerald-900/35 text-emerald-800 dark:text-emerald-200 border border-emerald-200 dark:border-emerald-800/60' },
 ];
 
 export const DEFAULT_PRIORITIES: PriorityOption[] = [

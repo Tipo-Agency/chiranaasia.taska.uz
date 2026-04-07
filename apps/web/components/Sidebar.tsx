@@ -18,6 +18,7 @@ import {
   Users,
   Layers,
   Package,
+  Factory,
 } from 'lucide-react';
 import { TableCollection, User } from '../types';
 import { LogoIcon, DynamicIcon } from './AppIcons';
@@ -59,7 +60,7 @@ export interface SidebarProps {
   tables: TableCollection[];
   activeTableId: string;
   onSelectTable: (id: string) => void;
-  onNavigate: (view: 'home' | 'tasks' | 'inbox' | 'chat' | 'search' | 'clients' | 'employees' | 'sales-funnel' | 'client-chats' | 'finance' | 'business-processes' | 'analytics' | 'settings' | 'inventory' | 'admin') => void;
+  onNavigate: (view: 'home' | 'tasks' | 'inbox' | 'chat' | 'search' | 'clients' | 'employees' | 'sales-funnel' | 'client-chats' | 'finance' | 'business-processes' | 'production' | 'analytics' | 'settings' | 'inventory' | 'admin') => void;
   currentView: string;
   currentUser: User;
   onCreateTable: () => void;
@@ -138,13 +139,19 @@ const Sidebar: React.FC<SidebarProps> = ({
         h-full flex flex-col text-notion-text dark:text-gray-300
       `} style={{ paddingTop: 'env(safe-area-inset-top)', paddingBottom: 'env(safe-area-inset-bottom)' }}>
         {/* Workspace Header */}
-        <div className={`flex items-center ${isCollapsed ? 'justify-center relative' : 'justify-between'} p-2 mb-2`}>
-            <div 
+        <div className={`flex items-center ${isCollapsed ? 'justify-center relative' : 'justify-between'} px-2 py-2 mb-2`}>
+            <div
                 onClick={() => handleNav(() => onNavigate('home'))}
-                className={`flex items-center ${isCollapsed ? 'justify-center' : 'gap-3'} hover:bg-notion-hover dark:hover:bg-[#252525] rounded cursor-pointer transition-colors p-2 ${isCollapsed ? 'w-full' : 'flex-1'}`}
+                className={`group flex items-center ${isCollapsed ? 'justify-center' : 'gap-2'} ${
+                  isCollapsed ? 'px-2' : 'px-3'
+                } py-1.5 rounded-lg cursor-pointer transition-colors hover:bg-notion-hover dark:hover:bg-[#252525] ${
+                  isCollapsed ? 'w-full' : 'flex-1'
+                }`}
             >
-                <LogoIcon className="w-6 h-6 shrink-0" />
-                {!isCollapsed && <span className="font-semibold text-sm">Типа задачи</span>}
+                <span className="flex shrink-0 items-center justify-center w-8 h-8 rounded-xl text-indigo-600 dark:text-indigo-300">
+                    <LogoIcon className="w-6 h-6 shrink-0" />
+                </span>
+                {!isCollapsed && <span className="font-semibold text-sm leading-none">Типа задачи</span>}
             </div>
             {!isCollapsed && (
               <div className="flex items-center gap-1 shrink-0">
@@ -207,7 +214,7 @@ const Sidebar: React.FC<SidebarProps> = ({
             )}
 
             {/* Бизнес-процессы; склад — вложенным пунктом */}
-            {can('org.bpm') && can('org.inventory') && (
+            {can('org.bpm') && (can('org.production') || can('org.inventory')) && (
               <div className="space-y-0.5">
                 <div
                   onClick={() => handleNav(() => onNavigate('business-processes'))}
@@ -223,6 +230,20 @@ const Sidebar: React.FC<SidebarProps> = ({
                     <span className={`text-sm ${currentView === 'business-processes' ? 'font-semibold' : ''}`}>Бизнес-процессы</span>
                   )}
                 </div>
+                {can('org.production') && (
+                  <div
+                    onClick={() => handleNav(() => onNavigate('production'))}
+                    className={`group flex items-center ${isCollapsed ? 'justify-center' : 'gap-2'} ${isCollapsed ? 'px-2' : 'px-3'} py-1.5 rounded-lg cursor-pointer transition-colors ${
+                      currentView === 'production'
+                        ? 'text-gray-900 dark:text-white'
+                        : 'text-notion-text/70 dark:text-gray-400 hover:bg-notion-hover dark:hover:bg-[#252525] hover:text-notion-text dark:hover:text-gray-200'
+                    }`}
+                    title={isCollapsed ? 'Производство' : ''}
+                  >
+                    <NavIcon active={currentView === 'production'} accent="emerald"><Factory size={18} className="shrink-0" /></NavIcon>
+                    {!isCollapsed && <span className={`text-sm ${currentView === 'production' ? 'font-semibold' : ''}`}>Производство</span>}
+                  </div>
+                )}
                 <div
                   onClick={() => handleNav(() => onNavigate('inventory'))}
                   className={`group flex items-center ${isCollapsed ? 'justify-center' : 'gap-2'} ${isCollapsed ? 'px-2' : 'px-3'} py-1.5 rounded-lg cursor-pointer transition-colors ${
@@ -267,6 +288,20 @@ const Sidebar: React.FC<SidebarProps> = ({
                 {!isCollapsed && <span className={`text-sm ${currentView === 'inventory' ? 'font-semibold' : ''}`}>Склад</span>}
               </div>
             )}
+            {!can('org.bpm') && can('org.production') && (
+              <div
+                onClick={() => handleNav(() => onNavigate('production'))}
+                className={`group flex items-center ${isCollapsed ? 'justify-center' : 'gap-2'} ${isCollapsed ? 'px-2' : 'px-3'} py-1.5 rounded-lg cursor-pointer transition-colors ${
+                  currentView === 'production'
+                    ? 'text-gray-900 dark:text-white'
+                    : 'text-notion-text/70 dark:text-gray-400 hover:bg-notion-hover dark:hover:bg-[#252525] hover:text-notion-text dark:hover:text-gray-200'
+                }`}
+                title={isCollapsed ? 'Производство' : ''}
+              >
+                <NavIcon active={currentView === 'production'} accent="emerald"><Factory size={18} /></NavIcon>
+                {!isCollapsed && <span className={`text-sm ${currentView === 'production' ? 'font-semibold' : ''}`}>Производство</span>}
+              </div>
+            )}
 
             {/* Чат на мобильной версии отключён (плохой UX). */}
 
@@ -285,7 +320,7 @@ const Sidebar: React.FC<SidebarProps> = ({
         </div>
 
         {/* Tables List with Grouping */}
-        <div className={`${isCollapsed ? 'px-2' : 'px-3'} flex-1 overflow-y-auto custom-scrollbar min-h-0`}>
+        <div className={`px-2 flex-1 overflow-y-auto custom-scrollbar min-h-0`}>
             {can('crm.spaces') && (
               <div className="space-y-0.5 mb-3">
                 <div 
@@ -293,7 +328,7 @@ const Sidebar: React.FC<SidebarProps> = ({
                   className={`group flex items-center ${isCollapsed ? 'justify-center' : 'gap-2'} ${isCollapsed ? 'px-2' : 'px-3'} py-1.5 rounded-lg cursor-pointer transition-colors ${(currentView === 'spaces' && activeSpaceTab === 'content-plan') || (currentView === 'table' && activeTableId && tables.find(t => t.id === activeTableId)?.type === 'content-plan') ? 'text-gray-900 dark:text-white' : 'text-notion-text/70 dark:text-gray-400 hover:bg-notion-hover dark:hover:bg-[#252525] hover:text-notion-text dark:hover:text-gray-200'}`}
                   title={isCollapsed ? 'Пространство' : ''}
                 >
-                  <NavIcon active={(currentView === 'spaces' && activeSpaceTab === 'content-plan') || (currentView === 'table' && activeTableId && tables.find(t => t.id === activeTableId)?.type === 'content-plan')} accent="indigo"><Layers size={isCollapsed ? 18 : 16} /></NavIcon>
+                  <NavIcon active={(currentView === 'spaces' && activeSpaceTab === 'content-plan') || (currentView === 'table' && activeTableId && tables.find(t => t.id === activeTableId)?.type === 'content-plan')} accent="indigo"><Layers size={18} /></NavIcon>
                   {!isCollapsed && <span className={`text-sm ${((currentView === 'spaces' && activeSpaceTab === 'content-plan') || (currentView === 'table' && activeTableId && tables.find(t => t.id === activeTableId)?.type === 'content-plan')) ? 'font-semibold' : ''}`}>Пространство</span>}
                 </div>
               </div>
