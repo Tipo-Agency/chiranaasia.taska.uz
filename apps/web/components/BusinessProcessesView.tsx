@@ -1,12 +1,13 @@
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useLayoutEffect, useCallback } from 'react';
 import { BusinessProcess, ProcessStep, ProcessStepBranch, OrgPosition, User, Task, ProcessInstance, TableCollection, EmployeeInfo } from '../types';
 import { getStepsForInstance } from '../utils/bpmDealFunnel';
 import { resolveAssigneesForOrgPosition } from '../utils/orgPositionAssignee';
 import { Network, Plus, Edit2, Trash2, ChevronRight, User as UserIcon, Building2, Save, X, ArrowDown, Play, CheckCircle2, Clock, FileText, ArrowLeft, Calendar, Users, Layers3 } from 'lucide-react';
 import { TaskSelect } from './TaskSelect';
 import { ProcessCard } from './features/processes/ProcessCard';
-import { Button, ModuleCreateDropdown, ModulePageShell, ModulePageHeader, ModuleSegmentedControl, MODULE_PAGE_GUTTER, SystemAlertDialog } from './ui';
+import { Button, ModuleCreateDropdown, ModulePageShell, ModuleSegmentedControl, MODULE_PAGE_GUTTER, MODULE_PAGE_TOP_PAD, SystemAlertDialog } from './ui';
+import { useAppToolbar } from '../contexts/AppToolbarContext';
 
 interface BusinessProcessesViewProps {
   processes: BusinessProcess[];
@@ -30,6 +31,7 @@ interface BusinessProcessesViewProps {
 const BusinessProcessesView: React.FC<BusinessProcessesViewProps> = ({ 
     processes, orgPositions, employees, users, tasks, tables, currentUser, onSaveProcess, onDeleteProcess, onSaveTask, onOpenTask, onCompleteProcessStepWithBranch, onSavePosition, autoOpenCreateModal = false
 }) => {
+  const { setLeading, setModule } = useAppToolbar();
   const activeOrgPositions = useMemo(
       () => orgPositions.filter((p) => !p.isArchived),
       [orgPositions]
@@ -73,12 +75,21 @@ const BusinessProcessesView: React.FC<BusinessProcessesViewProps> = ({
 
   const selectedProcess = uniqueProcesses.find(p => p.id === selectedProcessId);
 
+  const handleOpenCreate = useCallback(() => {
+    setEditingProcess(null);
+    setTitle('');
+    setDescription('');
+    setSteps([]);
+    setEditModalTab('steps');
+    setIsModalOpen(true);
+  }, []);
+
   // Автоматически открываем модалку создания при монтировании, если autoOpenCreateModal = true
   useEffect(() => {
     if (autoOpenCreateModal) {
       handleOpenCreate();
     }
-  }, [autoOpenCreateModal]);
+  }, [autoOpenCreateModal, handleOpenCreate]);
 
   // Слушаем событие для открытия модалки с рабочего стола (WorkdeskView)
   useEffect(() => {
@@ -87,14 +98,7 @@ const BusinessProcessesView: React.FC<BusinessProcessesViewProps> = ({
     };
     window.addEventListener('openCreateProcessModal', handleOpenModal);
     return () => window.removeEventListener('openCreateProcessModal', handleOpenModal);
-  }, []);
-
-  const handleOpenCreate = () => {
-      setEditingProcess(null);
-      setTitle(''); setDescription(''); setSteps([]);
-      setEditModalTab('steps');
-      setIsModalOpen(true);
-  };
+  }, [handleOpenCreate]);
 
   const handleOpenEdit = (proc: BusinessProcess) => {
       const latestVersion = processes
@@ -401,6 +405,87 @@ const BusinessProcessesView: React.FC<BusinessProcessesViewProps> = ({
       {status === 'paused' && 'Приостановлен'}
     </span>
   );
+
+  const isProcessListView = !selectedProcessId && !selectedInstanceId;
+
+  useLayoutEffect(() => {
+    if (!isProcessListView) {
+      setLeading(null);
+      setModule(null);
+      return;
+    }
+    const indigo = 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300';
+    const idle = 'text-gray-600 dark:text-gray-400';
+    const tabs: { id: 'templates' | 'running' | 'completed'; label: string }[] = [
+      { id: 'templates', label: 'Шаблоны' },
+      { id: 'running', label: 'В работе' },
+      { id: 'completed', label: 'Завершённые' },
+    ];
+    setLeading(
+      <div className="flex items-center gap-0.5 shrink-0 flex-wrap sm:flex-nowrap" role="tablist" aria-label="Бизнес-процессы">
+        {tabs.map((t) => (
+          <button
+            key={t.id}
+            type="button"
+            role="tab"
+            aria-selected={activeTab === t.id}
+            onClick={() => setActiveTab(t.id)}
+            className={`px-2 sm:px-2.5 py-1 rounded-lg text-[11px] sm:text-xs font-medium whitespace-nowrap transition-colors ${
+              activeTab === t.id ? indigo : `${idle} hover:bg-gray-100 dark:hover:bg-[#252525]`
+            }`}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
+    );
+    setModule(
+      <div className="flex items-center gap-1.5 shrink-0 flex-wrap justify-end">
+        <ModuleSegmentedControl
+          variant="accent"
+          accent="indigo"
+          value={viewMode}
+          onChange={(v) => setViewMode(v as 'grid' | 'list')}
+          className="!shadow-none [&_button]:!px-2.5 [&_button]:!py-1.5 [&_button]:!text-xs [&_button]:!rounded-lg"
+          options={[
+            { value: 'grid', label: 'Плитка' },
+            { value: 'list', label: 'Список' },
+          ]}
+        />
+        <ModuleCreateDropdown
+          accent="indigo"
+          buttonSize="sm"
+          items={[
+            {
+              id: 'template',
+              label: 'Шаблон процесса',
+              icon: Layers3,
+              onClick: handleOpenCreate,
+              iconClassName: 'text-indigo-600 dark:text-indigo-400',
+            },
+            {
+              id: 'start-process',
+              label: 'Запустить процесс…',
+              icon: Play,
+              onClick: () => setStartPickerOpen(true),
+              iconClassName: 'text-emerald-600 dark:text-emerald-400',
+            },
+          ]}
+        />
+      </div>
+    );
+    return () => {
+      setLeading(null);
+      setModule(null);
+    };
+  }, [
+    isProcessListView,
+    activeTab,
+    viewMode,
+    handleOpenCreate,
+    setLeading,
+    setModule,
+  ]);
 
   const renderInstancesTable = (items: Array<{ process: BusinessProcess; instance: ProcessInstance; tasks: Task[] }>) => {
     return (
@@ -1315,64 +1400,8 @@ const BusinessProcessesView: React.FC<BusinessProcessesViewProps> = ({
   // Список процессов
   return (
     <ModulePageShell>
-      <div className={`${MODULE_PAGE_GUTTER} pt-6 md:pt-8 flex-shrink-0`}>
-        <div className="mb-6">
-          <ModulePageHeader
-            accent="indigo"
-            icon={<Network size={24} strokeWidth={2} />}
-            title="Бизнес-процессы"
-            description="Шаблоны, запуски и история процессов"
-            tabs={
-              <ModuleSegmentedControl
-                variant="neutral"
-                value={activeTab}
-                onChange={(v) => setActiveTab(v as 'templates' | 'running' | 'completed')}
-                options={[
-                  { value: 'templates', label: 'Шаблоны', icon: <Layers3 size={14} /> },
-                  { value: 'running', label: 'В работе', icon: <Play size={14} /> },
-                  { value: 'completed', label: 'Завершённые', icon: <CheckCircle2 size={14} /> },
-                ]}
-              />
-            }
-            controls={
-              <>
-                <ModuleSegmentedControl
-                  variant="accent"
-                  accent="indigo"
-                  value={viewMode}
-                  onChange={(v) => setViewMode(v as 'grid' | 'list')}
-                  options={[
-                    { value: 'grid', label: 'Плитка' },
-                    { value: 'list', label: 'Список' },
-                  ]}
-                />
-                <ModuleCreateDropdown
-                  accent="indigo"
-                  items={[
-                    {
-                      id: 'template',
-                      label: 'Шаблон процесса',
-                      icon: Layers3,
-                      onClick: handleOpenCreate,
-                      iconClassName: 'text-indigo-600 dark:text-indigo-400',
-                    },
-                    {
-                      id: 'start-process',
-                      label: 'Запустить процесс…',
-                      icon: Play,
-                      onClick: () => setStartPickerOpen(true),
-                      iconClassName: 'text-emerald-600 dark:text-emerald-400',
-                    },
-                  ]}
-                />
-              </>
-            }
-          />
-        </div>
-      </div>
-      
       <div className="flex-1 min-h-0 overflow-hidden">
-        <div className={`${MODULE_PAGE_GUTTER} pb-20 h-full overflow-y-auto custom-scrollbar`}>
+        <div className={`${MODULE_PAGE_GUTTER} ${MODULE_PAGE_TOP_PAD} pb-20 h-full overflow-y-auto custom-scrollbar`}>
           {activeTab === 'templates' ? (
             userTemplates.length === 0 ? (
             <div className="bg-white dark:bg-[#252525] border border-gray-200 dark:border-[#333] rounded-xl p-12 text-center">

@@ -119,3 +119,6 @@ export const MODULE_ACCENTS: Record<
 
 /** Общий контейнер ширины как у модуля «Встречи» */
 export const MODULE_PAGE_GUTTER = 'max-w-7xl mx-auto w-full px-4 sm:px-6';
+
+/** Отступ контента от нижней границы верхней панели — как горизонтальный gutter (px-4 / sm:px-6). */
+export const MODULE_PAGE_TOP_PAD = 'pt-4 sm:pt-6';

@@ -13,6 +13,7 @@ import {
   ModuleFilterIconButton,
   ModulePageShell,
   MODULE_PAGE_GUTTER,
+  MODULE_PAGE_TOP_PAD,
   SystemAlertDialog,
   SystemConfirmDialog,
 } from './ui';
@@ -508,7 +509,7 @@ const InventoryView: React.FC<InventoryViewProps> = ({
   return (
     <ModulePageShell>
       <div className="flex-1 overflow-y-auto custom-scrollbar min-h-0">
-        <div className={`${MODULE_PAGE_GUTTER} pt-1 pb-20`}>
+        <div className={`${MODULE_PAGE_GUTTER} ${MODULE_PAGE_TOP_PAD} pb-20`}>
           {activeWarehouses.length === 0 && (
             <div className="rounded-2xl border border-emerald-200/70 dark:border-emerald-900/40 bg-emerald-50/60 dark:bg-emerald-950/20 p-4 sm:p-5 mb-4">
               <p className="text-sm font-semibold text-emerald-900 dark:text-emerald-100">

@@ -100,6 +100,27 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
       </div>
 
       <div className="flex items-center gap-1.5 shrink-0">
+        {module}
+
+        <div className="hidden sm:block w-44 md:w-52 shrink-0">
+          <div className="relative group">
+            <Search
+              size={14}
+              className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-[#3337AD]"
+            />
+            <input
+              type="text"
+              placeholder="Поиск"
+              value={searchQuery}
+              onChange={(e) => onSearchChange(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') onSearchFocus();
+              }}
+              className="w-full bg-white dark:bg-[#252525] border border-gray-300 dark:border-[#333] group-focus-within:border-[#3337AD] rounded-lg pl-8 pr-2 py-1.5 text-xs text-gray-900 dark:text-white outline-none transition-all placeholder-gray-400"
+            />
+          </div>
+        </div>
+
         <div className="relative" ref={userRef}>
           <button
             type="button"
@@ -191,27 +212,6 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
               </div>
             </div>
           )}
-        </div>
-
-        {module}
-
-        <div className="hidden sm:block w-44 md:w-52 shrink-0">
-          <div className="relative group">
-            <Search
-              size={14}
-              className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-[#3337AD]"
-            />
-            <input
-              type="text"
-              placeholder="Поиск"
-              value={searchQuery}
-              onChange={(e) => onSearchChange(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') onSearchFocus();
-              }}
-              className="w-full bg-white dark:bg-[#252525] border border-gray-300 dark:border-[#333] group-focus-within:border-[#3337AD] rounded-lg pl-8 pr-2 py-1.5 text-xs text-gray-900 dark:text-white outline-none transition-all placeholder-gray-400"
-            />
-          </div>
         </div>
       </div>
     </div>

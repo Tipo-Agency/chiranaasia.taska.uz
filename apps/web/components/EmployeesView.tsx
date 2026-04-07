@@ -2,7 +2,7 @@
 import React, { useState, useMemo, useLayoutEffect, useCallback } from 'react';
 import { EmployeeInfo, User, OrgPosition, Department } from '../types';
 import { Search, Trash2, Edit2, Calendar, FileText, X, Save, User as UserIcon, Phone, Send, Cake, Network, Building2, UserPlus, ChevronDown, ChevronRight, FolderTree } from 'lucide-react';
-import { ModuleCreateDropdown, ModulePageShell, MODULE_PAGE_GUTTER } from './ui';
+import { ModuleCreateDropdown, ModulePageShell, MODULE_PAGE_GUTTER, MODULE_PAGE_TOP_PAD } from './ui';
 import { useAppToolbar } from '../contexts/AppToolbarContext';
 import { TaskSelect } from './TaskSelect';
 import { getDefaultAvatarForId } from '../constants/avatars';
@@ -589,7 +589,7 @@ const EmployeesView: React.FC<EmployeesViewProps> = ({
   return (
     <ModulePageShell>
        <div className="flex-1 min-h-0 overflow-hidden">
-         <div className={`${MODULE_PAGE_GUTTER} pt-1 pb-20 h-full overflow-y-auto custom-scrollbar`}>
+         <div className={`${MODULE_PAGE_GUTTER} ${MODULE_PAGE_TOP_PAD} pb-20 h-full overflow-y-auto custom-scrollbar`}>
        {activeTab === 'cards' && renderCards()}
        {activeTab === 'orgchart' && renderOrgChart()}
        {activeTab === 'structure' && renderStructure()}

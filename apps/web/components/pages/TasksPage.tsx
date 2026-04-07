@@ -17,7 +17,7 @@ import {
   BusinessProcess,
   ViewMode,
 } from '../../types';
-import { ModulePageShell, MODULE_PAGE_GUTTER, ModuleFilterIconButton, ModuleCreateIconButton } from '../ui';
+import { ModulePageShell, MODULE_PAGE_GUTTER, MODULE_PAGE_TOP_PAD, ModuleFilterIconButton, ModuleCreateIconButton } from '../ui';
 import { TasksFilters } from '../features/tasks';
 import { useAppToolbar } from '../../contexts/AppToolbarContext';
 import TableView from '../TableView';
@@ -231,6 +231,7 @@ export const TasksPage: React.FC<TasksPageProps> = ({
       <div className="flex items-center gap-1 shrink-0">
         <ModuleFilterIconButton
           accent="indigo"
+          size="sm"
           active={showFilters || hasActiveFilters}
           activeCount={activeFiltersCount}
           onClick={() => setShowFilters((v) => !v)}
@@ -255,13 +256,13 @@ export const TasksPage: React.FC<TasksPageProps> = ({
   return (
     <ModulePageShell className="flex-1 min-h-0 flex flex-col overflow-hidden">
       {showFilters && (
-        <div className={`${MODULE_PAGE_GUTTER} pt-1 pb-2 flex-shrink-0 border-b border-gray-200 dark:border-[#333]`}>
+        <div className={`${MODULE_PAGE_GUTTER} ${MODULE_PAGE_TOP_PAD} pb-2 flex-shrink-0 border-b border-gray-200 dark:border-[#333]`}>
           <TasksFilters filters={taskFilters} onClear={clearFilters} />
         </div>
       )}
 
       <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
-        <div className={`${MODULE_PAGE_GUTTER} pt-1 flex-1 min-h-0 flex flex-col overflow-hidden pb-4`}>
+        <div className={`${MODULE_PAGE_GUTTER} ${showFilters ? 'pt-2' : MODULE_PAGE_TOP_PAD} flex-1 min-h-0 flex flex-col overflow-hidden pb-4`}>
           {viewMode === ViewMode.TABLE && (
             <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
             <TableView

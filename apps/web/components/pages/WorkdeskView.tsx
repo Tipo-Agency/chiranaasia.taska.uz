@@ -18,7 +18,7 @@ import {
 import { Deal, FinancePlan, Meeting, Task, User, Doc, BusinessProcess, SalesFunnel } from '../../types';
 import { getDealDisplayTitle, isFunnelDeal } from '../../utils/dealModel';
 import { ModuleCreateDropdown } from '../ui/ModuleCreateDropdown';
-import { ModulePageShell, MODULE_PAGE_GUTTER } from '../ui';
+import { ModulePageShell, MODULE_PAGE_GUTTER, MODULE_PAGE_TOP_PAD } from '../ui';
 import { useAppToolbar } from '../../contexts/AppToolbarContext';
 import { DateInput } from '../ui/DateInput';
 import { normalizeDateForInput, parseLocalDate } from '../../utils/dateUtils';
@@ -407,7 +407,7 @@ export const WorkdeskView: React.FC<WorkdeskViewProps> = ({
   return (
     <ModulePageShell>
       <div className="flex-1 min-h-0 overflow-hidden">
-        <div className={`${MODULE_PAGE_GUTTER} pt-1 pb-24 md:pb-32 h-full overflow-y-auto overflow-x-hidden custom-scrollbar space-y-4`}>
+        <div className={`${MODULE_PAGE_GUTTER} ${MODULE_PAGE_TOP_PAD} pb-24 md:pb-32 h-full overflow-y-auto overflow-x-hidden custom-scrollbar space-y-4`}>
           {activeTab === 'dashboard' && (
             <div className="space-y-4">
               <StatsCards

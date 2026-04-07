@@ -4,7 +4,7 @@ import { TaskSelect } from './TaskSelect';
 import { FinanceCategory, Fund, FinancePlan, PurchaseRequest, Department, User, FinancialPlanDocument, FinancialPlanning, Bdr } from '../types';
 import { hasPermission } from '../utils/permissions';
 import { Plus, X, Edit2, Trash2, PieChart, TrendingUp, DollarSign, Check, AlertCircle, Calendar, Settings, ArrowLeft, ArrowRight, Save, FileText, Clock, CheckCircle2, ChevronDown, Upload, Archive, RotateCcw } from 'lucide-react';
-import { Button, ModulePageShell, MODULE_PAGE_GUTTER, ModuleCreateDropdown, ModuleFilterIconButton, DateInput, ModuleSegmentedControl, SystemAlertDialog } from './ui';
+import { Button, ModulePageShell, MODULE_PAGE_GUTTER, MODULE_PAGE_TOP_PAD, ModuleCreateDropdown, ModuleFilterIconButton, DateInput, ModuleSegmentedControl, SystemAlertDialog } from './ui';
 import { useAppToolbar } from '../contexts/AppToolbarContext';
 import { BankStatementsView, type BankStatementsViewHandle } from './finance/BankStatementsView';
 import { BdrView } from './finance/BdrView';
@@ -1836,6 +1836,7 @@ const FinanceView: React.FC<FinanceViewProps> = ({
         {activeTab === 'planning' && planningSubView === 'list' && (
           <ModuleFilterIconButton
             accent="emerald"
+            size="sm"
             active={showPlanningFilters || hasActivePlanningFilters}
             activeCount={planningFilters.filter((f) => f.value && f.value !== 'all' && f.value !== '' && f.value !== 'hide').length}
             onClick={() => setShowPlanningFilters(!showPlanningFilters)}
@@ -1844,6 +1845,7 @@ const FinanceView: React.FC<FinanceViewProps> = ({
         {activeTab === 'plan' && planSubView === 'list' && (
           <ModuleFilterIconButton
             accent="emerald"
+            size="sm"
             active={showPlanFilters || hasActivePlanFilters}
             activeCount={planFilters.filter((f) => f.value && f.value !== 'all' && f.value !== '' && f.value !== 'hide').length}
             onClick={() => setShowPlanFilters(!showPlanFilters)}
@@ -1852,6 +1854,7 @@ const FinanceView: React.FC<FinanceViewProps> = ({
         {activeTab === 'requests' && (
           <ModuleFilterIconButton
             accent="emerald"
+            size="sm"
             active={showRequestFilters || hasActiveRequestFilters}
             activeCount={requestFilters.filter((f) => f.value && f.value !== 'all' && f.value !== '' && f.value !== 'hide').length}
             onClick={() => setShowRequestFilters(!showRequestFilters)}
@@ -1923,10 +1926,16 @@ const FinanceView: React.FC<FinanceViewProps> = ({
     setModule,
   ]);
 
+  const hasFinanceFilterStrip =
+    !financeFullScreen &&
+    ((showPlanningFilters && activeTab === 'planning' && planningSubView === 'list') ||
+      (showPlanFilters && activeTab === 'plan' && planSubView === 'list') ||
+      (showRequestFilters && activeTab === 'requests'));
+
   return (
     <ModulePageShell className="flex-1 min-h-0 flex flex-col overflow-hidden">
       {!financeFullScreen && showPlanningFilters && activeTab === 'planning' && planningSubView === 'list' && (
-        <div className={`${MODULE_PAGE_GUTTER} pt-1 pb-2 flex-shrink-0 border-b border-gray-200 dark:border-[#333]`}>
+        <div className={`${MODULE_PAGE_GUTTER} ${MODULE_PAGE_TOP_PAD} pb-2 flex-shrink-0 border-b border-gray-200 dark:border-[#333]`}>
           <div className="p-4 bg-gray-50 dark:bg-[#252525] rounded-lg border border-gray-200 dark:border-[#333]">
             <div className="grid gap-3" style={{ gridTemplateColumns: `repeat(auto-fit, minmax(150px, 1fr))`, maxWidth: '100%' }}>
               {planningFilters.map((filter, index) => (
@@ -1947,7 +1956,7 @@ const FinanceView: React.FC<FinanceViewProps> = ({
         </div>
       )}
       {!financeFullScreen && showPlanFilters && activeTab === 'plan' && planSubView === 'list' && (
-        <div className={`${MODULE_PAGE_GUTTER} pt-1 pb-2 flex-shrink-0 border-b border-gray-200 dark:border-[#333]`}>
+        <div className={`${MODULE_PAGE_GUTTER} ${MODULE_PAGE_TOP_PAD} pb-2 flex-shrink-0 border-b border-gray-200 dark:border-[#333]`}>
           <div className="p-4 bg-gray-50 dark:bg-[#252525] rounded-lg border border-gray-200 dark:border-[#333]">
             <div className="grid gap-3" style={{ gridTemplateColumns: `repeat(auto-fit, minmax(150px, 1fr))`, maxWidth: '100%' }}>
               {planFilters.map((filter, index) => (
@@ -1968,7 +1977,7 @@ const FinanceView: React.FC<FinanceViewProps> = ({
         </div>
       )}
       {!financeFullScreen && showRequestFilters && activeTab === 'requests' && (
-        <div className={`${MODULE_PAGE_GUTTER} pt-1 pb-2 flex-shrink-0 border-b border-gray-200 dark:border-[#333]`}>
+        <div className={`${MODULE_PAGE_GUTTER} ${MODULE_PAGE_TOP_PAD} pb-2 flex-shrink-0 border-b border-gray-200 dark:border-[#333]`}>
           <div className="p-4 bg-gray-50 dark:bg-[#252525] rounded-lg border border-gray-200 dark:border-[#333]">
             <div className="grid gap-3" style={{ gridTemplateColumns: `repeat(auto-fit, minmax(150px, 1fr))`, maxWidth: '100%' }}>
               {requestFilters.map((filter, index) => (
@@ -1989,7 +1998,11 @@ const FinanceView: React.FC<FinanceViewProps> = ({
         </div>
       )}
        <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
-         <div className={`${MODULE_PAGE_GUTTER} pt-1 pb-20 h-full overflow-y-auto custom-scrollbar flex-1 flex flex-col min-h-0`}>
+         <div
+           className={`${MODULE_PAGE_GUTTER} ${
+             hasFinanceFilterStrip ? 'pt-2 sm:pt-3' : MODULE_PAGE_TOP_PAD
+           } pb-20 h-full overflow-y-auto custom-scrollbar flex-1 flex flex-col min-h-0`}
+         >
            {activeTab === 'planning' && planningSubView === 'list' && renderPlanningList()}
            {/* creation planning moved to modal */}
            {activeTab === 'planning' && planningSubView === 'detail' && selectedPlanning && renderPlanningDetail()}

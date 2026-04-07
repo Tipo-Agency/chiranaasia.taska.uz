@@ -3,7 +3,7 @@ import { TableCollection, User } from '../types';
 import { hasPermission } from '../utils/permissions';
 import { DynamicIcon } from './AppIcons';
 import { Instagram, Archive, Layers, Edit2, Trash2 } from 'lucide-react';
-import { ModulePageShell, MODULE_PAGE_GUTTER, ModuleCreateIconButton } from './ui';
+import { ModulePageShell, MODULE_PAGE_GUTTER, MODULE_PAGE_TOP_PAD, ModuleCreateIconButton } from './ui';
 import { useAppToolbar } from '../contexts/AppToolbarContext';
 
 type SpaceType = 'content-plan' | 'backlog' | 'functionality';
@@ -150,7 +150,7 @@ export const SpacesTabsView: React.FC<SpacesTabsViewProps> = ({
   return (
     <ModulePageShell>
       <div className="flex-1 overflow-y-auto overflow-x-hidden custom-scrollbar min-h-0">
-        <div className={`${MODULE_PAGE_GUTTER} pt-1 py-2 pb-24 md:pb-32`}>
+        <div className={`${MODULE_PAGE_GUTTER} ${MODULE_PAGE_TOP_PAD} py-2 pb-24 md:pb-32`}>
           {currentSpaces.length === 0 ? (
             <div className="text-center py-20">
               <div className="text-gray-400 dark:text-gray-500 mb-4 inline-block">

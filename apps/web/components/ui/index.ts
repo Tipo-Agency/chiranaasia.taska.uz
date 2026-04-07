@@ -5,7 +5,7 @@ export { ModulePageHeader } from './ModulePageHeader';
 export { ModuleTabsScroller } from './ModuleTabsScroller';
 export { ModuleSegmentedControl } from './ModuleSegmentedControl';
 export type { ModuleSegmentOption } from './ModuleSegmentedControl';
-export { MODULE_PAGE_GUTTER } from './moduleAccent';
+export { MODULE_PAGE_GUTTER, MODULE_PAGE_TOP_PAD } from './moduleAccent';
 export type { ModuleAccentKey } from './moduleAccent';
 export { ModuleCreateIconButton } from './ModuleCreateIconButton';
 export type { ModuleCreateIconButtonProps } from './ModuleCreateIconButton';
