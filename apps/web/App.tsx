@@ -99,6 +99,115 @@ function MainApp() {
     setMustChangePwdOpen(true);
   }, [state.currentUser?.id, state.currentUser?.mustChangePassword]);
 
+  /** До любого return: иначе при смене isLoading / login React #310 (число хуков). */
+  const createEntityFromChat = useCallback(
+    (type: 'task' | 'deal' | 'meeting' | 'doc', title: string) => {
+      if (!state.currentUser) return Promise.resolve(null);
+      return createEntityFromChatBridge(
+        {
+          currentUser: state.currentUser,
+          statuses: state.statuses,
+          priorities: state.priorities,
+          tasks: state.tasks,
+          deals: state.deals,
+          meetings: state.meetings,
+          docs: state.docs,
+          orgPositions: state.orgPositions,
+          employeeInfos: state.employeeInfos,
+          businessProcesses: state.businessProcesses,
+          actions,
+        },
+        type,
+        title
+      );
+    },
+    [
+      state.currentUser,
+      state.statuses,
+      state.priorities,
+      state.tasks,
+      state.deals,
+      state.meetings,
+      state.docs,
+      state.orgPositions,
+      state.employeeInfos,
+      state.businessProcesses,
+      actions,
+    ]
+  );
+
+  const updateEntityFromChat = useCallback(
+    (type: 'task' | 'deal' | 'meeting' | 'doc', id: string, patch: Record<string, unknown>) => {
+      if (!state.currentUser) return Promise.resolve(false);
+      return updateEntityFromChatBridge(
+        {
+          currentUser: state.currentUser,
+          statuses: state.statuses,
+          priorities: state.priorities,
+          tasks: state.tasks,
+          deals: state.deals,
+          meetings: state.meetings,
+          docs: state.docs,
+          orgPositions: state.orgPositions,
+          employeeInfos: state.employeeInfos,
+          businessProcesses: state.businessProcesses,
+          actions,
+        },
+        type,
+        id,
+        patch
+      );
+    },
+    [
+      state.currentUser,
+      state.statuses,
+      state.priorities,
+      state.tasks,
+      state.deals,
+      state.meetings,
+      state.docs,
+      state.orgPositions,
+      state.employeeInfos,
+      state.businessProcesses,
+      actions,
+    ]
+  );
+
+  const onStartProcessTemplate = useCallback(
+    (processId: string) => {
+      if (!state.currentUser) return Promise.resolve(null);
+      return startBusinessProcessFromTemplateBridge(
+        {
+          currentUser: state.currentUser,
+          statuses: state.statuses,
+          priorities: state.priorities,
+          tasks: state.tasks,
+          deals: state.deals,
+          meetings: state.meetings,
+          docs: state.docs,
+          orgPositions: state.orgPositions,
+          employeeInfos: state.employeeInfos,
+          businessProcesses: state.businessProcesses,
+          actions,
+        },
+        processId
+      );
+    },
+    [
+      state.currentUser,
+      state.statuses,
+      state.priorities,
+      state.tasks,
+      state.deals,
+      state.meetings,
+      state.docs,
+      state.orgPositions,
+      state.employeeInfos,
+      state.businessProcesses,
+      actions,
+    ]
+  );
+
   if (state.isLoading) return <div className="h-screen flex items-center justify-center bg-gray-50 dark:bg-[#121212] dark:text-white">Загрузка...</div>;
 
   if (!state.currentUser) {
@@ -129,73 +238,6 @@ function MainApp() {
   const myMeetings = (state.meetings || [])
     .filter((m) => !m.isArchived && (m.participantIds || []).includes(state.currentUser.id))
     .slice(0, 30);
-
-  const messengerBridgeDeps = {
-    currentUser: state.currentUser,
-    statuses: state.statuses,
-    priorities: state.priorities,
-    tasks: state.tasks,
-    deals: state.deals,
-    meetings: state.meetings,
-    docs: state.docs,
-    orgPositions: state.orgPositions,
-    employeeInfos: state.employeeInfos,
-    businessProcesses: state.businessProcesses,
-    actions,
-  };
-
-  const createEntityFromChat = useCallback(
-    (type: 'task' | 'deal' | 'meeting' | 'doc', title: string) =>
-      createEntityFromChatBridge(messengerBridgeDeps, type, title),
-    [
-      state.currentUser,
-      state.statuses,
-      state.priorities,
-      state.tasks,
-      state.deals,
-      state.meetings,
-      state.docs,
-      state.orgPositions,
-      state.employeeInfos,
-      state.businessProcesses,
-      actions,
-    ]
-  );
-
-  const updateEntityFromChat = useCallback(
-    (type: 'task' | 'deal' | 'meeting' | 'doc', id: string, patch: Record<string, unknown>) =>
-      updateEntityFromChatBridge(messengerBridgeDeps, type, id, patch),
-    [
-      state.currentUser,
-      state.statuses,
-      state.priorities,
-      state.tasks,
-      state.deals,
-      state.meetings,
-      state.docs,
-      state.orgPositions,
-      state.employeeInfos,
-      state.businessProcesses,
-      actions,
-    ]
-  );
-
-  const onStartProcessTemplate = useCallback(
-    (processId: string) => startBusinessProcessFromTemplateBridge(messengerBridgeDeps, processId),
-    [
-      state.currentUser,
-      state.statuses,
-      state.priorities,
-      state.tasks,
-      state.deals,
-      state.meetings,
-      state.docs,
-      state.orgPositions,
-      state.employeeInfos,
-      state.businessProcesses,
-      actions,
-    ]
-  );
 
   return (
     <NotificationCenterProvider userId={state.currentUser.id}>
