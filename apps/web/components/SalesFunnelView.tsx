@@ -4,7 +4,7 @@ import { Deal, Client, User, Comment, Task, Project, SalesFunnel, Meeting, Notif
 import { Plus, KanbanSquare, X, Send, MessageSquare, Instagram, Globe, UserPlus, Bot, Edit2, TrendingUp, CheckSquare, CheckCircle2, XCircle, Trash2, Calendar, Clock, Users, Tag, GitBranch, Filter, User as UserIcon } from 'lucide-react';
 // Клиентский Telegram/Instagram — при необходимости подключать через api/telegramService.
 import { DynamicIcon } from './AppIcons';
-import { Button, ModulePageShell, MODULE_PAGE_GUTTER, ModuleCreateIconButton, ModuleSelectDropdown, SystemAlertDialog, SystemConfirmDialog } from './ui';
+import { Button, ModulePageShell, MODULE_PAGE_GUTTER, MODULE_PAGE_TOP_PAD, ModuleCreateIconButton, ModuleSelectDropdown, SystemAlertDialog, SystemConfirmDialog } from './ui';
 import { DateInput } from './ui/DateInput';
 import { TaskSelect } from './TaskSelect';
 import { api } from '../backend/api';
@@ -218,30 +218,22 @@ const SalesFunnelView: React.FC<SalesFunnelViewProps> = ({ deals, clients, users
           ))}
         </div>
         <div className="flex items-center gap-2 flex-wrap min-w-0 flex-1">
-          <div className="min-w-[min(100%,180px)] max-w-[240px]">
-            <TaskSelect
-              value={selectedFunnelId}
-              onChange={setSelectedFunnelId}
-              options={[
-                { value: 'all', label: `Все (${activeFunnels.length})` },
-                ...activeFunnels.map((f) => ({ value: f.id, label: f.name })),
-              ]}
-            />
-          </div>
-          {selectedFunnelId !== 'all' && (
-            <div className="hidden sm:flex items-center gap-2 px-2 py-1.5 rounded-lg border border-gray-200 dark:border-[#333] bg-white dark:bg-[#252525] max-w-[200px]">
-              <span
-                className={`w-2.5 h-2.5 rounded shrink-0 ${
-                  activeFunnels.find((f) => f.id === selectedFunnelId)?.color ||
-                  activeFunnels.find((f) => f.id === selectedFunnelId)?.stages?.[0]?.color ||
-                  'bg-gray-200 dark:bg-gray-700'
-                }`}
-              />
-              <span className="text-xs font-semibold text-gray-700 dark:text-gray-200 truncate">
-                {activeFunnels.find((f) => f.id === selectedFunnelId)?.name || 'Воронка'}
-              </span>
-            </div>
-          )}
+          <ModuleSelectDropdown
+            accent="violet"
+            size="sm"
+            prefixLabel="Воронка"
+            selectedId={selectedFunnelId}
+            valueLabel={
+              selectedFunnelId === 'all'
+                ? `Все (${activeFunnels.length})`
+                : activeFunnels.find((f) => f.id === selectedFunnelId)?.name || '—'
+            }
+            items={[
+              { id: 'all', label: `Все (${activeFunnels.length})`, onClick: () => setSelectedFunnelId('all') },
+              ...activeFunnels.map((f) => ({ id: f.id, label: f.name, onClick: () => setSelectedFunnelId(f.id) })),
+            ]}
+            className="min-w-[min(100%,180px)]"
+          />
           <ModuleCreateIconButton
             accent="violet"
             label="Новая сделка"
@@ -641,7 +633,7 @@ const SalesFunnelView: React.FC<SalesFunnelViewProps> = ({ deals, clients, users
     <ModulePageShell className="flex-1 min-h-0 flex flex-col overflow-hidden">
       <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
         <div
-          className={`${MODULE_PAGE_GUTTER} pt-1 h-full min-h-0 flex flex-col ${
+          className={`${MODULE_PAGE_GUTTER} ${MODULE_PAGE_TOP_PAD} h-full min-h-0 flex flex-col ${
             viewMode === 'kanban'
               ? 'overflow-hidden pb-0'
               : 'pb-24 md:pb-32 overflow-y-auto overflow-x-hidden custom-scrollbar'

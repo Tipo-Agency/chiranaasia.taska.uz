@@ -595,9 +595,6 @@ const FinanceView: React.FC<FinanceViewProps> = ({
     );
     return (
       <div className="space-y-6">
-        <div className="flex justify-between items-center">
-          <h3 className="text-lg font-bold text-gray-800 dark:text-white">Планирование</h3>
-        </div>
         {sorted.length === 0 ? (
           <div className="bg-white dark:bg-[#252525] border border-gray-200 dark:border-[#333] rounded-xl p-12 text-center">
             <FileText size={48} className="mx-auto text-gray-300 dark:text-gray-600 mb-4" />
@@ -1103,9 +1100,6 @@ const FinanceView: React.FC<FinanceViewProps> = ({
     );
     return (
       <div className="space-y-6">
-        <div className="flex justify-between items-center">
-          <h3 className="text-lg font-bold text-gray-800 dark:text-white">Финансовый план</h3>
-        </div>
         {sorted.length === 0 ? (
           <div className="bg-white dark:bg-[#252525] border border-gray-200 dark:border-[#333] rounded-xl p-12 text-center">
             <FileText size={48} className="mx-auto text-gray-300 dark:text-gray-600 mb-4" />
@@ -1613,10 +1607,6 @@ const FinanceView: React.FC<FinanceViewProps> = ({
   const renderRequestsTab = () => {
       return (
       <div className="space-y-6">
-          <div className="flex justify-between items-center">
-              <h3 className="text-lg font-bold text-gray-800 dark:text-white">Реестр заявок</h3>
-          </div>
-
           <div className="bg-white dark:bg-[#252525] border border-gray-200 dark:border-[#333] rounded-xl overflow-hidden">
               <table className="w-full text-left text-sm">
                   <thead className="bg-gray-50 dark:bg-[#202020] border-b border-gray-200 dark:border-[#333]">

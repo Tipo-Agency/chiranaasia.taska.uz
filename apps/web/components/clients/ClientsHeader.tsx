@@ -55,7 +55,9 @@ export const ClientsHeader: React.FC<ClientsHeaderProps> = ({
             {showFunnelFilter && salesFunnels.length > 0 && (
               <ModuleSelectDropdown
                 accent="violet"
+                size="sm"
                 prefixLabel="Воронка"
+                selectedId={selectedFunnelId || 'all'}
                 valueLabel={
                   selectedFunnelId
                     ? (salesFunnels.find((f) => f.id === selectedFunnelId)?.name || '—')

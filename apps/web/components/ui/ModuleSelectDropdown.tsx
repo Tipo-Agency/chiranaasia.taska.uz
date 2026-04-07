@@ -12,10 +12,14 @@ interface ModuleSelectDropdownProps {
   accent?: ModuleAccentKey;
   items: ModuleSelectDropdownItem[];
   valueLabel: string;
+  /** Selected item id for checkmark (preferred over label compare) */
+  selectedId?: string;
   /** Optional prefix shown on >= sm screens */
   prefixLabel?: string;
   disabled?: boolean;
   align?: 'left' | 'right';
+  /** sm — по высоте как кнопки в верхней панели (w-9 h-9) */
+  size?: 'md' | 'sm';
   className?: string;
 }
 
@@ -26,9 +30,11 @@ export const ModuleSelectDropdown: React.FC<ModuleSelectDropdownProps> = ({
   accent = 'indigo',
   items,
   valueLabel,
+  selectedId,
   prefixLabel,
   disabled = false,
   align = 'left',
+  size = 'md',
   className = '',
 }) => {
   const [open, setOpen] = useState(false);
@@ -56,6 +62,12 @@ export const ModuleSelectDropdown: React.FC<ModuleSelectDropdownProps> = ({
 
   if (!items.length) return null;
 
+  const buttonSizeClass =
+    size === 'sm'
+      ? 'max-w-[200px] sm:max-w-[220px] rounded-lg px-2.5 pr-9 py-1.5 text-xs font-semibold min-h-[36px]'
+      : 'max-w-[220px] sm:max-w-[260px] rounded-lg px-3 pr-10 py-2 text-sm font-medium min-h-[44px]';
+  const chevronSize = size === 'sm' ? 14 : 16;
+
   return (
     <div className={`relative ${className}`} ref={ref}>
       <button
@@ -66,15 +78,11 @@ export const ModuleSelectDropdown: React.FC<ModuleSelectDropdownProps> = ({
           relative
           inline-flex items-center
           w-auto
-          max-w-[220px] sm:max-w-[260px]
-          rounded-lg
+          ${buttonSizeClass}
           border border-gray-300 dark:border-gray-600
           bg-gray-100 dark:bg-[#252525]
           text-gray-900 dark:text-white
           hover:bg-gray-200 dark:hover:bg-[#303030]
-          px-3 pr-10 py-2
-          text-sm font-medium
-          min-h-[44px]
           transition-colors
           focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500
           disabled:opacity-50 disabled:cursor-not-allowed
@@ -84,7 +92,7 @@ export const ModuleSelectDropdown: React.FC<ModuleSelectDropdownProps> = ({
           {buttonText as any}
         </span>
         <ChevronDown
-          size={16}
+          size={chevronSize}
           className={`absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none transition-transform ${open ? 'rotate-180' : ''}`}
         />
       </button>
@@ -113,7 +121,7 @@ export const ModuleSelectDropdown: React.FC<ModuleSelectDropdownProps> = ({
                 className="w-full flex items-center justify-between gap-2 px-3 py-2 text-sm text-gray-800 dark:text-gray-100 hover:bg-gray-100 dark:hover:bg-[#333] text-left"
               >
                 <span className="truncate">{item.label}</span>
-                {item.label === valueLabel && (
+                {(selectedId ? item.id === selectedId : item.label === valueLabel) && (
                   <Check size={16} className={menuIconClass} />
                 )}
               </button>
