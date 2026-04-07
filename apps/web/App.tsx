@@ -17,7 +17,7 @@ import { MiniMessenger } from './components/features/chat/MiniMessenger';
 import { MessageCircle } from 'lucide-react';
 import { useAppLogic } from './frontend/hooks/useAppLogic';
 import { NotificationCenterProvider, useNotificationCenter } from './frontend/contexts/NotificationCenterContext';
-import type { AppHeaderProps } from './components/AppHeader';
+import { AppToolbarProvider } from './contexts/AppToolbarContext';
 import { StandardModal, Input, Button } from './components/ui';
 import { resolveAssigneesForOrgPosition } from './utils/orgPositionAssignee';
 
@@ -28,23 +28,28 @@ function getPublicContentPlanIdFromPath(): string | null {
   return m ? decodeURIComponent(m[1].trim()) : null;
 }
 
-function AppHeaderWithNotifications(
-  props: Omit<AppHeaderProps, 'activityLogs' | 'unreadNotificationsCount' | 'onMarkAllRead'>
-) {
-  const { notifications, unreadCount, markAllRead } = useNotificationCenter();
-  return (
-    <AppHeader
-      {...props}
-      activityLogs={notifications}
-      unreadNotificationsCount={unreadCount}
-      onMarkAllRead={markAllRead}
-    />
-  );
-}
-
 function SidebarWithUnread(props: Omit<SidebarProps, 'unreadCount'>) {
   const { unreadCount } = useNotificationCenter();
   return <Sidebar {...props} unreadCount={unreadCount} />;
+}
+
+function ChatFloatingButton({ onOpen }: { onOpen: () => void }) {
+  const { unreadCount } = useNotificationCenter();
+  return (
+    <button
+      type="button"
+      onClick={onOpen}
+      className="hidden md:flex fixed bottom-6 right-6 z-40 w-14 h-14 rounded-full bg-[#3337AD] text-white shadow-lg hover:bg-[#292b8a] items-center justify-center relative"
+      title={unreadCount > 0 ? `Чат — непрочитанных: ${unreadCount}` : 'Чат'}
+    >
+      <MessageCircle size={24} />
+      {unreadCount > 0 && (
+        <span className="absolute -top-0.5 -right-0.5 min-w-[1.125rem] h-[1.125rem] px-1 flex items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white border-2 border-white dark:border-[#191919]">
+          {unreadCount > 99 ? '99+' : unreadCount}
+        </span>
+      )}
+    </button>
+  );
 }
 
 function MainApp() {
@@ -212,6 +217,7 @@ function MainApp() {
 
   return (
     <NotificationCenterProvider userId={state.currentUser.id}>
+    <AppToolbarProvider>
     <div 
       className={`flex h-screen w-full transition-colors duration-200 overflow-hidden ${state.darkMode ? 'dark bg-[#191919] text-gray-100' : 'bg-white text-gray-900'}`}
       style={{
@@ -243,19 +249,15 @@ function MainApp() {
 
         <div className="flex-1 flex flex-col min-w-0 bg-white dark:bg-[#191919] relative">
             {/* Header */}
-            <AppHeaderWithNotifications
+            <AppHeader
               darkMode={state.darkMode}
               currentView={state.currentView}
-              workdeskTab={state.workdeskTab}
-              crmHubTab={state.crmHubTab}
-              bpmHubTab={state.bpmHubTab}
               activeTable={state.activeTable}
               currentUser={state.currentUser}
               searchQuery={state.searchQuery}
               onToggleDarkMode={actions.toggleDarkMode}
               onSearchChange={actions.setSearchQuery}
               onSearchFocus={() => { if(state.currentView !== 'search') actions.setCurrentView('search'); }}
-              onNavigateToInbox={() => actions.setCurrentView('inbox')}
               onOpenSystemChat={() => {
                 setChatOpenToSystemFeed(true);
                 setChatPanelOpen(true);
@@ -273,18 +275,12 @@ function MainApp() {
                 </div>
             )}
 
-            {/* Кнопка чата справа внизу — десктоп/планшет, в т.ч. на главной (рабочий стол) */}
-            <button
-              type="button"
-              onClick={() => {
+            <ChatFloatingButton
+              onOpen={() => {
                 setChatOpenToSystemFeed(false);
                 setChatPanelOpen(true);
               }}
-              className="hidden md:flex fixed bottom-6 right-6 z-40 w-14 h-14 rounded-full bg-[#3337AD] text-white shadow-lg hover:bg-[#292b8a] items-center justify-center"
-              title="Чат"
-            >
-              <MessageCircle size={24} />
-            </button>
+            />
 
             {/* Чат в модальном окне (десктоп) */}
             {chatPanelOpen && (
@@ -484,7 +480,6 @@ function MainApp() {
                 activeSpaceTab={state.activeSpaceTab}
                 workdeskTab={state.workdeskTab}
                 crmHubTab={state.crmHubTab}
-                bpmHubTab={state.bpmHubTab}
                 notificationPrefs={state.notificationPrefs}
                 actions={actions}
             />
@@ -656,6 +651,7 @@ function MainApp() {
         />
       </div>
     </StandardModal>
+    </AppToolbarProvider>
     </NotificationCenterProvider>
   );
 }

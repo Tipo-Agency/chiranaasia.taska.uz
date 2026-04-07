@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Department, Warehouse, InventoryItem, StockBalance, StockMovement, InventoryRevision } from '../types';
 import {
   Layers,
@@ -13,13 +13,12 @@ import {
   ModuleCreateDropdown,
   ModuleFilterIconButton,
   ModulePageShell,
-  ModulePageHeader,
-  ModuleSegmentedControl,
   MODULE_PAGE_GUTTER,
   SystemAlertDialog,
   SystemConfirmDialog,
 } from './ui';
 import { StandardModal } from './ui/StandardModal';
+import { useAppToolbar } from '../contexts/AppToolbarContext';
 
 interface InventoryViewProps {
   departments: Department[];
@@ -63,6 +62,7 @@ const InventoryView: React.FC<InventoryViewProps> = ({
   onUpdateRevision,
   onPostRevision,
 }) => {
+  const { setLeading, setModule } = useAppToolbar();
   const [activeTab, setActiveTab] = useState<'balances' | 'items' | 'movements' | 'revisions'>('balances');
   const [selectedDepartmentId, setSelectedDepartmentId] = useState<string>('');
   const [selectedWarehouseId, setSelectedWarehouseId] = useState<string>('');
@@ -394,96 +394,121 @@ const InventoryView: React.FC<InventoryViewProps> = ({
     URL.revokeObjectURL(url);
   };
 
+  useLayoutEffect(() => {
+    const em = 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300';
+    const idle = 'text-gray-500 dark:text-gray-400';
+    const tabs: { id: typeof activeTab; title: string; node: React.ReactNode }[] = [
+      { id: 'balances', title: 'Остатки', node: <BarChart3 size={17} /> },
+      { id: 'items', title: 'Номенклатура', node: <Package size={17} /> },
+      { id: 'movements', title: 'Журнал', node: <ArrowLeftRight size={17} /> },
+      { id: 'revisions', title: 'Ревизии', node: <ClipboardCheck size={17} /> },
+    ];
+    setLeading(
+      <div className="flex items-center gap-1 shrink-0" role="tablist" aria-label="Склад">
+        {tabs.map((t) => {
+          const on = activeTab === t.id;
+          return (
+            <button
+              key={t.id}
+              type="button"
+              role="tab"
+              aria-selected={on}
+              title={t.title}
+              onClick={() => setActiveTab(t.id)}
+              className={`h-8 w-8 rounded-xl flex items-center justify-center shrink-0 transition-colors ${
+                on ? em : `${idle} hover:bg-gray-100 dark:hover:bg-[#252525]`
+              }`}
+            >
+              {t.node}
+            </button>
+          );
+        })}
+      </div>
+    );
+    setModule(
+      <div className="flex items-center gap-1.5 shrink-0">
+        <ModuleFilterIconButton
+          accent="emerald"
+          active={showFilters || hasActiveFilters}
+          activeCount={
+            Number(!!search.trim()) +
+            Number(filterOnlyNonZero) +
+            Number(!!filterCategory) +
+            Number(!!selectedDepartmentId) +
+            Number(!!selectedWarehouseId)
+          }
+          onClick={() => setShowFilters((prev) => !prev)}
+        />
+        <ModuleCreateDropdown
+          accent="emerald"
+          items={[
+            {
+              id: 'wh',
+              label: 'Новый склад',
+              icon: Layers,
+              onClick: () => setIsCreateWarehouseOpen(true),
+              iconClassName: 'text-emerald-600 dark:text-emerald-400',
+            },
+            {
+              id: 'nom',
+              label: 'Новая номенклатура',
+              icon: Package,
+              onClick: () => setIsCreateItemOpen(true),
+              iconClassName: 'text-emerald-600 dark:text-emerald-400',
+            },
+            {
+              id: 'mov',
+              label: 'Складская операция',
+              icon: ArrowLeftRight,
+              onClick: () => setIsCreateMovementOpen(true),
+              iconClassName: 'text-emerald-600 dark:text-emerald-400',
+            },
+            {
+              id: 'rev',
+              label: 'Ревизия',
+              icon: ClipboardCheck,
+              onClick: () => setIsCreateRevisionOpen(true),
+              iconClassName: 'text-emerald-600 dark:text-emerald-400',
+            },
+            {
+              id: 'import',
+              label: 'Загрузить остатки (CSV)',
+              icon: Upload,
+              onClick: () => importInputRef.current?.click(),
+              iconClassName: 'text-emerald-600 dark:text-emerald-400',
+            },
+            {
+              id: 'import-template',
+              label: 'Скачать шаблон импорта',
+              icon: Upload,
+              onClick: downloadBalancesTemplate,
+              iconClassName: 'text-emerald-600 dark:text-emerald-400',
+            },
+          ]}
+        />
+      </div>
+    );
+    return () => {
+      setLeading(null);
+      setModule(null);
+    };
+  }, [
+    activeTab,
+    showFilters,
+    hasActiveFilters,
+    search,
+    filterOnlyNonZero,
+    filterCategory,
+    selectedDepartmentId,
+    selectedWarehouseId,
+    setLeading,
+    setModule,
+  ]);
+
   return (
     <ModulePageShell>
-      <div className={`${MODULE_PAGE_GUTTER} pt-6 md:pt-8 flex-shrink-0`}>
-        <div className="mb-5 space-y-5">
-          <ModulePageHeader
-            accent="emerald"
-            icon={<Layers size={24} strokeWidth={2} />}
-            title="Склад"
-            description="Рабочая зона склада: таблицы, фильтры, загрузка остатков"
-            tabs={
-              <ModuleSegmentedControl
-                variant="neutral"
-                value={activeTab}
-                onChange={(v) => setActiveTab(v as typeof activeTab)}
-                options={[
-                  { value: 'balances', label: 'Остатки' },
-                  { value: 'items', label: 'Номенклатура' },
-                  { value: 'movements', label: 'Журнал' },
-                  { value: 'revisions', label: 'Ревизии' },
-                ]}
-              />
-            }
-            controls={
-              <>
-                <ModuleFilterIconButton
-                  accent="emerald"
-                  active={showFilters || hasActiveFilters}
-                  activeCount={
-                    Number(!!search.trim()) +
-                    Number(filterOnlyNonZero) +
-                    Number(!!filterCategory) +
-                    Number(!!selectedDepartmentId) +
-                    Number(!!selectedWarehouseId)
-                  }
-                  onClick={() => setShowFilters((prev) => !prev)}
-                />
-                <ModuleCreateDropdown
-                  accent="emerald"
-                  items={[
-                    {
-                      id: 'wh',
-                      label: 'Новый склад',
-                      icon: Layers,
-                      onClick: () => setIsCreateWarehouseOpen(true),
-                      iconClassName: 'text-emerald-600 dark:text-emerald-400',
-                    },
-                    {
-                      id: 'nom',
-                      label: 'Новая номенклатура',
-                      icon: Package,
-                      onClick: () => setIsCreateItemOpen(true),
-                      iconClassName: 'text-emerald-600 dark:text-emerald-400',
-                    },
-                    {
-                      id: 'mov',
-                      label: 'Складская операция',
-                      icon: ArrowLeftRight,
-                      onClick: () => setIsCreateMovementOpen(true),
-                      iconClassName: 'text-emerald-600 dark:text-emerald-400',
-                    },
-                    {
-                      id: 'rev',
-                      label: 'Ревизия',
-                      icon: ClipboardCheck,
-                      onClick: () => setIsCreateRevisionOpen(true),
-                      iconClassName: 'text-emerald-600 dark:text-emerald-400',
-                    },
-                    {
-                      id: 'import',
-                      label: 'Загрузить остатки (CSV)',
-                      icon: Upload,
-                      onClick: () => importInputRef.current?.click(),
-                      iconClassName: 'text-emerald-600 dark:text-emerald-400',
-                    },
-                    {
-                      id: 'import-template',
-                      label: 'Скачать шаблон импорта',
-                      icon: Upload,
-                      onClick: downloadBalancesTemplate,
-                      iconClassName: 'text-emerald-600 dark:text-emerald-400',
-                    },
-                  ]}
-                />
-              </>
-            }
-          />
-        </div>
-      </div>
       <div className="flex-1 overflow-y-auto custom-scrollbar min-h-0">
-        <div className={`${MODULE_PAGE_GUTTER} pb-20`}>
+        <div className={`${MODULE_PAGE_GUTTER} pt-3 pb-20`}>
           {activeWarehouses.length === 0 && (
             <div className="rounded-2xl border border-emerald-200/70 dark:border-emerald-900/40 bg-emerald-50/60 dark:bg-emerald-950/20 p-4 sm:p-5 mb-4">
               <p className="text-sm font-semibold text-emerald-900 dark:text-emerald-100">

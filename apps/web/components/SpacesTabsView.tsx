@@ -1,9 +1,10 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useLayoutEffect, useRef } from 'react';
 import { TableCollection, User } from '../types';
 import { hasPermission } from '../utils/permissions';
 import { DynamicIcon } from './AppIcons';
-import { Instagram, Archive, Layers, Edit2, Trash2 } from 'lucide-react';
-import { ModulePageShell, ModulePageHeader, ModuleSegmentedControl, MODULE_PAGE_GUTTER, ModuleCreateIconButton } from './ui';
+import { Instagram, Archive, Layers, Edit2, Trash2, LayoutGrid, List } from 'lucide-react';
+import { ModulePageShell, MODULE_PAGE_GUTTER, ModuleCreateIconButton } from './ui';
+import { useAppToolbar } from '../contexts/AppToolbarContext';
 
 type SpaceType = 'content-plan' | 'backlog' | 'functionality';
 
@@ -50,6 +51,7 @@ export const SpacesTabsView: React.FC<SpacesTabsViewProps> = ({
   onDeleteTable,
   onCreateTable,
 }) => {
+  const { setLeading, setModule } = useAppToolbar();
   const [activeTab, setActiveTab] = useState<SpaceType>(initialTab || 'content-plan');
   const [viewMode, setViewMode] = useState<ViewMode>('grid');
 
@@ -69,57 +71,87 @@ export const SpacesTabsView: React.FC<SpacesTabsViewProps> = ({
   // Фильтруем пространства по типу, исключаем архивные
   const currentSpaces = tables.filter(t => t.type === activeTab && !t.isArchived);
 
+  useLayoutEffect(() => {
+    const indigo = 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300';
+    const idle = 'text-gray-500 dark:text-gray-400';
+    const types: { id: SpaceType; title: string; icon: React.ReactNode }[] = [
+      { id: 'content-plan', title: 'Контент планы', icon: <Instagram size={17} /> },
+      { id: 'backlog', title: 'Бэклог', icon: <Archive size={17} /> },
+      { id: 'functionality', title: 'Функционал', icon: <Layers size={17} /> },
+    ];
+    setLeading(
+      <div className="flex items-center gap-1 shrink-0" role="tablist" aria-label="Тип пространства">
+        {types.map((t) => {
+          const active = activeTab === t.id;
+          return (
+            <button
+              key={t.id}
+              type="button"
+              role="tab"
+              aria-selected={active}
+              title={t.title}
+              onClick={() => setActiveTab(t.id)}
+              className={`h-8 w-8 rounded-xl flex items-center justify-center shrink-0 transition-colors ${
+                active ? indigo : `${idle} hover:bg-gray-100 dark:hover:bg-[#252525]`
+              }`}
+            >
+              {t.icon}
+            </button>
+          );
+        })}
+      </div>
+    );
+    setModule(
+      <div className="flex items-center gap-2 shrink-0">
+        <span
+          className="text-xs text-gray-500 dark:text-gray-400 tabular-nums max-w-[4rem] truncate hidden sm:inline"
+          title={`${getTypeLabel(activeTab)}: ${currentSpaces.length}`}
+        >
+          {currentSpaces.length}
+        </span>
+        <div className="flex items-center rounded-lg border border-gray-200 dark:border-[#333] p-0.5 gap-0.5">
+          <button
+            type="button"
+            title="Плитка"
+            aria-pressed={viewMode === 'grid'}
+            onClick={() => setViewMode('grid')}
+            className={`p-1.5 rounded-md transition-colors ${
+              viewMode === 'grid' ? indigo : `${idle} hover:bg-gray-100 dark:hover:bg-[#252525]`
+            }`}
+          >
+            <LayoutGrid size={16} />
+          </button>
+          <button
+            type="button"
+            title="Список"
+            aria-pressed={viewMode === 'list'}
+            onClick={() => setViewMode('list')}
+            className={`p-1.5 rounded-md transition-colors ${
+              viewMode === 'list' ? indigo : `${idle} hover:bg-gray-100 dark:hover:bg-[#252525]`
+            }`}
+          >
+            <List size={16} />
+          </button>
+        </div>
+        {hasPermission(currentUser, 'settings.general') && (
+          <ModuleCreateIconButton
+            accent="indigo"
+            label="Создать пространство"
+            onClick={() => onCreateTable(activeTab)}
+          />
+        )}
+      </div>
+    );
+    return () => {
+      setLeading(null);
+      setModule(null);
+    };
+  }, [activeTab, viewMode, currentSpaces.length, currentUser, onCreateTable, setLeading, setModule]);
+
   return (
     <ModulePageShell>
-      <div className={`${MODULE_PAGE_GUTTER} pt-6 md:pt-8 pb-4 border-b border-gray-200 dark:border-[#333] shrink-0`}>
-        <ModulePageHeader
-          accent="indigo"
-          icon={React.cloneElement(getTypeIcon(activeTab) as React.ReactElement, { size: 24, strokeWidth: 2 })}
-          title={getTypeLabel(activeTab)}
-          description={`${currentSpaces.length} ${currentSpaces.length === 1 ? 'пространство' : 'пространств'}`}
-          tabs={
-            <ModuleSegmentedControl
-              variant="neutral"
-              value={viewMode}
-              onChange={(v) => setViewMode(v as ViewMode)}
-              options={[
-                { value: 'grid', label: 'Плитка' },
-                { value: 'list', label: 'Список' },
-              ]}
-            />
-          }
-          controls={
-            <>
-              {hasPermission(currentUser, 'settings.general') && (
-                <ModuleCreateIconButton
-                  accent="indigo"
-                  label="Создать пространство"
-                  onClick={() => onCreateTable(activeTab)}
-                />
-              )}
-            </>
-          }
-          actions={undefined}
-          className="w-full"
-        />
-      </div>
-
-      <div className={`${MODULE_PAGE_GUTTER} pb-4 shrink-0`}>
-        <ModuleSegmentedControl
-          variant="neutral"
-          value={activeTab}
-          onChange={(v) => setActiveTab(v as SpaceType)}
-          options={[
-            { value: 'content-plan', label: 'Контент-планы', icon: <Instagram size={14} /> },
-            { value: 'backlog', label: 'Бэклог', icon: <Archive size={14} /> },
-            { value: 'functionality', label: 'Функционал', icon: <Layers size={14} /> },
-          ]}
-        />
-      </div>
-
-      {/* Content */}
       <div className="flex-1 overflow-y-auto overflow-x-hidden custom-scrollbar min-h-0">
-        <div className={`${MODULE_PAGE_GUTTER} py-6 pb-24 md:pb-32`}>
+        <div className={`${MODULE_PAGE_GUTTER} pt-3 py-4 pb-24 md:pb-32`}>
           {currentSpaces.length === 0 ? (
             <div className="text-center py-20">
               <div className="text-gray-400 dark:text-gray-500 mb-4 inline-block">

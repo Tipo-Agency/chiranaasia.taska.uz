@@ -52,7 +52,6 @@ export interface UrlStateSlice {
   settingsTab?: string;
   workdeskTab?: 'dashboard' | 'weekly' | 'tasks' | 'deals' | 'meetings' | 'documents';
   crmHubTab?: 'funnel' | 'chats' | 'clients';
-  bpmHubTab?: 'processes' | 'inventory';
 }
 
 /** Построить path + search из состояния навигации */
@@ -63,7 +62,6 @@ export function buildLocation(opts: {
   settingsActiveTab?: string;
   workdeskTab?: 'dashboard' | 'weekly' | 'tasks' | 'deals' | 'meetings' | 'documents';
   crmHubTab?: 'funnel' | 'chats' | 'clients';
-  bpmHubTab?: 'processes' | 'inventory';
 }): string {
   const {
     currentView,
@@ -72,7 +70,6 @@ export function buildLocation(opts: {
     settingsActiveTab,
     workdeskTab,
     crmHubTab,
-    bpmHubTab,
   } = opts;
 
   if (currentView === 'table' && activeTableId) {
@@ -111,9 +108,7 @@ export function buildLocation(opts: {
   }
 
   if (currentView === 'business-processes') {
-    let path = VIEW_PATHS['business-processes'];
-    if (bpmHubTab === 'inventory') path += '?bpm=inventory';
-    return path;
+    return VIEW_PATHS['business-processes'];
   }
 
   const path = VIEW_PATHS[currentView];
@@ -173,10 +168,6 @@ export function parseLocation(pathname: string, search: string): UrlStateSlice |
     out.view = 'home';
     out.workdeskTab = view === 'meetings' ? 'meetings' : 'documents';
   }
-  if (view === 'inventory') {
-    out.view = 'business-processes';
-    out.bpmHubTab = 'inventory';
-  }
   if (view === 'analytics') {
     out.view = 'home';
     out.workdeskTab = 'dashboard';
@@ -211,8 +202,7 @@ export function parseLocation(pathname: string, search: string): UrlStateSlice |
 
   if (out.view === 'business-processes') {
     const bpm = q.get('bpm');
-    if (bpm === 'inventory') out.bpmHubTab = 'inventory';
-    else if (!out.bpmHubTab) out.bpmHubTab = 'processes';
+    if (bpm === 'inventory') out.view = 'inventory';
   }
 
   return out;

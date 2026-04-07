@@ -26,7 +26,7 @@ const SettingsViewLazy = lazy(() => import('./SettingsView'));
 const DocEditorLazy = lazy(() => import('./DocEditor'));
 const SpaceModuleLazy = lazy(() => import('./modules/SpaceModule').then((m) => ({ default: m.SpaceModule })));
 const CRMHubModuleLazy = lazy(() => import('./modules/CRMHubModule').then((m) => ({ default: m.CRMHubModule })));
-const BPMHubModuleLazy = lazy(() => import('./modules/BPMHubModule').then((m) => ({ default: m.BPMHubModule })));
+const InventoryViewLazy = lazy(() => import('./InventoryView'));
 const FinanceModuleLazy = lazy(() => import('./modules/FinanceModule').then((m) => ({ default: m.FinanceModule })));
 const HRModuleLazy = lazy(() => import('./modules/HRModule').then((m) => ({ default: m.HRModule })));
 const MeetingsModuleLazy = lazy(() => import('./modules/MeetingsModule').then((m) => ({ default: m.MeetingsModule })));
@@ -78,7 +78,6 @@ interface AppRouterProps {
   activeSpaceTab?: 'content-plan' | 'backlog' | 'functionality';
   workdeskTab?: 'dashboard' | 'weekly' | 'tasks' | 'deals' | 'meetings' | 'documents';
   crmHubTab?: 'funnel' | 'chats' | 'clients';
-  bpmHubTab?: 'processes' | 'inventory';
   notificationPrefs?: NotificationPreferences;
   actions: AppActions;
 }
@@ -581,26 +580,44 @@ export const AppRouter: React.FC<AppRouterProps> = (props) => {
   if (view === 'business-processes') {
       return (
         <Suspense fallback={<RouteFallback />}>
-          <BPMHubModuleLazy
-            tab={props.bpmHubTab ?? 'processes'}
-            onTabChange={actions.setBpmHubTab}
-            currentUser={props.currentUser}
+          <HRModuleLazy
+            view="business-processes"
             employees={props.employeeInfos}
             users={props.users}
+            currentUser={props.currentUser}
             departments={props.departments}
             orgPositions={props.orgPositions}
             processes={props.businessProcesses}
             tasks={props.filteredTasks}
             tables={props.tables}
-            warehouses={props.warehouses}
-            items={props.inventoryItems}
-            balances={props.inventoryBalances}
-            movements={props.inventoryMovements}
-            revisions={props.inventoryRevisions || []}
             actions={actions}
           />
         </Suspense>
       );
+  }
+
+  if (view === 'inventory') {
+    return (
+      <Suspense fallback={<RouteFallback />}>
+        <InventoryViewLazy
+          departments={props.departments}
+          warehouses={props.warehouses}
+          items={props.inventoryItems}
+          balances={props.inventoryBalances}
+          movements={props.inventoryMovements}
+          revisions={props.inventoryRevisions || []}
+          currentUserId={props.currentUser.id}
+          onSaveWarehouse={actions.saveWarehouse}
+          onDeleteWarehouse={actions.deleteWarehouse}
+          onSaveItem={actions.saveInventoryItem}
+          onDeleteItem={actions.deleteInventoryItem}
+          onCreateMovement={actions.createInventoryMovement}
+          onCreateRevision={actions.createInventoryRevision}
+          onUpdateRevision={actions.updateInventoryRevision}
+          onPostRevision={actions.postInventoryRevision}
+        />
+      </Suspense>
+    );
   }
 
   // Fallback: если ничего не подошло, показываем home

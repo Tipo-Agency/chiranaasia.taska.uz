@@ -1,10 +1,10 @@
 
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useLayoutEffect, useMemo, useRef } from 'react';
 import { Deal, Client, User, Comment, Task, Project, SalesFunnel, Meeting, NotificationPreferences } from '../types';
 import { Plus, KanbanSquare, List as ListIcon, X, Send, MessageSquare, Instagram, Globe, UserPlus, Bot, Edit2, TrendingUp, CheckSquare, CheckCircle2, XCircle, Trash2, Calendar, Clock, Users, Tag, GitBranch, Filter, User as UserIcon } from 'lucide-react';
 // Клиентский Telegram/Instagram — при необходимости подключать через api/telegramService.
 import { DynamicIcon } from './AppIcons';
-import { Button, ModulePageShell, ModulePageHeader, ModuleSegmentedControl, MODULE_PAGE_GUTTER, ModuleCreateIconButton, ModuleSelectDropdown, SystemAlertDialog, SystemConfirmDialog } from './ui';
+import { Button, ModulePageShell, MODULE_PAGE_GUTTER, ModuleCreateIconButton, ModuleSelectDropdown, SystemAlertDialog, SystemConfirmDialog } from './ui';
 import { DateInput } from './ui/DateInput';
 import { TaskSelect } from './TaskSelect';
 import { api } from '../backend/api';
@@ -12,6 +12,7 @@ import { isFunnelDeal } from '../utils/dealModel';
 import { getFunnelKanbanCardAccent } from '../utils/funnelVisual';
 import { devWarn } from '../utils/devLog';
 import { formatDate } from '../utils/dateUtils';
+import { useAppToolbar } from '../contexts/AppToolbarContext';
 
 interface SalesFunnelViewProps {
   deals: Deal[];
@@ -40,6 +41,7 @@ const STAGES = [
 ];
 
 const SalesFunnelView: React.FC<SalesFunnelViewProps> = ({ deals, clients, users, projects = [], tasks = [], meetings = [], salesFunnels = [], currentUser, onSaveDeal, onDeleteDeal, onCreateTask, onCreateClient, onOpenTask, onSaveMeeting, onDeleteMeeting, onUpdateMeetingSummary, autoOpenCreateModal = false }) => {
+  const { setModule } = useAppToolbar();
   const [viewMode, setViewMode] = useState<'kanban' | 'list' | 'rejected'>('kanban');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingDeal, setEditingDeal] = useState<Deal | null>(null);
@@ -180,6 +182,77 @@ const SalesFunnelView: React.FC<SalesFunnelViewProps> = ({ deals, clients, users
     setModalTab('chat');
     setIsModalOpen(true); 
   };
+
+  const handleOpenCreateRef = useRef(handleOpenCreate);
+  handleOpenCreateRef.current = handleOpenCreate;
+
+  useLayoutEffect(() => {
+    if (!salesFunnels.length) {
+      setModule(null);
+      return;
+    }
+    const violet = 'bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-300';
+    const idle = 'text-gray-500 dark:text-gray-400';
+    setModule(
+      <div className="flex items-center gap-2 flex-wrap min-w-0">
+        <div className="flex items-center gap-1 shrink-0" role="tablist" aria-label="Вид воронки">
+          {(
+            [
+              { id: 'kanban' as const, title: 'Канбан', icon: <KanbanSquare size={17} /> },
+              { id: 'list' as const, title: 'Список', icon: <ListIcon size={17} /> },
+              { id: 'rejected' as const, title: 'Отказы', icon: <XCircle size={17} /> },
+            ] as const
+          ).map((t) => (
+            <button
+              key={t.id}
+              type="button"
+              role="tab"
+              aria-selected={viewMode === t.id}
+              title={t.title}
+              onClick={() => setViewMode(t.id)}
+              className={`h-8 w-8 rounded-xl flex items-center justify-center shrink-0 transition-colors ${
+                viewMode === t.id ? violet : `${idle} hover:bg-gray-100 dark:hover:bg-[#252525]`
+              }`}
+            >
+              {t.icon}
+            </button>
+          ))}
+        </div>
+        <div className="flex items-center gap-2 flex-wrap min-w-0 flex-1">
+          <div className="min-w-[min(100%,180px)] max-w-[240px]">
+            <TaskSelect
+              value={selectedFunnelId}
+              onChange={setSelectedFunnelId}
+              options={[
+                { value: 'all', label: `Все (${activeFunnels.length})` },
+                ...activeFunnels.map((f) => ({ value: f.id, label: f.name })),
+              ]}
+            />
+          </div>
+          {selectedFunnelId !== 'all' && (
+            <div className="hidden sm:flex items-center gap-2 px-2 py-1.5 rounded-lg border border-gray-200 dark:border-[#333] bg-white dark:bg-[#252525] max-w-[200px]">
+              <span
+                className={`w-2.5 h-2.5 rounded shrink-0 ${
+                  activeFunnels.find((f) => f.id === selectedFunnelId)?.color ||
+                  activeFunnels.find((f) => f.id === selectedFunnelId)?.stages?.[0]?.color ||
+                  'bg-gray-200 dark:bg-gray-700'
+                }`}
+              />
+              <span className="text-xs font-semibold text-gray-700 dark:text-gray-200 truncate">
+                {activeFunnels.find((f) => f.id === selectedFunnelId)?.name || 'Воронка'}
+              </span>
+            </div>
+          )}
+          <ModuleCreateIconButton
+            accent="violet"
+            label="Новая сделка"
+            onClick={() => handleOpenCreateRef.current?.()}
+          />
+        </div>
+      </div>
+    );
+    return () => setModule(null);
+  }, [salesFunnels.length, viewMode, selectedFunnelId, activeFunnels, setModule]);
   
   const handleOpenEdit = (d: Deal) => { 
     setEditingDeal(d); 
@@ -557,7 +630,7 @@ const SalesFunnelView: React.FC<SalesFunnelViewProps> = ({ deals, clients, users
             Создайте воронку в разделе «Настройки системы» → «Воронки продаж».
           </p>
           <p className="text-sm text-gray-400 dark:text-gray-500 mb-6">
-            Быстрый переход: иконка шестерёнки в шапке рядом с названием «Воронка продаж».
+            Меню пользователя (аватар) → «Настройки» → раздел «Воронки продаж».
           </p>
         </div>
       </div>
@@ -566,65 +639,9 @@ const SalesFunnelView: React.FC<SalesFunnelViewProps> = ({ deals, clients, users
 
   return (
     <ModulePageShell className="flex-1 min-h-0 flex flex-col overflow-hidden">
-      <div className={`${MODULE_PAGE_GUTTER} pt-6 md:pt-8 flex-shrink-0`}>
-        <div className="mb-6 space-y-5">
-          <ModulePageHeader
-            accent="violet"
-            icon={<TrendingUp size={24} strokeWidth={2} />}
-            title="Воронка продаж"
-            description="Управление сделками и продажами"
-            tabs={
-              <ModuleSegmentedControl
-                variant="neutral"
-                value={viewMode}
-                onChange={(v) => setViewMode(v as 'kanban' | 'list' | 'rejected')}
-                options={[
-                  { value: 'kanban', label: 'Канбан' },
-                  { value: 'list', label: 'Список' },
-                  { value: 'rejected', label: 'Отказы' },
-                ]}
-              />
-            }
-            controls={
-              <>
-                <div className="flex items-center gap-2 flex-wrap">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <div className="min-w-[260px]">
-                      <TaskSelect
-                        value={selectedFunnelId}
-                        onChange={setSelectedFunnelId}
-                        options={[
-                          { value: 'all', label: `Основная: Все (${activeFunnels.length})` },
-                          ...activeFunnels.map((f) => ({ value: f.id, label: f.name })),
-                        ]}
-                      />
-                    </div>
-                    {selectedFunnelId !== 'all' && (
-                      <div className="hidden md:flex items-center gap-2 px-3 py-2 rounded-lg border border-gray-200 dark:border-[#333] bg-white dark:bg-[#252525]">
-                        <span
-                          className={`w-3 h-3 rounded ${
-                            activeFunnels.find((f) => f.id === selectedFunnelId)?.color ||
-                            activeFunnels.find((f) => f.id === selectedFunnelId)?.stages?.[0]?.color ||
-                            'bg-gray-200 dark:bg-gray-700'
-                          }`}
-                        />
-                        <span className="text-xs font-semibold text-gray-700 dark:text-gray-200 truncate max-w-[220px]">
-                          {activeFunnels.find((f) => f.id === selectedFunnelId)?.name || 'Воронка'}
-                        </span>
-                      </div>
-                    )}
-                  </div>
-
-                  <ModuleCreateIconButton accent="violet" label="Новая сделка" onClick={() => handleOpenCreate()} />
-                </div>
-              </>
-            }
-          />
-        </div>
-      </div>
       <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
         <div
-          className={`${MODULE_PAGE_GUTTER} h-full min-h-0 flex flex-col ${
+          className={`${MODULE_PAGE_GUTTER} pt-3 h-full min-h-0 flex flex-col ${
             viewMode === 'kanban'
               ? 'overflow-hidden pb-0'
               : 'pb-24 md:pb-32 overflow-y-auto overflow-x-hidden custom-scrollbar'

@@ -1,5 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Tabs } from '../ui/Tabs';
+import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { WeeklyPlansView, type WeeklyPlansViewHandle } from '../documents/WeeklyPlansView';
 import { StatsCards } from '../features/home/StatsCards';
 import {
@@ -8,6 +7,7 @@ import {
   Briefcase,
   FileText,
   Network,
+  LayoutDashboard,
   X,
   Save,
   AlertCircle,
@@ -19,7 +19,8 @@ import {
 import { Deal, FinancePlan, Meeting, Task, User, Doc, BusinessProcess, SalesFunnel } from '../../types';
 import { getDealDisplayTitle, isFunnelDeal } from '../../utils/dealModel';
 import { ModuleCreateDropdown } from '../ui/ModuleCreateDropdown';
-import { ModulePageHeader, ModulePageShell, MODULE_PAGE_GUTTER } from '../ui';
+import { ModulePageShell, MODULE_PAGE_GUTTER } from '../ui';
+import { useAppToolbar } from '../../contexts/AppToolbarContext';
 import { DateInput } from '../ui/DateInput';
 import { normalizeDateForInput, parseLocalDate } from '../../utils/dateUtils';
 
@@ -123,6 +124,7 @@ export const WorkdeskView: React.FC<WorkdeskViewProps> = ({
   onCreateEntity,
   onUpdateEntity,
 }) => {
+  const { setLeading, setModule } = useAppToolbar();
   const activeTab = workdeskTab;
   const setActiveTab = onWorkdeskTabChange;
   const weeklyPlansRef = useRef<WeeklyPlansViewHandle>(null);
@@ -297,84 +299,115 @@ export const WorkdeskView: React.FC<WorkdeskViewProps> = ({
     return m;
   }, [salesFunnels]);
 
+  useLayoutEffect(() => {
+    const activeBox = 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300';
+    const idleBox = 'text-gray-500 dark:text-gray-400';
+    const tabs: { id: WorkdeskTab; title: string; node: React.ReactNode }[] = [
+      { id: 'dashboard', title: 'Дашборд', node: <LayoutDashboard size={17} /> },
+      { id: 'weekly', title: 'Планы', node: <Calendar size={17} /> },
+      { id: 'tasks', title: 'Задачи', node: <CheckSquare size={17} /> },
+      { id: 'deals', title: 'Сделки', node: <Briefcase size={17} /> },
+      { id: 'meetings', title: 'Календарь', node: <Users size={17} /> },
+      { id: 'documents', title: 'Документы', node: <FileText size={17} /> },
+    ];
+    setLeading(
+      <div className="flex items-center gap-1 shrink-0" role="tablist" aria-label="Рабочий стол">
+        {tabs.map((t) => {
+          const active = activeTab === t.id;
+          return (
+            <button
+              key={t.id}
+              type="button"
+              role="tab"
+              aria-selected={active}
+              title={t.title}
+              onClick={() => setActiveTab(t.id)}
+              className={`h-8 w-8 rounded-xl flex items-center justify-center shrink-0 transition-colors ${
+                active ? activeBox : idleBox + ' hover:bg-gray-100 dark:hover:bg-[#252525]'
+              }`}
+            >
+              {t.node}
+            </button>
+          );
+        })}
+      </div>
+    );
+    setModule(
+      <ModuleCreateDropdown
+        accent="indigo"
+        label="Создать"
+        items={[
+          {
+            id: 'create-task',
+            label: 'Новая задача',
+            icon: CheckSquare,
+            onClick: () => {
+              void onCreateEntity?.('task', `Задача ${new Date().toLocaleTimeString('ru-RU')}`);
+            },
+          },
+          {
+            id: 'create-deal',
+            label: 'Новая сделка',
+            icon: Briefcase,
+            onClick: () => {
+              void onCreateEntity?.('deal', `Сделка ${new Date().toLocaleTimeString('ru-RU')}`);
+            },
+          },
+          {
+            id: 'create-weekly-plan',
+            label: 'Недельный план',
+            icon: Calendar,
+            onClick: () => {
+              setActiveTab('weekly');
+              window.setTimeout(() => weeklyPlansRef.current?.openCreateModal(), 0);
+            },
+          },
+          {
+            id: 'create-meeting',
+            label: 'Новая встреча',
+            icon: Calendar,
+            onClick: () => {
+              void onCreateEntity?.('meeting', `Встреча ${new Date().toLocaleTimeString('ru-RU')}`);
+            },
+          },
+          {
+            id: 'create-doc',
+            label: 'Новый документ',
+            icon: FileText,
+            onClick: () => {
+              void onCreateEntity?.('doc', `Документ ${new Date().toLocaleTimeString('ru-RU')}`);
+            },
+          },
+          ...(availableProcessTemplates.length
+            ? [
+                {
+                  id: 'start-process',
+                  label: 'Запустить бизнес-процесс',
+                  icon: Network,
+                  onClick: () => setProcessPickerOpen(true),
+                },
+              ]
+            : []),
+        ]}
+      />
+    );
+    return () => {
+      setLeading(null);
+      setModule(null);
+    };
+  }, [
+    activeTab,
+    setActiveTab,
+    setLeading,
+    setModule,
+    onCreateEntity,
+    availableProcessTemplates.length,
+  ]);
 
   return (
     <ModulePageShell>
-      <div className={`${MODULE_PAGE_GUTTER} pt-6 md:pt-8 flex-shrink-0`}>
-        <div className="mb-6">
-          <ModulePageHeader
-            accent="indigo"
-            icon={<div />}
-            title="Рабочий стол"
-                tabs={
-              <Tabs
-                tabs={[
-                  { id: 'dashboard', label: 'Дашборд' },
-                  { id: 'weekly', label: 'Планы' },
-                  { id: 'tasks', label: 'Задачи' },
-                  { id: 'deals', label: 'Сделки' },
-                  { id: 'meetings', label: 'Календарь' },
-                  { id: 'documents', label: 'Документы' },
-                ]}
-                activeTab={activeTab}
-                onChange={(id) => setActiveTab(id as WorkdeskTab)}
-              />
-            }
-            controls={
-              <ModuleCreateDropdown
-                accent="indigo"
-                label="Создать"
-                items={[
-                  {
-                    id: 'create-task',
-                    label: 'Новая задача',
-                    icon: CheckSquare,
-                    onClick: () => { void onCreateEntity?.('task', `Задача ${new Date().toLocaleTimeString('ru-RU')}`); },
-                  },
-                  {
-                    id: 'create-deal',
-                    label: 'Новая сделка',
-                    icon: Briefcase,
-                    onClick: () => { void onCreateEntity?.('deal', `Сделка ${new Date().toLocaleTimeString('ru-RU')}`); },
-                  },
-                  {
-                    id: 'create-weekly-plan',
-                    label: 'Недельный план',
-                    icon: Calendar,
-                    onClick: () => {
-                      setActiveTab('weekly');
-                      window.setTimeout(() => weeklyPlansRef.current?.openCreateModal(), 0);
-                    },
-                  },
-                  {
-                    id: 'create-meeting',
-                    label: 'Новая встреча',
-                    icon: Calendar,
-                    onClick: () => { void onCreateEntity?.('meeting', `Встреча ${new Date().toLocaleTimeString('ru-RU')}`); },
-                  },
-                  {
-                    id: 'create-doc',
-                    label: 'Новый документ',
-                    icon: FileText,
-                    onClick: () => { void onCreateEntity?.('doc', `Документ ${new Date().toLocaleTimeString('ru-RU')}`); },
-                  },
-                  ...(availableProcessTemplates.length
-                    ? [{
-                        id: 'start-process',
-                        label: 'Запустить бизнес-процесс',
-                        icon: Network,
-                        onClick: () => setProcessPickerOpen(true),
-                      }]
-                    : []),
-                ]}
-              />
-            }
-          />
-          </div>
-      </div>
-
       <div className="flex-1 min-h-0 overflow-hidden">
-        <div className={`${MODULE_PAGE_GUTTER} mt-3 pb-24 md:pb-32 h-full overflow-y-auto overflow-x-hidden custom-scrollbar space-y-4`}>
+        <div className={`${MODULE_PAGE_GUTTER} pt-3 pb-24 md:pb-32 h-full overflow-y-auto overflow-x-hidden custom-scrollbar space-y-4`}>
           {activeTab === 'dashboard' && (
             <div className="space-y-4">
               <StatsCards

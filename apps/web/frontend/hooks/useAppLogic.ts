@@ -349,9 +349,6 @@ export const useAppLogic = () => {
     if (parsed.crmHubTab) {
       settingsSlice.setters.setCrmHubTab(parsed.crmHubTab);
     }
-    if (parsed.bpmHubTab) {
-      settingsSlice.setters.setBpmHubTab(parsed.bpmHubTab);
-    }
   }, [isLoading, authSlice.state.currentUser]);
 
   // Адресная строка следует за состоянием (клик по меню и т.д.)
@@ -372,7 +369,6 @@ export const useAppLogic = () => {
       settingsActiveTab: settingsSlice.state.settingsActiveTab,
       workdeskTab: settingsSlice.state.workdeskTab,
       crmHubTab: settingsSlice.state.crmHubTab,
-      bpmHubTab: settingsSlice.state.bpmHubTab,
     });
     if (next === built) return;
     window.history.pushState(null, '', built);
@@ -385,7 +381,6 @@ export const useAppLogic = () => {
     settingsSlice.state.settingsActiveTab,
     settingsSlice.state.workdeskTab,
     settingsSlice.state.crmHubTab,
-    settingsSlice.state.bpmHubTab,
   ]);
 
   useEffect(() => {
@@ -413,9 +408,6 @@ export const useAppLogic = () => {
       }
       if (parsed.crmHubTab) {
         settingsSlice.setters.setCrmHubTab(parsed.crmHubTab);
-      }
-      if (parsed.bpmHubTab) {
-        settingsSlice.setters.setBpmHubTab(parsed.bpmHubTab);
       }
     };
     window.addEventListener('popstate', onPop);
@@ -480,9 +472,6 @@ export const useAppLogic = () => {
                   loadBPMData(),
                   loadCRMData(), // EmployeeInfos находятся в CRM
               ]);
-              if (currentView === 'business-processes' && settingsSlice.state.bpmHubTab === 'inventory') {
-                  await loadInventoryData();
-              }
               break;
           case 'meetings':
           case 'docs':
@@ -512,7 +501,7 @@ export const useAppLogic = () => {
     loadData().catch(err => {
       console.error('Ошибка загрузки данных модуля:', err);
     });
-  }, [settingsSlice.state.currentView, settingsSlice.state.activeTableId, settingsSlice.state.bpmHubTab]);
+  }, [settingsSlice.state.currentView, settingsSlice.state.activeTableId]);
 
   // Обработчик синхронизации контент-плана
   useEffect(() => {
@@ -1014,8 +1003,7 @@ export const useAppLogic = () => {
       return;
     }
     if (v === 'inventory') {
-      st.setBpmHubTab('inventory');
-      st.setCurrentView('business-processes');
+      st.setCurrentView('inventory');
       st.setActiveTableId('');
       return;
     }
@@ -1046,7 +1034,7 @@ export const useAppLogic = () => {
       salesFunnels: salesFunnels,
       inboxMessages, outboxMessages,
       darkMode: settingsSlice.state.darkMode, tables: settingsSlice.state.tables, activityLogs: settingsSlice.state.activityLogs, currentView: settingsSlice.state.currentView, activeTableId: settingsSlice.state.activeTableId, viewMode: settingsSlice.state.viewMode, searchQuery: settingsSlice.state.searchQuery, settingsActiveTab: settingsSlice.state.settingsActiveTab, isCreateTableModalOpen: settingsSlice.state.isCreateTableModalOpen, createTableType: settingsSlice.state.createTableType, isEditTableModalOpen: settingsSlice.state.isEditTableModalOpen, editingTable: settingsSlice.state.editingTable, notificationPrefs: settingsSlice.state.notificationPrefs, automationRules: settingsSlice.state.automationRules, activeSpaceTab: settingsSlice.state.activeSpaceTab,
-      workdeskTab: settingsSlice.state.workdeskTab, crmHubTab: settingsSlice.state.crmHubTab, bpmHubTab: settingsSlice.state.bpmHubTab,
+      workdeskTab: settingsSlice.state.workdeskTab, crmHubTab: settingsSlice.state.crmHubTab,
       activeTable: settingsSlice.state.tables.find(t => t.id === settingsSlice.state.activeTableId), activeDoc: contentSlice.state.docs.find(d => d.id === contentSlice.state.activeDocId)
     },
     actions: {
@@ -1513,7 +1501,7 @@ export const useAppLogic = () => {
       },
       toggleDarkMode: settingsSlice.actions.toggleDarkMode, createTable: createTableWrapper, updateTable: settingsSlice.actions.updateTable, deleteTable: settingsSlice.actions.deleteTable, markAllRead: settingsSlice.actions.markAllRead, navigate: settingsSlice.actions.navigate, openSettings: settingsSlice.actions.openSettings, closeSettings: settingsSlice.actions.closeSettings, openCreateTable: settingsSlice.actions.openCreateTable, closeCreateTable: settingsSlice.actions.closeCreateTable, openEditTable: settingsSlice.actions.openEditTable, closeEditTable: settingsSlice.actions.closeEditTable, updateNotificationPrefs: settingsSlice.actions.updateNotificationPrefs, saveAutomationRule: settingsSlice.actions.saveAutomationRule, deleteAutomationRule: settingsSlice.actions.deleteAutomationRule, setActiveSpaceTab: settingsSlice.actions.setActiveSpaceTab,
       setActiveTableId: settingsSlice.setters.setActiveTableId, setCurrentView, setViewMode: settingsSlice.setters.setViewMode, setSearchQuery: settingsSlice.setters.setSearchQuery, setSettingsActiveTab: settingsSlice.setters.setSettingsActiveTab,
-      setWorkdeskTab: settingsSlice.setters.setWorkdeskTab, setCrmHubTab: settingsSlice.setters.setCrmHubTab, setBpmHubTab: settingsSlice.setters.setBpmHubTab,
+      setWorkdeskTab: settingsSlice.setters.setWorkdeskTab, setCrmHubTab: settingsSlice.setters.setCrmHubTab,
       /** Открыть контент-план и вкладку «Съёмки» (из календаря) */
       openShootPlanFromCalendar: (tableId: string, shootPlanId?: string) => {
         settingsSlice.setters.setActiveTableId(tableId);

@@ -1,4 +1,5 @@
 import React, { useLayoutEffect, useMemo } from 'react';
+import { BarChart3, Briefcase, MessageCircle } from 'lucide-react';
 import {
   Deal,
   Client,
@@ -13,9 +14,9 @@ import {
 } from '../../types';
 import type { AppActions } from '../../frontend/hooks/useAppLogic';
 import { hasPermission } from '../../utils/permissions';
-import { ModuleSegmentedControl } from '../ui';
 import { CRMModule } from './CRMModule';
 import { ClientChatsPage } from '../pages/ClientChatsPage';
+import { useAppToolbar } from '../../contexts/AppToolbarContext';
 
 export type CrmHubTab = 'funnel' | 'chats' | 'clients';
 
@@ -52,6 +53,7 @@ export const CRMHubModule: React.FC<CRMHubModuleProps> = ({
   meetings = [],
   actions,
 }) => {
+  const { setLeading } = useAppToolbar();
   const canFunnel = hasPermission(currentUser, 'crm.sales_funnel');
   const canChats = hasPermission(currentUser, 'crm.client_chats');
   const canClients = hasPermission(currentUser, 'crm.clients');
@@ -73,6 +75,46 @@ export const CRMHubModule: React.FC<CRMHubModuleProps> = ({
     if (!options.length) return;
     if (tab !== effectiveTab) onTabChange(effectiveTab);
   }, [options.length, tab, effectiveTab, onTabChange]);
+
+  useLayoutEffect(() => {
+    if (options.length <= 1) {
+      setLeading(null);
+      return () => setLeading(null);
+    }
+    const activeBox = 'bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-300';
+    const idleBox = 'text-gray-500 dark:text-gray-400';
+    setLeading(
+      <div className="flex items-center gap-1 shrink-0" role="tablist" aria-label="CRM">
+        {options.map((o) => {
+          const active = effectiveTab === o.value;
+          const icon =
+            o.value === 'funnel' ? (
+              <BarChart3 size={17} />
+            ) : o.value === 'chats' ? (
+              <MessageCircle size={17} />
+            ) : (
+              <Briefcase size={17} />
+            );
+          return (
+            <button
+              key={o.value}
+              type="button"
+              role="tab"
+              aria-selected={active}
+              title={o.label}
+              onClick={() => onTabChange(o.value)}
+              className={`h-8 w-8 rounded-xl flex items-center justify-center shrink-0 transition-colors ${
+                active ? activeBox : idleBox + ' hover:bg-gray-100 dark:hover:bg-[#252525]'
+              }`}
+            >
+              {icon}
+            </button>
+          );
+        })}
+      </div>
+    );
+    return () => setLeading(null);
+  }, [options, effectiveTab, onTabChange, setLeading]);
 
   const sharedCrm = {
     deals,
@@ -99,16 +141,6 @@ export const CRMHubModule: React.FC<CRMHubModuleProps> = ({
 
   return (
     <div className="h-full min-h-0 flex flex-col bg-white dark:bg-[#191919]">
-      {options.length > 1 && (
-        <div className="shrink-0 border-b border-gray-200 dark:border-[#333] px-4 py-3 md:px-6">
-          <ModuleSegmentedControl
-            variant="neutral"
-            value={effectiveTab}
-            onChange={(v) => onTabChange(v as CrmHubTab)}
-            options={options}
-          />
-        </div>
-      )}
       <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
         {effectiveTab === 'funnel' && canFunnel && <CRMModule view="sales-funnel" {...sharedCrm} />}
         {effectiveTab === 'chats' && canChats && (

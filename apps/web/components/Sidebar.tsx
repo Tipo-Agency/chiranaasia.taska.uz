@@ -17,6 +17,7 @@ import {
   ChevronDown,
   Users,
   Layers,
+  Package,
 } from 'lucide-react';
 import { TableCollection, User } from '../types';
 import { LogoIcon, DynamicIcon } from './AppIcons';
@@ -171,15 +172,58 @@ const Sidebar: React.FC<SidebarProps> = ({
             </div>
             )}
 
-            {/* Бизнес-процессы + склад */}
-            {(can('org.bpm') || can('org.inventory')) && (
-            <div 
+            {/* Бизнес-процессы; склад — вложенным пунктом */}
+            {can('org.bpm') && can('org.inventory') && (
+              <div className="space-y-0.5">
+                <div
+                  onClick={() => handleNav(() => onNavigate('business-processes'))}
+                  className={`flex items-center ${isCollapsed ? 'justify-center' : 'gap-2'} ${isCollapsed ? 'px-2' : 'px-3'} py-1.5 rounded cursor-pointer transition-colors ${
+                    currentView === 'business-processes'
+                      ? 'bg-notion-hover dark:bg-[#252525] text-notion-text dark:text-white font-medium'
+                      : 'text-notion-text/70 dark:text-gray-400 hover:bg-notion-hover dark:hover:bg-[#252525] hover:text-notion-text dark:hover:text-gray-200'
+                  }`}
+                  title={isCollapsed ? 'Бизнес-процессы' : ''}
+                >
+                  <Network size={18} /> {!isCollapsed && <span className="text-sm">Бизнес-процессы</span>}
+                </div>
+                <div
+                  onClick={() => handleNav(() => onNavigate('inventory'))}
+                  className={`flex items-center ${isCollapsed ? 'justify-center' : 'gap-2'} ${isCollapsed ? 'px-2' : 'pl-7 pr-3'} py-1.5 rounded cursor-pointer transition-colors ${
+                    currentView === 'inventory'
+                      ? 'bg-notion-hover dark:bg-[#252525] text-notion-text dark:text-white font-medium'
+                      : 'text-notion-text/70 dark:text-gray-400 hover:bg-notion-hover dark:hover:bg-[#252525] hover:text-notion-text dark:hover:text-gray-200'
+                  }`}
+                  title={isCollapsed ? 'Склад' : ''}
+                >
+                  <Package size={17} className="shrink-0" /> {!isCollapsed && <span className="text-sm">Склад</span>}
+                </div>
+              </div>
+            )}
+            {can('org.bpm') && !can('org.inventory') && (
+              <div
                 onClick={() => handleNav(() => onNavigate('business-processes'))}
-                className={`flex items-center ${isCollapsed ? 'justify-center' : 'gap-2'} ${isCollapsed ? 'px-2' : 'px-3'} py-1.5 rounded cursor-pointer transition-colors ${currentView === 'business-processes' ? 'bg-notion-hover dark:bg-[#252525] text-notion-text dark:text-white font-medium' : 'text-notion-text/70 dark:text-gray-400 hover:bg-notion-hover dark:hover:bg-[#252525] hover:text-notion-text dark:hover:text-gray-200'}`}
-                title={isCollapsed ? "Бизнес-процессы" : ""}
-            >
+                className={`flex items-center ${isCollapsed ? 'justify-center' : 'gap-2'} ${isCollapsed ? 'px-2' : 'px-3'} py-1.5 rounded cursor-pointer transition-colors ${
+                  currentView === 'business-processes'
+                    ? 'bg-notion-hover dark:bg-[#252525] text-notion-text dark:text-white font-medium'
+                    : 'text-notion-text/70 dark:text-gray-400 hover:bg-notion-hover dark:hover:bg-[#252525] hover:text-notion-text dark:hover:text-gray-200'
+                }`}
+                title={isCollapsed ? 'Бизнес-процессы' : ''}
+              >
                 <Network size={18} /> {!isCollapsed && <span className="text-sm">Бизнес-процессы</span>}
-            </div>
+              </div>
+            )}
+            {!can('org.bpm') && can('org.inventory') && (
+              <div
+                onClick={() => handleNav(() => onNavigate('inventory'))}
+                className={`flex items-center ${isCollapsed ? 'justify-center' : 'gap-2'} ${isCollapsed ? 'px-2' : 'px-3'} py-1.5 rounded cursor-pointer transition-colors ${
+                  currentView === 'inventory'
+                    ? 'bg-notion-hover dark:bg-[#252525] text-notion-text dark:text-white font-medium'
+                    : 'text-notion-text/70 dark:text-gray-400 hover:bg-notion-hover dark:hover:bg-[#252525] hover:text-notion-text dark:hover:text-gray-200'
+                }`}
+                title={isCollapsed ? 'Склад' : ''}
+              >
+                <Package size={18} /> {!isCollapsed && <span className="text-sm">Склад</span>}
+              </div>
             )}
 
             {/* Чат на мобильной версии отключён (плохой UX). */}

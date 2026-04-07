@@ -23,8 +23,6 @@ export const useSettingsLogic = (showNotification: (msg: string) => void) => {
   >('dashboard');
   /** Подраздел внутри «Воронка продаж»: воронка / диалоги / клиенты */
   const [crmHubTab, setCrmHubTab] = useState<'funnel' | 'chats' | 'clients'>('funnel');
-  /** Подраздел внутри «Бизнес-процессы»: процессы / склад */
-  const [bpmHubTab, setBpmHubTab] = useState<'processes' | 'inventory'>('processes');
   
   // Modals
   const [settingsActiveTab, setSettingsActiveTab] = useState<string>('users'); 
@@ -164,8 +162,7 @@ export const useSettingsLogic = (showNotification: (msg: string) => void) => {
       return;
     }
     if (view === 'inventory') {
-      setBpmHubTab('inventory');
-      setCurrentView('business-processes');
+      setCurrentView('inventory');
       return;
     }
     if (view === 'admin') {
@@ -183,7 +180,6 @@ export const useSettingsLogic = (showNotification: (msg: string) => void) => {
       return;
     }
     if (view === 'business-processes') {
-      setBpmHubTab('processes');
       setCurrentView('business-processes');
       return;
     }
@@ -199,7 +195,7 @@ export const useSettingsLogic = (showNotification: (msg: string) => void) => {
     state: { 
         darkMode, tables, activityLogs, currentView, activeTableId, viewMode, searchQuery,
         settingsActiveTab, isCreateTableModalOpen, createTableType, isEditTableModalOpen, editingTable, notificationPrefs,
-        automationRules, activeSpaceTab, workdeskTab, crmHubTab, bpmHubTab
+        automationRules, activeSpaceTab, workdeskTab, crmHubTab
     },
     setters: {
       setTables,
@@ -214,7 +210,6 @@ export const useSettingsLogic = (showNotification: (msg: string) => void) => {
       setSettingsActiveTab,
       setWorkdeskTab,
       setCrmHubTab,
-      setBpmHubTab,
     },
     actions: {
         toggleDarkMode, createTable, updateTable, deleteTable, markAllRead, navigate: handleNavigate,
