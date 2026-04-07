@@ -31,6 +31,8 @@ interface SalesFunnelViewProps {
   onDeleteMeeting?: (meetingId: string) => void;
   onUpdateMeetingSummary?: (meetingId: string, summary: string) => void;
   autoOpenCreateModal?: boolean; // Автоматически открыть модалку создания
+  /** Если задан — принудительно фиксирует режим просмотра (для вкладок CRMHub) */
+  forcedViewMode?: 'kanban' | 'list' | 'rejected';
 }
 
 const STAGES = [
@@ -40,9 +42,9 @@ const STAGES = [
     { id: 'negotiation', label: 'Переговоры', color: 'bg-orange-200 dark:bg-orange-900' },
 ];
 
-const SalesFunnelView: React.FC<SalesFunnelViewProps> = ({ deals, clients, users, projects = [], tasks = [], meetings = [], salesFunnels = [], currentUser, onSaveDeal, onDeleteDeal, onCreateTask, onCreateClient, onOpenTask, onSaveMeeting, onDeleteMeeting, onUpdateMeetingSummary, autoOpenCreateModal = false }) => {
+const SalesFunnelView: React.FC<SalesFunnelViewProps> = ({ deals, clients, users, projects = [], tasks = [], meetings = [], salesFunnels = [], currentUser, onSaveDeal, onDeleteDeal, onCreateTask, onCreateClient, onOpenTask, onSaveMeeting, onDeleteMeeting, onUpdateMeetingSummary, autoOpenCreateModal = false, forcedViewMode }) => {
   const { setModule } = useAppToolbar();
-  const [viewMode, setViewMode] = useState<'kanban' | 'list' | 'rejected'>('kanban');
+  const [viewMode, setViewMode] = useState<'kanban' | 'list' | 'rejected'>(forcedViewMode || 'kanban');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingDeal, setEditingDeal] = useState<Deal | null>(null);
   const [modalTab, setModalTab] = useState<'chat' | 'tasks' | 'meetings'>('chat');
@@ -191,36 +193,40 @@ const SalesFunnelView: React.FC<SalesFunnelViewProps> = ({ deals, clients, users
       setModule(null);
       return;
     }
+    if (forcedViewMode && viewMode !== forcedViewMode) {
+      setViewMode(forcedViewMode);
+    }
     const violet = 'bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-300';
     const idle = 'text-gray-500 dark:text-gray-400';
     setModule(
       <div className="flex items-center gap-2 flex-wrap min-w-0">
-        <div className="flex items-center gap-0.5 shrink-0" role="tablist" aria-label="Вид воронки">
-          {(
-            [
-              { id: 'kanban' as const, label: 'Канбан' },
-              { id: 'list' as const, label: 'Список' },
-              { id: 'rejected' as const, label: 'Отказы' },
-            ] as const
-          ).map((t) => (
-            <button
-              key={t.id}
-              type="button"
-              role="tab"
-              aria-selected={viewMode === t.id}
-              onClick={() => setViewMode(t.id)}
-              className={`px-2 py-1 rounded-lg text-[11px] sm:text-xs font-medium whitespace-nowrap shrink-0 transition-colors ${
-                viewMode === t.id ? violet : `${idle} hover:bg-gray-100 dark:hover:bg-[#252525]`
-              }`}
-            >
-              {t.label}
-            </button>
-          ))}
-        </div>
+        {!forcedViewMode && (
+          <div className="flex items-center gap-0.5 shrink-0" role="tablist" aria-label="Вид воронки">
+            {(
+              [
+                { id: 'kanban' as const, label: 'Канбан' },
+                { id: 'list' as const, label: 'Список' },
+              ] as const
+            ).map((t) => (
+              <button
+                key={t.id}
+                type="button"
+                role="tab"
+                aria-selected={viewMode === t.id}
+                onClick={() => setViewMode(t.id)}
+                className={`px-2 py-1 rounded-lg text-[11px] sm:text-xs font-medium whitespace-nowrap shrink-0 transition-colors ${
+                  viewMode === t.id ? violet : `${idle} hover:bg-gray-100 dark:hover:bg-[#252525]`
+                }`}
+              >
+                {t.label}
+              </button>
+            ))}
+          </div>
+        )}
         <div className="flex items-center gap-2 flex-wrap min-w-0 flex-1">
           <ModuleSelectDropdown
             accent="violet"
-            size="sm"
+            size="xs"
             prefixLabel="Воронка"
             selectedId={selectedFunnelId}
             valueLabel={
@@ -244,7 +250,7 @@ const SalesFunnelView: React.FC<SalesFunnelViewProps> = ({ deals, clients, users
       </div>
     );
     return () => setModule(null);
-  }, [salesFunnels.length, viewMode, selectedFunnelId, activeFunnels, setModule]);
+  }, [salesFunnels.length, viewMode, selectedFunnelId, activeFunnels, forcedViewMode, setModule]);
   
   const handleOpenEdit = (d: Deal) => { 
     setEditingDeal(d); 

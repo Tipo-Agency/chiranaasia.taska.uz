@@ -441,17 +441,27 @@ const BusinessProcessesView: React.FC<BusinessProcessesViewProps> = ({
     );
     setModule(
       <div className="flex items-center gap-1.5 shrink-0 flex-wrap justify-end">
-        <ModuleSegmentedControl
-          variant="accent"
-          accent="indigo"
-          value={viewMode}
-          onChange={(v) => setViewMode(v as 'grid' | 'list')}
-          className="!shadow-none [&_button]:!px-2.5 [&_button]:!py-1.5 [&_button]:!text-xs [&_button]:!rounded-lg"
-          options={[
-            { value: 'grid', label: 'Плитка' },
-            { value: 'list', label: 'Список' },
-          ]}
-        />
+        <div className="flex items-center gap-0.5 shrink-0" role="tablist" aria-label="Вид списка">
+          {(
+            [
+              { id: 'grid' as const, label: 'Плитка' },
+              { id: 'list' as const, label: 'Список' },
+            ] as const
+          ).map((t) => (
+            <button
+              key={t.id}
+              type="button"
+              role="tab"
+              aria-selected={viewMode === t.id}
+              onClick={() => setViewMode(t.id)}
+              className={`px-2 py-1 rounded-lg text-[11px] sm:text-xs font-medium whitespace-nowrap shrink-0 transition-colors ${
+                viewMode === t.id ? indigo : `${idle} hover:bg-gray-100 dark:hover:bg-[#252525]`
+              }`}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
         <ModuleCreateDropdown
           accent="indigo"
           buttonSize="sm"

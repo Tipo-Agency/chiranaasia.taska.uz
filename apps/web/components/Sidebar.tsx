@@ -301,23 +301,8 @@ const Sidebar: React.FC<SidebarProps> = ({
 
         </div>
 
-        {/* Footer Settings */}
-        {can('settings.general') && (
-            <div className={`${isCollapsed ? 'p-2' : 'p-3'} mt-auto border-t border-notion-border dark:border-[#333] shrink-0 bg-white dark:bg-[#191919]`}>
-                <button 
-                    type="button"
-                    onClick={() => { handleNav(() => onOpenSettings()); }}
-                    className={`group w-full ${isCollapsed ? 'flex justify-center' : 'text-left flex items-center gap-2'} ${isCollapsed ? 'px-2' : 'px-3'} py-2 rounded-lg cursor-pointer text-sm transition-colors ${currentView === 'settings' ? 'text-gray-900 dark:text-white' : 'text-notion-text dark:text-gray-300 hover:bg-notion-hover dark:hover:bg-[#252525]'}`}
-                    title={isCollapsed ? "Настройки" : ""}
-                >
-                    <NavIcon active={currentView === 'settings'} accent="slate"><Settings size={18} /></NavIcon>
-                    {!isCollapsed && <span className={currentView === 'settings' ? 'font-semibold' : ''}>Настройки</span>}
-                </button>
-            </div>
-        )}
-
         {/* Collapse Button (внизу меню, всегда) */}
-        <div className="border-t border-notion-border dark:border-[#333] shrink-0 bg-white dark:bg-[#191919] p-2">
+        <div className="shrink-0 bg-white dark:bg-[#191919] p-2">
           <button 
             onClick={handleToggleCollapse} 
             className="hidden md:flex items-center justify-center w-full h-8 text-gray-500 hover:bg-gray-100 dark:hover:bg-[#252525] rounded transition-colors"

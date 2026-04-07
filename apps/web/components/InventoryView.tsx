@@ -428,6 +428,7 @@ const InventoryView: React.FC<InventoryViewProps> = ({
       <div className="flex items-center gap-1.5 shrink-0">
         <ModuleFilterIconButton
           accent="emerald"
+          size="sm"
           active={showFilters || hasActiveFilters}
           activeCount={
             Number(!!search.trim()) +

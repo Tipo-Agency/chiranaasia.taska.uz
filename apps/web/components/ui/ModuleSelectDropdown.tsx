@@ -18,8 +18,8 @@ interface ModuleSelectDropdownProps {
   prefixLabel?: string;
   disabled?: boolean;
   align?: 'left' | 'right';
-  /** sm — по высоте как кнопки в верхней панели (w-9 h-9) */
-  size?: 'md' | 'sm';
+  /** xs/sm — компакт для верхней панели */
+  size?: 'md' | 'sm' | 'xs';
   className?: string;
 }
 
@@ -63,10 +63,12 @@ export const ModuleSelectDropdown: React.FC<ModuleSelectDropdownProps> = ({
   if (!items.length) return null;
 
   const buttonSizeClass =
-    size === 'sm'
-      ? 'max-w-[200px] sm:max-w-[220px] rounded-lg px-2.5 pr-9 py-1.5 text-xs font-semibold min-h-[36px]'
-      : 'max-w-[220px] sm:max-w-[260px] rounded-lg px-3 pr-10 py-2 text-sm font-medium min-h-[44px]';
-  const chevronSize = size === 'sm' ? 14 : 16;
+    size === 'xs'
+      ? 'max-w-[170px] sm:max-w-[200px] rounded-lg px-2 pr-7 py-1 text-[11px] font-semibold min-h-[28px]'
+      : size === 'sm'
+        ? 'max-w-[200px] sm:max-w-[220px] rounded-lg px-2.5 pr-9 py-1.5 text-xs font-semibold min-h-[36px]'
+        : 'max-w-[220px] sm:max-w-[260px] rounded-lg px-3 pr-10 py-2 text-sm font-medium min-h-[44px]';
+  const chevronSize = size === 'xs' ? 12 : size === 'sm' ? 14 : 16;
 
   return (
     <div className={`relative ${className}`} ref={ref}>

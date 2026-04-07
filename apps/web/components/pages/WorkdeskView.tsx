@@ -303,9 +303,6 @@ export const WorkdeskView: React.FC<WorkdeskViewProps> = ({
     const idleBox = 'text-gray-600 dark:text-gray-400';
     const tabs: { id: WorkdeskTab; label: string }[] = [
       { id: 'dashboard', label: 'Дашборд' },
-      { id: 'weekly', label: 'Планы' },
-      { id: 'tasks', label: 'Задачи' },
-      { id: 'deals', label: 'Сделки' },
       { id: 'meetings', label: 'Календарь' },
       { id: 'documents', label: 'Документы' },
     ];

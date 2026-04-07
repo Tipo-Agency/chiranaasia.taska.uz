@@ -1810,19 +1810,6 @@ const FinanceView: React.FC<FinanceViewProps> = ({
     );
     setModule(
       <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap justify-end shrink-0">
-        {((activeTab === 'planning' && planningSubView === 'list') ||
-          (activeTab === 'plan' && planSubView === 'list') ||
-          activeTab === 'requests') && (
-          <ModuleSegmentedControl
-            variant="neutral"
-            value={financeArchiveScope}
-            onChange={(v) => setFinanceArchiveScope(v as 'active' | 'archived')}
-            options={[
-              { value: 'active', label: 'Активные' },
-              { value: 'archived', label: 'Архив' },
-            ]}
-          />
-        )}
         {activeTab === 'planning' && planningSubView === 'list' && (
           <ModuleFilterIconButton
             accent="emerald"
@@ -1927,6 +1914,17 @@ const FinanceView: React.FC<FinanceViewProps> = ({
       {!financeFullScreen && showPlanningFilters && activeTab === 'planning' && planningSubView === 'list' && (
         <div className={`${MODULE_PAGE_GUTTER} ${MODULE_PAGE_TOP_PAD} pb-2 flex-shrink-0 border-b border-gray-200 dark:border-[#333]`}>
           <div className="p-4 bg-gray-50 dark:bg-[#252525] rounded-lg border border-gray-200 dark:border-[#333]">
+            <div className="flex items-center justify-end mb-3">
+              <ModuleSegmentedControl
+                variant="neutral"
+                value={financeArchiveScope}
+                onChange={(v) => setFinanceArchiveScope(v as 'active' | 'archived')}
+                options={[
+                  { value: 'active', label: 'Активные' },
+                  { value: 'archived', label: 'Архив' },
+                ]}
+              />
+            </div>
             <div className="grid gap-3" style={{ gridTemplateColumns: `repeat(auto-fit, minmax(150px, 1fr))`, maxWidth: '100%' }}>
               {planningFilters.map((filter, index) => (
                 <div key={index}>
@@ -1948,6 +1946,17 @@ const FinanceView: React.FC<FinanceViewProps> = ({
       {!financeFullScreen && showPlanFilters && activeTab === 'plan' && planSubView === 'list' && (
         <div className={`${MODULE_PAGE_GUTTER} ${MODULE_PAGE_TOP_PAD} pb-2 flex-shrink-0 border-b border-gray-200 dark:border-[#333]`}>
           <div className="p-4 bg-gray-50 dark:bg-[#252525] rounded-lg border border-gray-200 dark:border-[#333]">
+            <div className="flex items-center justify-end mb-3">
+              <ModuleSegmentedControl
+                variant="neutral"
+                value={financeArchiveScope}
+                onChange={(v) => setFinanceArchiveScope(v as 'active' | 'archived')}
+                options={[
+                  { value: 'active', label: 'Активные' },
+                  { value: 'archived', label: 'Архив' },
+                ]}
+              />
+            </div>
             <div className="grid gap-3" style={{ gridTemplateColumns: `repeat(auto-fit, minmax(150px, 1fr))`, maxWidth: '100%' }}>
               {planFilters.map((filter, index) => (
                 <div key={index}>
@@ -1969,6 +1978,17 @@ const FinanceView: React.FC<FinanceViewProps> = ({
       {!financeFullScreen && showRequestFilters && activeTab === 'requests' && (
         <div className={`${MODULE_PAGE_GUTTER} ${MODULE_PAGE_TOP_PAD} pb-2 flex-shrink-0 border-b border-gray-200 dark:border-[#333]`}>
           <div className="p-4 bg-gray-50 dark:bg-[#252525] rounded-lg border border-gray-200 dark:border-[#333]">
+            <div className="flex items-center justify-end mb-3">
+              <ModuleSegmentedControl
+                variant="neutral"
+                value={financeArchiveScope}
+                onChange={(v) => setFinanceArchiveScope(v as 'active' | 'archived')}
+                options={[
+                  { value: 'active', label: 'Активные' },
+                  { value: 'archived', label: 'Архив' },
+                ]}
+              />
+            </div>
             <div className="grid gap-3" style={{ gridTemplateColumns: `repeat(auto-fit, minmax(150px, 1fr))`, maxWidth: '100%' }}>
               {requestFilters.map((filter, index) => (
                 <div key={index}>

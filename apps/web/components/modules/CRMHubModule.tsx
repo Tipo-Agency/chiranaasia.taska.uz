@@ -17,7 +17,7 @@ import { CRMModule } from './CRMModule';
 import { ClientChatsPage } from '../pages/ClientChatsPage';
 import { useAppToolbar } from '../../contexts/AppToolbarContext';
 
-export type CrmHubTab = 'funnel' | 'chats' | 'clients';
+export type CrmHubTab = 'funnel' | 'chats' | 'clients' | 'rejected';
 
 interface CRMHubModuleProps {
   tab: CrmHubTab;
@@ -62,6 +62,7 @@ export const CRMHubModule: React.FC<CRMHubModuleProps> = ({
     if (canFunnel) o.push({ value: 'funnel', label: 'Воронка' });
     if (canChats) o.push({ value: 'chats', label: 'Диалоги' });
     if (canClients) o.push({ value: 'clients', label: 'Клиенты и договора' });
+    if (canFunnel) o.push({ value: 'rejected', label: 'Отказы' });
     return o;
   }, [canFunnel, canChats, canClients]);
 
@@ -149,6 +150,7 @@ export const CRMHubModule: React.FC<CRMHubModuleProps> = ({
           />
         )}
         {effectiveTab === 'clients' && canClients && <CRMModule view="clients" {...sharedCrm} />}
+        {effectiveTab === 'rejected' && canFunnel && <CRMModule view="sales-funnel" forcedFunnelViewMode="rejected" {...sharedCrm} />}
       </div>
     </div>
   );
