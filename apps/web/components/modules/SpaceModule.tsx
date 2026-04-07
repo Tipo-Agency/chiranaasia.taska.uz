@@ -114,6 +114,7 @@ export const SpaceModule: React.FC<SpaceModuleProps> = ({
                             icon={<CheckSquare size={24} strokeWidth={2} />}
                             title="Задачи"
                             description="Управление задачами и проектами"
+                            hideTitleBlock
                             actions={
                                 <ModuleCreateIconButton
                                     accent="indigo"

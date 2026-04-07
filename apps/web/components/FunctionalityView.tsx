@@ -153,6 +153,7 @@ const FunctionalityView: React.FC<FunctionalityViewProps> = ({
             title="Функционал"
             description="Функции проектов"
             accent="sky"
+            hideTitleBlock
             tabs={
               <ModuleSegmentedControl
                 variant="neutral"

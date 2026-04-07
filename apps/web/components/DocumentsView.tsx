@@ -278,6 +278,7 @@ const DocumentsView: React.FC<DocumentsViewProps> = ({
             icon={<FileTextIcon size={24} strokeWidth={2} />}
             title="Документы"
             description="Управление документами и папками"
+            hideTitleBlock
             tabs={
               <Tabs
                 tabs={[

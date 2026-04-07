@@ -588,6 +588,7 @@ const MeetingsView: React.FC<MeetingsViewProps> = ({
             icon={<CalendarDays size={24} strokeWidth={2} />}
             title="Календарь"
             description="Встречи, планёрки и события по проектам — в списке и в календаре"
+            hideTitleBlock
             tabs={
               <ModuleSegmentedControl<'all' | 'client' | 'work' | 'project' | 'shoot'>
                 variant="neutral"
@@ -649,42 +650,6 @@ const MeetingsView: React.FC<MeetingsViewProps> = ({
                   ]}
                 />
               </>
-            }
-            actions={
-              <ModuleCreateDropdown
-                accent="teal"
-                label="Новое событие"
-                items={[
-                  {
-                    id: 'work',
-                    label: 'Рабочая встреча',
-                    icon: Building2,
-                    onClick: () => openMeetingCreate('work', getTodayLocalDate()),
-                  },
-                  {
-                    id: 'client',
-                    label: 'Встреча с клиентом',
-                    icon: Briefcase,
-                    onClick: () => openMeetingCreate('client', getTodayLocalDate()),
-                  },
-                  {
-                    id: 'project',
-                    label: 'Событие по проекту',
-                    icon: Clapperboard,
-                    onClick: () => openMeetingCreate('project', getTodayLocalDate()),
-                  },
-                  ...(onSaveShootPlan && contentPlanTables.length > 0
-                    ? [
-                        {
-                          id: 'shoot',
-                          label: 'План съёмки',
-                          icon: Camera,
-                          onClick: () => openNewShootPlan(getTodayLocalDate()),
-                        },
-                      ]
-                    : []),
-                ]}
-              />
             }
           />
         </div>

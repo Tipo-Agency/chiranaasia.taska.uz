@@ -49,6 +49,7 @@ export const ClientsHeader: React.FC<ClientsHeaderProps> = ({
         icon={<Users size={24} strokeWidth={2} />}
         title="Клиенты и договора"
         description="Управление клиентами и контрактами"
+        hideTitleBlock
         tabs={tabs}
         controls={
           <div className="flex items-center gap-2">
@@ -56,7 +57,6 @@ export const ClientsHeader: React.FC<ClientsHeaderProps> = ({
               <ModuleSelectDropdown
                 accent="violet"
                 size="sm"
-                prefixLabel="Воронка"
                 selectedId={selectedFunnelId || 'all'}
                 valueLabel={
                   selectedFunnelId

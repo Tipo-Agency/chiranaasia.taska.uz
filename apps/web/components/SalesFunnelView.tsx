@@ -199,7 +199,7 @@ const SalesFunnelView: React.FC<SalesFunnelViewProps> = ({ deals, clients, users
     const violet = 'bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-300';
     const idle = 'text-gray-500 dark:text-gray-400';
     setModule(
-      <div className="flex w-full min-w-0 flex-wrap items-center gap-1.5 sm:gap-2">
+      <div className="flex w-full min-w-0 flex-wrap items-center gap-2">
         {!forcedViewMode && (
           <div className="flex w-full items-center gap-0.5 sm:w-auto sm:shrink-0" role="tablist" aria-label="Вид воронки">
             {(
@@ -223,22 +223,21 @@ const SalesFunnelView: React.FC<SalesFunnelViewProps> = ({ deals, clients, users
             ))}
           </div>
         )}
-        <div className="flex w-full min-w-0 items-center gap-2 sm:w-auto sm:flex-1 sm:flex-nowrap">
+        <div className="flex min-w-0 items-center gap-2 shrink-0">
           <ModuleSelectDropdown
             accent="violet"
             size="xs"
-            prefixLabel="Воронка"
             selectedId={selectedFunnelId}
             valueLabel={
               selectedFunnelId === 'all'
-                ? `Все (${activeFunnels.length})`
+                ? `Все воронки (${activeFunnels.length})`
                 : activeFunnels.find((f) => f.id === selectedFunnelId)?.name || '—'
             }
             items={[
-              { id: 'all', label: `Все (${activeFunnels.length})`, onClick: () => setSelectedFunnelId('all') },
+              { id: 'all', label: `Все воронки (${activeFunnels.length})`, onClick: () => setSelectedFunnelId('all') },
               ...activeFunnels.map((f) => ({ id: f.id, label: f.name, onClick: () => setSelectedFunnelId(f.id) })),
             ]}
-            className="w-full min-w-0 sm:w-auto sm:min-w-[220px] sm:max-w-[340px]"
+            className="min-w-0 max-w-[min(100%,280px)]"
           />
           <ModuleCreateIconButton
             accent="violet"

@@ -219,14 +219,8 @@ export function PayrollView({
   return (
     <div className="space-y-3">
       <div className="bg-white dark:bg-[#252525] border border-gray-200 dark:border-[#333] rounded-2xl p-4">
-        <div className="flex flex-wrap items-end justify-between gap-3">
-          <div className="min-w-0">
-            <div className="text-sm font-semibold text-gray-900 dark:text-white">Зарплата</div>
-            <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-              Условия (оклад/КПИ) + табель + расчёт. Пока хранится локально по месяцам.
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex flex-wrap items-center gap-2">
             <label className="text-xs font-semibold text-gray-600 dark:text-gray-400">Месяц</label>
             <input
               type="month"

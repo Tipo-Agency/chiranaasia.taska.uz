@@ -99,7 +99,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
         {leading}
       </div>
 
-      <div className="flex items-center gap-1.5 shrink-0">
+      <div className="flex items-center gap-2 shrink-0">
         {module}
 
         <div className="hidden sm:block w-44 md:w-52 shrink-0">
@@ -125,16 +125,18 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
           <button
             type="button"
             onClick={() => setShowUserDropdown((p) => !p)}
-            className="flex items-center gap-0.5 hover:bg-gray-100 dark:hover:bg-[#252525] p-1 rounded-full transition-colors border border-transparent hover:border-gray-200 dark:hover:border-[#333]"
+            className="flex items-center gap-1 hover:bg-gray-100 dark:hover:bg-[#252525] pl-1 pr-1.5 py-1 rounded-full transition-colors border border-transparent hover:border-gray-200 dark:hover:border-[#333]"
             aria-expanded={showUserDropdown}
             aria-haspopup="menu"
           >
-            <img
-              src={currentUser.avatar || getDefaultAvatarForId(currentUser.id)}
-              className="w-8 h-8 rounded-full border border-gray-200 dark:border-[#444] object-cover object-center"
-              alt=""
-            />
-            <ChevronDown size={14} className="text-gray-400 hidden sm:block" />
+            <span className="relative h-8 w-8 shrink-0 overflow-hidden rounded-full border border-gray-200 dark:border-[#444] bg-gray-100 dark:bg-[#333]">
+              <img
+                src={currentUser.avatar || getDefaultAvatarForId(currentUser.id)}
+                className="h-full w-full object-cover object-center"
+                alt=""
+              />
+            </span>
+            <ChevronDown size={14} className="text-gray-400 shrink-0" aria-hidden />
           </button>
           {showUserDropdown && (
             <div className="absolute right-0 top-full mt-2 w-56 bg-white dark:bg-[#252525] border border-gray-200 dark:border-[#333] rounded-xl shadow-xl z-[120] overflow-hidden">

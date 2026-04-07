@@ -15,6 +15,8 @@ export interface ModulePageHeaderProps {
   /** Правая часть: фильтры, плюс, доп. действия */
   controls?: React.ReactNode;
   className?: string;
+  /** Скрыть блок иконка+заголовок+описание (когда название модуля уже в верхней панели приложения) */
+  hideTitleBlock?: boolean;
 }
 
 /**
@@ -29,9 +31,25 @@ export const ModulePageHeader: React.FC<ModulePageHeaderProps> = ({
   tabs,
   controls,
   className = '',
+  hideTitleBlock = false,
 }) => {
   const hasNewLayout = Boolean(tabs || controls);
   if (!actions && !hasNewLayout) return null;
+
+  if (hideTitleBlock && hasNewLayout) {
+    return (
+      <div className={`flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between min-w-0 ${className}`}>
+        {tabs && (
+          <div className="min-w-0 flex-1 overflow-hidden">
+            <ModuleTabsScroller contentClassName="flex items-center gap-2">
+              {tabs}
+            </ModuleTabsScroller>
+          </div>
+        )}
+        {controls && <div className="flex items-center gap-2 shrink-0 flex-wrap justify-end sm:justify-end">{controls}</div>}
+      </div>
+    );
+  }
 
   return hasNewLayout ? (
     <div className={`flex flex-row items-center justify-between gap-2 ${className}`}>

@@ -806,6 +806,7 @@ const ContentPlanView: React.FC<ContentPlanViewProps> = ({
           title={activeTable?.name || 'Контент-план'}
           description="Планирование контента"
           accent="slate"
+          hideTitleBlock
           tabs={
             <ModuleSegmentedControl
               value={viewMode}

@@ -225,6 +225,7 @@ const BacklogView: React.FC<BacklogViewProps> = ({
             title="Бэклог"
             description="Идеи для реализации"
             accent="orange"
+            hideTitleBlock
             tabs={
               <ModuleSegmentedControl
                 variant="neutral"
