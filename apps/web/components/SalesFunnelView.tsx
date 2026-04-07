@@ -1,10 +1,11 @@
 
 import React, { useState, useEffect, useLayoutEffect, useMemo, useRef } from 'react';
 import { Deal, Client, User, Comment, Task, Project, SalesFunnel, Meeting, NotificationPreferences } from '../types';
-import { Plus, KanbanSquare, X, Send, MessageSquare, Instagram, Globe, UserPlus, Bot, Edit2, TrendingUp, CheckSquare, CheckCircle2, XCircle, Trash2, Calendar, Clock, Users, Tag, GitBranch, Filter, User as UserIcon } from 'lucide-react';
+import { Plus, KanbanSquare, X, Send, MessageSquare, Instagram, Globe, UserPlus, Bot, Edit2, TrendingUp, CheckSquare, CheckCircle2, XCircle, Trash2, Calendar, Clock, Users, Tag, GitBranch, Filter, User as UserIcon, Building2, Briefcase, FileText, AlertCircle, Check } from 'lucide-react';
 // Клиентский Telegram/Instagram — при необходимости подключать через api/telegramService.
 import { DynamicIcon } from './AppIcons';
-import { Button, ModulePageShell, MODULE_PAGE_GUTTER, MODULE_PAGE_TOP_PAD, ModuleCreateIconButton, ModuleSelectDropdown, SystemAlertDialog, SystemConfirmDialog } from './ui';
+import { Button, ModulePageShell, MODULE_PAGE_GUTTER, MODULE_PAGE_TOP_PAD, ModuleCreateDropdown, ModuleFilterIconButton, SystemAlertDialog, SystemConfirmDialog } from './ui';
+import { MODULE_ACCENTS } from './ui/moduleAccent';
 import { DateInput } from './ui/DateInput';
 import { TaskSelect } from './TaskSelect';
 import { api } from '../backend/api';
@@ -44,6 +45,7 @@ const STAGES = [
 
 const SalesFunnelView: React.FC<SalesFunnelViewProps> = ({ deals, clients, users, projects = [], tasks = [], meetings = [], salesFunnels = [], currentUser, onSaveDeal, onDeleteDeal, onCreateTask, onCreateClient, onOpenTask, onSaveMeeting, onDeleteMeeting, onUpdateMeetingSummary, autoOpenCreateModal = false, forcedViewMode }) => {
   const { setModule } = useAppToolbar();
+  const [funnelMenuOpen, setFunnelMenuOpen] = useState(false);
   const [viewMode, setViewMode] = useState<'kanban' | 'list' | 'rejected'>(forcedViewMode || 'kanban');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingDeal, setEditingDeal] = useState<Deal | null>(null);
@@ -224,33 +226,97 @@ const SalesFunnelView: React.FC<SalesFunnelViewProps> = ({ deals, clients, users
           </div>
         )}
         <div className="flex min-w-0 items-center gap-2 shrink-0">
-          <ModuleSelectDropdown
+          <div className="relative min-w-0">
+            <ModuleFilterIconButton
+              accent="violet"
+              size="sm"
+              active={selectedFunnelId !== 'all'}
+              activeCount={selectedFunnelId === 'all' ? 0 : 1}
+              label={
+                selectedFunnelId === 'all'
+                  ? `Все воронки (${activeFunnels.length})`
+                  : activeFunnels.find((f) => f.id === selectedFunnelId)?.name || 'Воронка'
+              }
+              onClick={() => setFunnelMenuOpen((o) => !o)}
+            />
+            {funnelMenuOpen && (
+              <>
+                <button
+                  type="button"
+                  className="fixed inset-0 z-[100] cursor-default bg-black/10 dark:bg-black/25"
+                  aria-hidden
+                  onClick={() => setFunnelMenuOpen(false)}
+                />
+                <div className="absolute right-0 top-full mt-1.5 w-[min(100vw-2rem,18rem)] max-h-[min(70vh,20rem)] overflow-y-auto overscroll-contain bg-white dark:bg-[#1f1f1f] border border-gray-200 dark:border-[#333] rounded-xl shadow-xl py-1 z-[110]">
+                  {[
+                    { id: 'all', label: `Все воронки (${activeFunnels.length})`, onClick: () => setSelectedFunnelId('all') },
+                    ...activeFunnels.map((f) => ({ id: f.id, label: f.name, onClick: () => setSelectedFunnelId(f.id) })),
+                  ].map((item) => (
+                    <button
+                      key={item.id}
+                      type="button"
+                      onClick={() => {
+                        item.onClick();
+                        setFunnelMenuOpen(false);
+                      }}
+                      className="w-full flex items-center justify-between gap-2 px-3 py-2.5 text-sm text-gray-800 dark:text-gray-100 hover:bg-gray-50 dark:hover:bg-[#2a2a2a] text-left border-b border-gray-100/80 dark:border-[#333]/80 last:border-b-0"
+                    >
+                      <span className="truncate">{item.label}</span>
+                      {(selectedFunnelId === 'all' ? item.id === 'all' : item.id === selectedFunnelId) && (
+                        <Check size={16} className={`${MODULE_ACCENTS.violet.menuIcon} shrink-0`} />
+                      )}
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
+          <ModuleCreateDropdown
             accent="violet"
-            size="xs"
-            selectedId={selectedFunnelId}
-            valueLabel={
-              selectedFunnelId === 'all'
-                ? `Все воронки (${activeFunnels.length})`
-                : activeFunnels.find((f) => f.id === selectedFunnelId)?.name || '—'
-            }
+            buttonSize="sm"
+            label="Создать"
             items={[
-              { id: 'all', label: `Все воронки (${activeFunnels.length})`, onClick: () => setSelectedFunnelId('all') },
-              ...activeFunnels.map((f) => ({ id: f.id, label: f.name, onClick: () => setSelectedFunnelId(f.id) })),
+              {
+                id: 'deal',
+                label: 'Сделка',
+                icon: Briefcase,
+                onClick: () => handleOpenCreateRef.current?.(),
+              },
+              {
+                id: 'client',
+                label: 'Клиент',
+                icon: Building2,
+                onClick: () =>
+                  window.dispatchEvent(new CustomEvent('crmHub:createEntity', { detail: { type: 'client' } })),
+              },
+              {
+                id: 'contract',
+                label: 'Договор',
+                icon: FileText,
+                onClick: () =>
+                  window.dispatchEvent(new CustomEvent('crmHub:createEntity', { detail: { type: 'contract' } })),
+              },
+              {
+                id: 'sale',
+                label: 'Продажа',
+                icon: TrendingUp,
+                onClick: () =>
+                  window.dispatchEvent(new CustomEvent('crmHub:createEntity', { detail: { type: 'sale' } })),
+              },
+              {
+                id: 'receivable',
+                label: 'Задолженность',
+                icon: AlertCircle,
+                onClick: () =>
+                  window.dispatchEvent(new CustomEvent('crmHub:createEntity', { detail: { type: 'receivable' } })),
+              },
             ]}
-            className="min-w-0 max-w-[min(100%,280px)]"
-          />
-          <ModuleCreateIconButton
-            accent="violet"
-            label="Новая сделка"
-            size="sm"
-            className="shrink-0"
-            onClick={() => handleOpenCreateRef.current?.()}
           />
         </div>
       </div>
     );
     return () => setModule(null);
-  }, [salesFunnels.length, viewMode, selectedFunnelId, activeFunnels, forcedViewMode, setModule]);
+  }, [salesFunnels.length, viewMode, selectedFunnelId, activeFunnels, forcedViewMode, funnelMenuOpen, setModule]);
   
   const handleOpenEdit = (d: Deal) => { 
     setEditingDeal(d); 

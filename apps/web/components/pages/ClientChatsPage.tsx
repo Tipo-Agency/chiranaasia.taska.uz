@@ -240,7 +240,7 @@ export const ClientChatsPage: React.FC<ClientChatsPageProps> = ({
 
   const content = (
     <div
-      className={`flex flex-1 min-h-0 gap-0 bg-white dark:bg-[#191919] ${
+      className={`flex h-full min-h-0 w-full flex-1 gap-0 overflow-hidden bg-white dark:bg-[#191919] ${
         layout === 'page' ? 'border-t border-gray-200 dark:border-[#333]' : ''
       }`}
     >

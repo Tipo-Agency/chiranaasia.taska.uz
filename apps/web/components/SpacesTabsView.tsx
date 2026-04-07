@@ -26,7 +26,7 @@ type ViewMode = 'grid' | 'list';
 const getTypeLabel = (type: SpaceType): string => {
   switch(type) {
     case 'content-plan': return 'Контент планы';
-    case 'backlog': return 'Бэклог';
+    case 'backlog': return 'Идеи';
     case 'functionality': return 'Функционал';
   }
 };
@@ -76,7 +76,7 @@ export const SpacesTabsView: React.FC<SpacesTabsViewProps> = ({
     const idle = 'text-gray-600 dark:text-gray-400';
     const types: { id: SpaceType; label: string }[] = [
       { id: 'content-plan', label: 'Контент' },
-      { id: 'backlog', label: 'Бэклог' },
+      { id: 'backlog', label: 'Идеи' },
       { id: 'functionality', label: 'Функционал' },
     ];
     setLeading(

@@ -91,14 +91,12 @@ export const FinanceSetupSettings: React.FC<{
   return (
     <div className="space-y-8 w-full">
       <div>
-        <div className="flex items-center justify-between gap-3 mb-3">
-          <div>
-            <div className="text-sm font-bold text-gray-900 dark:text-white">Статьи расходов</div>
-            <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Используются в финпланировании и заявках.</div>
+        <div className="mb-3">
+          <div className="text-sm font-bold text-gray-900 dark:text-white">Статьи расходов</div>
+          <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 space-y-1">
+            <p>Вид затрат (фикс или %): план по подразделениям, заявки на закупку, БДР. Это не «фонды».</p>
+            <p className="text-gray-400 dark:text-gray-500">Создание — через «+» в шапке.</p>
           </div>
-          <Button variant="secondary" onClick={() => openCreate('category')}>
-            Добавить статью
-          </Button>
         </div>
 
         <div className="bg-white dark:bg-[#252525] border border-gray-200 dark:border-[#333] rounded-2xl overflow-hidden">
@@ -168,14 +166,15 @@ export const FinanceSetupSettings: React.FC<{
       </div>
 
       <div>
-        <div className="flex items-center justify-between gap-3 mb-3">
-          <div>
-            <div className="text-sm font-bold text-gray-900 dark:text-white">Фонды</div>
-            <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Распределение дохода по целям.</div>
+        <div className="mb-3">
+          <div className="text-sm font-bold text-gray-900 dark:text-white">Фонды</div>
+          <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 space-y-1">
+            <p>
+              Целевые «кошельки» для распределения поступившего дохода (касса → фонды). Отдельно от статей расхода: статья
+              отвечает на вопрос «на что тратим», фонд — «куда кладём выручку до оплат».
+            </p>
+            <p className="text-gray-400 dark:text-gray-500">Создание — через «+» в шапке.</p>
           </div>
-          <Button variant="secondary" onClick={() => openCreate('fund')}>
-            Добавить фонд
-          </Button>
         </div>
 
         <div className="bg-white dark:bg-[#252525] border border-gray-200 dark:border-[#333] rounded-2xl overflow-hidden">

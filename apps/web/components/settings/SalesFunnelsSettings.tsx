@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { SalesFunnel, FunnelStage, FunnelSourceConfig, User, NotificationPreferences } from '../../types';
-import { Plus, X, Edit2, Trash2, GripVertical, Settings, Instagram, MessageSquare, Star, Globe, Bell } from 'lucide-react';
+import { Plus, Edit2, Trash2, GripVertical, Settings, Instagram, MessageSquare, Star, Globe, Bell, ArrowLeft } from 'lucide-react';
 import { TaskSelect } from '../TaskSelect';
 import { api } from '../../backend/api';
 
@@ -51,7 +51,8 @@ const FUNNEL_COLOR_OPTIONS = [
 ];
 
 const SalesFunnelsSettings: React.FC<SalesFunnelsSettingsProps> = ({ funnels, users = [], onSave, onDelete, createRequested }) => {
-    const [isModalOpen, setIsModalOpen] = useState(false);
+    /** Полноэкранный редактор вместо модалки (внутри вкладки настроек) */
+    const [editorOpen, setEditorOpen] = useState(false);
     const [editingFunnel, setEditingFunnel] = useState<SalesFunnel | null>(null);
     const [funnelName, setFunnelName] = useState('');
     const [funnelColor, setFunnelColor] = useState<string>(FUNNEL_COLOR_OPTIONS[1]?.class || FUNNEL_COLOR_OPTIONS[0]?.class || 'bg-gray-200');
@@ -109,12 +110,12 @@ const SalesFunnelsSettings: React.FC<SalesFunnelsSettingsProps> = ({ funnels, us
         setNotifTitle('');
         setNotifChat('');
         setNotifTg('');
-        setIsModalOpen(true);
+        setEditorOpen(true);
     };
 
     useEffect(() => {
         const current = createRequested || 0;
-        // Важно: не открываем модалку просто при переходе на вкладку,
+        // Важно: не открываем редактор просто при переходе на вкладку,
         // если значение createRequested осталось > 0 от прошлого клика на "+".
         if (current > lastCreateRequestRef.current) {
             handleOpenCreate();
@@ -184,7 +185,7 @@ const SalesFunnelsSettings: React.FC<SalesFunnelsSettingsProps> = ({ funnels, us
         setNotifTitle((da?.title || '').trim());
         setNotifChat((da?.chatBody || '').trim());
         setNotifTg((da?.telegramHtml || '').trim());
-        setIsModalOpen(true);
+        setEditorOpen(true);
 
         // Load actual key status from backend (source of truth)
         try {
@@ -307,7 +308,7 @@ const SalesFunnelsSettings: React.FC<SalesFunnelsSettingsProps> = ({ funnels, us
         };
 
         onSave(funnel);
-        setIsModalOpen(false);
+        setEditorOpen(false);
         setEditingFunnel(null);
         setFunnelName('');
         setFunnelColor(FUNNEL_COLOR_OPTIONS[1]?.class || FUNNEL_COLOR_OPTIONS[0]?.class || 'bg-gray-200');
@@ -391,85 +392,91 @@ const SalesFunnelsSettings: React.FC<SalesFunnelsSettingsProps> = ({ funnels, us
         }
     };
 
-    const handleBackdrop = (e: React.MouseEvent) => {
-        if (e.target === e.currentTarget) {
-            setIsModalOpen(false);
-        }
-    };
-
     return (
         <div className="space-y-6">
-            <div>
-                <h3 className="text-sm font-bold text-gray-900 dark:text-white">Воронки продаж</h3>
-                <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-                    Настройка направлений продаж, этапов и источников лидов.
-                </p>
-            </div>
+            {!editorOpen ? (
+                <>
+                    <div>
+                        <h3 className="text-sm font-bold text-gray-900 dark:text-white">Воронки продаж</h3>
+                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                            Настройка направлений продаж, этапов и источников лидов.
+                        </p>
+                    </div>
 
-            {/* "Основная воронка" убрана из UI: в CRM-канбане показываем все выбранные воронки сразу. */}
-
-            <div className="bg-white dark:bg-[#252525] border border-gray-200 dark:border-[#333] rounded-xl overflow-hidden">
-                {funnels.filter(f => !f.isArchived).length > 0 ? (
-                    <div className="divide-y divide-gray-200 dark:divide-[#333]">
-                        {funnels.filter(f => !f.isArchived).map(funnel => (
-                            <div key={funnel.id} className="p-4 hover:bg-gray-50 dark:hover:bg-[#303030]">
-                                <div className="flex justify-between items-start">
-                                    <div className="flex-1">
-                                        <div className="flex items-center gap-2 mb-2">
-                                            <span className={`w-3 h-3 rounded ${funnel.color || funnel.stages?.[0]?.color || 'bg-gray-200 dark:bg-gray-700'}`} />
-                                            <h4 className="font-semibold text-gray-800 dark:text-white">{funnel.name}</h4>
-                                        </div>
-                                        <div className="flex flex-wrap gap-2">
-                                            {funnel.stages.map((stage, idx) => (
-                                                <div
-                                                    key={stage.id}
-                                                    className={`px-3 py-1 rounded text-xs font-medium ${stage.color} text-gray-800 dark:text-gray-200`}
-                                                >
-                                                    {idx + 1}. {stage.label}
+                    <div className="bg-white dark:bg-[#252525] border border-gray-200 dark:border-[#333] rounded-xl overflow-hidden">
+                        {funnels.filter(f => !f.isArchived).length > 0 ? (
+                            <div className="divide-y divide-gray-200 dark:divide-[#333]">
+                                {funnels.filter(f => !f.isArchived).map(funnel => (
+                                    <div key={funnel.id} className="p-4 hover:bg-gray-50 dark:hover:bg-[#303030]">
+                                        <div className="flex justify-between items-start">
+                                            <div className="flex-1">
+                                                <div className="flex items-center gap-2 mb-2">
+                                                    <span className={`w-3 h-3 rounded ${funnel.color || funnel.stages?.[0]?.color || 'bg-gray-200 dark:bg-gray-700'}`} />
+                                                    <h4 className="font-semibold text-gray-800 dark:text-white">{funnel.name}</h4>
                                                 </div>
-                                            ))}
+                                                <div className="flex flex-wrap gap-2">
+                                                    {funnel.stages.map((stage, idx) => (
+                                                        <div
+                                                            key={stage.id}
+                                                            className={`px-3 py-1 rounded text-xs font-medium ${stage.color} text-gray-800 dark:text-gray-200`}
+                                                        >
+                                                            {idx + 1}. {stage.label}
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                            <div className="flex gap-2 ml-4">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => handleOpenEdit(funnel)}
+                                                    className="p-2 text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+                                                    title="Редактировать"
+                                                >
+                                                    <Edit2 size={16}/>
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => { if(confirm(`Удалить воронку "${funnel.name}"?`)) onDelete(funnel.id) }}
+                                                    className="p-2 text-gray-400 hover:text-red-600 dark:hover:text-red-400 transition-colors"
+                                                    title="Удалить"
+                                                >
+                                                    <Trash2 size={16}/>
+                                                </button>
+                                            </div>
                                         </div>
                                     </div>
-                                    <div className="flex gap-2 ml-4">
-                                        <button 
-                                            onClick={() => handleOpenEdit(funnel)} 
-                                            className="p-2 text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
-                                            title="Редактировать"
-                                        >
-                                            <Edit2 size={16}/>
-                                        </button>
-                                        <button 
-                                            onClick={() => { if(confirm(`Удалить воронку "${funnel.name}"?`)) onDelete(funnel.id) }} 
-                                            className="p-2 text-gray-400 hover:text-red-600 dark:hover:text-red-400 transition-colors"
-                                            title="Удалить"
-                                        >
-                                            <Trash2 size={16}/>
-                                        </button>
-                                    </div>
-                                </div>
+                                ))}
                             </div>
-                        ))}
+                        ) : (
+                            <div className="p-8 text-center text-gray-400 dark:text-gray-500">
+                                Нет воронок. Создайте первую воронку продаж.
+                            </div>
+                        )}
                     </div>
-                ) : (
-                    <div className="p-8 text-center text-gray-400 dark:text-gray-500">
-                        Нет воронок. Создайте первую воронку продаж.
-                    </div>
-                )}
-            </div>
-
-            {/* Modal */}
-            {isModalOpen && (
-                <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-[80] animate-in fade-in duration-200" onClick={handleBackdrop}>
-                    <div className="bg-white dark:bg-[#252525] rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden border border-gray-200 dark:border-[#333] flex flex-col" onClick={e => e.stopPropagation()}>
-                        <div className="p-4 border-b border-gray-100 dark:border-[#333] flex justify-between items-center bg-white dark:bg-[#252525]">
-                            <h3 className="font-bold text-gray-800 dark:text-white">
+                </>
+            ) : (
+                <div className="space-y-4">
+                    <div className="flex items-start gap-3 pb-4 border-b border-gray-200 dark:border-[#333]">
+                        <button
+                            type="button"
+                            onClick={() => setEditorOpen(false)}
+                            className="mt-0.5 p-2 rounded-lg border border-gray-200 dark:border-[#333] bg-white dark:bg-[#1a1a1a] text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-[#252525] shrink-0"
+                            title="К списку воронок"
+                            aria-label="Назад к списку"
+                        >
+                            <ArrowLeft size={18} />
+                        </button>
+                        <div className="min-w-0 flex-1">
+                            <h3 className="text-base font-bold text-gray-900 dark:text-white">
                                 {editingFunnel ? 'Редактировать воронку' : 'Новая воронка продаж'}
                             </h3>
-                            <button onClick={() => setIsModalOpen(false)} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 p-1 rounded-full hover:bg-gray-100 dark:hover:bg-[#333]">
-                                <X size={18} />
-                            </button>
+                            <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                                Этапы, источники лидов и уведомления — на этой странице, без модального окна.
+                            </p>
                         </div>
-                        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-6 space-y-4">
+                    </div>
+
+                    <form onSubmit={handleSubmit} className="space-y-4 pb-8">
                             <div>
                                 <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 mb-1">
                                     Название воронки (направление)
@@ -1027,22 +1034,21 @@ const SalesFunnelsSettings: React.FC<SalesFunnelsSettingsProps> = ({ funnels, us
                             )}
 
                             <div className="flex justify-end gap-2 pt-4 border-t border-gray-200 dark:border-[#333]">
-                                <button 
-                                    type="button" 
-                                    onClick={() => setIsModalOpen(false)} 
+                                <button
+                                    type="button"
+                                    onClick={() => setEditorOpen(false)}
                                     className="px-4 py-2 text-sm font-medium text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-[#303030] rounded-lg"
                                 >
                                     Отмена
                                 </button>
-                                <button 
-                                    type="submit" 
+                                <button
+                                    type="submit"
                                     className="px-4 py-2 text-sm font-medium bg-blue-600 text-white hover:bg-blue-700 rounded-lg shadow-sm"
                                 >
                                     {editingFunnel ? 'Сохранить' : 'Создать'}
                                 </button>
                             </div>
-                        </form>
-                    </div>
+                    </form>
                 </div>
             )}
         </div>

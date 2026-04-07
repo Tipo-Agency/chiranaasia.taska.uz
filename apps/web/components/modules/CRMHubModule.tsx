@@ -1,4 +1,4 @@
-import React, { useLayoutEffect, useMemo } from 'react';
+import React, { useEffect, useLayoutEffect, useMemo } from 'react';
 import {
   Deal,
   Client,
@@ -76,6 +76,20 @@ export const CRMHubModule: React.FC<CRMHubModuleProps> = ({
     if (tab !== effectiveTab) onTabChange(effectiveTab);
   }, [options.length, tab, effectiveTab, onTabChange]);
 
+  /** Создание сущностей из шапки воронки — переключаем на «Клиенты» и открываем нужную модалку */
+  useEffect(() => {
+    const onHubCreate = (event: Event) => {
+      const t = (event as CustomEvent<{ type?: string }>).detail?.type;
+      if (!t || t === 'deal') return;
+      onTabChange('clients');
+      window.setTimeout(() => {
+        window.dispatchEvent(new CustomEvent('clients:openModal', { detail: { kind: t } }));
+      }, 100);
+    };
+    window.addEventListener('crmHub:createEntity', onHubCreate as EventListener);
+    return () => window.removeEventListener('crmHub:createEntity', onHubCreate as EventListener);
+  }, [onTabChange]);
+
   useLayoutEffect(() => {
     if (options.length <= 1) {
       setLeading(null);
@@ -136,6 +150,7 @@ export const CRMHubModule: React.FC<CRMHubModuleProps> = ({
         {effectiveTab === 'funnel' && canFunnel && <CRMModule view="sales-funnel" {...sharedCrm} />}
         {effectiveTab === 'chats' && canChats && (
           <ClientChatsPage
+            layout="embedded"
             deals={deals}
             users={users}
             currentUser={currentUser}
@@ -149,7 +164,7 @@ export const CRMHubModule: React.FC<CRMHubModuleProps> = ({
             }}
           />
         )}
-        {effectiveTab === 'clients' && canClients && <CRMModule view="clients" {...sharedCrm} />}
+        {effectiveTab === 'clients' && canClients && <CRMModule view="clients" embedInCrmHub {...sharedCrm} />}
         {effectiveTab === 'rejected' && canFunnel && <CRMModule view="sales-funnel" forcedFunnelViewMode="rejected" {...sharedCrm} />}
       </div>
     </div>

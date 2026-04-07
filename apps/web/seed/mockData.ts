@@ -35,7 +35,7 @@ export function runSeed(): void {
   localStoreService.setAll('tables', [
     { id: 't1', name: 'Задачи', type: 'tasks', icon: 'CheckSquare', color: 'text-blue-500' },
     { id: 't2', name: 'Контент-план', type: 'content-plan', icon: 'Instagram', color: 'text-pink-500' },
-    { id: 't3', name: 'Беклог', type: 'backlog', icon: 'Archive', color: 'text-amber-500' },
+    { id: 't3', name: 'Идеи', type: 'backlog', icon: 'Archive', color: 'text-amber-500' },
     { id: 't4', name: 'Функционал', type: 'functionality', icon: 'Layers', color: 'text-green-600' },
   ]);
 

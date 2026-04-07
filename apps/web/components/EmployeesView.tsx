@@ -288,7 +288,11 @@ const EmployeesView: React.FC<EmployeesViewProps> = ({
               <div key={node.id} className="relative flex flex-col items-center">
                   {/* Линия вверх к родителю (если есть родитель) */}
                   {hasParent && (
-                      <div className="absolute -top-4 left-1/2 -translate-x-1/2 w-0.5 h-4 bg-gray-300 dark:bg-gray-600"></div>
+                      <div
+                        className="pointer-events-none absolute -top-4 left-1/2 z-[1] w-px -translate-x-1/2 bg-gray-300 dark:bg-gray-600"
+                        style={{ height: 'calc(1rem + 1px)' }}
+                        aria-hidden
+                      />
                   )}
 
                   {/* Node card */}
@@ -316,17 +320,22 @@ const EmployeesView: React.FC<EmployeesViewProps> = ({
 
                   {/* Children container */}
                   {children.length > 0 && (
-                      <div className="relative mt-4">
-                          {/* Вертикальная линия вниз от карточки родителя к горизонтальной линии */}
-                          <div className="absolute -top-4 left-1/2 -translate-x-1/2 w-0.5 bg-gray-300 dark:bg-gray-600 z-0" style={{ height: '20px' }} />
-                          
-                          {/* Горизонтальная линия (только если больше одного ребенка) - по верхнему краю */}
+                      <div className="relative mt-4 overflow-visible">
+                          {/* Вертикальная линия вниз от карточки родителя к горизонтальной линии (чуть длиннее — перекрытие стыка) */}
+                          <div
+                            className="pointer-events-none absolute -top-4 left-1/2 z-[1] w-px -translate-x-1/2 bg-gray-300 dark:bg-gray-600"
+                            style={{ height: 'calc(1.25rem + 2px)' }}
+                            aria-hidden
+                          />
+
+                          {/* Горизонталь: расстояние между центрами = w-64 (16rem) + gap-8 (2rem); +2px на стыки с вертикалями */}
                           {children.length > 1 && (
-                              <div 
-                                  className="absolute top-0 left-1/2 -translate-x-1/2 h-0.5 bg-gray-300 dark:bg-gray-600 z-0"
-                                  style={{
-                                      width: `calc(${children.length - 1} * (256px + 2rem))`,
-                                  }}
+                              <div
+                                className="pointer-events-none absolute left-1/2 top-0 z-[1] h-0.5 -translate-x-1/2 bg-gray-300 dark:bg-gray-600"
+                                style={{
+                                  width: `calc(${children.length - 1} * (16rem + 2rem) + 2px)`,
+                                }}
+                                aria-hidden
                               />
                           )}
 
@@ -335,14 +344,20 @@ const EmployeesView: React.FC<EmployeesViewProps> = ({
                               {children.map((child) => {
                                   const isMultiple = children.length > 1;
                                   return (
-                                      <div key={child.id} className="relative z-10">
-                                          {/* Вертикальная линия вверх от ребенка к горизонтальной линии - по верхнему краю */}
+                                      <div key={child.id} className="relative z-10 w-64 shrink-0">
                                           {isMultiple && (
-                                              <div className="absolute -top-6 left-1/2 -translate-x-1/2 w-0.5 h-6 bg-gray-300 dark:bg-gray-600 z-0" />
+                                              <div
+                                                className="pointer-events-none absolute -top-6 left-1/2 z-[1] w-px -translate-x-1/2 bg-gray-300 dark:bg-gray-600"
+                                                style={{ height: 'calc(1.5rem + 2px)' }}
+                                                aria-hidden
+                                              />
                                           )}
-                                          {/* Если только один ребенок, линия идет напрямую вниз */}
                                           {!isMultiple && (
-                                              <div className="absolute -top-4 left-1/2 -translate-x-1/2 w-0.5 h-4 bg-gray-300 dark:bg-gray-600 z-0" />
+                                              <div
+                                                className="pointer-events-none absolute -top-4 left-1/2 z-[1] w-px -translate-x-1/2 bg-gray-300 dark:bg-gray-600"
+                                                style={{ height: 'calc(1rem + 1px)' }}
+                                                aria-hidden
+                                              />
                                           )}
                                           {renderNode(child, level + 1)}
                                       </div>
@@ -356,7 +371,7 @@ const EmployeesView: React.FC<EmployeesViewProps> = ({
       };
 
       return (
-          <div className="overflow-x-auto overflow-y-hidden pb-8">
+          <div className="overflow-x-auto pb-8">
               {roots.length === 0 ? (
                   <div className="text-center py-12 text-gray-400 dark:text-gray-500">Оргсхема пуста. Добавьте первую должность.</div>
               ) : (

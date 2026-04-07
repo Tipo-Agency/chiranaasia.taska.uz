@@ -434,7 +434,7 @@ export interface Task {
   processInstanceId?: string; // ID экземпляра процесса
   stepId?: string; // ID шага процесса
   dealId?: string; // Связь со сделкой
-  source?: string; // 'Задача', 'Беклог', 'Функционал', или название контент-плана
+  source?: string; // 'Задача', 'Идеи' (ранее «Беклог»), 'Функционал', или название контент-плана
   category?: string; // Категория функции (ID из functionalityCategories)
   taskId?: string; // ID связанной задачи (для функций)
   /** Родительская задача (подзадачи) */
@@ -646,6 +646,7 @@ export interface NotificationPreferences {
 
 // --- FINANCE TYPES ---
 
+/** Статья расхода: классификация затрат (фикс/%) — планы, заявки, БДР. Не путать с Fund. */
 export interface FinanceCategory {
     id: string;
     name: string;
@@ -701,7 +702,7 @@ export interface FinancialPlanDocument {
     isArchived?: boolean;
 }
 
-/** Фонд — целевое распределение дохода (настраиваются в настройках) */
+/** Фонд — целевое распределение выручки по «кошелькам» (не то же самое, что статья расхода). */
 export interface Fund {
     id: string;
     name: string;

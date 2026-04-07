@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useState } from 'react';
 import type { Department, User } from '../../types';
 import { ModuleSegmentedControl } from '../ui';
 
@@ -62,15 +62,24 @@ function clampInt(n: number, min: number, max: number) {
   return Math.max(min, Math.min(max, v));
 }
 
-export function PayrollView({
-  users,
-  departments,
-  initialPeriod,
-}: {
+export type PayrollViewHandle = {
+  copyFromPrevMonth: () => void;
+};
+
+type PayrollViewProps = {
   users: User[];
   departments: Department[];
   initialPeriod: string; // yyyy-mm
-}) {
+  /** Период из родителя (шапка «Фильтры») */
+  controlledPeriod?: { value: string; onChange: (v: string) => void };
+  /** Скрыть месяц/копирование и горизонтальные вкладки — они в шапке; вкладки слева */
+  hideTopChrome?: boolean;
+};
+
+export const PayrollView = forwardRef<PayrollViewHandle, PayrollViewProps>(function PayrollView(
+  { users, departments, initialPeriod, controlledPeriod, hideTopChrome = false },
+  ref
+) {
   const staff = useMemo(() => users.filter((u) => !u.isArchived), [users]);
   const deptById = useMemo(() => {
     const entries = departments
@@ -82,7 +91,19 @@ export function PayrollView({
   const deptList = useMemo(() => Array.from(deptById.values()) as Department[], [deptById]);
 
   const [subTab, setSubTab] = useState<PayrollSubTab>('calc');
-  const [period, setPeriod] = useState(initialPeriod);
+  const [internalPeriod, setInternalPeriod] = useState(initialPeriod);
+  useEffect(() => {
+    if (!controlledPeriod) setInternalPeriod(initialPeriod);
+  }, [initialPeriod, controlledPeriod]);
+
+  const period = controlledPeriod?.value ?? internalPeriod;
+  const setPeriod = useCallback(
+    (v: string) => {
+      if (controlledPeriod) controlledPeriod.onChange(v);
+      else setInternalPeriod(v);
+    },
+    [controlledPeriod]
+  );
 
   const [defaultConditionsByUserId, setDefaultConditionsByUserId] = useState<Record<string, PayrollUserConditions>>({});
   const [monthData, setMonthData] = useState<PayrollMonthData>({ byUserId: {} });
@@ -97,10 +118,13 @@ export function PayrollView({
     localStorage.setItem(lsKey('conditions', period), JSON.stringify(next));
   };
 
-  const persistMonth = (next: PayrollMonthData) => {
-    setMonthData(next);
-    localStorage.setItem(lsKey('month', period), JSON.stringify(next));
-  };
+  const persistMonth = useCallback(
+    (next: PayrollMonthData) => {
+      setMonthData(next);
+      localStorage.setItem(lsKey('month', period), JSON.stringify(next));
+    },
+    [period]
+  );
 
   const getUserBundle = (userId: string) => monthData.byUserId[userId] || {};
 
@@ -154,12 +178,11 @@ export function PayrollView({
     });
   };
 
-  const copyFromPrevMonth = () => {
+  const copyFromPrevMonth = useCallback(() => {
     const [y, m] = period.split('-').map((x) => Number(x));
     if (!y || !m) return;
     const prev = m === 1 ? `${y - 1}-12` : `${y}-${String(m - 1).padStart(2, '0')}`;
     const prevMonth = safeParse<PayrollMonthData>(localStorage.getItem(lsKey('month', prev)), { byUserId: {} });
-    // копируем только табель/надбавки; условия берём из дефолтов текущего месяца
     const next: PayrollMonthData = { byUserId: {} };
     staff.forEach((u) => {
       const p = prevMonth.byUserId[u.id] || {};
@@ -170,7 +193,9 @@ export function PayrollView({
     });
     persistMonth(next);
     alert(`Скопировано из ${prev}`);
-  };
+  }, [period, staff, persistMonth]);
+
+  useImperativeHandle(ref, () => ({ copyFromPrevMonth }), [copyFromPrevMonth]);
 
   const tabs = useMemo(
     () => [
@@ -216,38 +241,30 @@ export function PayrollView({
     return Array.from(map.entries()).map(([id, v]) => ({ id, ...v })).sort((a, b) => b.net - a.net);
   }, [staff, monthData, defaultConditionsByUserId, deptById]);
 
-  return (
-    <div className="space-y-3">
-      <div className="bg-white dark:bg-[#252525] border border-gray-200 dark:border-[#333] rounded-2xl p-4">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="flex flex-wrap items-center gap-2">
-            <label className="text-xs font-semibold text-gray-600 dark:text-gray-400">Месяц</label>
-            <input
-              type="month"
-              value={period}
-              onChange={(e) => setPeriod(e.target.value)}
-              className="h-9 rounded-lg border border-gray-200 dark:border-[#333] bg-white dark:bg-[#1a1a1a] px-3 text-sm text-gray-900 dark:text-gray-100"
-            />
-            <button
-              type="button"
-              onClick={copyFromPrevMonth}
-              className="h-9 px-3 rounded-lg border border-gray-200 dark:border-[#333] bg-white dark:bg-[#1a1a1a] text-sm font-semibold text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-[#2a2a2a]"
-              title="Скопировать табель и начисления из прошлого месяца"
-            >
-              Копировать месяц
-            </button>
-          </div>
-        </div>
-        <div className="mt-3">
-          <ModuleSegmentedControl<PayrollSubTab>
-            variant="neutral"
-            value={subTab}
-            onChange={(v) => setSubTab(v as PayrollSubTab)}
-            options={tabs}
-          />
-        </div>
-      </div>
+  const tabNav = (
+    <>
+      {tabs.map((t) => {
+        const on = subTab === t.value;
+        return (
+          <button
+            key={t.value}
+            type="button"
+            onClick={() => setSubTab(t.value)}
+            className={`w-full text-left px-3 py-2 rounded-xl text-sm font-semibold transition-colors border ${
+              on
+                ? 'bg-white dark:bg-[#2a2a2a] border-gray-200 dark:border-[#444] text-gray-900 dark:text-white shadow-sm'
+                : 'border-transparent text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-[#1f1f1f]'
+            }`}
+          >
+            {t.label}
+          </button>
+        );
+      })}
+    </>
+  );
 
+  const tablesBlock = (
+    <>
       {subTab === 'conditions' && (
         <div className="bg-white dark:bg-[#252525] border border-gray-200 dark:border-[#333] rounded-2xl overflow-hidden">
           <div className="overflow-x-auto">
@@ -282,7 +299,7 @@ export function PayrollView({
                             };
                             persistConditions(next);
                           }}
-                          className="h-9 rounded-lg border border-gray-200 dark:border-[#333] bg-white dark:bg-[#1a1a1a] px-2 text-sm text-gray-900 dark:text-gray-100 max-w-[240px]"
+                          className="h-9 rounded-lg border border-gray-200 dark:border-[#333] bg-white dark:bg-[#1a1a1a] pl-3 pr-9 text-sm text-gray-900 dark:text-gray-100 max-w-[240px]"
                         >
                           <option value="">Без подразделения</option>
                           {deptList.map((d) => (
@@ -503,7 +520,57 @@ export function PayrollView({
           </div>
         </div>
       )}
+    </>
+  );
+
+  if (hideTopChrome) {
+    return (
+      <div className="flex flex-col lg:flex-row gap-4 items-start min-h-0 flex-1 w-full">
+        <nav
+          className="w-full lg:w-44 shrink-0 flex flex-row lg:flex-col gap-1 overflow-x-auto lg:overflow-visible pb-1 lg:pb-0 -mx-1 px-1 lg:mx-0 lg:px-0"
+          aria-label="Разделы ЗП"
+        >
+          {tabNav}
+        </nav>
+        <div className="flex-1 min-w-0 space-y-3 w-full">{tablesBlock}</div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-3">
+      <div className="bg-white dark:bg-[#252525] border border-gray-200 dark:border-[#333] rounded-2xl p-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex flex-wrap items-center gap-2">
+            <label className="text-xs font-semibold text-gray-600 dark:text-gray-400">Месяц</label>
+            <input
+              type="month"
+              value={period}
+              onChange={(e) => setPeriod(e.target.value)}
+              className="h-9 rounded-lg border border-gray-200 dark:border-[#333] bg-white dark:bg-[#1a1a1a] px-3 text-sm text-gray-900 dark:text-gray-100"
+            />
+            <button
+              type="button"
+              onClick={copyFromPrevMonth}
+              className="h-9 px-3 rounded-lg border border-gray-200 dark:border-[#333] bg-white dark:bg-[#1a1a1a] text-sm font-semibold text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-[#2a2a2a]"
+              title="Скопировать табель и начисления из прошлого месяца"
+            >
+              Копировать месяц
+            </button>
+          </div>
+        </div>
+        <div className="mt-3">
+          <ModuleSegmentedControl<PayrollSubTab>
+            size="sm"
+            variant="neutral"
+            value={subTab}
+            onChange={(v) => setSubTab(v as PayrollSubTab)}
+            options={tabs}
+          />
+        </div>
+      </div>
+      {tablesBlock}
     </div>
   );
-}
+});
 

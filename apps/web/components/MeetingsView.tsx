@@ -11,10 +11,11 @@ import {
   CalendarDays,
   ChevronLeft,
   ChevronRight,
+  Trash2,
 } from 'lucide-react';
 import { TaskSelect } from './TaskSelect';
 import { normalizeDateForInput, compareDates, getTodayLocalDate } from '../utils/dateUtils';
-import { ModulePageShell, MODULE_PAGE_GUTTER } from './ui';
+import { ModulePageShell, MODULE_PAGE_GUTTER, SystemConfirmDialog } from './ui';
 import { ModuleCreateDropdown } from './ui/ModuleCreateDropdown';
 import { ModuleSelectDropdown } from './ui/ModuleSelectDropdown';
 import { useAppToolbar } from '../contexts/AppToolbarContext';
@@ -92,6 +93,7 @@ const MeetingsView: React.FC<MeetingsViewProps> = ({
     const t = new Date();
     return { month: t.getMonth(), year: t.getFullYear() };
   });
+  const [meetingDeleteConfirmOpen, setMeetingDeleteConfirmOpen] = useState(false);
   
   // Form State
   const [meetingType, setMeetingType] = useState<'client' | 'work' | 'project'>('work'); // shoot только из планов съёмок
@@ -240,6 +242,17 @@ const MeetingsView: React.FC<MeetingsViewProps> = ({
     return () => window.removeEventListener('openCreateMeetingModal', handleOpenCreateMeeting as EventListener);
   }, [openMeetingCreate]);
 
+  /** С рабочего стола: сначала выбор типа события (команда / клиент / проект / съёмка) */
+  React.useEffect(() => {
+    const handleOpenKindPicker = (event: Event) => {
+      const custom = event as CustomEvent<{ date?: string }>;
+      setPickEventKindDate(custom.detail?.date || getTodayLocalDate());
+      setPickEventKindOpen(true);
+    };
+    window.addEventListener('openMeetingKindPickerModal', handleOpenKindPicker as EventListener);
+    return () => window.removeEventListener('openMeetingKindPickerModal', handleOpenKindPicker as EventListener);
+  }, []);
+
   const saveShootFromCalendar = () => {
     if (!shootModalDraft || !onSaveShootPlan) return;
     if (!shootModalDraft.title.trim()) {
@@ -265,6 +278,7 @@ const MeetingsView: React.FC<MeetingsViewProps> = ({
 
   const closeMeetingModal = () => {
     setIsModalOpen(false);
+    setMeetingDeleteConfirmOpen(false);
     setEditingMeeting(null);
     setMeetingTypeLocked(false);
     setTitle('');
@@ -653,14 +667,14 @@ const MeetingsView: React.FC<MeetingsViewProps> = ({
   return (
     <ModulePageShell>
       <div className="flex-1 min-h-0 overflow-hidden">
-        <div className={`${MODULE_PAGE_GUTTER} pt-6 md:pt-8 pb-20 h-full overflow-y-auto custom-scrollbar`}>
+        <div className={`${MODULE_PAGE_GUTTER} pt-3 md:pt-5 pb-16 md:pb-20 h-full overflow-y-auto custom-scrollbar`}>
       {renderCalendar()}
         </div>
       </div>
 
       {/* Create/Edit Modal — один скролл по центру, шапка и футер фиксированы */}
       {isModalOpen && (
-        <div className="fixed inset-0 bg-black/35 flex items-center justify-center z-50 p-4" onClick={handleBackdropClick}>
+        <div className="fixed inset-0 z-[100] flex min-h-[100dvh] items-center justify-center bg-black/35 p-4" onClick={handleBackdropClick}>
             <div
               className="bg-white dark:bg-[#252525] rounded-2xl shadow-2xl w-full max-w-xl border border-gray-200 dark:border-[#333] flex flex-col max-h-[min(92vh,840px)] min-h-0"
               onClick={e => e.stopPropagation()}
@@ -855,7 +869,20 @@ const MeetingsView: React.FC<MeetingsViewProps> = ({
                         </div>
                     </div>
 
-                    <div className="px-5 py-4 border-t border-gray-100 dark:border-[#333] bg-gray-50/80 dark:bg-[#1f1f1f] flex justify-end gap-2 shrink-0">
+                    <div className="px-5 py-4 border-t border-gray-100 dark:border-[#333] bg-gray-50/80 dark:bg-[#1f1f1f] flex flex-wrap items-center justify-between gap-2 shrink-0">
+                        <div className="min-w-0">
+                          {editingMeeting && onDeleteMeeting && (
+                            <button
+                              type="button"
+                              onClick={() => setMeetingDeleteConfirmOpen(true)}
+                              className="inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40 rounded-xl"
+                            >
+                              <Trash2 size={16} />
+                              Удалить событие
+                            </button>
+                          )}
+                        </div>
+                        <div className="flex flex-wrap justify-end gap-2">
                         <button 
                             type="button" 
                             onClick={closeMeetingModal}
@@ -869,6 +896,7 @@ const MeetingsView: React.FC<MeetingsViewProps> = ({
                         >
                             {editingMeeting ? 'Сохранить' : 'Создать'}
                         </button>
+                        </div>
                     </div>
                 </form>
             </div>
@@ -877,7 +905,7 @@ const MeetingsView: React.FC<MeetingsViewProps> = ({
 
       {pickEventKindOpen && (
         <div
-          className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 p-4"
+          className="fixed inset-0 z-[100] flex min-h-[100dvh] items-center justify-center bg-black/40 p-4"
           onClick={(e) => e.target === e.currentTarget && setPickEventKindOpen(false)}
         >
           <div
@@ -950,6 +978,23 @@ const MeetingsView: React.FC<MeetingsViewProps> = ({
           </div>
         </div>
       )}
+
+      <SystemConfirmDialog
+        open={meetingDeleteConfirmOpen}
+        title="Удалить событие?"
+        message="Встреча будет удалена из календаря (в архив). Продолжить?"
+        danger
+        confirmText="Удалить"
+        cancelText="Отмена"
+        onCancel={() => setMeetingDeleteConfirmOpen(false)}
+        onConfirm={() => {
+          if (editingMeeting && onDeleteMeeting) {
+            onDeleteMeeting(editingMeeting.id);
+            closeMeetingModal();
+          }
+          setMeetingDeleteConfirmOpen(false);
+        }}
+      />
 
       {shootModalDraft && onSaveShootPlan && (
         <ShootPlanModal

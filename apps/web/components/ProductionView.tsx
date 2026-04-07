@@ -1,6 +1,7 @@
 import React, { useLayoutEffect, useMemo, useState } from 'react';
+import { BarChart3, ClipboardList, Factory, LayoutDashboard } from 'lucide-react';
 import type { Department, User } from '../types';
-import { ModulePageShell, ModuleSegmentedControl } from './ui';
+import { ModuleCreateDropdown, ModuleFilterIconButton, ModulePageShell } from './ui';
 import { MODULE_PAGE_GUTTER, MODULE_PAGE_TOP_PAD } from './ui/moduleAccent';
 import { useAppToolbar } from '../contexts/AppToolbarContext';
 import { useProductionStore } from './production/useProductionStore';
@@ -20,6 +21,7 @@ interface ProductionViewProps {
 export default function ProductionView({ users, departments, currentUser }: ProductionViewProps) {
   const { setLeading, setModule } = useAppToolbar();
   const [tab, setTab] = useState<ProductionTab>('monitor');
+  const [prodFiltersOpen, setProdFiltersOpen] = useState(false);
   const { orders, operations, shiftLogs, stats, setStatus, createOrder, updateOrder, createOperation, updateOperation, logShift } =
     useProductionStore();
 
@@ -59,13 +61,58 @@ export default function ProductionView({ users, departments, currentUser }: Prod
       </div>
     );
 
-    setModule(null);
+    setModule(
+      <div className="flex items-center gap-1.5 shrink-0 flex-wrap justify-end">
+        <ModuleFilterIconButton
+          accent="emerald"
+          size="sm"
+          active={prodFiltersOpen}
+          label="Фильтры производства"
+          onClick={() => setProdFiltersOpen((o) => !o)}
+        />
+        <ModuleCreateDropdown
+          accent="emerald"
+          buttonSize="sm"
+          label="Создать"
+          items={[
+            {
+              id: 'order',
+              label: 'Производственный заказ',
+              icon: ClipboardList,
+              onClick: () => setTab('orders'),
+              iconClassName: 'text-emerald-600 dark:text-emerald-400',
+            },
+            {
+              id: 'planning',
+              label: 'Планирование и смены',
+              icon: Factory,
+              onClick: () => setTab('planning'),
+              iconClassName: 'text-emerald-600 dark:text-emerald-400',
+            },
+            {
+              id: 'monitor',
+              label: 'Монитор производства',
+              icon: LayoutDashboard,
+              onClick: () => setTab('monitor'),
+              iconClassName: 'text-emerald-600 dark:text-emerald-400',
+            },
+            {
+              id: 'reports',
+              label: 'Отчёты',
+              icon: BarChart3,
+              onClick: () => setTab('reports'),
+              iconClassName: 'text-emerald-600 dark:text-emerald-400',
+            },
+          ]}
+        />
+      </div>
+    );
 
     return () => {
       setLeading(null);
       setModule(null);
     };
-  }, [setLeading, setModule, tab, tabs]);
+  }, [setLeading, setModule, tab, tabs, prodFiltersOpen]);
 
   return (
     <ModulePageShell>
@@ -79,6 +126,7 @@ export default function ProductionView({ users, departments, currentUser }: Prod
               departments={departments}
               onCreateOrder={createOrder}
               onUpdateOrder={updateOrder}
+              filterRowHighlight={prodFiltersOpen && tab === 'orders'}
             />
           )}
           {tab === 'planning' && (
@@ -95,14 +143,6 @@ export default function ProductionView({ users, departments, currentUser }: Prod
           {tab === 'reports' && (
             <ProductionReportsPanel orders={orders} operations={operations} shiftLogs={shiftLogs} departments={departments} />
           )}
-          <div className="mt-3 rounded-xl border border-gray-200 dark:border-[#333] bg-gray-50 dark:bg-[#1a1a1a] p-3">
-            <ModuleSegmentedControl
-              variant="neutral"
-              value={tab}
-              onChange={(v) => setTab(v as ProductionTab)}
-              options={tabs.map((t) => ({ value: t.id, label: t.label }))}
-            />
-          </div>
           <div className="mt-2 text-xs text-gray-500 dark:text-gray-400">
             Ответственный: {currentUser.name} · Активных заказов: {stats.total}
           </div>

@@ -1,20 +1,48 @@
 # Документация tipa.taska.uz
 
-## Система и API (с чего начать)
+Единая точка входа для разработчиков, DevOps и сопровождения.
 
-| Документ | Содержание |
-|----------|------------|
-| [ARCHITECTURE.md](./ARCHITECTURE.md) | Архитектура: Postgres, Redis Stream, уведомления, чат, Telegram, ограничения «мгновенности» |
-| [API-OVERVIEW.md](./API-OVERVIEW.md) | Обзор HTTP API, префиксы, WebSocket, вебхуки, интеграция заявок (`POST /deals`) |
+## 1. Назначение продукта
 
-## Эксплуатация и локальный запуск
+Веб-приложение объединяет:
 
-| Документ | Содержание |
-|----------|------------|
-| [00-ONBOARDING.md](./00-ONBOARDING.md) | Локальный запуск: Docker, фронт, порты |
-| [operations/DEPLOY.md](./operations/DEPLOY.md) | Автодеплой, nginx, шаги `ops/scripts/deploy.sh` |
-| [operations/ENV_AND_SECRETS.md](./operations/ENV_AND_SECRETS.md) | Переменные окружения и секреты GitHub Actions |
-| [operations/TROUBLESHOOTING.md](./operations/TROUBLESHOOTING.md) | Частые неполадки |
-| [CLIENT.md](./CLIENT.md) | Кратко для заказчика: развёртывание и эксплуатация (без внутренностей репо) |
+- **Рабочий стол** — дашборд, сводки, быстрый доступ к задачам и CRM.
+- **Задачи** — глобальный список/канбан с фильтрами и бизнес-процессами.
+- **Пространства (страницы)** — типизированные таблицы: задачи проекта, беклог, функциональность, контент-план, календарь, документы и др.
+- **CRM** — воронка продаж, диалоги с лидами (Instagram / Telegram / сайт), клиенты и договоры.
+- **Финансы** — планирование, заявки, отчёты.
+- **HR** — сотрудники, оргструктура, бизнес-процессы.
+- **Производство и склад** — при наличии прав.
 
-Источник правды по коду — репозиторий: `apps/api/app/models/`, миграции Alembic, роутеры `apps/api/app/routers/`, UI в `apps/web/`.
+Детали в **[ARCHITECTURE.md](./ARCHITECTURE.md)** и **[FRONTEND.md](./FRONTEND.md)**.
+
+## 2. Оглавление
+
+
+| Документ                             | Описание                                                                             |
+| ------------------------------------ | ------------------------------------------------------------------------------------ |
+| [ARCHITECTURE.md](./ARCHITECTURE.md) | Компоненты системы, поток данных, уведомления, Redis, WebSocket, честные ограничения |
+| [FRONTEND.md](./FRONTEND.md)         | Архитектура SPA: роутинг, `AppRouter`, модули, хуки, контексты, UI-кит, права        |
+| [COMPONENTS.md](./COMPONENTS.md)     | Карта папок и ключевых компонентов `components/`                                     |
+| [API.md](./API.md)                   | REST-префиксы, авторизация, WebSocket, вебхуки, модули роутеров                      |
+| [OPERATIONS.md](./OPERATIONS.md)     | Docker, локальный запуск, деплой, GitHub Secrets, nginx, типовые проблемы            |
+| [CLIENT.md](./CLIENT.md)             | Кратко для передачи заказчику (без внутренней кухни)                                 |
+
+
+## 3. Карта репозитория (кратко)
+
+
+| Путь            | Роль                                                       |
+| --------------- | ---------------------------------------------------------- |
+| `apps/web/`     | Клиент: `components/`, `frontend/hooks/`, `backend/api.ts` |
+| `apps/api/app/` | Сервер: `main.py`, `routers/`, `models/`, `services/`      |
+| `apps/bot/`     | Опрос API, зеркалирование чата, рассылки                   |
+| `ops/`          | nginx, `deploy.sh`                                         |
+| `scripts/`      | Миграции данных (например Firestore → Postgres)            |
+
+
+## 4. Где искать ответы
+
+- **Поведение API** — `apps/api/app/routers/*.py`, OpenAPI: `GET /openapi.json` при запущенном сервере.
+- **Схема БД** — `apps/api/app/models/`, миграции Alembic.
+- **Новый экран во фронте** — `AppRouter.tsx`, модули в `components/modules/`, состояние в `frontend/hooks/useAppLogic.ts` и слайсах.

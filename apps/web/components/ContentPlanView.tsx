@@ -1,11 +1,11 @@
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useLayoutEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { ContentPost, Task, TableCollection, ShootPlan, User } from '../types';
 import { ShootPlansPanel } from './ShootPlansPanel';
 import { Calendar, X, FileText as FileTextIcon, Send, Youtube, Video, Image, FileText, Clock, List, LayoutGrid, KanbanSquare, Linkedin, Check, CheckSquare, ChevronLeft, ChevronRight, Trash2, Edit2, Instagram, CheckSquare2, Save, RefreshCw, MoreVertical } from 'lucide-react';
-import { DynamicIcon } from './AppIcons';
-import { ModulePageShell, ModulePageHeader, ModuleSegmentedControl, MODULE_PAGE_GUTTER, ModuleCreateIconButton } from './ui';
+import { ModulePageShell, ModuleSegmentedControl, MODULE_PAGE_GUTTER, ModuleCreateIconButton } from './ui';
+import { useAppToolbar } from '../contexts/AppToolbarContext';
 import { TaskSelect } from './TaskSelect';
 import { api } from '../backend/api';
 import { normalizeDateForInput } from '../utils/dateUtils';
@@ -36,6 +36,7 @@ const ContentPlanView: React.FC<ContentPlanViewProps> = ({
     onDeleteShootPlan,
     onOpenTask, onCreateTask 
 }) => {
+  const { setLeading, setModule } = useAppToolbar();
   const [viewMode, setViewMode] = useState<'calendar' | 'table' | 'kanban' | 'gantt' | 'tasks' | 'shoots'>('calendar');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingPost, setEditingPost] = useState<ContentPost | null>(null);
@@ -131,7 +132,7 @@ const ContentPlanView: React.FC<ContentPlanViewProps> = ({
       ? filteredPosts
       : filteredPosts.filter(p => p.format === formatFilter);
 
-  const handleOpenCreate = () => {
+  const handleOpenCreate = useCallback(() => {
       setEditingPost(null);
       const newDate = new Date().toISOString().split('T')[0];
       setTopic('');
@@ -151,7 +152,45 @@ const ContentPlanView: React.FC<ContentPlanViewProps> = ({
         copy: ''
       };
       setIsModalOpen(true);
-  };
+  }, []);
+
+  useLayoutEffect(() => {
+    setLeading(
+      <ModuleSegmentedControl
+        size="sm"
+        variant="neutral"
+        value={viewMode}
+        onChange={setViewMode}
+        options={[
+          { value: 'calendar', label: 'Календарь' },
+          { value: 'table', label: 'Список' },
+          { value: 'kanban', label: 'Доска' },
+          { value: 'gantt', label: 'Таймлайн' },
+          { value: 'tasks', label: 'Задачи' },
+          { value: 'shoots', label: 'Съёмки' },
+        ]}
+      />
+    );
+    setModule(
+      <div className="flex items-center gap-1.5 shrink-0 flex-wrap justify-end">
+        <button
+          type="button"
+          onClick={refreshData}
+          disabled={isRefreshing}
+          className="inline-flex items-center gap-1.5 h-8 px-2.5 rounded-lg border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 text-xs font-medium hover:bg-gray-50 dark:hover:bg-[#2a2a2a] disabled:opacity-50 disabled:cursor-not-allowed"
+          title="Обновить данные"
+        >
+          <RefreshCw size={14} className={isRefreshing ? 'animate-spin' : ''} />
+          {isRefreshing ? '…' : 'Обновить'}
+        </button>
+        <ModuleCreateIconButton accent="slate" label="Новый пост" onClick={handleOpenCreate} />
+      </div>
+    );
+    return () => {
+      setLeading(null);
+      setModule(null);
+    };
+  }, [viewMode, isRefreshing, setLeading, setModule, handleOpenCreate]);
 
   /** Создать пост/рилс по клику на пустую ячейку календаря с предзаполненной датой */
   const handleCreateForDate = (dateString: string) => {
@@ -800,44 +839,8 @@ const ContentPlanView: React.FC<ContentPlanViewProps> = ({
 
   return (
     <ModulePageShell>
-      <div className={`${MODULE_PAGE_GUTTER} pt-8 pb-4 flex-shrink-0`}>
-        <ModulePageHeader
-          icon={<DynamicIcon name={activeTable?.icon || 'FileText'} className="text-slate-700 dark:text-slate-200" size={18} />}
-          title={activeTable?.name || 'Контент-план'}
-          description="Планирование контента"
-          accent="slate"
-          hideTitleBlock
-          tabs={
-            <ModuleSegmentedControl
-              value={viewMode}
-              onChange={setViewMode}
-              variant="neutral"
-              options={[
-                { value: 'calendar', label: 'Календарь' },
-                { value: 'table', label: 'Список' },
-                { value: 'kanban', label: 'Доска' },
-                { value: 'gantt', label: 'Таймлайн' },
-                { value: 'tasks', label: 'Задачи' },
-                { value: 'shoots', label: 'Съёмки' },
-              ]}
-            />
-          }
-          controls={
-            <div className="flex items-center gap-2">
-              <button 
-                onClick={refreshData} 
-                disabled={isRefreshing}
-                className="px-3 py-2 rounded-xl border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 text-sm font-medium flex items-center gap-2 hover:bg-gray-50 dark:hover:bg-[#2a2a2a] disabled:opacity-50 disabled:cursor-not-allowed"
-                title="Обновить данные"
-              >
-                <RefreshCw size={16} className={isRefreshing ? 'animate-spin' : ''} /> 
-                {isRefreshing ? 'Обновление...' : 'Обновить'}
-              </button>
-              <ModuleCreateIconButton accent="slate" label="Новый пост" onClick={handleOpenCreate} />
-            </div>
-          }
-        />
-        <div className="mt-3 inline-flex max-w-full items-center gap-2 rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-xs text-gray-700 dark:border-[#333] dark:bg-[#1a1a1a] dark:text-gray-300">
+      <div className={`${MODULE_PAGE_GUTTER} pt-4 md:pt-6 pb-3 flex-shrink-0`}>
+        <div className="inline-flex max-w-full items-center gap-2 rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-xs text-gray-700 dark:border-[#333] dark:bg-[#1a1a1a] dark:text-gray-300">
           <span className="font-medium">Публичная ссылка:</span>
           <span className="truncate">{`${window.location.origin}/content-plan/${tableId}`}</span>
           <button
@@ -853,7 +856,7 @@ const ContentPlanView: React.FC<ContentPlanViewProps> = ({
         </div>
       </div>
       <div className="flex-1 overflow-y-auto custom-scrollbar min-h-0">
-        <div className={`${MODULE_PAGE_GUTTER} pb-20`}>
+        <div className={`${MODULE_PAGE_GUTTER} pb-16 md:pb-20`}>
           {viewMode === 'calendar' && renderCalendar()}
           {viewMode === 'table' && renderTable()}
           {viewMode === 'shoots' && onSaveShootPlan && onDeleteShootPlan && (

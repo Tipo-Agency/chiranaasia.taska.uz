@@ -732,6 +732,7 @@ const AnalyticsView: React.FC<AnalyticsViewProps> = ({
             description="Аналитика и отчётность"
             tabs={
               <ModuleSegmentedControl
+                size="sm"
                 variant="neutral"
                 value={activeTab}
                 onChange={(v) => setActiveTab(v as 'dashboard' | 'statistics' | 'reports')}
@@ -744,6 +745,7 @@ const AnalyticsView: React.FC<AnalyticsViewProps> = ({
             }
             controls={
               <ModuleSegmentedControl
+                size="sm"
                 variant="accent"
                 accent="sky"
                 value={period}

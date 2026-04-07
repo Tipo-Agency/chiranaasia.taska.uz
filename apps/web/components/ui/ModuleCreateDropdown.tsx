@@ -61,14 +61,15 @@ export const ModuleCreateDropdown: React.FC<ModuleCreateDropdownProps> = ({
 
       {open && (
         <>
+          {/* Выше шапки приложения (z-40), иначе верхняя полоса остаётся без затемнения */}
           <button
             type="button"
-            className="fixed inset-0 z-[15] cursor-default"
+            className="fixed inset-0 z-[100] cursor-default bg-black/20 dark:bg-black/35"
             aria-hidden
             onClick={() => setOpen(false)}
           />
           <div
-            className={`absolute top-full mt-2 w-56 bg-white dark:bg-[#252525] border border-gray-200 dark:border-[#333] rounded-xl shadow-xl py-1 z-20 ${
+            className={`absolute top-full mt-2 w-56 bg-white dark:bg-[#252525] border border-gray-200 dark:border-[#333] rounded-xl shadow-xl py-1 z-[110] ${
               align === 'right' ? 'right-0' : 'left-0'
             }`}
           >

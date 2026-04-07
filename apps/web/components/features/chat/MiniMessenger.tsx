@@ -248,7 +248,7 @@ export const MiniMessenger: React.FC<MiniMessengerProps> = ({
     const q = processSearch.trim().toLowerCase();
     const latestById = new Map<string, BusinessProcess>();
     for (const p of processTemplates || []) {
-      if (p.isArchived || p.systemKey) continue;
+      if (p.isArchived || !(p.steps?.length)) continue;
       const prev = latestById.get(p.id);
       if (!prev || (p.version || 1) > (prev.version || 1)) {
         latestById.set(p.id, p);

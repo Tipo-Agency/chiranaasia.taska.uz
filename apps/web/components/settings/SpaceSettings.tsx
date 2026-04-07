@@ -115,7 +115,7 @@ export const SpaceSettings: React.FC<SpaceSettingsProps> = ({
                   <ModuleCreateIconButton accent="indigo" label="Создать проект" onClick={onCreateTable} />
               </div>
               <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
-                  Здесь отображаются только проекты внутри модулей (Контент планы, Беклог, Функционал). 
+                  Здесь отображаются только проекты внутри модулей (Контент планы, Идеи, Функционал). 
                   Системные модули (Встречи, Документы) не требуют создания страниц.
               </p>
 
@@ -138,7 +138,7 @@ export const SpaceSettings: React.FC<SpaceSettingsProps> = ({
                             <label className="block text-xs font-bold text-gray-500 mb-2">Тип</label>
                             <div className="grid grid-cols-2 gap-2">
                                 {/* Только проекты внутри модулей - системные модули больше не создаются */}
-                                {[{id:'content-plan',icon:<Instagram size={16}/>,l:'Контент-план'},{id:'backlog',icon:<Archive size={16}/>,l:'Бэклог'},{id:'functionality',icon:<Layers size={16}/>,l:'Функционал'}].map(t => (
+                                {[{id:'content-plan',icon:<Instagram size={16}/>,l:'Контент-план'},{id:'backlog',icon:<Archive size={16}/>,l:'Идеи'},{id:'functionality',icon:<Layers size={16}/>,l:'Функционал'}].map(t => (
                                     <div key={t.id} onClick={() => setNewPageType(t.id)} className={`cursor-pointer border rounded p-2 text-center text-xs flex flex-col items-center gap-1 ${newPageType === t.id ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400' : 'border-gray-200 dark:border-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-[#303030]'}`}>
                                         {t.icon}{t.l}
                                     </div>
@@ -179,7 +179,7 @@ export const SpaceSettings: React.FC<SpaceSettingsProps> = ({
                           // Фильтруем архивные таблицы
                           if (table.isArchived) return false;
                           // Фильтруем системные страницы - они больше не нужны
-                          // Встречи, документы, контент-планы, беклог и функционал теперь хардкодные модули
+                          // Встречи, документы, контент-планы, идеи и функционал — хардкодные модули
                           const systemTypes = ['meetings', 'docs', 'content-plan', 'backlog', 'functionality'];
                           // Показываем только если НЕ системная страница с типом из списка системных
                           return !(table.isSystem && systemTypes.includes(table.type));

@@ -8,7 +8,7 @@ import { Button, ModulePageShell, MODULE_PAGE_GUTTER, MODULE_PAGE_TOP_PAD, Modul
 import { useAppToolbar } from '../contexts/AppToolbarContext';
 import { BankStatementsView, type BankStatementsViewHandle } from './finance/BankStatementsView';
 import { BdrView } from './finance/BdrView';
-import { PayrollView } from './finance/PayrollView';
+import { PayrollView, type PayrollViewHandle } from './finance/PayrollView';
 import { FilterConfig } from './FiltersPanel';
 
 interface FinanceViewProps {
@@ -40,7 +40,7 @@ const FinanceView: React.FC<FinanceViewProps> = ({
     onSaveFinancialPlanDocument, onDeleteFinancialPlanDocument, onSaveFinancialPlanning, onDeleteFinancialPlanning
 }) => {
   const { setLeading, setModule } = useAppToolbar();
-  const [activeTab, setActiveTab] = useState<'planning' | 'requests' | 'plan' | 'statements' | 'bdr'>('planning');
+  const [activeTab, setActiveTab] = useState<'planning' | 'requests' | 'plan' | 'statements' | 'bdr' | 'payroll'>('planning');
   
   // Состояния для детальных страниц
   const [selectedPlanning, setSelectedPlanning] = useState<FinancialPlanning | null>(null);
@@ -74,6 +74,18 @@ const FinanceView: React.FC<FinanceViewProps> = ({
   const [editingRequest, setEditingRequest] = useState<PurchaseRequest | null>(null);
   const [alertText, setAlertText] = useState<string | null>(null);
   const bankStatementsRef = useRef<BankStatementsViewHandle>(null);
+  const payrollRef = useRef<PayrollViewHandle>(null);
+  const [payrollPeriod, setPayrollPeriod] = useState(() => {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  });
+  /** Текущий календарный месяц (yyyy-mm) для планов и планирования */
+  const currentPeriod = useMemo(() => {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  }, []);
+  const [payrollFiltersOpen, setPayrollFiltersOpen] = useState(false);
+  const [statementFiltersOpen, setStatementFiltersOpen] = useState(true);
 
   // Формы
   const [reqAmount, setReqAmount] = useState('');
@@ -82,12 +94,6 @@ const FinanceView: React.FC<FinanceViewProps> = ({
   const [reqCat, setReqCat] = useState('');
   const [reqPaymentDate, setReqPaymentDate] = useState('');
   
-  // Получаем текущий период (месяц)
-  const currentPeriod = useMemo(() => {
-    const now = new Date();
-    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-  }, []);
-
   // Payroll is implemented as a separate component (PayrollView).
 
   const getDefaultRangeForMonth = useCallback((yyyyMm: string) => {
@@ -1189,7 +1195,14 @@ const FinanceView: React.FC<FinanceViewProps> = ({
   };
 
   const renderPayrollTab = () => (
-    <PayrollView users={users} departments={departments} initialPeriod={currentPeriod} />
+    <PayrollView
+      ref={payrollRef}
+      users={users}
+      departments={departments}
+      initialPeriod={payrollPeriod}
+      controlledPeriod={{ value: payrollPeriod, onChange: setPayrollPeriod }}
+      hideTopChrome
+    />
   );
 
   // --- Render Plan Detail ---
@@ -1847,6 +1860,27 @@ const FinanceView: React.FC<FinanceViewProps> = ({
             onClick={() => setShowRequestFilters(!showRequestFilters)}
           />
         )}
+        {activeTab === 'statements' && (
+          <ModuleFilterIconButton
+            accent="emerald"
+            size="sm"
+            active={statementFiltersOpen}
+            label="Фильтры выписок"
+            onClick={() => {
+              bankStatementsRef.current?.toggleFilters();
+              setStatementFiltersOpen((o) => !o);
+            }}
+          />
+        )}
+        {activeTab === 'payroll' && (
+          <ModuleFilterIconButton
+            accent="emerald"
+            size="sm"
+            active={payrollFiltersOpen}
+            label="Период и вкладки ЗП"
+            onClick={() => setPayrollFiltersOpen((o) => !o)}
+          />
+        )}
         <ModuleCreateDropdown
           accent="emerald"
           buttonSize="sm"
@@ -1911,13 +1945,16 @@ const FinanceView: React.FC<FinanceViewProps> = ({
     requestFilters,
     setLeading,
     setModule,
+    payrollFiltersOpen,
+    statementFiltersOpen,
   ]);
 
   const hasFinanceFilterStrip =
     !financeFullScreen &&
     ((showPlanningFilters && activeTab === 'planning' && planningSubView === 'list') ||
       (showPlanFilters && activeTab === 'plan' && planSubView === 'list') ||
-      (showRequestFilters && activeTab === 'requests'));
+      (showRequestFilters && activeTab === 'requests') ||
+      (payrollFiltersOpen && activeTab === 'payroll'));
 
   return (
     <ModulePageShell className="flex-1 min-h-0 flex flex-col overflow-hidden">
@@ -1926,6 +1963,7 @@ const FinanceView: React.FC<FinanceViewProps> = ({
           <div className="p-4 bg-gray-50 dark:bg-[#252525] rounded-lg border border-gray-200 dark:border-[#333]">
             <div className="flex items-center justify-end mb-3">
               <ModuleSegmentedControl
+                size="sm"
                 variant="neutral"
                 value={financeArchiveScope}
                 onChange={(v) => setFinanceArchiveScope(v as 'active' | 'archived')}
@@ -1958,6 +1996,7 @@ const FinanceView: React.FC<FinanceViewProps> = ({
           <div className="p-4 bg-gray-50 dark:bg-[#252525] rounded-lg border border-gray-200 dark:border-[#333]">
             <div className="flex items-center justify-end mb-3">
               <ModuleSegmentedControl
+                size="sm"
                 variant="neutral"
                 value={financeArchiveScope}
                 onChange={(v) => setFinanceArchiveScope(v as 'active' | 'archived')}
@@ -1990,6 +2029,7 @@ const FinanceView: React.FC<FinanceViewProps> = ({
           <div className="p-4 bg-gray-50 dark:bg-[#252525] rounded-lg border border-gray-200 dark:border-[#333]">
             <div className="flex items-center justify-end mb-3">
               <ModuleSegmentedControl
+                size="sm"
                 variant="neutral"
                 value={financeArchiveScope}
                 onChange={(v) => setFinanceArchiveScope(v as 'active' | 'archived')}
@@ -2014,6 +2054,29 @@ const FinanceView: React.FC<FinanceViewProps> = ({
                 </button>
               </div>
             )}
+          </div>
+        </div>
+      )}
+      {!financeFullScreen && payrollFiltersOpen && activeTab === 'payroll' && (
+        <div className={`${MODULE_PAGE_GUTTER} ${MODULE_PAGE_TOP_PAD} pb-2 flex-shrink-0 border-b border-gray-200 dark:border-[#333]`}>
+          <div className="p-4 bg-gray-50 dark:bg-[#252525] rounded-lg border border-gray-200 dark:border-[#333]">
+            <div className="flex flex-wrap items-center gap-3">
+              <label className="text-xs font-semibold text-gray-600 dark:text-gray-400 shrink-0">Месяц</label>
+              <input
+                type="month"
+                value={payrollPeriod}
+                onChange={(e) => setPayrollPeriod(e.target.value)}
+                className="h-9 rounded-lg border border-gray-200 dark:border-[#333] bg-white dark:bg-[#1a1a1a] px-3 text-sm text-gray-900 dark:text-gray-100"
+              />
+              <button
+                type="button"
+                onClick={() => payrollRef.current?.copyFromPrevMonth()}
+                className="h-9 px-3 rounded-lg border border-gray-200 dark:border-[#333] bg-white dark:bg-[#1a1a1a] text-sm font-semibold text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-[#2a2a2a]"
+                title="Скопировать табель и начисления из прошлого месяца"
+              >
+                Копировать месяц
+              </button>
+            </div>
           </div>
         </div>
       )}

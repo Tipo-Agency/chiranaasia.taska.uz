@@ -25,9 +25,9 @@ const CreateTableModal: React.FC<CreateTableModalProps> = ({ onClose, onCreate, 
 
   const pageTypes = [
     // Только проекты внутри модулей - системные модули (встречи, документы) больше не создаются
-    // Контент-планы, беклог и функционал - это проекты внутри модулей
+    // Контент-планы, идеи и функционал — проекты внутри модулей
     { id: 'content-plan', label: 'Контент-план', icon: <Instagram size={18} /> },
-    { id: 'backlog', label: 'Бэклог', icon: <Archive size={18} /> },
+    { id: 'backlog', label: 'Идеи', icon: <Archive size={18} /> },
     { id: 'functionality', label: 'Функционал', icon: <Layers size={18} /> },
   ];
 

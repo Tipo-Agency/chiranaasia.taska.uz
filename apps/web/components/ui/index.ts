@@ -26,6 +26,7 @@ export { SafeArea, SafeAreaTop, SafeAreaBottom, SafeAreaAll } from './SafeArea';
 export { Container } from './Container';
 export { PageLayout } from './PageLayout';
 export { RouteFallback } from './RouteFallback';
+export { ToolbarModuleLabel } from './ToolbarModuleLabel';
 export { Select } from './Select';
 export { Toast } from './Toast';
 export { Touchable } from './Touchable';

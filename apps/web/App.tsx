@@ -362,7 +362,7 @@ function MainApp() {
                     </button>
                   </div>
 
-                  <div className="flex-1 min-h-0">
+                  <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
                     {chatMainTab === 'team' ? (
                       <MiniMessenger
                         className="h-full min-h-0 rounded-none border-0 shadow-none"

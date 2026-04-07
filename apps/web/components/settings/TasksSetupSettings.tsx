@@ -2,6 +2,8 @@ import React, { useMemo, useState } from 'react';
 import { Edit2, Plus, Trash2, X } from 'lucide-react';
 import type { PriorityOption, StatusOption } from '../../types';
 import { SystemConfirmDialog } from '../ui';
+import { TaskBadgeInline } from '../ui/TaskBadgeInline';
+import { DEFAULT_PRIORITY_BADGE_INDEX, TASK_BADGE_PRESETS } from '../../utils/taskBadgePresets';
 
 interface TasksSetupSettingsProps {
   statuses: StatusOption[];
@@ -10,53 +12,8 @@ interface TasksSetupSettingsProps {
   onUpdatePriorities: (priorities: PriorityOption[]) => void;
 }
 
-const COLOR_PRESETS: { label: string; value: string; swatch: string }[] = [
-  {
-    label: 'Серый',
-    value: 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-700',
-    swatch: 'bg-gray-300 dark:bg-gray-600',
-  },
-  {
-    label: 'Синий',
-    value: 'bg-blue-100 dark:bg-blue-900/35 text-blue-800 dark:text-blue-200 border border-blue-200 dark:border-blue-800/60',
-    swatch: 'bg-blue-400 dark:bg-blue-500',
-  },
-  {
-    label: 'Фиолетовый',
-    value: 'bg-violet-100 dark:bg-violet-900/35 text-violet-800 dark:text-violet-200 border border-violet-200 dark:border-violet-800/60',
-    swatch: 'bg-violet-400 dark:bg-violet-500',
-  },
-  {
-    label: 'Жёлтый',
-    value: 'bg-amber-100 dark:bg-amber-900/35 text-amber-800 dark:text-amber-200 border border-amber-200 dark:border-amber-800/60',
-    swatch: 'bg-amber-400 dark:bg-amber-500',
-  },
-  {
-    label: 'Зелёный',
-    value: 'bg-emerald-100 dark:bg-emerald-900/35 text-emerald-800 dark:text-emerald-200 border border-emerald-200 dark:border-emerald-800/60',
-    swatch: 'bg-emerald-400 dark:bg-emerald-500',
-  },
-  {
-    label: 'Красный',
-    value: 'bg-rose-100 dark:bg-rose-900/35 text-rose-800 dark:text-rose-200 border border-rose-200 dark:border-rose-800/60',
-    swatch: 'bg-rose-400 dark:bg-rose-500',
-  },
-  {
-    label: 'Низкий (зел.)',
-    value: 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-700',
-    swatch: 'bg-emerald-400 dark:bg-emerald-500',
-  },
-  {
-    label: 'Средний (жёлт.)',
-    value: 'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300 border border-amber-300 dark:border-amber-700',
-    swatch: 'bg-amber-400 dark:bg-amber-500',
-  },
-  {
-    label: 'Высокий (красн.)',
-    value: 'bg-rose-100 dark:bg-rose-900/40 text-rose-700 dark:text-rose-300 border border-rose-300 dark:border-rose-700',
-    swatch: 'bg-rose-400 dark:bg-rose-500',
-  },
-];
+const defaultStatusColorValue = 'badge:0';
+const defaultPriorityColorValue = `badge:${DEFAULT_PRIORITY_BADGE_INDEX}`;
 
 export const TasksSetupSettings: React.FC<TasksSetupSettingsProps> = ({
   statuses,
@@ -70,19 +27,19 @@ export const TasksSetupSettings: React.FC<TasksSetupSettingsProps> = ({
   const [statusModalOpen, setStatusModalOpen] = useState(false);
   const [editingStatus, setEditingStatus] = useState<StatusOption | null>(null);
   const [statusName, setStatusName] = useState('');
-  const [statusColor, setStatusColor] = useState(COLOR_PRESETS[0]?.value || '');
+  const [statusColor, setStatusColor] = useState(defaultStatusColorValue);
   const [deleteStatusId, setDeleteStatusId] = useState<string | null>(null);
 
   const [priorityModalOpen, setPriorityModalOpen] = useState(false);
   const [editingPriority, setEditingPriority] = useState<PriorityOption | null>(null);
   const [priorityName, setPriorityName] = useState('');
-  const [priorityColor, setPriorityColor] = useState(COLOR_PRESETS[6]?.value || COLOR_PRESETS[0]?.value || '');
+  const [priorityColor, setPriorityColor] = useState(defaultPriorityColorValue);
   const [deletePriorityId, setDeletePriorityId] = useState<string | null>(null);
 
   const openStatusCreate = () => {
     setEditingStatus(null);
     setStatusName('');
-    setStatusColor(COLOR_PRESETS[0]?.value || '');
+    setStatusColor(defaultStatusColorValue);
     setStatusModalOpen(true);
   };
   const openStatusEdit = (s: StatusOption) => {
@@ -98,7 +55,7 @@ export const TasksSetupSettings: React.FC<TasksSetupSettingsProps> = ({
     const payload: StatusOption = {
       id: editingStatus?.id || `st-${Date.now()}`,
       name,
-      color: statusColor || COLOR_PRESETS[0]?.value || '',
+      color: statusColor || defaultStatusColorValue,
       isArchived: false,
     };
     const next = editingStatus
@@ -111,7 +68,7 @@ export const TasksSetupSettings: React.FC<TasksSetupSettingsProps> = ({
   const openPriorityCreate = () => {
     setEditingPriority(null);
     setPriorityName('');
-    setPriorityColor(COLOR_PRESETS[6]?.value || COLOR_PRESETS[0]?.value || '');
+    setPriorityColor(defaultPriorityColorValue);
     setPriorityModalOpen(true);
   };
   const openPriorityEdit = (p: PriorityOption) => {
@@ -127,7 +84,7 @@ export const TasksSetupSettings: React.FC<TasksSetupSettingsProps> = ({
     const payload: PriorityOption = {
       id: editingPriority?.id || `pr-${Date.now()}`,
       name,
-      color: priorityColor || COLOR_PRESETS[6]?.value || COLOR_PRESETS[0]?.value || '',
+      color: priorityColor || defaultPriorityColorValue,
       isArchived: false,
     };
     const next = editingPriority
@@ -178,9 +135,9 @@ export const TasksSetupSettings: React.FC<TasksSetupSettingsProps> = ({
                     className="flex items-center justify-between gap-3 rounded-xl border border-gray-200 dark:border-[#333] bg-white dark:bg-[#252525] px-3 py-2"
                   >
                     <div className="min-w-0 flex items-center gap-2">
-                      <span className={`inline-flex items-center px-2 py-1 rounded-md text-xs font-semibold ${s.color}`}>
+                      <TaskBadgeInline color={s.color} className="px-2 py-1 text-xs">
                         {s.name}
-                      </span>
+                      </TaskBadgeInline>
                       <span className="text-[11px] text-gray-400 dark:text-gray-500 truncate">{s.id}</span>
                     </div>
                     <div className="flex items-center gap-1 shrink-0">
@@ -235,9 +192,9 @@ export const TasksSetupSettings: React.FC<TasksSetupSettingsProps> = ({
                     className="flex items-center justify-between gap-3 rounded-xl border border-gray-200 dark:border-[#333] bg-white dark:bg-[#252525] px-3 py-2"
                   >
                     <div className="min-w-0 flex items-center gap-2">
-                      <span className={`inline-flex items-center px-2 py-1 rounded-md text-xs font-semibold ${p.color}`}>
+                      <TaskBadgeInline color={p.color} className="px-2 py-1 text-xs">
                         {p.name}
-                      </span>
+                      </TaskBadgeInline>
                       <span className="text-[11px] text-gray-400 dark:text-gray-500 truncate">{p.id}</span>
                     </div>
                     <div className="flex items-center gap-1 shrink-0">
@@ -275,7 +232,7 @@ export const TasksSetupSettings: React.FC<TasksSetupSettingsProps> = ({
           }}
         >
           <div
-            className="bg-white dark:bg-[#252525] rounded-xl shadow-2xl w-full max-w-sm overflow-hidden border border-gray-200 dark:border-[#333]"
+            className="bg-white dark:bg-[#252525] rounded-xl shadow-2xl w-full max-w-md overflow-hidden border border-gray-200 dark:border-[#333]"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="p-4 border-b border-gray-100 dark:border-[#333] flex justify-between items-center bg-white dark:bg-[#252525]">
@@ -297,33 +254,37 @@ export const TasksSetupSettings: React.FC<TasksSetupSettingsProps> = ({
               </div>
               <div>
                 <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 mb-1">Цвет</label>
-                <div className="grid grid-cols-2 gap-2">
-                  {COLOR_PRESETS.slice(0, 6).map((c) => {
-                    const active = statusColor === c.value;
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 max-h-[min(50vh,22rem)] overflow-y-auto custom-scrollbar pr-0.5">
+                  {TASK_BADGE_PRESETS.map((preset, idx) => {
+                    const value = `badge:${idx}`;
+                    const active = statusColor === value;
                     return (
                       <button
-                        key={c.label}
+                        key={preset.label + idx}
                         type="button"
-                        onClick={() => setStatusColor(c.value)}
-                        className={`flex items-center gap-2 px-3 py-2 rounded-lg border text-sm transition-colors ${
+                        onClick={() => setStatusColor(value)}
+                        className={`flex items-center gap-2 px-2 py-2 rounded-lg border text-sm transition-colors ${
                           active
                             ? 'border-gray-900 dark:border-white bg-gray-50 dark:bg-[#1f1f1f]'
                             : 'border-gray-200 dark:border-[#444] hover:bg-gray-50 dark:hover:bg-[#303030]'
                         }`}
                       >
                         <span
-                          className={`w-4 h-4 rounded-full ${c.swatch} ring-1 ring-black/10 dark:ring-white/10`}
+                          className="w-4 h-4 rounded-full shrink-0 ring-1 ring-black/10 dark:ring-white/10"
+                          style={{ backgroundColor: preset.dot.light }}
                           aria-hidden="true"
                         />
-                        <span className="text-xs font-semibold text-gray-700 dark:text-gray-200">{c.label}</span>
+                        <span className="text-[11px] font-semibold text-gray-700 dark:text-gray-200 text-left leading-tight line-clamp-2">
+                          {preset.label}
+                        </span>
                       </button>
                     );
                   })}
                 </div>
                 <div className="mt-2">
-                  <span className={`inline-flex items-center px-2 py-1 rounded-md text-xs font-semibold ${statusColor}`}>
+                  <TaskBadgeInline color={statusColor} className="px-2 py-1 text-xs">
                     {statusName.trim() || 'Пример'}
-                  </span>
+                  </TaskBadgeInline>
                 </div>
               </div>
               <div className="flex justify-end gap-2 pt-2">
@@ -348,7 +309,7 @@ export const TasksSetupSettings: React.FC<TasksSetupSettingsProps> = ({
           }}
         >
           <div
-            className="bg-white dark:bg-[#252525] rounded-xl shadow-2xl w-full max-w-sm overflow-hidden border border-gray-200 dark:border-[#333]"
+            className="bg-white dark:bg-[#252525] rounded-xl shadow-2xl w-full max-w-md overflow-hidden border border-gray-200 dark:border-[#333]"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="p-4 border-b border-gray-100 dark:border-[#333] flex justify-between items-center bg-white dark:bg-[#252525]">
@@ -370,33 +331,37 @@ export const TasksSetupSettings: React.FC<TasksSetupSettingsProps> = ({
               </div>
               <div>
                 <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 mb-1">Цвет</label>
-                <div className="grid grid-cols-1 gap-2">
-                  {COLOR_PRESETS.slice(6).map((c) => {
-                    const active = priorityColor === c.value;
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 max-h-[min(50vh,22rem)] overflow-y-auto custom-scrollbar pr-0.5">
+                  {TASK_BADGE_PRESETS.map((preset, idx) => {
+                    const value = `badge:${idx}`;
+                    const active = priorityColor === value;
                     return (
                       <button
-                        key={c.label}
+                        key={`pr-${preset.label}-${idx}`}
                         type="button"
-                        onClick={() => setPriorityColor(c.value)}
-                        className={`flex items-center gap-2 px-3 py-2 rounded-lg border text-sm transition-colors ${
+                        onClick={() => setPriorityColor(value)}
+                        className={`flex items-center gap-2 px-2 py-2 rounded-lg border text-sm transition-colors ${
                           active
                             ? 'border-gray-900 dark:border-white bg-gray-50 dark:bg-[#1f1f1f]'
                             : 'border-gray-200 dark:border-[#444] hover:bg-gray-50 dark:hover:bg-[#303030]'
                         }`}
                       >
                         <span
-                          className={`w-4 h-4 rounded-full ${c.swatch} ring-1 ring-black/10 dark:ring-white/10`}
+                          className="w-4 h-4 rounded-full shrink-0 ring-1 ring-black/10 dark:ring-white/10"
+                          style={{ backgroundColor: preset.dot.light }}
                           aria-hidden="true"
                         />
-                        <span className="text-xs font-semibold text-gray-700 dark:text-gray-200">{c.label}</span>
+                        <span className="text-[11px] font-semibold text-gray-700 dark:text-gray-200 text-left leading-tight line-clamp-2">
+                          {preset.label}
+                        </span>
                       </button>
                     );
                   })}
                 </div>
                 <div className="mt-2">
-                  <span className={`inline-flex items-center px-2 py-1 rounded-md text-xs font-semibold ${priorityColor}`}>
+                  <TaskBadgeInline color={priorityColor} className="px-2 py-1 text-xs">
                     {priorityName.trim() || 'Пример'}
-                  </span>
+                  </TaskBadgeInline>
                 </div>
               </div>
               <div className="flex justify-end gap-2 pt-2">

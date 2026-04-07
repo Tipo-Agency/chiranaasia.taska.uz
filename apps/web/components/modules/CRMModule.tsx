@@ -7,6 +7,8 @@ import ClientsView from '../ClientsView';
 
 interface CRMModuleProps {
   view: 'sales-funnel' | 'clients';
+  /** Скрыть дублирующие кнопки в шапке страницы «Клиенты» — действия в верхней панели приложения */
+  embedInCrmHub?: boolean;
   forcedFunnelViewMode?: 'kanban' | 'list' | 'rejected';
   deals: Deal[];
   clients: Client[];
@@ -23,7 +25,7 @@ interface CRMModuleProps {
   autoOpenCreateModal?: boolean;
 }
 
-export const CRMModule: React.FC<CRMModuleProps> = ({ view, forcedFunnelViewMode, deals, clients, contracts, oneTimeDeals = [], accountsReceivable = [], users, salesFunnels = [], projects, tasks, meetings = [], currentUser, actions, autoOpenCreateModal = false }) => {
+export const CRMModule: React.FC<CRMModuleProps> = ({ view, embedInCrmHub = false, forcedFunnelViewMode, deals, clients, contracts, oneTimeDeals = [], accountsReceivable = [], users, salesFunnels = [], projects, tasks, meetings = [], currentUser, actions, autoOpenCreateModal = false }) => {
   if (view === 'sales-funnel') {
       return (
         <div className="h-full min-h-0 flex flex-col">
@@ -61,6 +63,7 @@ export const CRMModule: React.FC<CRMModuleProps> = ({ view, forcedFunnelViewMode
             oneTimeDeals={oneTimeDeals}
             accountsReceivable={accountsReceivable}
             salesFunnels={salesFunnels}
+            embedInCrmHub={embedInCrmHub}
             onSaveClient={actions.saveClient} 
             onDeleteClient={actions.deleteClient} 
             onSaveContract={actions.saveContract} 

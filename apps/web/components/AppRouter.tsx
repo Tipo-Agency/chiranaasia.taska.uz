@@ -129,6 +129,21 @@ export const AppRouter: React.FC<AppRouterProps> = (props) => {
     ]
   );
 
+  const onQuickCreateTask = useCallback(() => {
+    actions.openTaskModal(null);
+  }, [actions]);
+
+  const onOpenDocModalFromWorkdesk = useCallback(() => {
+    actions.openDocModal();
+  }, [actions]);
+
+  const onQuickCreateDeal = useCallback(() => {
+    actions.setCurrentView('sales-funnel');
+    window.setTimeout(() => {
+      window.dispatchEvent(new CustomEvent('openCreateDealModal'));
+    }, 150);
+  }, [actions]);
+
   const updateEntityFromChat = useCallback(
     (type: 'task' | 'deal' | 'meeting' | 'doc', id: string, patch: Record<string, unknown>) =>
       updateEntityFromChatBridge(messengerBridgeDeps, type, id, patch),
@@ -227,6 +242,9 @@ export const AppRouter: React.FC<AppRouterProps> = (props) => {
         onOpenDocument={actions.handleDocClick}
         onCreateEntity={createEntityFromChat}
         onUpdateEntity={updateEntityFromChat}
+        onOpenDocModal={onOpenDocModalFromWorkdesk}
+        onQuickCreateTask={onQuickCreateTask}
+        onQuickCreateDeal={onQuickCreateDeal}
         processTemplates={props.businessProcesses}
         onStartProcessTemplate={startBusinessProcessFromTemplate}
         meetingsSlot={
@@ -340,9 +358,10 @@ export const AppRouter: React.FC<AppRouterProps> = (props) => {
                       </button>
                     </div>
 
-                    <div className="flex-1 min-h-0">
+                    <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
                       {chatMainTab === 'team' ? (
                         <MiniMessenger
+                          className="h-full min-h-0"
                           users={props.users}
                           currentUser={props.currentUser}
                           docs={props.docs}

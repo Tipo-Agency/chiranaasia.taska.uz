@@ -22,6 +22,8 @@ interface ClientsHeaderProps {
   hasActiveFilters?: boolean;
   activeFiltersCount?: number;
   tabs?: React.ReactNode;
+  /** Скрыть только кнопки «Создать» (воронка и фильтры по договорам остаются) */
+  hideCreateActions?: boolean;
 }
 
 export const ClientsHeader: React.FC<ClientsHeaderProps> = ({
@@ -39,6 +41,7 @@ export const ClientsHeader: React.FC<ClientsHeaderProps> = ({
   hasActiveFilters = false,
   activeFiltersCount = 0,
   tabs,
+  hideCreateActions = false,
 }) => {
   const filterActiveClass = MODULE_ACCENTS.violet.filterActive;
 
@@ -93,16 +96,19 @@ export const ClientsHeader: React.FC<ClientsHeaderProps> = ({
                 )}
               </Button>
             )}
-            <ModuleCreateDropdown
-              accent="violet"
-              label="Создать"
-              items={[
-                { id: 'create-client', label: 'Клиент', icon: Building2, onClick: onCreateClient },
-                { id: 'create-contract', label: 'Договор', icon: FileText, onClick: onCreateContract },
-                { id: 'create-sale', label: 'Продажа', icon: Briefcase, onClick: onCreateSale },
-                { id: 'create-receivable', label: 'Задолженность', icon: AlertCircle, onClick: onCreateReceivable },
-              ]}
-            />
+            {!hideCreateActions && (
+              <ModuleCreateDropdown
+                accent="violet"
+                buttonSize="sm"
+                label="Создать"
+                items={[
+                  { id: 'create-client', label: 'Клиент', icon: Building2, onClick: onCreateClient },
+                  { id: 'create-contract', label: 'Договор', icon: FileText, onClick: onCreateContract },
+                  { id: 'create-sale', label: 'Продажа', icon: Briefcase, onClick: onCreateSale },
+                  { id: 'create-receivable', label: 'Задолженность', icon: AlertCircle, onClick: onCreateReceivable },
+                ]}
+              />
+            )}
           </div>
         }
       />

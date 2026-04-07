@@ -7,6 +7,8 @@ import { dedupeBankStatementFlatLines, parseBankStatementFile } from '../../util
 
 export interface BankStatementsViewHandle {
   triggerUpload: () => void;
+  /** Показать/скрыть блок дат и подразделения (из кнопки «фильтр» в шапке финансов) */
+  toggleFilters: () => void;
 }
 
 export const BankStatementsView = forwardRef<BankStatementsViewHandle>(function BankStatementsView(_, ref) {
@@ -21,6 +23,7 @@ export const BankStatementsView = forwardRef<BankStatementsViewHandle>(function 
   const [reportIncome, setReportIncome] = useState('');
   const [reportCommission, setReportCommission] = useState('');
   const [reportPeriod, setReportPeriod] = useState(new Date().toISOString().slice(0, 7));
+  const [filtersExpanded, setFiltersExpanded] = useState(true);
   const uploadRef = useRef<HTMLInputElement>(null);
 
   const isSaldoLine = (desc?: string) => {
@@ -50,6 +53,7 @@ export const BankStatementsView = forwardRef<BankStatementsViewHandle>(function 
 
   useImperativeHandle(ref, () => ({
     triggerUpload: () => uploadRef.current?.click(),
+    toggleFilters: () => setFiltersExpanded((v) => !v),
   }));
 
   const load = async () => {
@@ -178,6 +182,7 @@ export const BankStatementsView = forwardRef<BankStatementsViewHandle>(function 
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <ModuleSegmentedControl
           variant="neutral"
+          size="sm"
           value={tab}
           onChange={(v) => setTab(v as typeof tab)}
           options={[
@@ -193,7 +198,7 @@ export const BankStatementsView = forwardRef<BankStatementsViewHandle>(function 
           <button
             type="button"
             onClick={load}
-            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-gray-100 dark:bg-[#252525] hover:bg-gray-200 dark:hover:bg-[#333] text-sm"
+            className="inline-flex items-center gap-1.5 h-8 px-2.5 rounded-lg bg-gray-100 dark:bg-[#252525] hover:bg-gray-200 dark:hover:bg-[#333] text-xs font-medium"
           >
             <RefreshCw size={14} />
             Обновить
@@ -201,6 +206,7 @@ export const BankStatementsView = forwardRef<BankStatementsViewHandle>(function 
         </div>
       </div>
 
+      {filtersExpanded && (
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
         <DateInput value={startDate} onChange={setStartDate} placeholder="Период: с" />
         <DateInput value={endDate} onChange={setEndDate} placeholder="Период: по" />
@@ -215,6 +221,7 @@ export const BankStatementsView = forwardRef<BankStatementsViewHandle>(function 
           ]}
         />
       </div>
+      )}
 
       {tab === 'balance' && (
         <>

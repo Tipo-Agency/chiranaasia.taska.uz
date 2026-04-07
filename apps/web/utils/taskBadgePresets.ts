@@ -1,0 +1,137 @@
+/**
+ * Пресеты цветов статусов/приоритетов: храним как badge:INDEX — рендер через inline hex,
+ * чтобы не зависеть от Tailwind JIT и динамических классов.
+ */
+export type TaskBadgePalette = {
+  label: string;
+  light: { bg: string; text: string; border: string };
+  dark: { bg: string; text: string; border: string };
+  /** Точка на канбане / свотч */
+  dot: { light: string; dark: string };
+};
+
+function hslToRgb(h: number, s: number, l: number): [number, number, number] {
+  const hue = ((h % 360) + 360) % 360;
+  const sat = Math.max(0, Math.min(1, s));
+  const light = Math.max(0, Math.min(1, l));
+  const c = (1 - Math.abs(2 * light - 1)) * sat;
+  const x = c * (1 - Math.abs(((hue / 60) % 2) - 1));
+  const m = light - c / 2;
+  let r = 0;
+  let g = 0;
+  let b = 0;
+  if (hue < 60) {
+    r = c;
+    g = x;
+  } else if (hue < 120) {
+    r = x;
+    g = c;
+  } else if (hue < 180) {
+    g = c;
+    b = x;
+  } else if (hue < 240) {
+    g = x;
+    b = c;
+  } else if (hue < 300) {
+    r = x;
+    b = c;
+  } else {
+    r = c;
+    b = x;
+  }
+  return [Math.round((r + m) * 255), Math.round((g + m) * 255), Math.round((b + m) * 255)];
+}
+
+function toHex(r: number, g: number, b: number): string {
+  return `#${[r, g, b].map((x) => x.toString(16).padStart(2, '0')).join('')}`;
+}
+
+/** 40 гармоничных оттенков (полный круг по hue). */
+export const TASK_BADGE_PRESETS: TaskBadgePalette[] = (() => {
+  const labels: string[] = [
+    'Серый',
+    'Сланцевый',
+    'Каменный',
+    'Нейтральный',
+    'Красный',
+    'Малиновый',
+    'Розовый',
+    'Фуксия',
+    'Пурпурный',
+    'Фиолетовый',
+    'Индиго',
+    'Синий',
+    'Небесный',
+    'Голубой',
+    'Бирюзовый',
+    'Мятный',
+    'Зелёный',
+    'Лайм',
+    'Жёлто-зелёный',
+    'Оливковый',
+    'Жёлтый',
+    'Янтарный',
+    'Оранжевый',
+    'Коралл',
+    'Терракота',
+    'Коричневый',
+    'Хаки',
+    'Морской',
+    'Аква',
+    'Лаванда',
+    'Сирень',
+    'Виноград',
+    'Персик',
+    'Песочный',
+    'Графит',
+    'Сталь',
+    'Изумруд',
+    'Сапфир',
+    'Рубин',
+    'Уголь',
+    'Пепел',
+  ];
+  const out: TaskBadgePalette[] = [];
+  for (let i = 0; i < 40; i++) {
+    const hue = Math.round((i / 40) * 360);
+    const [lr, lg, lb] = hslToRgb(hue, 0.32, 0.94);
+    const [dr, dg, db] = hslToRgb(hue, 0.35, 0.22);
+    const [ltr, ltg, ltb] = hslToRgb(hue, 0.45, 0.28);
+    const [dtr, dtg, dtb] = hslToRgb(hue, 0.25, 0.88);
+    const [lbr, lbg, lbb] = hslToRgb(hue, 0.2, 0.82);
+    const [dbr, dbg, dbb] = hslToRgb(hue, 0.25, 0.35);
+    const [dotLr, dotLg, dotLb] = hslToRgb(hue, 0.55, 0.55);
+    const [dotDr, dotDg, dotDb] = hslToRgb(hue, 0.45, 0.5);
+    out.push({
+      label: labels[i] || `Цвет ${i + 1}`,
+      light: {
+        bg: toHex(lr, lg, lb),
+        text: toHex(ltr, ltg, ltb),
+        border: toHex(lbr, lbg, lbb),
+      },
+      dark: {
+        bg: toHex(dr, dg, db),
+        text: toHex(dtr, dtg, dtb),
+        border: toHex(dbr, dbg, dbb),
+      },
+      dot: {
+        light: toHex(dotLr, dotLg, dotLb),
+        dark: toHex(dotDr, dotDg, dotDb),
+      },
+    });
+  }
+  return out;
+})();
+
+export const TASK_BADGE_PRESET_COUNT = TASK_BADGE_PRESETS.length;
+
+/** Дефолт для нового приоритета — «Зелёный» (индекс в labels) */
+export const DEFAULT_PRIORITY_BADGE_INDEX = 16;
+
+export function parseBadgeIndex(color: string | undefined): number | null {
+  const m = /^badge:(\d+)$/.exec((color || '').trim());
+  if (!m) return null;
+  const idx = parseInt(m[1], 10);
+  if (idx < 0 || idx >= TASK_BADGE_PRESETS.length) return null;
+  return idx;
+}

@@ -8,6 +8,7 @@ import { Trash2, Layout, AlertCircle, ChevronDown, Check, Network, TrendingUp, F
 import { normalizeDateForInput, isOverdue } from '../utils/dateUtils';
 import { UserAvatar } from './features/common/UserAvatar';
 import { DateInput } from './ui/DateInput';
+import { TaskBadgeInline } from './ui/TaskBadgeInline';
 
 interface TableViewProps {
   tasks: Task[];
@@ -165,7 +166,13 @@ const CustomSelect = ({ value, options, onChange, type }: { value: string, optio
                         }}
                         className="flex items-center gap-2 px-2 py-2.5 hover:bg-gray-50 dark:hover:bg-[#303030] rounded-lg cursor-pointer transition-colors whitespace-nowrap"
                     >
-                        <span className={`text-xs font-medium ${optColor} px-2 py-0.5 rounded inline-block`}>{opt.name}</span>
+                        {type === 'status' || type === 'priority' ? (
+                          <TaskBadgeInline color={opt.color} className="text-xs px-2 py-0.5">
+                            {opt.name}
+                          </TaskBadgeInline>
+                        ) : (
+                          <span className={`text-xs font-medium ${optColor} px-2 py-0.5 rounded inline-block`}>{opt.name}</span>
+                        )}
                         {val === value && <Check size={14} className="text-slate-600 dark:text-slate-300 flex-shrink-0 ml-auto"/>}
                     </div>
                 );
@@ -190,9 +197,21 @@ const CustomSelect = ({ value, options, onChange, type }: { value: string, optio
                     e.stopPropagation(); 
                     e.preventDefault();
                 }}
-                className={`px-2 py-1.5 rounded-lg text-xs font-semibold cursor-pointer transition-colors w-full text-center flex items-center justify-center gap-1.5 hover:bg-black/5 dark:hover:bg-white/5 ${colorClass}`}
+                className={`px-2 py-1.5 rounded-lg text-xs font-semibold cursor-pointer transition-colors w-full text-center flex items-center justify-center gap-1.5 hover:bg-black/5 dark:hover:bg-white/5 ${
+                  type === 'status' || type === 'priority' ? 'border border-transparent' : colorClass
+                }`}
             >
-                <span className="truncate">{label}</span>
+                {type === 'status' || type === 'priority' ? (
+                  selectedOption ? (
+                    <TaskBadgeInline color={selectedOption.color} className="px-2 py-0.5 text-xs max-w-[calc(100%-1rem)]">
+                      <span className="truncate">{label}</span>
+                    </TaskBadgeInline>
+                  ) : (
+                    <span className="truncate text-gray-500">{label}</span>
+                  )
+                ) : (
+                  <span className={`truncate ${colorClass}`}>{label}</span>
+                )}
                 <ChevronDown size={12} className={`transition-transform flex-shrink-0 ${isOpen ? 'rotate-180' : ''}`} />
             </div>
             {typeof document !== 'undefined' && dropdownContent && createPortal(dropdownContent, document.body)}
@@ -378,7 +397,7 @@ const TableView: React.FC<TableViewProps> = ({
   const getTaskSource = (task: Task) => {
       // Используем entityType для определения источника
       if (task.entityType === 'idea') {
-          return { name: 'Беклог', isProcess: false, isBacklog: true };
+          return { name: 'Идеи', isProcess: false, isBacklog: true };
       }
       if (task.entityType === 'feature') {
           return { name: 'Функционал', isProcess: false, isFunctionality: true };
@@ -395,8 +414,8 @@ const TableView: React.FC<TableViewProps> = ({
           return { name: processName || 'Процесс', isProcess: true };
       }
       if (task.source) {
-          if (task.source === 'Беклог') {
-              return { name: 'Беклог', isProcess: false, isBacklog: true };
+          if (task.source === 'Идеи' || task.source === 'Беклог') {
+              return { name: 'Идеи', isProcess: false, isBacklog: true };
           }
           if (task.source === 'Функционал') {
               return { name: 'Функционал', isProcess: false, isFunctionality: true };

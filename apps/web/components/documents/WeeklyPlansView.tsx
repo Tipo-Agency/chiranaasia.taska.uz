@@ -337,10 +337,17 @@ export const WeeklyPlansView = forwardRef<WeeklyPlansViewHandle, WeeklyPlansView
                         key={plan.id}
                         className="rounded-xl border border-gray-200 dark:border-[#333] overflow-hidden bg-white dark:bg-[#252525] hover:shadow-md transition-shadow"
                       >
-                        <button
-                          type="button"
-                          className="w-full flex items-center justify-between gap-2 px-4 py-3 text-left hover:bg-gray-50/80 dark:hover:bg-[#2a2a2a]/80 transition-colors"
+                        <div
+                          role="button"
+                          tabIndex={0}
+                          className="w-full flex items-center justify-between gap-2 px-4 py-3 text-left hover:bg-gray-50/80 dark:hover:bg-[#2a2a2a]/80 transition-colors cursor-pointer"
                           onClick={() => setOpenedPlanId(plan.id)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' || e.key === ' ') {
+                              e.preventDefault();
+                              setOpenedPlanId(plan.id);
+                            }
+                          }}
                         >
                           <span className="flex items-center gap-3 min-w-0">
                             <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#3337AD]/10 text-[#3337AD] dark:bg-[#3337AD]/25 dark:text-[#a8abf0] shrink-0">
@@ -368,7 +375,7 @@ export const WeeklyPlansView = forwardRef<WeeklyPlansViewHandle, WeeklyPlansView
                               <Trash2 size={14} />
                             </button>
                           </div>
-                        </button>
+                        </div>
                       </div>
                     ))}
                   </div>

@@ -1,11 +1,13 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useLayoutEffect, useCallback } from 'react';
 import { Task, User, StatusOption, Project } from '../types';
-import { CheckCircle2, Trash2, Edit2, Play, Layers, Folder, ChevronDown } from 'lucide-react';
+import { Trash2, Edit2, Play, Layers, Folder } from 'lucide-react';
 import { TaskSelect } from './TaskSelect';
-import { ModulePageShell, ModulePageHeader, ModuleSegmentedControl, MODULE_PAGE_GUTTER, ModuleCreateDropdown, ModuleCreateIconButton, ModuleFilterIconButton } from './ui';
+import { ModulePageShell, MODULE_PAGE_GUTTER, ModuleCreateDropdown, ModuleCreateIconButton, ModuleFilterIconButton, ToolbarModuleLabel } from './ui';
+import { TaskBadgeInline } from './ui/TaskBadgeInline';
+import { useAppToolbar } from '../contexts/AppToolbarContext';
 
 interface FunctionalityViewProps {
-  features: Task[]; // Все функции из всех functionality таблиц
+  features: Task[]; // Функции только текущей страницы пространства (tableId совпадает с активной таблицей)
   users: User[];
   statuses: StatusOption[];
   projects: Project[]; // Добавляем проекты для вкладок
@@ -57,10 +59,76 @@ const FunctionalityView: React.FC<FunctionalityViewProps> = ({
     onCreateProject,
     onTakeToWork
 }) => {
+  const { setLeading, setModule } = useAppToolbar();
   const [selectedProjectId, setSelectedProjectId] = useState<string>('all'); // 'all' или конкретный projectId
   const [selectedCategory, setSelectedCategory] = useState<string>('all'); // 'all' или конкретная категория
   const [scope, setScope] = useState<'all' | 'assigned' | 'unassigned'>('all');
   const [showFilters, setShowFilters] = useState(false);
+
+  const filterActiveCount = useMemo(
+    () =>
+      (selectedProjectId !== 'all' ? 1 : 0) +
+      (selectedCategory !== 'all' ? 1 : 0) +
+      (scope !== 'all' ? 1 : 0),
+    [selectedProjectId, selectedCategory, scope]
+  );
+
+  const handleCreateFeatureClick = useCallback(() => {
+    onCreateFeature(
+      selectedProjectId !== 'all' ? selectedProjectId : undefined,
+      selectedCategory !== 'all' ? selectedCategory : undefined
+    );
+  }, [onCreateFeature, selectedProjectId, selectedCategory]);
+
+  const handleCreateProjectClick = useCallback(() => {
+    const name = window.prompt('Название проекта');
+    if (!name?.trim()) return;
+    onCreateProject?.(name.trim());
+  }, [onCreateProject]);
+
+  useLayoutEffect(() => {
+    setLeading(<ToolbarModuleLabel>Функционал</ToolbarModuleLabel>);
+    setModule(
+      <div className="flex items-center gap-1.5 shrink-0 flex-wrap justify-end">
+        <ModuleFilterIconButton
+          accent="sky"
+          size="sm"
+          active={showFilters || filterActiveCount > 0}
+          activeCount={filterActiveCount}
+          label="Фильтры"
+          onClick={() => setShowFilters((v) => !v)}
+        />
+        <ModuleCreateDropdown
+          accent="sky"
+          buttonSize="sm"
+          label="Создать"
+          items={[
+            {
+              id: 'create-feature',
+              label: 'Функция',
+              onClick: handleCreateFeatureClick,
+            },
+            {
+              id: 'create-project',
+              label: 'Проект',
+              onClick: handleCreateProjectClick,
+            },
+          ]}
+        />
+      </div>
+    );
+    return () => {
+      setLeading(null);
+      setModule(null);
+    };
+  }, [
+    setLeading,
+    setModule,
+    showFilters,
+    filterActiveCount,
+    handleCreateFeatureClick,
+    handleCreateProjectClick,
+  ]);
 
   // Получаем все проекты, у которых есть функции
   const projectsWithFeatures = useMemo(() => {
@@ -114,10 +182,8 @@ const FunctionalityView: React.FC<FunctionalityViewProps> = ({
 
   // Calculate Progress
   const total = features.length;
-  const completed = features.filter(f => {
-      const s = statuses.find(st => st.name === f.status);
-      return s?.color.includes('green');
-  }).length;
+  const completedStatuses = ['Выполнено', 'Done', 'Завершено'];
+  const completed = features.filter((f) => completedStatuses.includes(f.status)).length;
   
   const progress = total > 0 ? Math.round((completed / total) * 100) : 0;
 
@@ -126,9 +192,9 @@ const FunctionalityView: React.FC<FunctionalityViewProps> = ({
       const color = s?.color || 'bg-gray-100 text-gray-600';
       
       return (
-          <span className={`px-2 py-1 rounded-full text-xs font-bold uppercase border border-transparent ${color}`}>
+          <TaskBadgeInline color={color} className="px-2 py-1 rounded-full text-xs font-bold uppercase">
               {statusName}
-          </span>
+          </TaskBadgeInline>
       );
   };
 
@@ -146,103 +212,61 @@ const FunctionalityView: React.FC<FunctionalityViewProps> = ({
 
   return (
     <ModulePageShell>
-      <div className={`${MODULE_PAGE_GUTTER} pt-6 md:pt-8 flex-shrink-0`}>
-        <div className="mb-6">
-          <ModulePageHeader
-            icon={<Layers size={24} strokeWidth={2} />}
-            title="Функционал"
-            description="Функции проектов"
-            accent="sky"
-            hideTitleBlock
-            tabs={
-              <ModuleSegmentedControl
-                variant="neutral"
-                value={scope}
-                onChange={(v) => setScope(v as 'all' | 'assigned' | 'unassigned')}
-                options={[
-                  { value: 'all', label: 'Все' },
-                  { value: 'assigned', label: 'С исполнителем' },
-                  { value: 'unassigned', label: 'Без исполнителя' },
-                ]}
-              />
-            }
-            controls={
-              <div className="flex items-center gap-2">
-                  <ModuleFilterIconButton
-                    accent="sky"
-                    active={showFilters || selectedProjectId !== 'all' || selectedCategory !== 'all'}
-                    activeCount={(selectedProjectId !== 'all' ? 1 : 0) + (selectedCategory !== 'all' ? 1 : 0)}
-                    onClick={() => setShowFilters((v) => !v)}
-                  />
-                  <ModuleCreateDropdown
-                    accent="sky"
-                    label="Создать"
-                    items={[
-                      {
-                        id: 'create-feature',
-                        label: 'Функция',
-                        onClick: () =>
-                          onCreateFeature(
-                            selectedProjectId !== 'all' ? selectedProjectId : undefined,
-                            selectedCategory !== 'all' ? selectedCategory : undefined
-                          ),
-                      },
-                      {
-                        id: 'create-project',
-                        label: 'Проект',
-                        onClick: () => {
-                          const name = window.prompt('Название проекта');
-                          if (!name?.trim()) return;
-                          onCreateProject?.(name.trim());
-                        },
-                      },
-                    ]}
-                  />
-                </div>
-            }
-            className="mb-4"
-          />
-          {showFilters && (
-            <div className="mt-4 p-4 bg-gray-50 dark:bg-[#252525] rounded-lg border border-gray-200 dark:border-[#333]">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-semibold text-gray-600 dark:text-gray-400 mb-1">Проект</label>
-                  <TaskSelect
-                    value={selectedProjectId}
-                    onChange={setSelectedProjectId}
-                    options={[
-                      { value: 'all', label: 'Все проекты' },
-                      ...projectsWithFeatures.map((p) => ({ value: p.id, label: p.name })),
-                    ]}
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-semibold text-gray-600 dark:text-gray-400 mb-1">Категория</label>
-                  <TaskSelect
-                    value={selectedCategory}
-                    onChange={setSelectedCategory}
-                    options={[
-                      { value: 'all', label: 'Все категории' },
-                      ...STANDARD_CATEGORIES.map((c) => ({ value: c.id, label: c.name })),
-                    ]}
-                  />
-                </div>
+      {showFilters && (
+        <div className={`${MODULE_PAGE_GUTTER} pt-2 pb-2 flex-shrink-0 border-b border-gray-200 dark:border-[#333]`}>
+          <div className="p-4 bg-gray-50 dark:bg-[#252525] rounded-lg border border-gray-200 dark:border-[#333]">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+              <div>
+                <label className="block text-xs font-semibold text-gray-600 dark:text-gray-400 mb-1">Проект</label>
+                <TaskSelect
+                  value={selectedProjectId}
+                  onChange={setSelectedProjectId}
+                  options={[
+                    { value: 'all', label: 'Все проекты' },
+                    ...projectsWithFeatures.map((p) => ({ value: p.id, label: p.name })),
+                  ]}
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-gray-600 dark:text-gray-400 mb-1">Категория</label>
+                <TaskSelect
+                  value={selectedCategory}
+                  onChange={setSelectedCategory}
+                  options={[
+                    { value: 'all', label: 'Все категории' },
+                    ...STANDARD_CATEGORIES.map((c) => ({ value: c.id, label: c.name })),
+                  ]}
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-gray-600 dark:text-gray-400 mb-1">Исполнитель</label>
+                <TaskSelect
+                  value={scope}
+                  onChange={(v) => setScope(v as 'all' | 'assigned' | 'unassigned')}
+                  options={[
+                    { value: 'all', label: 'Все' },
+                    { value: 'assigned', label: 'С исполнителем' },
+                    { value: 'unassigned', label: 'Без исполнителя' },
+                  ]}
+                />
               </div>
             </div>
-          )}
-          <div className="w-full bg-gray-100 dark:bg-[#333] rounded-full h-3 overflow-hidden">
-                <div 
-                    className="bg-blue-600 h-full rounded-full transition-all duration-500 ease-out relative"
-                    style={{ width: `${progress}%` }}
-                >
-                    <div className="absolute inset-0 bg-white/20 animate-pulse"></div>
-                </div>
-            </div>
-            <div className="flex justify-between mt-2 text-xs text-gray-500 dark:text-gray-400 font-medium">
-                <span>0%</span>
-                <span>{completed} из {total} функций готово</span>
-                <span>100%</span>
-            </div>
+          </div>
+        </div>
+      )}
+
+      <div className={`${MODULE_PAGE_GUTTER} pt-4 md:pt-5 pb-2 flex-shrink-0`}>
+        <div className="w-full bg-gray-100 dark:bg-[#333] rounded-full h-3 overflow-hidden">
+          <div className="bg-blue-600 h-full rounded-full transition-all duration-500 ease-out relative" style={{ width: `${progress}%` }}>
+            <div className="absolute inset-0 bg-white/20 animate-pulse" />
+          </div>
+        </div>
+        <div className="flex justify-between mt-2 text-xs text-gray-500 dark:text-gray-400 font-medium">
+          <span>0%</span>
+          <span>
+            {completed} из {total} функций готово
+          </span>
+          <span>100%</span>
         </div>
       </div>
 

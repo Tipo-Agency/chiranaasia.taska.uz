@@ -9,7 +9,7 @@ DEFAULT_FINANCE_CATEGORIES = [
 ]
 
 DEFAULT_FUNDS = [
-    {"id": "fund-1", "name": "Зарплаты", "order": 1},
+    {"id": "fund-1", "name": "Операционный", "order": 1},
     {"id": "fund-2", "name": "Закупки", "order": 2},
     {"id": "fund-3", "name": "Резерв", "order": 3},
 ]

@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import { Client, Deal, Contract, OneTimeDeal, AccountsReceivable, SalesFunnel, User } from '../types';
 import { FilterConfig } from './FiltersPanel';
 import {
@@ -30,6 +30,8 @@ interface ClientsViewProps {
   onDeleteOneTimeDeal?: (id: string) => void;
   onSaveAccountsReceivable?: (receivable: AccountsReceivable) => void;
   onDeleteAccountsReceivable?: (id: string) => void;
+  /** Встроено в единый хаб CRM: скрыть дублирующие кнопки создания в шапке */
+  embedInCrmHub?: boolean;
 }
 
 const ClientsView: React.FC<ClientsViewProps> = ({ 
@@ -47,6 +49,7 @@ const ClientsView: React.FC<ClientsViewProps> = ({
   onDeleteOneTimeDeal,
   onSaveAccountsReceivable,
   onDeleteAccountsReceivable,
+  embedInCrmHub = false,
 }) => {
   const [activeTab, setActiveTab] = useState<'clients' | 'contracts' | 'finance' | 'receivables'>('clients');
   const [contractStatusFilter, setContractStatusFilter] = useState<string>('all');
@@ -188,6 +191,7 @@ const ClientsView: React.FC<ClientsViewProps> = ({
           selectedFunnelId={selectedFunnelId}
           onFunnelChange={setSelectedFunnelId}
           showFunnelFilter={activeTab === 'clients' || activeTab === 'contracts'}
+          hideCreateActions={embedInCrmHub}
           activeTab={activeTab}
           onCreateClient={handleOpenClientCreate}
           onCreateContract={() => handleOpenContractCreate('')}

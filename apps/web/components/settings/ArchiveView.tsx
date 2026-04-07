@@ -340,6 +340,7 @@ export const ArchiveView: React.FC<{
     <div className="space-y-4">
       <h3 className="font-bold text-lg text-gray-800 dark:text-white tracking-tight">Архив</h3>
       <ModuleSegmentedControl
+        size="sm"
         variant="neutral"
         value={archiveTab}
         onChange={v => setArchiveTab(v as ArchiveTabId)}

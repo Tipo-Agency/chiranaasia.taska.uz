@@ -15,13 +15,13 @@ import {
   Megaphone,
   Zap,
 } from 'lucide-react';
-import { Deal, FinancePlan, Meeting, Task, User, Doc, BusinessProcess, SalesFunnel } from '../../types';
+import { Deal, FinancePlan, Meeting, Task, User, Doc, type BusinessProcess, SalesFunnel } from '../../types';
 import { getDealDisplayTitle, isFunnelDeal } from '../../utils/dealModel';
 import { ModuleCreateDropdown } from '../ui/ModuleCreateDropdown';
 import { ModulePageShell, MODULE_PAGE_GUTTER, MODULE_PAGE_TOP_PAD } from '../ui';
 import { useAppToolbar } from '../../contexts/AppToolbarContext';
 import { DateInput } from '../ui/DateInput';
-import { normalizeDateForInput, parseLocalDate } from '../../utils/dateUtils';
+import { getTodayLocalDate, normalizeDateForInput, parseLocalDate } from '../../utils/dateUtils';
 
 type WorkdeskTab = 'dashboard' | 'weekly' | 'tasks' | 'deals' | 'meetings' | 'documents';
 
@@ -96,6 +96,12 @@ interface WorkdeskViewProps {
     id: string,
     patch: Record<string, unknown>
   ) => Promise<boolean> | boolean;
+  /** Открыть модалку документа (ссылка / файл) без мгновенного создания */
+  onOpenDocModal?: () => void;
+  /** Создать задачу из шапки, не уходя со страницы */
+  onQuickCreateTask?: () => void;
+  /** Открыть форму новой сделки (обычно переход в воронку + модалка) */
+  onQuickCreateDeal?: () => void;
 }
 
 export const WorkdeskView: React.FC<WorkdeskViewProps> = ({
@@ -122,6 +128,9 @@ export const WorkdeskView: React.FC<WorkdeskViewProps> = ({
   onStartProcessTemplate,
   onCreateEntity,
   onUpdateEntity,
+  onOpenDocModal,
+  onQuickCreateTask,
+  onQuickCreateDeal,
 }) => {
   const { setLeading, setModule } = useAppToolbar();
   const activeTab = workdeskTab;
@@ -210,10 +219,18 @@ export const WorkdeskView: React.FC<WorkdeskViewProps> = ({
       });
     return map;
   }, [tasks]);
-  const availableProcessTemplates = useMemo(
-    () => processTemplates.filter((process) => !process.isArchived && !process.systemKey),
-    [processTemplates]
-  );
+  /** Дедуп по id, последняя версия; системные шаблоны тоже можно запускать */
+  const availableProcessTemplates = useMemo(() => {
+    const latestById = new Map<string, BusinessProcess>();
+    for (const p of processTemplates) {
+      if (p.isArchived || !(p.steps?.length)) continue;
+      const prev = latestById.get(p.id);
+      if (!prev || (p.version || 1) > (prev.version || 1)) {
+        latestById.set(p.id, p);
+      }
+    }
+    return [...latestById.values()];
+  }, [processTemplates]);
 
   const myFunnelDeals = useMemo(
     () =>
@@ -339,6 +356,10 @@ export const WorkdeskView: React.FC<WorkdeskViewProps> = ({
             label: 'Новая задача',
             icon: CheckSquare,
             onClick: () => {
+              if (onQuickCreateTask) {
+                onQuickCreateTask();
+                return;
+              }
               onNavigateToTasks();
               window.setTimeout(() => {
                 window.dispatchEvent(new CustomEvent('openCreateTaskModal'));
@@ -350,10 +371,14 @@ export const WorkdeskView: React.FC<WorkdeskViewProps> = ({
             label: 'Новая сделка',
             icon: Briefcase,
             onClick: () => {
+              if (onQuickCreateDeal) {
+                onQuickCreateDeal();
+                return;
+              }
               onNavigateToDeals();
               window.setTimeout(() => {
                 window.dispatchEvent(new CustomEvent('openCreateDealModal'));
-              }, 0);
+              }, 150);
             },
           },
           {
@@ -361,7 +386,6 @@ export const WorkdeskView: React.FC<WorkdeskViewProps> = ({
             label: 'Недельный план',
             icon: Calendar,
             onClick: () => {
-              setActiveTab('weekly');
               window.setTimeout(() => weeklyPlansRef.current?.openCreateModal(), 0);
             },
           },
@@ -372,7 +396,9 @@ export const WorkdeskView: React.FC<WorkdeskViewProps> = ({
             onClick: () => {
               onNavigateToMeetings();
               window.setTimeout(() => {
-                window.dispatchEvent(new CustomEvent('openCreateMeetingModal', { detail: { type: 'work' } }));
+                window.dispatchEvent(
+                  new CustomEvent('openMeetingKindPickerModal', { detail: { date: getTodayLocalDate() } })
+                );
               }, 0);
             },
           },
@@ -381,19 +407,19 @@ export const WorkdeskView: React.FC<WorkdeskViewProps> = ({
             label: 'Новый документ',
             icon: FileText,
             onClick: () => {
+              if (onOpenDocModal) {
+                onOpenDocModal();
+                return;
+              }
               void onCreateEntity?.('doc', `Документ ${new Date().toLocaleTimeString('ru-RU')}`);
             },
           },
-          ...(availableProcessTemplates.length
-            ? [
-                {
-                  id: 'start-process',
-                  label: 'Запустить бизнес-процесс',
-                  icon: Network,
-                  onClick: () => setProcessPickerOpen(true),
-                },
-              ]
-            : []),
+          {
+            id: 'start-process',
+            label: 'Запустить бизнес-процесс',
+            icon: Network,
+            onClick: () => setProcessPickerOpen(true),
+          },
         ]}
       />
     );
@@ -407,7 +433,12 @@ export const WorkdeskView: React.FC<WorkdeskViewProps> = ({
     setLeading,
     setModule,
     onCreateEntity,
-    availableProcessTemplates.length,
+    onOpenDocModal,
+    onQuickCreateTask,
+    onQuickCreateDeal,
+    onNavigateToTasks,
+    onNavigateToDeals,
+    onNavigateToMeetings,
   ]);
 
   return (
@@ -638,14 +669,15 @@ export const WorkdeskView: React.FC<WorkdeskViewProps> = ({
             </div>
           )}
 
-          {activeTab === 'weekly' && (
+          {/* Всегда в DOM, чтобы ref работал при создании плана с дашборда без переключения вкладки */}
+          <div className={activeTab === 'weekly' ? 'block' : 'hidden'} aria-hidden={activeTab !== 'weekly'}>
             <div className="bg-white dark:bg-[#252525] rounded-2xl border border-gray-200 dark:border-[#333] p-4">
               <WeeklyPlansView
                 ref={weeklyPlansRef}
                 currentUser={currentUser}
                 tasks={tasks}
                 onOpenTask={onOpenTask}
-                onCreateTask={(title) => onCreateEntity ? onCreateEntity('task', title) : null}
+                onCreateTask={(title) => (onCreateEntity ? onCreateEntity('task', title) : null)}
                 onUpdateTask={(taskId, updates) => {
                   void onUpdateEntity?.('task', taskId, updates as unknown as Record<string, unknown>);
                 }}
@@ -653,7 +685,7 @@ export const WorkdeskView: React.FC<WorkdeskViewProps> = ({
                 hideEmbeddedToolbar
               />
             </div>
-          )}
+          </div>
 
           {activeTab === 'tasks' && (
             <div className="bg-white dark:bg-[#252525] rounded-2xl border border-gray-200 dark:border-[#333] p-4 space-y-3">
@@ -891,7 +923,7 @@ export const WorkdeskView: React.FC<WorkdeskViewProps> = ({
             <div className="p-4 space-y-2 max-h-[60vh] overflow-y-auto custom-scrollbar">
               {availableProcessTemplates.map((process) => (
                 <button
-                  key={process.id}
+                  key={`${process.id}-v${process.version ?? 1}`}
                   type="button"
                   className="w-full text-left rounded-xl border border-gray-200 dark:border-[#333] px-3 py-2 hover:bg-gray-50 dark:hover:bg-[#252525]"
                   onClick={async () => {
@@ -899,7 +931,7 @@ export const WorkdeskView: React.FC<WorkdeskViewProps> = ({
                     setProcessPickerOpen(false);
                   }}
                 >
-                  <div className="text-sm font-medium text-gray-900 dark:text-white">{process.name || 'Без названия'}</div>
+                  <div className="text-sm font-medium text-gray-900 dark:text-white">{process.title || 'Без названия'}</div>
                   {!!process.description && (
                     <div className="text-xs text-gray-500 dark:text-gray-400 mt-1 line-clamp-2">{process.description}</div>
                   )}

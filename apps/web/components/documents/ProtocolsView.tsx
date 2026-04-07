@@ -290,12 +290,20 @@ export const ProtocolsView = forwardRef<ProtocolsViewHandle, ProtocolsViewProps>
                 <div className="p-2 space-y-2">
                   {group.list.map((protocol) => (
                     <div key={protocol.id} className="rounded-xl border border-gray-200 dark:border-[#333] bg-white dark:bg-[#252525] hover:shadow-sm">
-                      <button
-                        type="button"
-                        className="w-full px-4 py-3 flex items-center justify-between text-left"
+                      <div
+                        role="button"
+                        tabIndex={0}
+                        className="w-full px-4 py-3 flex items-center justify-between text-left cursor-pointer"
                         onClick={() => {
                           setOpenedProtocolId(protocol.id);
                           setEditingProtocol(protocol);
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault();
+                            setOpenedProtocolId(protocol.id);
+                            setEditingProtocol(protocol);
+                          }
                         }}
                       >
                         <div>
@@ -315,7 +323,7 @@ export const ProtocolsView = forwardRef<ProtocolsViewHandle, ProtocolsViewProps>
                             <Trash2 size={14} />
                           </button>
                         </div>
-                      </button>
+                      </div>
                     </div>
                   ))}
                 </div>

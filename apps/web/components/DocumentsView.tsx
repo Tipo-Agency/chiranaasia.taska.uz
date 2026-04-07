@@ -323,6 +323,7 @@ const DocumentsView: React.FC<DocumentsViewProps> = ({
       <div className="flex items-center gap-2 shrink-0">
         {docSection === 'docs' && (
           <ModuleSegmentedControl
+            size="sm"
             variant="accent"
             accent="slate"
             value={viewMode}
@@ -385,44 +386,50 @@ const DocumentsView: React.FC<DocumentsViewProps> = ({
     <>
     <ModulePageShell>
       <div className="flex-1 min-h-0 overflow-hidden">
-        <div className={`${MODULE_PAGE_GUTTER} pt-6 md:pt-8 pb-20 h-full overflow-y-auto custom-scrollbar`}>
+        <div className={`${MODULE_PAGE_GUTTER} pt-3 md:pt-5 pb-16 md:pb-20 h-full overflow-y-auto custom-scrollbar`}>
           {docSection === 'docs' ? (
             <>
               {renderBreadcrumbs()}
-              {!currentFolderId && (
-                <div className="mb-8">
-                  <h3 className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase mb-3 ml-1">Системные папки</h3>
-                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
-                    {systemFolderCards.map((sys) => {
-                      const Icon = sys.icon;
-                      return (
-                        <button
-                          key={sys.id}
-                          type="button"
-                          onClick={() => {
-                            setDocSection(sys.id);
-                            setFolderPath([]);
-                          }}
-                          className="flex flex-col items-start gap-2 rounded-xl border border-gray-200 dark:border-[#333] bg-white dark:bg-[#252525] p-4 text-left hover:border-blue-300 dark:hover:border-blue-700 hover:shadow-md transition-all"
-                        >
-                          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400">
-                            <Icon size={20} />
-                          </div>
-                          <span className="font-semibold text-gray-800 dark:text-gray-200 text-sm">{sys.label}</span>
-                          <span className="text-xs text-gray-500 dark:text-gray-400">{sys.desc}</span>
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
               {viewMode === 'grid' ? (
                <div className="space-y-8">
-                   {/* FOLDERS GRID */}
-                   {visibleFolders.length > 0 && (
+                   {/* FOLDERS GRID + системные разделы в той же сетке */}
+                   {((!currentFolderId && systemFolderCards.length > 0) || visibleFolders.length > 0) && (
                        <div>
-                           <h3 className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase mb-3 ml-1">Папки</h3>
+                           <h3 className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase mb-3 ml-1">
+                             {!currentFolderId ? 'Папки и разделы' : 'Папки'}
+                           </h3>
                            <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-5 gap-4">
+                               {!currentFolderId &&
+                                 systemFolderCards.map((sys) => {
+                                   const Icon = sys.icon;
+                                   return (
+                                     <div
+                                       key={`sys-${sys.id}`}
+                                       className="bg-white dark:bg-[#252525] border border-gray-200 dark:border-[#333] rounded-xl p-4 hover:shadow-md hover:border-indigo-300 dark:hover:border-indigo-700 transition-all cursor-pointer group relative flex flex-col items-center text-center gap-3"
+                                       onClick={() => {
+                                         setDocSection(sys.id);
+                                         setFolderPath([]);
+                                       }}
+                                       role="button"
+                                       tabIndex={0}
+                                       onKeyDown={(e) => {
+                                         if (e.key === 'Enter' || e.key === ' ') {
+                                           e.preventDefault();
+                                           setDocSection(sys.id);
+                                           setFolderPath([]);
+                                         }
+                                       }}
+                                     >
+                                       <div className="w-12 h-12 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-300 rounded-full flex items-center justify-center">
+                                         <Icon size={24} />
+                                       </div>
+                                       <div className="font-medium text-gray-800 dark:text-gray-200 text-sm truncate w-full px-2">
+                                         {sys.label}
+                                       </div>
+                                       <div className="text-[10px] text-gray-500 dark:text-gray-400 line-clamp-2 px-1">{sys.desc}</div>
+                                     </div>
+                                   );
+                                 })}
                                {visibleFolders.map(folder => (
                                    <div 
                                         key={folder.id} 
@@ -475,8 +482,11 @@ const DocumentsView: React.FC<DocumentsViewProps> = ({
 
                    {/* DOCS GRID */}
                    <div>
-                       {visibleFolders.length > 0 && visibleDocs.length > 0 && <h3 className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase mb-3 mt-6 ml-1">Файлы</h3>}
-                       
+                       {(visibleFolders.length > 0 || (!currentFolderId && systemFolderCards.length > 0)) &&
+                         visibleDocs.length > 0 && (
+                           <h3 className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase mb-3 mt-6 ml-1">Файлы</h3>
+                         )}
+
                        {visibleDocs.length === 0 && visibleFolders.length === 0 && currentFolderId ? (
                            <div className="text-center py-12 border-2 border-dashed border-gray-100 dark:border-[#333] rounded-xl bg-gray-50/50 dark:bg-[#202020] flex flex-col items-center">
                                <FileText size={48} className="text-gray-300 dark:text-gray-600 mb-3" />
@@ -497,7 +507,7 @@ const DocumentsView: React.FC<DocumentsViewProps> = ({
                                                         <Edit2 size={14}/>
                                                     </button>
                                                 )}
-                                                {onDeleteDoc && !showAll && (
+                                                {onDeleteDoc && (
                                                     <button onClick={(e) => { e.stopPropagation(); onDeleteDoc(doc.id); }} className="text-gray-300 hover:text-red-500 p-1 rounded hover:bg-red-50 dark:hover:bg-red-900/30" title="Удалить">
                                                         <Trash2 size={14}/>
                                                     </button>
@@ -536,6 +546,34 @@ const DocumentsView: React.FC<DocumentsViewProps> = ({
                            </tr>
                        </thead>
                        <tbody className="divide-y divide-gray-100 dark:divide-[#333]">
+                           {!currentFolderId &&
+                             systemFolderCards.map((sys) => {
+                               const Icon = sys.icon;
+                               return (
+                                 <tr
+                                   key={`sys-${sys.id}`}
+                                   onClick={() => {
+                                     setDocSection(sys.id);
+                                     setFolderPath([]);
+                                   }}
+                                   className="hover:bg-gray-50 dark:hover:bg-[#252525] cursor-pointer group bg-indigo-50/40 dark:bg-indigo-950/15"
+                                 >
+                                   <td className="px-4 py-3 text-center text-indigo-600 dark:text-indigo-400">
+                                     <Icon size={18} />
+                                   </td>
+                                   <td className="px-4 py-3 font-semibold text-gray-800 dark:text-gray-200">
+                                     {sys.label}
+                                     <span className="block text-[11px] font-normal text-gray-500 dark:text-gray-400 mt-0.5">
+                                       {sys.desc}
+                                     </span>
+                                   </td>
+                                   {showAll && <td className="px-4 py-3 text-xs text-gray-500">—</td>}
+                                   <td className="px-4 py-3 text-gray-500 dark:text-gray-400 text-xs">Раздел</td>
+                                   <td className="px-4 py-3"></td>
+                                   <td className="px-4 py-3"></td>
+                                 </tr>
+                               );
+                             })}
                            {/* Folders first in List View */}
                            {visibleFolders.map(folder => (
                                <tr key={folder.id} onClick={() => handleFolderClick(folder.id)} className="hover:bg-gray-50 dark:hover:bg-[#252525] cursor-pointer group">
@@ -603,7 +641,7 @@ const DocumentsView: React.FC<DocumentsViewProps> = ({
                                            </div>
                                        </td>
                                        <td className="px-4 py-3 text-right">
-                                                {!showAll && onDeleteDoc && (
+                                                {onDeleteDoc && (
                                                     <button onClick={(e) => { e.stopPropagation(); onDeleteDoc(doc.id); }} className="text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity">
                                                         <Trash2 size={14}/>
                                                     </button>

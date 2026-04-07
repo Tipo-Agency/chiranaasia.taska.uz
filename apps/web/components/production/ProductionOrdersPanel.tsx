@@ -8,12 +8,15 @@ export function ProductionOrdersPanel({
   departments,
   onCreateOrder,
   onUpdateOrder,
+  filterRowHighlight,
 }: {
   orders: ProductionOrder[];
   users: User[];
   departments: Department[];
   onCreateOrder: (payload: Partial<ProductionOrder> & { title: string }) => void;
   onUpdateOrder: (id: string, patch: Partial<ProductionOrder>) => void;
+  /** Подсветка блока поиска/статуса при открытом фильтре в шапке модуля */
+  filterRowHighlight?: boolean;
 }) {
   const [title, setTitle] = useState('');
   const [plannedQty, setPlannedQty] = useState(0);
@@ -86,7 +89,13 @@ export function ProductionOrdersPanel({
         </div>
       </div>
 
-      <div className="bg-white dark:bg-[#252525] border border-gray-200 dark:border-[#333] rounded-2xl p-3 flex flex-wrap gap-2 items-center">
+      <div
+        className={`bg-white dark:bg-[#252525] border rounded-2xl p-3 flex flex-wrap gap-2 items-center transition-shadow ${
+          filterRowHighlight
+            ? 'border-emerald-400 dark:border-emerald-600 ring-2 ring-emerald-500/35'
+            : 'border-gray-200 dark:border-[#333]'
+        }`}
+      >
         <input
           value={q}
           onChange={(e) => setQ(e.target.value)}

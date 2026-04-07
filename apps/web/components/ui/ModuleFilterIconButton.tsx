@@ -7,7 +7,7 @@ interface ModuleFilterIconButtonProps extends Omit<React.ButtonHTMLAttributes<HT
   active?: boolean;
   activeCount?: number;
   label?: string;
-  /** sm — как кнопка «+» с buttonSize="sm" в шапке (w-9 h-9) */
+  /** sm — как кнопка «+» с buttonSize="sm" в шапке (высота как у поля поиска) */
   size?: 'md' | 'sm';
 }
 
@@ -23,7 +23,7 @@ export const ModuleFilterIconButton: React.FC<ModuleFilterIconButtonProps> = ({
   ...rest
 }) => {
   const activeClass = MODULE_ACCENTS[accent].filterActive;
-  const dim = size === 'sm' ? 'w-9 h-9 rounded-lg' : 'w-11 h-11 rounded-xl';
+  const dim = size === 'sm' ? 'w-8 h-8 rounded-lg' : 'w-11 h-11 rounded-xl';
   const iconSize = size === 'sm' ? 16 : 18;
   return (
     <button

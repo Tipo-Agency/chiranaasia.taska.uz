@@ -2,6 +2,8 @@
 import React, { useMemo, useState } from 'react';
 import { Project, Task, User, StatusOption, TableCollection, BusinessProcess } from '../types';
 import { Plus, Network, TrendingUp, FileText, Archive, Layers, Layout } from 'lucide-react';
+import { useDarkClass } from '../hooks/useDarkClass';
+import { getKanbanDotClass, getKanbanDotStyle } from './ui/TaskBadgeInline';
 
 interface KanbanBoardProps {
   tasks: Task[];
@@ -34,27 +36,10 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({
   );
   const [draggedTaskId, setDraggedTaskId] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
+  const isDark = useDarkClass();
 
   const getTasksByStatus = (statusName: string) => {
     return tasks.filter(t => t.status === statusName);
-  };
-
-  const getStatusColor = (statusName: string) => {
-      const s = statuses.find(st => st.name === statusName);
-      if (!s?.color) return 'bg-gray-400 dark:bg-gray-600';
-      
-      const bgMatch = s.color.match(/bg-(\w+)-(\d+)/);
-      if (bgMatch) {
-          const colorName = bgMatch[1];
-          const colorNum = bgMatch[2];
-          return `bg-${colorName}-${colorNum} dark:bg-${colorName}-${Math.min(parseInt(colorNum) + 100, 900)}`;
-      }
-      
-      if(s?.color.includes('green') || s?.color.includes('emerald')) return 'bg-emerald-500 dark:bg-emerald-600';
-      if(s?.color.includes('blue')) return 'bg-blue-500 dark:bg-blue-600';
-      if(s?.color.includes('yellow') || s?.color.includes('amber')) return 'bg-amber-500 dark:bg-amber-600';
-      if(s?.color.includes('red') || s?.color.includes('rose')) return 'bg-rose-500 dark:bg-rose-600';
-      return 'bg-gray-400 dark:bg-gray-600';
   };
 
   const getTableName = (tableId: string) => {
@@ -69,7 +54,7 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({
   const getTaskSource = (task: Task) => {
       // Используем entityType для определения источника
       if (task.entityType === 'idea') {
-          return { name: 'Беклог', isProcess: false, isBacklog: true };
+          return { name: 'Идеи', isProcess: false, isBacklog: true };
       }
       if (task.entityType === 'feature') {
           return { name: 'Функционал', isProcess: false, isFunctionality: true };
@@ -86,8 +71,8 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({
           return { name: processName || 'Процесс', isProcess: true };
       }
       if (task.source) {
-          if (task.source === 'Беклог') {
-              return { name: 'Беклог', isProcess: false, isBacklog: true };
+          if (task.source === 'Идеи' || task.source === 'Беклог') {
+              return { name: 'Идеи', isProcess: false, isBacklog: true };
           }
           if (task.source === 'Функционал') {
               return { name: 'Функционал', isProcess: false, isFunctionality: true };
@@ -170,6 +155,8 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({
           <div className="flex gap-4 p-4 h-full min-w-max">
             {columnStatuses.map(status => {
                 const statusTasks = getTasksByStatus(status.name);
+                const dotStyle = getKanbanDotStyle(status.color, isDark);
+                const dotClass = getKanbanDotClass(status.color);
                 return (
                   <div 
                       key={status.id} 
@@ -180,7 +167,10 @@ const KanbanBoard: React.FC<KanbanBoardProps> = ({
                   >
                     <div className="flex items-center justify-between mb-3 px-2 pt-1 shrink-0">
                       <div className="flex items-center gap-2">
-                          <span className={`w-2 h-2 rounded-full ${getStatusColor(status.name)}`}></span>
+                          <span
+                            className={`w-2 h-2 rounded-full shrink-0 ${dotClass}`}
+                            style={dotStyle}
+                          />
                           <span className="text-sm font-semibold text-gray-700 dark:text-gray-200">{status.name}</span>
                           <span className="text-xs text-gray-500 dark:text-gray-400 bg-white dark:bg-[#333] px-1.5 py-0.5 rounded shadow-sm border border-gray-100 dark:border-[#444]">{statusTasks.length}</span>
                       </div>

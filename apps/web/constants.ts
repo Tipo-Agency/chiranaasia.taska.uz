@@ -89,6 +89,65 @@ export const COLOR_OPTIONS = [
   'text-indigo-500',
 ];
 
+/** 40 hex — палитра иконки модуля (inline style, не зависит от Tailwind safelist). */
+export const MODULE_ICON_HEX_COLORS: readonly string[] = [
+  '#64748b',
+  '#57534e',
+  '#92400e',
+  '#b45309',
+  '#ca8a04',
+  '#a16207',
+  '#65a30d',
+  '#16a34a',
+  '#059669',
+  '#0d9488',
+  '#0e7490',
+  '#0c4a6e',
+  '#1d4ed8',
+  '#2563eb',
+  '#4f46e5',
+  '#5b21b6',
+  '#6d28d9',
+  '#7c3aed',
+  '#9333ea',
+  '#a21caf',
+  '#c026d3',
+  '#db2777',
+  '#e11d48',
+  '#ea580c',
+  '#f97316',
+  '#f59e0b',
+  '#eab308',
+  '#facc15',
+  '#fbbf24',
+  '#a3e635',
+  '#84cc16',
+  '#22c55e',
+  '#14b8a6',
+  '#06b6d4',
+  '#0ea5e9',
+  '#38bdf8',
+  '#818cf8',
+  '#a78bfa',
+  '#c084fc',
+  '#e879f9',
+];
+
+/** Старые project.color (Tailwind) → hex при открытии формы модуля */
+export const LEGACY_PROJECT_COLOR_TO_HEX: Record<string, string> = {
+  'text-slate-500': '#64748b',
+  'text-gray-500': '#6b7280',
+  'text-red-500': '#ef4444',
+  'text-orange-500': '#f97316',
+  'text-amber-500': '#f59e0b',
+  'text-yellow-500': '#eab308',
+  'text-lime-600': '#65a30d',
+  'text-green-600': '#16a34a',
+  'text-emerald-600': '#059669',
+  'text-blue-500': '#3b82f6',
+  'text-indigo-500': '#6366f1',
+};
+
 export const DEFAULT_STATUSES: StatusOption[] = [
     { id: 's1', name: 'Не начато', color: 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-700' },
     { id: 's2', name: 'В работе', color: 'bg-blue-100 dark:bg-blue-900/35 text-blue-800 dark:text-blue-200 border border-blue-200 dark:border-blue-800/60' },
@@ -201,9 +260,9 @@ export const DEFAULT_FINANCE_CATEGORIES: FinanceCategory[] = [
     { id: 'fc6', name: 'Дивиденды', type: 'percent', value: 10, color: 'bg-yellow-100 text-yellow-700' },
 ];
 
-/** Моковые фонды для распределения дохода (настраиваются в настройках) */
+/** Моковые фонды (имена не дублируют статьи расхода вроде «ФОТ», чтобы не путать сущности) */
 export const DEFAULT_FUNDS: Fund[] = [
-    { id: 'fund-1', name: 'Зарплаты', order: 1 },
+    { id: 'fund-1', name: 'Операционный', order: 1 },
     { id: 'fund-2', name: 'Закупки', order: 2 },
     { id: 'fund-3', name: 'Резерв', order: 3 },
 ];

@@ -167,6 +167,7 @@ const PublicContentPlanView: React.FC<PublicContentPlanViewProps> = ({ tableId }
         />
 
         <ModuleSegmentedControl
+          size="sm"
           value={viewMode}
           onChange={setViewMode}
           variant="accent"

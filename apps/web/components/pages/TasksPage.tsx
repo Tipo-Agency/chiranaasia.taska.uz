@@ -40,7 +40,7 @@ interface TasksPageProps {
 }
 
 const COMPLETED_STATUSES = ['Выполнено', 'Done', 'Завершено'];
-const EXCLUDED_SOURCES = ['Задача', 'Беклог', 'Функционал'];
+const EXCLUDED_SOURCES = ['Задача', 'Идеи', 'Беклог', 'Функционал'];
 
 export const TasksPage: React.FC<TasksPageProps> = ({
   tasks,
@@ -95,7 +95,7 @@ export const TasksPage: React.FC<TasksPageProps> = ({
       case 'content':
         return !!task.contentPostId || (!!task.source && !EXCLUDED_SOURCES.includes(task.source));
       case 'backlog':
-        return task.source === 'Беклог';
+        return task.source === 'Идеи' || task.source === 'Беклог';
       case 'functionality':
         return task.source === 'Функционал';
       case 'task':
@@ -168,7 +168,7 @@ export const TasksPage: React.FC<TasksPageProps> = ({
         { value: 'deal', label: 'Сделка' },
         { value: 'process', label: 'Процесс' },
         { value: 'content', label: 'Контент' },
-        { value: 'backlog', label: 'Беклог' },
+        { value: 'backlog', label: 'Идеи' },
         { value: 'functionality', label: 'Функционал' },
         ...uniqueSources.map(source => ({ value: source, label: source }))
       ]

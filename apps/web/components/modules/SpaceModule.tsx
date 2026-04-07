@@ -74,7 +74,11 @@ export const SpaceModule: React.FC<SpaceModuleProps> = ({
   const backlogLinkedTasks = useMemo(() => {
     if (activeTable?.type !== 'backlog') return [];
     return tasks.filter(
-      (t) => t.entityType === 'task' && t.source === 'Беклог' && !!t.linkedIdeaId && !t.isArchived
+      (t) =>
+        t.entityType === 'task' &&
+        (t.source === 'Идеи' || t.source === 'Беклог') &&
+        !!t.linkedIdeaId &&
+        !t.isArchived
     );
   }, [tasks, activeTable?.type]);
 
@@ -83,15 +87,16 @@ export const SpaceModule: React.FC<SpaceModuleProps> = ({
     return tables.filter(t => t.type === 'backlog').map(t => t.id);
   }, [tables]);
 
-  // Получаем ВСЕ функции из всех functionality таблиц (entityType: 'feature')
+  // Только функции текущей страницы пространства (как у бэклога: tableId === activeTable)
   const allFunctionalityTasks = useMemo(() => {
-    const functionalityTableIds = tables.filter(t => t.type === 'functionality').map(t => t.id);
-    return tasks.filter(t => 
-      t.entityType === 'feature' && 
-      functionalityTableIds.includes(t.tableId) &&
-      !t.isArchived
+    if (activeTable?.type !== 'functionality' || !activeTable.id) return [];
+    return tasks.filter(
+      (t) =>
+        t.entityType === 'feature' &&
+        t.tableId === activeTable.id &&
+        !t.isArchived
     );
-  }, [tasks, tables]);
+  }, [tasks, activeTable?.type, activeTable?.id]);
 
   // Защита от undefined activeTable (после всех хуков)
   if (!activeTable) {
@@ -125,6 +130,7 @@ export const SpaceModule: React.FC<SpaceModuleProps> = ({
                         />
                         <div className="flex flex-wrap items-center justify-between gap-2 md:gap-3">
                             <ModuleSegmentedControl
+                                size="sm"
                                 variant="accent"
                                 accent="indigo"
                                 value={viewMode}
@@ -268,7 +274,7 @@ export const SpaceModule: React.FC<SpaceModuleProps> = ({
                 assigneeIds: idea.assigneeIds,
                 startDate: idea.startDate || new Date().toISOString().split('T')[0],
                 endDate: idea.endDate || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-                source: 'Беклог',
+                source: 'Идеи',
                 linkedIdeaId: idea.id,
                 attachments: idea.attachments,
                 createdAt: new Date().toISOString()
@@ -368,22 +374,9 @@ export const SpaceModule: React.FC<SpaceModuleProps> = ({
                     onOpenFeature={actions.openTaskModal} 
                     onCreateProject={(name) => actions.quickCreateProject(name)}
                     onCreateFeature={(projectId, category) => {
-                        // При создании функции в функционале, находим подходящую functionality таблицу
-                        // Если указан projectId, ищем таблицу для этого проекта, иначе используем activeTable
-                        let targetTableId = activeTable.id;
-                        
-                        // Если указан projectId, ищем functionality таблицу для этого проекта
-                        if (projectId) {
-                            // Можно использовать первую попавшуюся functionality таблицу или создать новую
-                            const functionalityTable = tables.find(t => t.type === 'functionality');
-                            if (functionalityTable) {
-                                targetTableId = functionalityTable.id;
-                            }
-                        }
-                        
                         const newTask: Partial<Task> = {
                             entityType: 'feature',
-                            tableId: targetTableId,
+                            tableId: activeTable.id,
                             title: '',
                             status: 'Не начато',
                             assigneeId: null,

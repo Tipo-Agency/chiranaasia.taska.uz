@@ -1,8 +1,8 @@
 
 import React, { useState, useEffect, useMemo, useLayoutEffect, lazy, Suspense } from 'react';
-import { Project, Role, Task, User, StatusOption, PriorityOption, NotificationPreferences, AutomationRule, TableCollection, Deal, Department, FinanceCategory, Fund, SalesFunnel, Doc, ContentPost, EmployeeInfo, Client, Contract, BusinessProcess, Meeting, Warehouse, OrgPosition } from '../types';
-import { User as UserIcon, Briefcase, Archive, Users, Building2, Wallet, TrendingUp, PiggyBank, ShieldAlert, Settings, BellRing, Zap, Package, ArrowLeft, Plus, ShieldCheck } from 'lucide-react';
-import { Button, Input, ModuleCreateIconButton, ModuleFilterIconButton, ModulePageShell, MODULE_PAGE_GUTTER, MODULE_PAGE_TOP_PAD, StandardModal } from './ui';
+import { Project, Task, User, StatusOption, PriorityOption, NotificationPreferences, AutomationRule, TableCollection, Deal, Department, FinanceCategory, Fund, SalesFunnel, Doc, ContentPost, EmployeeInfo, Client, Contract, BusinessProcess, Meeting, Warehouse, OrgPosition } from '../types';
+import { User as UserIcon, Briefcase, Archive, Users, Building2, Wallet, TrendingUp, PiggyBank, ShieldAlert, Settings, BellRing, Zap, Package, ArrowLeft, ShieldCheck, Receipt } from 'lucide-react';
+import { Input, ModuleCreateDropdown, ModuleCreateIconButton, ModuleFilterIconButton, ModulePageShell, MODULE_PAGE_GUTTER, MODULE_PAGE_TOP_PAD } from './ui';
 import { ProfileSettings } from './settings/ProfileSettings';
 import { AccessSettings } from './settings/AccessSettings';
 import { StructureSettings } from './settings/StructureSettings';
@@ -11,7 +11,6 @@ import { AutomationSettings } from './settings/AutomationSettings';
 import DepartmentsView from './DepartmentsView';
 import SalesFunnelsSettings from './settings/SalesFunnelsSettings';
 import { DEFAULT_NOTIFICATION_PREFS } from '../constants';
-import { SYSTEM_ROLE_EMPLOYEE_ID } from '../constants/systemRoles';
 // Integrations are managed outside Settings now.
 import { ArchiveView, ARCHIVE_TAB_OPTIONS, type ArchiveTabId } from './settings/ArchiveView';
 import { FinanceSetupSettings } from './settings/FinanceSetupSettings';
@@ -151,13 +150,9 @@ const SettingsView: React.FC<SettingsViewProps> = ({
   const [archiveShowFilters, setArchiveShowFilters] = useState(false);
   const [archiveQuery, setArchiveQuery] = useState('');
 
-  const [createUserOpen, setCreateUserOpen] = useState(false);
-  const [createUserName, setCreateUserName] = useState('');
-  const [createUserLogin, setCreateUserLogin] = useState('');
-  const [createUserPassword, setCreateUserPassword] = useState('');
-  const [structureCreatePickerOpen, setStructureCreatePickerOpen] = useState(false);
+  /** Инкремент при нажатии «+» на вкладке пользователей — открывает форму создания в AccessSettings */
+  const [openNewUserSignal, setOpenNewUserSignal] = useState(0);
   const [structureCreateKind, setStructureCreateKind] = useState<null | 'project' | 'department' | 'warehouse'>(null);
-  const [financeCreatePickerOpen, setFinanceCreatePickerOpen] = useState(false);
   const [financeCreateKind, setFinanceCreateKind] = useState<null | 'category' | 'fund'>(null);
   const [salesFunnelsCreateRequested, setSalesFunnelsCreateRequested] = useState(0);
 
@@ -231,19 +226,70 @@ const SettingsView: React.FC<SettingsViewProps> = ({
           </>
         ) : (
           <>
-            <ModuleCreateIconButton
-              accent="slate"
-              size="sm"
-              label={activeTab === 'users' ? 'Создать' : 'Создание доступно не во всех вкладках'}
-              disabled={!canCreate}
-              onClick={() => {
-                if (!canCreate) return;
-                if (activeTab === 'users') setCreateUserOpen(true);
-                if (activeTab === 'structure') setStructureCreatePickerOpen(true);
-                if (activeTab === 'finance-setup') setFinanceCreatePickerOpen(true);
-                if (activeTab === 'sales-funnels') setSalesFunnelsCreateRequested((x) => x + 1);
-              }}
-            />
+            {activeTab === 'structure' && canCreate ? (
+              <ModuleCreateDropdown
+                accent="slate"
+                buttonSize="sm"
+                label="Создать"
+                items={[
+                  {
+                    id: 'project',
+                    label: 'Проект / модуль',
+                    icon: Briefcase,
+                    onClick: () => setStructureCreateKind('project'),
+                    iconClassName: 'text-slate-600 dark:text-slate-300',
+                  },
+                  {
+                    id: 'department',
+                    label: 'Подразделение',
+                    icon: Building2,
+                    onClick: () => setStructureCreateKind('department'),
+                    iconClassName: 'text-slate-600 dark:text-slate-300',
+                  },
+                  {
+                    id: 'warehouse',
+                    label: 'Склад',
+                    icon: Package,
+                    onClick: () => setStructureCreateKind('warehouse'),
+                    iconClassName: 'text-slate-600 dark:text-slate-300',
+                  },
+                ]}
+              />
+            ) : activeTab === 'finance-setup' && canCreate ? (
+              <ModuleCreateDropdown
+                accent="slate"
+                buttonSize="sm"
+                label="Создать"
+                items={[
+                  {
+                    id: 'category',
+                    label: 'Статья расходов',
+                    icon: Receipt,
+                    onClick: () => setFinanceCreateKind('category'),
+                    iconClassName: 'text-slate-600 dark:text-slate-300',
+                  },
+                  {
+                    id: 'fund',
+                    label: 'Фонд',
+                    icon: PiggyBank,
+                    onClick: () => setFinanceCreateKind('fund'),
+                    iconClassName: 'text-slate-600 dark:text-slate-300',
+                  },
+                ]}
+              />
+            ) : (
+              <ModuleCreateIconButton
+                accent="slate"
+                size="sm"
+                label={activeTab === 'users' ? 'Создать' : 'Создание доступно не во всех вкладках'}
+                disabled={!canCreate}
+                onClick={() => {
+                  if (!canCreate) return;
+                  if (activeTab === 'users') setOpenNewUserSignal((n) => n + 1);
+                  if (activeTab === 'sales-funnels') setSalesFunnelsCreateRequested((x) => x + 1);
+                }}
+              />
+            )}
             <button
               type="button"
               onClick={() => setShowArchiveScreen(true)}
@@ -340,7 +386,14 @@ const SettingsView: React.FC<SettingsViewProps> = ({
           ) : (
             <>
               {activeTab === 'profile' && currentUser && <ProfileSettings activeTab="profile" currentUser={currentUser} users={users} onUpdateProfile={onUpdateProfile!} onUpdateUsers={onUpdateUsers} />}
-              {activeTab === 'users' && currentUser && <AccessSettings currentUser={currentUser} users={users} onUpdateUsers={onUpdateUsers} />}
+              {activeTab === 'users' && currentUser && (
+                <AccessSettings
+                  currentUser={currentUser}
+                  users={users}
+                  onUpdateUsers={onUpdateUsers}
+                  openNewUserSignal={openNewUserSignal}
+                />
+              )}
               {activeTab === 'tasks' && (
                 <TasksSetupSettings
                   statuses={statuses}
@@ -419,139 +472,6 @@ const SettingsView: React.FC<SettingsViewProps> = ({
         </div>
       </div>
 
-      <StandardModal
-        isOpen={createUserOpen}
-        onClose={() => {
-          setCreateUserOpen(false);
-          setCreateUserName('');
-          setCreateUserLogin('');
-          setCreateUserPassword('');
-        }}
-        title="Новый пользователь"
-        size="sm"
-        footer={
-          <div className="flex items-center justify-end gap-2">
-            <Button variant="secondary" onClick={() => setCreateUserOpen(false)}>
-              Отмена
-            </Button>
-            <Button
-              onClick={() => {
-                const name = createUserName.trim();
-                const login = createUserLogin.trim();
-                const password = createUserPassword.trim() || '123';
-                if (!name || !login) return;
-                const newUser: User = {
-                  id: `u-${Date.now()}`,
-                  name,
-                  login,
-                  password,
-                  role: Role.EMPLOYEE,
-                  roleId: SYSTEM_ROLE_EMPLOYEE_ID,
-                  mustChangePassword: true,
-                } as any;
-                onUpdateUsers([...(users || []), newUser]);
-                setCreateUserOpen(false);
-                setCreateUserName('');
-                setCreateUserLogin('');
-                setCreateUserPassword('');
-              }}
-              disabled={!createUserName.trim() || !createUserLogin.trim()}
-            >
-              Создать
-            </Button>
-          </div>
-        }
-      >
-        <div className="space-y-3">
-          <Input label="Имя" value={createUserName} onChange={(e) => setCreateUserName(e.target.value)} />
-          <Input label="Логин" value={createUserLogin} onChange={(e) => setCreateUserLogin(e.target.value)} placeholder="ivan" />
-          <Input
-            label="Пароль (можно пусто — будет 123)"
-            value={createUserPassword}
-            onChange={(e) => setCreateUserPassword(e.target.value)}
-            type="password"
-            placeholder="••••••"
-          />
-          <div className="text-xs text-gray-500 dark:text-gray-400">
-            После первого входа пользователю покажется запрос на установку пароля.
-          </div>
-        </div>
-      </StandardModal>
-
-      <StandardModal
-        isOpen={structureCreatePickerOpen}
-        onClose={() => setStructureCreatePickerOpen(false)}
-        title="Создать"
-        size="sm"
-      >
-        <div className="grid grid-cols-1 gap-2">
-          <button
-            type="button"
-            onClick={() => {
-              setStructureCreatePickerOpen(false);
-              setStructureCreateKind('project');
-            }}
-            className="w-full text-left px-4 py-3 rounded-xl border border-gray-200 dark:border-[#333] bg-white dark:bg-[#252525] hover:bg-gray-50 dark:hover:bg-[#303030]"
-          >
-            <div className="font-semibold text-gray-900 dark:text-white">Проект / модуль</div>
-            <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Иконка + цвет</div>
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              setStructureCreatePickerOpen(false);
-              setStructureCreateKind('department');
-            }}
-            className="w-full text-left px-4 py-3 rounded-xl border border-gray-200 dark:border-[#333] bg-white dark:bg-[#252525] hover:bg-gray-50 dark:hover:bg-[#303030]"
-          >
-            <div className="font-semibold text-gray-900 dark:text-white">Подразделение</div>
-            <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Название, руководитель</div>
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              setStructureCreatePickerOpen(false);
-              setStructureCreateKind('warehouse');
-            }}
-            className="w-full text-left px-4 py-3 rounded-xl border border-gray-200 dark:border-[#333] bg-white dark:bg-[#252525] hover:bg-gray-50 dark:hover:bg-[#303030]"
-          >
-            <div className="font-semibold text-gray-900 dark:text-white">Склад</div>
-            <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Название, локация</div>
-          </button>
-        </div>
-      </StandardModal>
-
-      <StandardModal
-        isOpen={financeCreatePickerOpen}
-        onClose={() => setFinanceCreatePickerOpen(false)}
-        title="Создать"
-        size="sm"
-      >
-        <div className="grid grid-cols-1 gap-2">
-          <button
-            type="button"
-            onClick={() => {
-              setFinanceCreatePickerOpen(false);
-              setFinanceCreateKind('category');
-            }}
-            className="w-full text-left px-4 py-3 rounded-xl border border-gray-200 dark:border-[#333] bg-white dark:bg-[#252525] hover:bg-gray-50 dark:hover:bg-[#303030]"
-          >
-            <div className="font-semibold text-gray-900 dark:text-white">Статья расходов</div>
-            <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Фикс / процент</div>
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              setFinanceCreatePickerOpen(false);
-              setFinanceCreateKind('fund');
-            }}
-            className="w-full text-left px-4 py-3 rounded-xl border border-gray-200 dark:border-[#333] bg-white dark:bg-[#252525] hover:bg-gray-50 dark:hover:bg-[#303030]"
-          >
-            <div className="font-semibold text-gray-900 dark:text-white">Фонд</div>
-            <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Название и порядок</div>
-          </button>
-        </div>
-      </StandardModal>
     </ModulePageShell>
   );
 };

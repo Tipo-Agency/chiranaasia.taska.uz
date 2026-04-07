@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { Project, Department, Warehouse, User } from '../../types';
-import { ICON_OPTIONS, COLOR_OPTIONS } from '../../constants';
+import { ICON_OPTIONS, MODULE_ICON_HEX_COLORS, LEGACY_PROJECT_COLOR_TO_HEX } from '../../constants';
 import { DynamicIcon } from '../AppIcons';
 import { Button, Input, StandardModal } from '../ui';
 import { Edit2, Trash2 } from 'lucide-react';
@@ -42,8 +42,8 @@ export const StructureSettings: React.FC<{
   const [editingProjectId, setEditingProjectId] = useState<string | null>(null);
   const [projectName, setProjectName] = useState('');
   const [projectIcon, setProjectIcon] = useState('Briefcase');
-  const [projectColor, setProjectColor] = useState<string>(COLOR_OPTIONS[0] || 'text-indigo-500');
-  const [projectCustomColor, setProjectCustomColor] = useState('#3337AD');
+  const [projectColor, setProjectColor] = useState<string>(MODULE_ICON_HEX_COLORS[0] || '#6366f1');
+  const [projectCustomColor, setProjectCustomColor] = useState('#6366f1');
 
   const [departmentModalOpen, setDepartmentModalOpen] = useState(false);
   const [editingDepartment, setEditingDepartment] = useState<Department | null>(null);
@@ -62,8 +62,9 @@ export const StructureSettings: React.FC<{
       setEditingProjectId(null);
       setProjectName('');
       setProjectIcon('Briefcase');
-      setProjectColor(COLOR_OPTIONS[0] || 'text-indigo-500');
-      setProjectCustomColor('#3337AD');
+      const d = MODULE_ICON_HEX_COLORS[0] || '#6366f1';
+      setProjectColor(d);
+      setProjectCustomColor(d);
       setProjectModalOpen(true);
     }
     if (kind === 'department') {
@@ -110,12 +111,21 @@ export const StructureSettings: React.FC<{
     setEditingProjectId(p.id);
     setProjectName(p.name || '');
     setProjectIcon(p.icon || 'Briefcase');
-    if (p.color && p.color.startsWith('#')) {
-      setProjectColor('__custom__');
-      setProjectCustomColor(p.color);
+    const raw = p.color || '';
+    if (raw.startsWith('#')) {
+      setProjectColor(MODULE_ICON_HEX_COLORS.includes(raw) ? raw : '__custom__');
+      setProjectCustomColor(raw);
+    } else if (raw && LEGACY_PROJECT_COLOR_TO_HEX[raw]) {
+      const hex = LEGACY_PROJECT_COLOR_TO_HEX[raw];
+      setProjectColor(MODULE_ICON_HEX_COLORS.includes(hex) ? hex : '__custom__');
+      setProjectCustomColor(hex);
+    } else if (raw) {
+      setProjectColor(raw);
+      setProjectCustomColor('#6366f1');
     } else {
-      setProjectColor(p.color || (COLOR_OPTIONS[0] || 'text-indigo-500'));
-      setProjectCustomColor('#3337AD');
+      const d = MODULE_ICON_HEX_COLORS[0] || '#6366f1';
+      setProjectColor(d);
+      setProjectCustomColor(d);
     }
     setProjectModalOpen(true);
   };
@@ -171,25 +181,12 @@ export const StructureSettings: React.FC<{
     setWarehouseModalOpen(true);
   };
 
-  const renderColorDot = (value: string) => {
-    if (value.startsWith('#')) {
-      return <div className="w-6 h-6 rounded-full" style={{ backgroundColor: value }} />;
-    }
-    const bg = value.replace('text-', 'bg-').replace('500', '400').replace('600', '500');
-    return <div className={`w-6 h-6 rounded-full ${bg}`} />;
-  };
-
   return (
     <div className="space-y-8 w-full">
       <div>
-        <div className="flex items-center justify-between gap-3 mb-3">
-          <div>
-            <div className="text-sm font-bold text-gray-900 dark:text-white">Проекты / модули</div>
-            <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Иконка + цвет отображаются в меню и карточках.</div>
-          </div>
-          <Button variant="secondary" onClick={() => openCreate('project')}>
-            Создать модуль
-          </Button>
+        <div className="mb-3">
+          <div className="text-sm font-bold text-gray-900 dark:text-white">Проекты / модули</div>
+          <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Иконка + цвет отображаются в меню и карточках. Создание — через «+» в шапке.</div>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
@@ -231,14 +228,9 @@ export const StructureSettings: React.FC<{
       </div>
 
       <div>
-        <div className="flex items-center justify-between gap-3 mb-3">
-          <div>
-            <div className="text-sm font-bold text-gray-900 dark:text-white">Подразделения</div>
-            <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Используется в складе и кадровых настройках.</div>
-          </div>
-          <Button variant="secondary" onClick={() => openCreate('department')}>
-            Создать подразделение
-          </Button>
+        <div className="mb-3">
+          <div className="text-sm font-bold text-gray-900 dark:text-white">Подразделения</div>
+          <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Используется в складе и кадровых настройках. Создание — через «+» в шапке.</div>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
@@ -280,14 +272,9 @@ export const StructureSettings: React.FC<{
       </div>
 
       <div>
-        <div className="flex items-center justify-between gap-3 mb-3">
-          <div>
-            <div className="text-sm font-bold text-gray-900 dark:text-white">Склады</div>
-            <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Для учёта остатков и операций.</div>
-          </div>
-          <Button variant="secondary" onClick={() => openCreate('warehouse')}>
-            Создать склад
-          </Button>
+        <div className="mb-3">
+          <div className="text-sm font-bold text-gray-900 dark:text-white">Склады</div>
+          <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Для учёта остатков и операций. Создание — через «+» в шапке.</div>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
@@ -375,19 +362,20 @@ export const StructureSettings: React.FC<{
             <div>
               <div className="text-xs font-bold text-gray-500 dark:text-gray-400 mb-2 uppercase">Цвет</div>
               <div className="flex flex-wrap gap-2">
-                {COLOR_OPTIONS.map((c) => (
+                {MODULE_ICON_HEX_COLORS.map((hex) => (
                   <button
-                    key={c}
+                    key={hex}
                     type="button"
-                    onClick={() => setProjectColor(c)}
+                    onClick={() => setProjectColor(hex)}
                     className={`w-9 h-9 rounded-full border-2 flex items-center justify-center ${
-                      projectColor === c ? 'border-gray-900 dark:border-white' : 'border-transparent hover:border-gray-300 dark:hover:border-[#555]'
+                      projectColor === hex ? 'border-gray-900 dark:border-white' : 'border-transparent hover:border-gray-300 dark:hover:border-[#555]'
                     }`}
-                    title={c}
+                    title={hex}
                   >
-                    <div className="w-7 h-7 rounded-full bg-white dark:bg-[#1f1f1f] border border-black/5 dark:border-white/10 flex items-center justify-center">
-                      {renderColorDot(c)}
-                    </div>
+                    <div
+                      className="w-7 h-7 rounded-full border border-black/10 dark:border-white/15 shadow-inner"
+                      style={{ backgroundColor: hex }}
+                    />
                   </button>
                 ))}
 

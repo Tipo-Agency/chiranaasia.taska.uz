@@ -10,6 +10,7 @@ export const ClientsTabs: React.FC<ClientsTabsProps> = ({ activeTab, onTabChange
   return (
     <ModuleSegmentedControl
       variant="neutral"
+      size="sm"
       value={activeTab}
       onChange={(v) => onTabChange(v as 'clients' | 'contracts' | 'finance' | 'receivables')}
       className="flex-nowrap whitespace-nowrap"

@@ -1,16 +1,31 @@
-# Taska Backend (Python FastAPI)
+# Backend — FastAPI (`apps/api`)
 
-## Локальный запуск
+REST API, вебхуки, фоновые циклы в процессе приложения, интеграции (Meta, Telegram, сайт).
 
-### 1. PostgreSQL
+## Стек
 
-Установите PostgreSQL или используйте Docker:
+- Python 3.11+ (ориентир — см. `Dockerfile` / CI)
+- FastAPI, Uvicorn
+- SQLAlchemy 2 async, asyncpg
+- Alembic — миграции схемы
 
-```bash
-docker run -d --name taska-db -e POSTGRES_USER=taska -e POSTGRES_PASSWORD=taska -e POSTGRES_DB=taska -p 5432:5432 postgres:16-alpine
+## Структура (важное)
+
+```
+app/
+  main.py          — точка входа, подключение роутеров
+  config.py        — настройки из окружения
+  routers/         — HTTP-эндпоинты по доменам
+  models/          — ORM-модели
+  services/        — бизнес-логика, события, уведомления
 ```
 
-### 2. Backend
+Полный обзор префиксов — **[../../docs/API.md](../../docs/API.md)**.
+
+## Локальный запуск (без Docker)
+
+1. PostgreSQL локально или контейнер.
+2. Виртуальное окружение и зависимости:
 
 ```bash
 cd apps/api
@@ -19,70 +34,46 @@ source venv/bin/activate   # Windows: venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
-Создайте `.env`:
+3. Файл `.env` (пример):
+
 ```
-DATABASE_URL=postgresql+asyncpg://taska:taska@localhost:5432/taska
+DATABASE_URL=postgresql+asyncpg://user:pass@localhost:5432/dbname
 SECRET_KEY=your-secret-key
 CORS_ORIGINS=http://localhost:3000,http://127.0.0.1:3000
 ```
 
-Запустите миграции и сервер:
+4. Миграции и сервер:
 
 ```bash
 alembic upgrade head
-python seed.py          # опционально: демо-данные
 uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
-### 3. Frontend
+Фронтенд из корня репозитория: `npm run dev:web` — Vite проксирует `/api` на порт из конфига Vite.
 
-```bash
-cd ../..
-npm install
-npm run dev:web
-```
-
-Frontend на http://localhost:3000, API на http://localhost:8000. Vite проксирует `/api` на backend.
-
-## Docker Compose (полный стек)
+## Docker Compose (как в корне репозитория)
 
 ```bash
 docker-compose up -d
 ```
 
-- Backend: http://localhost:8000
-- PostgreSQL: localhost:5432
-- Демо-данные: `docker-compose exec backend python seed.py`
+Порты см. корневой **[../../docs/OPERATIONS.md](../../docs/OPERATIONS.md)**. Миграции при старте контейнера backend обычно выполняются автоматически (`alembic upgrade head`).
 
-## Панелька для PostgreSQL (Adminer / pgAdmin)
-
-Поднимается как dev-инструмент отдельным профилем:
+## Тесты
 
 ```bash
-docker-compose --profile tools up -d
+pip install -r requirements-dev.txt
+pytest tests/ -v
 ```
 
-- Adminer: http://localhost:8080
-  - System: `PostgreSQL`
-  - Server: `db`
-  - Username: `taska`
-  - Password: `${DB_PASSWORD:-taska}`
-  - Database: `taska`
-- pgAdmin: http://localhost:5050
-  - Email/Password: `${PGADMIN_DEFAULT_EMAIL:-admin@local}` / `${PGADMIN_DEFAULT_PASSWORD:-admin}`
-  - Host: `db`, Port: `5432`, User: `taska`, Password: `${DB_PASSWORD:-taska}`, DB: `taska`
+`TEST_API_URL` — адрес поднятого API.
 
-## Telegram Bot
+## Telegram-бот
 
-Бот использует Backend API. Добавьте в `.env`:
+Отдельный пакет **`apps/bot`**. Backend задаёт контракт данных; бот ходит по HTTP. Переменные: `BACKEND_URL`, `TELEGRAM_BOT_TOKEN` и др. — см. `apps/bot` и **[../../docs/OPERATIONS.md](../../docs/OPERATIONS.md)**.
 
-```
-BACKEND_URL=http://localhost:8000
-TELEGRAM_BOT_TOKEN=your-token
-```
+## Документация
 
-Firebase полностью удалён — единственный источник данных: Python backend.
-
-## Деплой
-
-При деплое миграции выполняются автоматически при старте контейнера (`alembic upgrade head` в CMD).
+- Системная архитектура: **[../../docs/ARCHITECTURE.md](../../docs/ARCHITECTURE.md)**
+- Обзор API: **[../../docs/API.md](../../docs/API.md)**
+- Деплой и секреты: **[../../docs/OPERATIONS.md](../../docs/OPERATIONS.md)**

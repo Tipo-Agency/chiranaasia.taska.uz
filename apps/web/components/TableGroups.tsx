@@ -41,7 +41,7 @@ const getTypeLabel = (type: string): string => {
     case 'meetings': return 'Календарь';
     case 'docs': return 'Документы';
     case 'tasks': return 'Задачи';
-    case 'backlog': return 'Бэклог';
+    case 'backlog': return 'Идеи';
     case 'functionality': return 'Функционал';
     default: return 'Другие';
   }

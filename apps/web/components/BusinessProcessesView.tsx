@@ -6,7 +6,16 @@ import { resolveAssigneesForOrgPosition } from '../utils/orgPositionAssignee';
 import { Network, Plus, Edit2, Trash2, ChevronRight, User as UserIcon, Building2, Save, X, ArrowDown, Play, CheckCircle2, Clock, FileText, ArrowLeft, Calendar, Users, Layers3 } from 'lucide-react';
 import { TaskSelect } from './TaskSelect';
 import { ProcessCard } from './features/processes/ProcessCard';
-import { Button, ModuleCreateDropdown, ModulePageShell, ModuleSegmentedControl, MODULE_PAGE_GUTTER, MODULE_PAGE_TOP_PAD, SystemAlertDialog } from './ui';
+import {
+  Button,
+  ModuleCreateDropdown,
+  ModuleFilterIconButton,
+  ModulePageShell,
+  ModuleSegmentedControl,
+  MODULE_PAGE_GUTTER,
+  MODULE_PAGE_TOP_PAD,
+  SystemAlertDialog,
+} from './ui';
 import { useAppToolbar } from '../contexts/AppToolbarContext';
 
 interface BusinessProcessesViewProps {
@@ -41,6 +50,8 @@ const BusinessProcessesView: React.FC<BusinessProcessesViewProps> = ({
   const [activeTab, setActiveTab] = useState<'templates' | 'running' | 'completed'>('templates');
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('list');
   const [startPickerOpen, setStartPickerOpen] = useState(false);
+  const [bpmListFilterOpen, setBpmListFilterOpen] = useState(false);
+  const [bpmSearchQuery, setBpmSearchQuery] = useState('');
   const [selectedInstanceId, setSelectedInstanceId] = useState<string | null>(null);
   
   // Modal State
@@ -390,6 +401,21 @@ const BusinessProcessesView: React.FC<BusinessProcessesViewProps> = ({
         ? runningInstances
         : completedInstancesList;
 
+  const filteredUserTemplates = useMemo(() => {
+    const q = bpmSearchQuery.trim().toLowerCase();
+    if (!q) return userTemplates;
+    return userTemplates.filter((p) => (p.title || '').toLowerCase().includes(q));
+  }, [userTemplates, bpmSearchQuery]);
+
+  const filteredTabInstanceList = useMemo(() => {
+    const q = bpmSearchQuery.trim().toLowerCase();
+    if (!q) return tabInstanceList;
+    return tabInstanceList.filter(({ process, instance }) => {
+      const hay = `${process.title || ''} ${instance.id}`.toLowerCase();
+      return hay.includes(q);
+    });
+  }, [tabInstanceList, bpmSearchQuery]);
+
   const renderStatusPill = (status: ProcessInstance['status']) => (
     <span
       className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium ${
@@ -441,6 +467,14 @@ const BusinessProcessesView: React.FC<BusinessProcessesViewProps> = ({
     );
     setModule(
       <div className="flex items-center gap-1.5 shrink-0 flex-wrap justify-end">
+        <ModuleFilterIconButton
+          accent="indigo"
+          size="sm"
+          active={bpmListFilterOpen || !!bpmSearchQuery.trim()}
+          activeCount={bpmSearchQuery.trim() ? 1 : 0}
+          label="Поиск по списку"
+          onClick={() => setBpmListFilterOpen((o) => !o)}
+        />
         <div className="flex items-center gap-0.5 shrink-0" role="tablist" aria-label="Вид списка">
           {(
             [
@@ -492,6 +526,8 @@ const BusinessProcessesView: React.FC<BusinessProcessesViewProps> = ({
     isProcessListView,
     activeTab,
     viewMode,
+    bpmListFilterOpen,
+    bpmSearchQuery,
     handleOpenCreate,
     setLeading,
     setModule,
@@ -574,7 +610,7 @@ const BusinessProcessesView: React.FC<BusinessProcessesViewProps> = ({
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100 dark:divide-[#333]">
-              {userTemplates.map((process) => {
+              {filteredUserTemplates.map((process) => {
                 const instances = getProcessInstances(process.id);
                 const running = instances.filter((i) => i.status === 'active' || i.status === 'paused').length;
                 const completed = instances.filter((i) => i.status === 'completed').length;
@@ -1412,6 +1448,17 @@ const BusinessProcessesView: React.FC<BusinessProcessesViewProps> = ({
     <ModulePageShell>
       <div className="flex-1 min-h-0 overflow-hidden">
         <div className={`${MODULE_PAGE_GUTTER} ${MODULE_PAGE_TOP_PAD} pb-20 h-full overflow-y-auto custom-scrollbar`}>
+          {bpmListFilterOpen && (
+            <div className="mb-3 p-3 rounded-xl border border-gray-200 dark:border-[#333] bg-gray-50 dark:bg-[#1a1a1a]">
+              <label className="block text-xs font-semibold text-gray-600 dark:text-gray-400 mb-1">Поиск по названию</label>
+              <input
+                value={bpmSearchQuery}
+                onChange={(e) => setBpmSearchQuery(e.target.value)}
+                placeholder="Название процесса или ID экземпляра…"
+                className="w-full max-w-md h-9 rounded-lg border border-gray-200 dark:border-[#333] bg-white dark:bg-[#252525] px-3 text-sm text-gray-900 dark:text-gray-100"
+              />
+            </div>
+          )}
           {activeTab === 'templates' ? (
             userTemplates.length === 0 ? (
             <div className="bg-white dark:bg-[#252525] border border-gray-200 dark:border-[#333] rounded-xl p-12 text-center">
@@ -1439,9 +1486,13 @@ const BusinessProcessesView: React.FC<BusinessProcessesViewProps> = ({
                 ]}
               />
             </div>
+          ) : filteredUserTemplates.length === 0 ? (
+            <div className="bg-white dark:bg-[#252525] border border-gray-200 dark:border-[#333] rounded-xl p-8 text-center text-sm text-gray-500 dark:text-gray-400">
+              Ничего не найдено по запросу.
+            </div>
           ) : viewMode === 'grid' ? (
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-2 gap-4">
-              {userTemplates.map(process => {
+              {filteredUserTemplates.map(process => {
                 const instances = getProcessInstances(process.id);
                 return (
                   <ProcessCard
@@ -1462,27 +1513,42 @@ const BusinessProcessesView: React.FC<BusinessProcessesViewProps> = ({
           )
           ) : (
             <div>
-              {tabInstanceList.length === 0 ? (
+              {filteredTabInstanceList.length === 0 ? (
                 <div className="bg-white dark:bg-[#252525] border border-gray-200 dark:border-[#333] rounded-xl p-12 text-center">
-                  {activeTab === 'running' ? (
-                    <Play size={48} className="mx-auto text-gray-300 dark:text-gray-600 mb-4" />
+                  {tabInstanceList.length > 0 && bpmSearchQuery.trim() ? (
+                    <>
+                      <p className="text-gray-500 dark:text-gray-400 text-sm mb-2">Ничего не найдено по запросу.</p>
+                      <button
+                        type="button"
+                        onClick={() => setBpmSearchQuery('')}
+                        className="text-xs text-indigo-600 dark:text-indigo-400 font-semibold hover:underline"
+                      >
+                        Сбросить поиск
+                      </button>
+                    </>
                   ) : (
-                    <CheckCircle2 size={48} className="mx-auto text-gray-300 dark:text-gray-600 mb-4" />
+                    <>
+                      {activeTab === 'running' ? (
+                        <Play size={48} className="mx-auto text-gray-300 dark:text-gray-600 mb-4" />
+                      ) : (
+                        <CheckCircle2 size={48} className="mx-auto text-gray-300 dark:text-gray-600 mb-4" />
+                      )}
+                      <p className="text-gray-500 dark:text-gray-400 text-sm mb-2">
+                        {activeTab === 'running'
+                          ? 'Нет процессов в работе'
+                          : 'Пока нет завершённых экземпляров'}
+                      </p>
+                      <p className="text-xs text-gray-400 dark:text-gray-500">
+                        {activeTab === 'running'
+                          ? 'Запустите процесс со страницы шаблона или из карточки процесса.'
+                          : 'После прохождения всех шагов экземпляр появится здесь.'}
+                      </p>
+                    </>
                   )}
-                  <p className="text-gray-500 dark:text-gray-400 text-sm mb-2">
-                    {activeTab === 'running'
-                      ? 'Нет процессов в работе'
-                      : 'Пока нет завершённых экземпляров'}
-                  </p>
-                  <p className="text-xs text-gray-400 dark:text-gray-500">
-                    {activeTab === 'running'
-                      ? 'Запустите процесс со страницы шаблона или из карточки процесса.'
-                      : 'После прохождения всех шагов экземпляр появится здесь.'}
-                  </p>
                 </div>
               ) : viewMode === 'grid' ? (
                 <div className="space-y-3">
-                  {tabInstanceList.map(({ process, instance, tasks }) => {
+                  {filteredTabInstanceList.map(({ process, instance, tasks }) => {
                     const currentStep = getStepsForInstance(process, instance).find((s) => s.id === instance.currentStepId);
                     const completedTasks = tasks.filter(t => t.status === 'Выполнено' || t.status === 'Done').length;
                     const totalTasks = tasks.length;
@@ -1568,7 +1634,7 @@ const BusinessProcessesView: React.FC<BusinessProcessesViewProps> = ({
                   })}
                 </div>
               ) : (
-                renderInstancesTable(tabInstanceList)
+                renderInstancesTable(filteredTabInstanceList)
               )}
             </div>
           )}

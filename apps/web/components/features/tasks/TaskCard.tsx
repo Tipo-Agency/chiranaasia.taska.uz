@@ -39,8 +39,8 @@ export const TaskCard: React.FC<TaskCardProps> = ({
 }) => {
   const assignee = users.find(u => u.id === task.assigneeId);
   const project = projects.find(p => p.id === task.projectId);
-  const status = statuses.find(s => s.value === task.status);
-  const priority = priorities.find(p => p.value === task.priority);
+  const status = statuses.find((s) => s.name === task.status);
+  const priority = priorities.find((p) => p.name === task.priority);
 
   const isOverdue = task.endDate && new Date(task.endDate) < new Date() && task.status !== 'Выполнено';
 
