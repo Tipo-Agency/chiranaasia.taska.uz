@@ -362,12 +362,12 @@ const ContentPlanView: React.FC<ContentPlanViewProps> = ({
   
   const getPlatformIcon = (p: string) => {
       switch (p) {
-          case 'instagram': return <Instagram size={14} className="text-pink-600 dark:text-pink-400"/>;
-          case 'telegram': return <Send size={14} className="text-blue-500 dark:text-blue-400"/>;
-          case 'youtube': return <Youtube size={14} className="text-red-600 dark:text-red-400"/>;
-          case 'vk': return <span className="text-[10px] font-bold text-blue-700 dark:text-blue-400">VK</span>;
-          case 'linkedin': return <Linkedin size={14} className="text-blue-700 dark:text-blue-400"/>;
-          default: return <Send size={14}/>;
+          case 'instagram': return <Instagram size={14} className="text-slate-600 dark:text-slate-300" />;
+          case 'telegram': return <Send size={14} className="text-slate-600 dark:text-slate-300" />;
+          case 'youtube': return <Youtube size={14} className="text-slate-600 dark:text-slate-300" />;
+          case 'vk': return <span className="text-[10px] font-bold text-slate-600 dark:text-slate-300">VK</span>;
+          case 'linkedin': return <Linkedin size={14} className="text-slate-600 dark:text-slate-300" />;
+          default: return <Send size={14} className="text-slate-600 dark:text-slate-300" />;
       }
   };
   
@@ -388,14 +388,23 @@ const ContentPlanView: React.FC<ContentPlanViewProps> = ({
   };
   const getFormatIcon = (f: string) => {
     switch (f) {
-      case 'reel': return <Video size={12} className="text-pink-500 shrink-0" />;
-      case 'story': return <Image size={12} className="text-amber-500 shrink-0" />;
-      case 'article': return <FileText size={12} className="text-blue-500 shrink-0" />;
-      case 'video': return <Video size={12} className="text-red-500 shrink-0" />;
-      default: return <FileTextIcon size={12} className="text-gray-500 shrink-0" />;
+      case 'reel': return <Video size={12} className="text-slate-500 dark:text-slate-300 shrink-0" />;
+      case 'story': return <Image size={12} className="text-slate-500 dark:text-slate-300 shrink-0" />;
+      case 'article': return <FileText size={12} className="text-slate-500 dark:text-slate-300 shrink-0" />;
+      case 'video': return <Video size={12} className="text-slate-500 dark:text-slate-300 shrink-0" />;
+      default: return <FileTextIcon size={12} className="text-slate-500 dark:text-slate-300 shrink-0" />;
     }
   };
-  const getStatusColor = (s: string) => { switch (s) { case 'idea': return 'border-gray-200 bg-gray-50 dark:bg-[#2a2a2a] dark:border-[#444]'; case 'published': return 'border-green-200 bg-green-50 dark:bg-green-900/20 dark:border-green-800'; default: return 'border-blue-200 bg-blue-50 dark:bg-blue-900/20 dark:border-blue-800'; } };
+  const getStatusColor = (s: string) => {
+    switch (s) {
+      case 'idea':
+        return 'border-gray-200 bg-gray-50 dark:bg-[#2a2a2a] dark:border-[#444]';
+      case 'published':
+        return 'border-emerald-200 bg-emerald-50/60 dark:bg-emerald-950/20 dark:border-emerald-800/60';
+      default:
+        return 'border-slate-200 bg-slate-50/60 dark:bg-slate-900/25 dark:border-slate-700/60';
+    }
+  };
   const getStatusLabel = (s: string) => { switch (s) { case 'idea': return 'Идея'; case 'copywriting': return 'Копирайтинг'; case 'design': return 'Дизайн'; case 'approval': return 'Согласование'; case 'scheduled': return 'План'; case 'published': return 'Готово'; default: return s; } };
 
   const statuses: ContentPost['status'][] = ['idea', 'copywriting', 'design', 'approval', 'scheduled', 'published'];
@@ -793,10 +802,10 @@ const ContentPlanView: React.FC<ContentPlanViewProps> = ({
     <ModulePageShell>
       <div className={`${MODULE_PAGE_GUTTER} pt-8 pb-4 flex-shrink-0`}>
         <ModulePageHeader
-          icon={<DynamicIcon name={activeTable?.icon || 'FileText'} className="text-white" size={24} />}
+          icon={<DynamicIcon name={activeTable?.icon || 'FileText'} className="text-slate-700 dark:text-slate-200" size={18} />}
           title={activeTable?.name || 'Контент-план'}
           description="Планирование контента"
-          accent="yellow"
+          accent="slate"
           tabs={
             <ModuleSegmentedControl
               value={viewMode}
@@ -823,11 +832,11 @@ const ContentPlanView: React.FC<ContentPlanViewProps> = ({
                 <RefreshCw size={16} className={isRefreshing ? 'animate-spin' : ''} /> 
                 {isRefreshing ? 'Обновление...' : 'Обновить'}
               </button>
-              <ModuleCreateIconButton accent="yellow" label="Новый пост" onClick={handleOpenCreate} />
+              <ModuleCreateIconButton accent="slate" label="Новый пост" onClick={handleOpenCreate} />
             </div>
           }
         />
-        <div className="mt-3 inline-flex max-w-full items-center gap-2 rounded-xl border border-green-200 bg-green-50 px-3 py-2 text-xs text-green-700 dark:border-green-900/30 dark:bg-green-900/10 dark:text-green-300">
+        <div className="mt-3 inline-flex max-w-full items-center gap-2 rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-xs text-gray-700 dark:border-[#333] dark:bg-[#1a1a1a] dark:text-gray-300">
           <span className="font-medium">Публичная ссылка:</span>
           <span className="truncate">{`${window.location.origin}/content-plan/${tableId}`}</span>
           <button

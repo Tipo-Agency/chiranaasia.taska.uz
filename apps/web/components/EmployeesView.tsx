@@ -213,7 +213,7 @@ const EmployeesView: React.FC<EmployeesViewProps> = ({
                    orgPositions.find((p) => p.holderUserId === info.userId);
                return (
                    <div key={info.id} className="bg-white dark:bg-[#252525] border border-gray-200 dark:border-[#333] rounded-xl p-5 shadow-sm hover:shadow-md transition-shadow group relative flex flex-col">
-                       <button onClick={() => handleOpenEdit(info)} className="absolute top-4 right-4 text-gray-300 hover:text-purple-600 opacity-0 group-hover:opacity-100 transition-opacity">
+                       <button onClick={() => handleOpenEdit(info)} className="absolute top-4 right-4 text-gray-300 hover:text-slate-700 dark:hover:text-slate-200 opacity-0 group-hover:opacity-100 transition-opacity">
                            <Edit2 size={16}/>
                        </button>
                        
@@ -225,7 +225,7 @@ const EmployeesView: React.FC<EmployeesViewProps> = ({
                             />
                             <div className="overflow-hidden">
                                 <h3 className="font-bold text-gray-900 dark:text-gray-200 truncate">{user?.name}</h3>
-                                <div className="text-xs text-purple-600 dark:text-purple-400 font-medium bg-purple-50 dark:bg-purple-900/30 px-2 py-0.5 rounded border border-purple-100 dark:border-purple-800 inline-block mt-1 truncate max-w-full">{linkedPosition?.title || info.position}</div>
+                                <div className="text-xs text-slate-700 dark:text-slate-200 font-medium bg-slate-100 dark:bg-slate-900/30 px-2 py-0.5 rounded border border-slate-200 dark:border-slate-700 inline-block mt-1 truncate max-w-full">{linkedPosition?.title || info.position}</div>
                             </div>
                        </div>
                        
@@ -249,7 +249,7 @@ const EmployeesView: React.FC<EmployeesViewProps> = ({
                                </a>
                            )}
                            {user?.telegram && (
-                               <a href={user.telegram.startsWith('http') ? user.telegram : `https://t.me/${user.telegram.replace('@', '')}`} target="_blank" rel="noopener noreferrer" className="flex items-center justify-center gap-1 p-1.5 rounded bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 text-xs hover:bg-blue-100 dark:hover:bg-blue-900/50 transition-colors">
+                               <a href={user.telegram.startsWith('http') ? user.telegram : `https://t.me/${user.telegram.replace('@', '')}`} target="_blank" rel="noopener noreferrer" className="flex items-center justify-center gap-1 p-1.5 rounded bg-slate-100 dark:bg-slate-900/30 text-slate-700 dark:text-slate-200 text-xs hover:bg-slate-200/60 dark:hover:bg-slate-900/45 transition-colors">
                                    <Send size={12}/> Telegram
                                </a>
                            )}
@@ -677,7 +677,7 @@ const EmployeesView: React.FC<EmployeesViewProps> = ({
 
                     <div className="flex justify-end items-center gap-2 pt-2 border-t border-gray-100 dark:border-[#333] mt-2">
                          <button type="button" onClick={() => setIsModalOpen(false)} className="px-4 py-2 text-sm font-medium text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-[#303030] rounded-lg">Отмена</button>
-                         <button type="submit" className="px-4 py-2 text-sm font-medium bg-purple-600 text-white hover:bg-purple-700 rounded-lg shadow-sm flex items-center gap-2"><Save size={16}/> Сохранить</button>
+                         <button type="submit" className="px-4 py-2 text-sm font-semibold bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 hover:bg-slate-800 dark:hover:bg-white rounded-lg shadow-sm flex items-center gap-2"><Save size={16}/> Сохранить</button>
                     </div>
                 </form>
             </div>
@@ -770,7 +770,7 @@ const EmployeesView: React.FC<EmployeesViewProps> = ({
                          )}
                          <div className="flex gap-2 ml-auto">
                             <button type="button" onClick={() => setIsPosModalOpen(false)} className="px-4 py-2 text-sm font-medium text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-[#303030] rounded-lg">Отмена</button>
-                            <button type="submit" className="px-4 py-2 text-sm font-medium bg-purple-600 text-white hover:bg-purple-700 rounded-lg shadow-sm flex items-center gap-2"><Save size={16}/> Сохранить</button>
+                            <button type="submit" className="px-4 py-2 text-sm font-semibold bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 hover:bg-slate-800 dark:hover:bg-white rounded-lg shadow-sm flex items-center gap-2"><Save size={16}/> Сохранить</button>
                          </div>
                     </div>
                 </form>

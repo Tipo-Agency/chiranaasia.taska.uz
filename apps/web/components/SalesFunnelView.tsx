@@ -989,7 +989,7 @@ const SalesFunnelView: React.FC<SalesFunnelViewProps> = ({ deals, clients, users
                               <button
                                   type="button"
                                   onClick={handleMarkAsWon}
-                                  className="flex-1 bg-green-600 hover:bg-green-700 text-white font-medium py-2 px-3 rounded-lg transition-colors flex items-center justify-center gap-2 text-sm"
+                                  className="flex-1 bg-emerald-50 dark:bg-emerald-950/30 text-emerald-800 dark:text-emerald-200 border border-emerald-200 dark:border-emerald-800/60 font-semibold py-2 px-3 rounded-lg transition-colors flex items-center justify-center gap-2 text-sm hover:bg-emerald-100/70 dark:hover:bg-emerald-950/45"
                               >
                                   <CheckCircle2 size={16} />
                                   <span>Успешно</span>
@@ -997,7 +997,7 @@ const SalesFunnelView: React.FC<SalesFunnelViewProps> = ({ deals, clients, users
                               <button
                                   type="button"
                                   onClick={handleMarkAsLost}
-                                  className="flex-1 bg-red-600 hover:bg-red-700 text-white font-medium py-2 px-3 rounded-lg transition-colors flex items-center justify-center gap-2 text-sm"
+                                  className="flex-1 bg-rose-50 dark:bg-rose-950/30 text-rose-800 dark:text-rose-200 border border-rose-200 dark:border-rose-800/60 font-semibold py-2 px-3 rounded-lg transition-colors flex items-center justify-center gap-2 text-sm hover:bg-rose-100/70 dark:hover:bg-rose-950/45"
                               >
                                   <XCircle size={16} />
                                   <span>Отказ</span>
@@ -1073,7 +1073,7 @@ const SalesFunnelView: React.FC<SalesFunnelViewProps> = ({ deals, clients, users
                                                   : 'Сообщение по сделке…'
                                           }
                                       />
-                                      <button onClick={handleSendChat} className="bg-blue-600 text-white p-2 rounded"><Send size={16}/></button>
+                                      <button onClick={handleSendChat} className="bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 p-2 rounded-lg"><Send size={16}/></button>
                                   </div>
                               </>
                           ) : modalTab === 'tasks' ? (
@@ -1094,7 +1094,7 @@ const SalesFunnelView: React.FC<SalesFunnelViewProps> = ({ deals, clients, users
                                               <div 
                                                   key={task.id}
                                                   onClick={() => onOpenTask && onOpenTask(task)}
-                                                  className="p-3 bg-white dark:bg-[#333] border border-gray-200 dark:border-[#444] rounded-lg hover:border-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors cursor-pointer"
+                                                  className="p-3 bg-white dark:bg-[#333] border border-gray-200 dark:border-[#444] rounded-lg hover:border-gray-300 dark:hover:border-[#555] hover:bg-gray-50 dark:hover:bg-[#2a2a2a] transition-colors cursor-pointer"
                                               >
                                                   <div className="font-medium text-sm text-gray-800 dark:text-gray-200 mb-1">{task.title}</div>
                                                   <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
@@ -1115,7 +1115,7 @@ const SalesFunnelView: React.FC<SalesFunnelViewProps> = ({ deals, clients, users
                                           title="Создать задачу"
                                           aria-label="Создать задачу"
                                           onClick={() => setShowTaskDropdown(!showTaskDropdown)}
-                                          className="w-full p-3 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg hover:border-violet-500 hover:bg-violet-50 dark:hover:bg-violet-900/20 transition-colors flex items-center justify-center text-violet-600 dark:text-violet-400"
+                                          className="w-full p-3 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg hover:border-gray-400 dark:hover:border-gray-500 hover:bg-gray-50 dark:hover:bg-[#2a2a2a] transition-colors flex items-center justify-center text-gray-700 dark:text-gray-200"
                                       >
                                           <Plus size={22} strokeWidth={2.5} />
                                       </button>

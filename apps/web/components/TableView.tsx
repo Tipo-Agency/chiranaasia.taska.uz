@@ -51,7 +51,7 @@ const resolveColorClass = (colorInput: string, type: 'status' | 'priority' | 'pr
     }
     
     if (type === 'status') {
-        return `bg-${baseColor}-500 dark:bg-${baseColor}-600 text-white border border-${baseColor}-600 dark:border-${baseColor}-500`;
+        return `bg-${baseColor}-100 dark:bg-${baseColor}-900/35 text-${baseColor}-800 dark:text-${baseColor}-200 border border-${baseColor}-200 dark:border-${baseColor}-800/60`;
     }
     
     if (type === 'priority') {
@@ -166,7 +166,7 @@ const CustomSelect = ({ value, options, onChange, type }: { value: string, optio
                         className="flex items-center gap-2 px-2 py-2.5 hover:bg-gray-50 dark:hover:bg-[#303030] rounded-lg cursor-pointer transition-colors whitespace-nowrap"
                     >
                         <span className={`text-xs font-medium ${optColor} px-2 py-0.5 rounded inline-block`}>{opt.name}</span>
-                        {val === value && <Check size={14} className="text-blue-500 dark:text-blue-400 flex-shrink-0 ml-auto"/>}
+                        {val === value && <Check size={14} className="text-slate-600 dark:text-slate-300 flex-shrink-0 ml-auto"/>}
                     </div>
                 );
             })}
@@ -190,7 +190,7 @@ const CustomSelect = ({ value, options, onChange, type }: { value: string, optio
                     e.stopPropagation(); 
                     e.preventDefault();
                 }}
-                className={`px-2 py-1.5 rounded-lg text-xs font-bold cursor-pointer transition-all w-full text-center flex items-center justify-center gap-1.5 hover:scale-105 active:scale-95 shadow-sm ${colorClass}`}
+                className={`px-2 py-1.5 rounded-lg text-xs font-semibold cursor-pointer transition-colors w-full text-center flex items-center justify-center gap-1.5 hover:bg-black/5 dark:hover:bg-white/5 ${colorClass}`}
             >
                 <span className="truncate">{label}</span>
                 <ChevronDown size={12} className={`transition-transform flex-shrink-0 ${isOpen ? 'rotate-180' : ''}`} />

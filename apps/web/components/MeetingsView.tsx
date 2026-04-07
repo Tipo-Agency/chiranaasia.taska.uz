@@ -47,10 +47,11 @@ interface MeetingsViewProps {
 }
 
 const DEFAULT_CAL_COLORS = {
-  client: '#0ea5e9',
-  work: '#8b5cf6',
-  project: '#10b981',
-  shoot: '#f97316',
+  // спокойные оттенки (используются в бордере слева, не как заливка)
+  client: '#38bdf8',
+  work: '#a78bfa',
+  project: '#34d399',
+  shoot: '#fb923c',
 };
 
 /** Как на бэкенде в shoot_plans: встречи общего календаря, CRM, чата, съёмок. */
@@ -510,17 +511,17 @@ const MeetingsView: React.FC<MeetingsViewProps> = ({
                                   }
                                 : undefined
                             }
-                            className={`min-h-[128px] border-r border-b border-gray-100 dark:border-[#2a2a2a] p-1.5 transition-colors ${!day ? 'bg-gray-50/40 dark:bg-[#0f0f0f]' : 'hover:bg-teal-50/30 dark:hover:bg-teal-950/20 cursor-pointer'}`}
+                            className={`min-h-[128px] border-r border-b border-gray-100 dark:border-[#2a2a2a] p-1.5 transition-colors ${!day ? 'bg-gray-50/40 dark:bg-[#0f0f0f]' : 'hover:bg-gray-50/70 dark:hover:bg-white/5 cursor-pointer'}`}
                             onDragOver={day ? onDragOver : undefined}
                             onDrop={day ? (e) => onDrop(e, dateStr) : undefined}
                             onClick={day ? () => openCreateFlowForDate(dateStr) : undefined}
                         >
                             {day && (
                                 <>
-                                    <div className={`text-right text-xs font-bold mb-1 px-0.5 ${isToday ? 'text-teal-600 dark:text-teal-400' : 'text-gray-500 dark:text-gray-500'}`}>
+                                    <div className={`text-right text-xs font-bold mb-1 px-0.5 ${isToday ? 'text-slate-700 dark:text-slate-200' : 'text-gray-500 dark:text-gray-500'}`}>
                                       {isToday ? (
                                         <span className="inline-flex items-center justify-end gap-1">
-                                          <span className="rounded-full bg-teal-600 text-white px-1.5 py-0.5 text-[10px]">{day}</span>
+                                          <span className="rounded-full bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 px-1.5 py-0.5 text-[10px]">{day}</span>
                                         </span>
                                       ) : (
                                         day
@@ -543,14 +544,14 @@ const MeetingsView: React.FC<MeetingsViewProps> = ({
                                                 draggable
                                                 onDragStart={(e) => onDragStart(e, m.id)}
                                                 onClick={(e) => { e.stopPropagation(); handleOpenEdit(m); }}
-                                                className="bg-white dark:bg-teal-950/55 text-teal-950 dark:text-teal-50 px-2 py-1.5 rounded-xl border border-teal-200/90 dark:border-teal-800 cursor-pointer shadow-sm hover:border-teal-500 dark:hover:border-teal-500 hover:shadow transition-all" 
+                                                className="bg-white dark:bg-[#1a1a1a] text-gray-900 dark:text-gray-100 px-2 py-1.5 rounded-xl border border-gray-200/90 dark:border-[#333] cursor-pointer shadow-sm hover:border-gray-300 dark:hover:border-[#444] hover:shadow transition-all" 
                                                 style={{ borderLeftWidth: 3, borderLeftColor: getTypeColor(m) }}
                                                 title={`${m.time} — ${m.title}`}
                                             >
-                                                <div className="text-[11px] font-bold text-teal-700 dark:text-teal-200 tabular-nums">{m.time}</div>
+                                                <div className="text-[11px] font-bold text-gray-700 dark:text-gray-200 tabular-nums">{m.time}</div>
                                                 <div className="text-[11px] font-semibold leading-snug line-clamp-2 mt-0.5">{m.title}</div>
                                                 <div className="flex flex-wrap items-center gap-1 mt-1">
-                                                  <span className="text-[9px] uppercase tracking-wide font-semibold px-1 py-0.5 rounded bg-teal-100/90 dark:bg-teal-900/60 text-teal-800 dark:text-teal-200">{typeShort}</span>
+                                                  <span className="text-[9px] uppercase tracking-wide font-semibold px-1 py-0.5 rounded bg-gray-100 dark:bg-[#252525] text-gray-700 dark:text-gray-200">{typeShort}</span>
                                                   {pCount > 0 && (
                                                     <span className="text-[9px] text-gray-600 dark:text-gray-400">{pCount} уч.</span>
                                                   )}
@@ -691,7 +692,7 @@ const MeetingsView: React.FC<MeetingsViewProps> = ({
                     <button
                       type="button"
                       onClick={() => openCreateFlowForDate(getTodayLocalDate())}
-                      className="mt-6 inline-flex items-center gap-2 rounded-xl bg-teal-600 hover:bg-teal-700 text-white text-sm font-semibold px-5 py-2.5 shadow-sm"
+                      className="mt-6 inline-flex items-center gap-2 rounded-xl bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 text-sm font-semibold px-5 py-2.5 shadow-sm hover:bg-slate-800 dark:hover:bg-white"
                     >
                       <Calendar size={16} /> Запланировать
                     </button>
