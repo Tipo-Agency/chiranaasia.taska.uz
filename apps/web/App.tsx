@@ -39,12 +39,12 @@ function ChatFloatingButton({ onOpen }: { onOpen: () => void }) {
     <button
       type="button"
       onClick={onOpen}
-      className="hidden md:flex fixed bottom-6 right-6 z-40 w-14 h-14 rounded-full bg-[#3337AD] text-white shadow-lg hover:bg-[#292b8a] items-center justify-center relative"
+      className="hidden md:flex fixed bottom-6 right-6 z-40 w-14 h-14 rounded-full bg-[#3337AD] text-white shadow-lg hover:bg-[#292b8a] items-center justify-center"
       title={unreadCount > 0 ? `Чат — непрочитанных: ${unreadCount}` : 'Чат'}
     >
       <MessageCircle size={24} />
       {unreadCount > 0 && (
-        <span className="absolute -top-0.5 -right-0.5 min-w-[1.125rem] h-[1.125rem] px-1 flex items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white border-2 border-white dark:border-[#191919]">
+        <span className="absolute top-1 right-1 min-w-[1.125rem] h-[1.125rem] px-1 flex items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white border-2 border-white dark:border-[#191919]">
           {unreadCount > 99 ? '99+' : unreadCount}
         </span>
       )}
@@ -275,13 +275,6 @@ function MainApp() {
                 </div>
             )}
 
-            <ChatFloatingButton
-              onOpen={() => {
-                setChatOpenToSystemFeed(false);
-                setChatPanelOpen(true);
-              }}
-            />
-
             {/* Чат в модальном окне (десктоп) */}
             {chatPanelOpen && (
               <div
@@ -485,6 +478,13 @@ function MainApp() {
             />
             </div>
         </div>
+
+        <ChatFloatingButton
+          onOpen={() => {
+            setChatOpenToSystemFeed(false);
+            setChatPanelOpen(true);
+          }}
+        />
 
         {/* Modals */}
         {state.isTaskModalOpen && (

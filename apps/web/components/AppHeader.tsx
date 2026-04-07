@@ -84,7 +84,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
     ) : null;
 
   return (
-    <div className="h-14 border-b border-gray-200 dark:border-[#333] flex items-center gap-2 px-2 md:px-3 bg-white/95 dark:bg-[#191919]/95 backdrop-blur shrink-0 z-[40] min-w-0">
+    <div className="h-12 border-b border-gray-200 dark:border-[#333] flex items-center gap-2 px-2 md:px-3 bg-white/95 dark:bg-[#191919]/95 backdrop-blur shrink-0 z-[40] min-w-0">
       <button
         type="button"
         onClick={onMobileMenuToggle}
@@ -94,37 +94,17 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
         <Menu size={20} />
       </button>
 
-      <div className="flex items-center gap-1.5 min-w-0 shrink overflow-x-auto scrollbar-none py-0.5">
+      <div className="flex-1 min-w-0 flex items-center gap-1.5 overflow-x-auto scrollbar-none py-0.5">
         {tableIconSlot}
         {leading}
-        {module}
       </div>
 
-      <div className="flex-1 min-w-0 max-w-2xl mx-1 md:mx-3 hidden sm:block">
-        <div className="relative group">
-          <Search
-            size={17}
-            className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-[#3337AD]"
-          />
-          <input
-            type="text"
-            placeholder="Поиск"
-            value={searchQuery}
-            onChange={(e) => onSearchChange(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') onSearchFocus();
-            }}
-            className="w-full bg-white dark:bg-[#252525] border border-gray-300 dark:border-[#333] group-focus-within:border-[#3337AD] rounded-xl pl-10 pr-4 py-2 text-sm text-gray-900 dark:text-white outline-none transition-all placeholder-gray-400"
-          />
-        </div>
-      </div>
-
-      <div className="flex items-center gap-1 shrink-0 ml-auto">
+      <div className="flex items-center gap-1.5 shrink-0">
         <div className="relative" ref={userRef}>
           <button
             type="button"
             onClick={() => setShowUserDropdown((p) => !p)}
-            className="flex items-center gap-1 hover:bg-gray-100 dark:hover:bg-[#252525] p-1 pl-1 pr-1.5 rounded-full transition-colors border border-transparent hover:border-gray-200 dark:hover:border-[#333]"
+            className="flex items-center gap-0.5 hover:bg-gray-100 dark:hover:bg-[#252525] p-1 rounded-full transition-colors border border-transparent hover:border-gray-200 dark:hover:border-[#333]"
             aria-expanded={showUserDropdown}
             aria-haspopup="menu"
           >
@@ -133,7 +113,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
               className="w-8 h-8 rounded-full border border-gray-200 dark:border-[#444] object-cover object-center"
               alt=""
             />
-            <ChevronDown size={14} className="text-gray-400" />
+            <ChevronDown size={14} className="text-gray-400 hidden sm:block" />
           </button>
           {showUserDropdown && (
             <div className="absolute right-0 top-full mt-2 w-56 bg-white dark:bg-[#252525] border border-gray-200 dark:border-[#333] rounded-xl shadow-xl z-[120] overflow-hidden">
@@ -211,6 +191,27 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
               </div>
             </div>
           )}
+        </div>
+
+        {module}
+
+        <div className="hidden sm:block w-44 md:w-52 shrink-0">
+          <div className="relative group">
+            <Search
+              size={14}
+              className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-[#3337AD]"
+            />
+            <input
+              type="text"
+              placeholder="Поиск"
+              value={searchQuery}
+              onChange={(e) => onSearchChange(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') onSearchFocus();
+              }}
+              className="w-full bg-white dark:bg-[#252525] border border-gray-300 dark:border-[#333] group-focus-within:border-[#3337AD] rounded-lg pl-8 pr-2 py-1.5 text-xs text-gray-900 dark:text-white outline-none transition-all placeholder-gray-400"
+            />
+          </div>
         </div>
       </div>
     </div>

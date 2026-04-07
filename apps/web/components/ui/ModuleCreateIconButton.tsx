@@ -8,6 +8,8 @@ export interface ModuleCreateIconButtonProps
   accent?: ModuleAccentKey;
   /** aria-label / title */
   label?: string;
+  /** sm — компактная кнопка для шапки */
+  size?: 'md' | 'sm';
 }
 
 /**
@@ -19,19 +21,23 @@ export const ModuleCreateIconButton: React.FC<ModuleCreateIconButtonProps> = ({
   className = '',
   type = 'button',
   disabled,
+  size = 'md',
   ...rest
 }) => {
   const fab = MODULE_ACCENTS[accent].fab;
+  const dim = size === 'sm' ? 'w-9 h-9 rounded-lg' : 'w-11 h-11 rounded-xl';
+  const iconSize = size === 'sm' ? 18 : 22;
+  const stroke = size === 'sm' ? 2.25 : 2.5;
   return (
     <button
       type={type}
       disabled={disabled}
       title={label}
       aria-label={label}
-      className={`inline-flex items-center justify-center w-11 h-11 rounded-xl shrink-0 transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${fab} ${className}`}
+      className={`inline-flex items-center justify-center ${dim} shrink-0 transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${fab} ${className}`}
       {...rest}
     >
-      <Plus size={22} strokeWidth={2.5} />
+      <Plus size={iconSize} strokeWidth={stroke} />
     </button>
   );
 };

@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useLayoutEffect, useMemo, useRef } from 'react';
 import { Deal, Client, User, Comment, Task, Project, SalesFunnel, Meeting, NotificationPreferences } from '../types';
-import { Plus, KanbanSquare, List as ListIcon, X, Send, MessageSquare, Instagram, Globe, UserPlus, Bot, Edit2, TrendingUp, CheckSquare, CheckCircle2, XCircle, Trash2, Calendar, Clock, Users, Tag, GitBranch, Filter, User as UserIcon } from 'lucide-react';
+import { Plus, KanbanSquare, X, Send, MessageSquare, Instagram, Globe, UserPlus, Bot, Edit2, TrendingUp, CheckSquare, CheckCircle2, XCircle, Trash2, Calendar, Clock, Users, Tag, GitBranch, Filter, User as UserIcon } from 'lucide-react';
 // Клиентский Telegram/Instagram — при необходимости подключать через api/telegramService.
 import { DynamicIcon } from './AppIcons';
 import { Button, ModulePageShell, MODULE_PAGE_GUTTER, ModuleCreateIconButton, ModuleSelectDropdown, SystemAlertDialog, SystemConfirmDialog } from './ui';
@@ -195,12 +195,12 @@ const SalesFunnelView: React.FC<SalesFunnelViewProps> = ({ deals, clients, users
     const idle = 'text-gray-500 dark:text-gray-400';
     setModule(
       <div className="flex items-center gap-2 flex-wrap min-w-0">
-        <div className="flex items-center gap-1 shrink-0" role="tablist" aria-label="Вид воронки">
+        <div className="flex items-center gap-0.5 shrink-0" role="tablist" aria-label="Вид воронки">
           {(
             [
-              { id: 'kanban' as const, title: 'Канбан', icon: <KanbanSquare size={17} /> },
-              { id: 'list' as const, title: 'Список', icon: <ListIcon size={17} /> },
-              { id: 'rejected' as const, title: 'Отказы', icon: <XCircle size={17} /> },
+              { id: 'kanban' as const, label: 'Канбан' },
+              { id: 'list' as const, label: 'Список' },
+              { id: 'rejected' as const, label: 'Отказы' },
             ] as const
           ).map((t) => (
             <button
@@ -208,13 +208,12 @@ const SalesFunnelView: React.FC<SalesFunnelViewProps> = ({ deals, clients, users
               type="button"
               role="tab"
               aria-selected={viewMode === t.id}
-              title={t.title}
               onClick={() => setViewMode(t.id)}
-              className={`h-8 w-8 rounded-xl flex items-center justify-center shrink-0 transition-colors ${
+              className={`px-2 py-1 rounded-lg text-[11px] sm:text-xs font-medium whitespace-nowrap shrink-0 transition-colors ${
                 viewMode === t.id ? violet : `${idle} hover:bg-gray-100 dark:hover:bg-[#252525]`
               }`}
             >
-              {t.icon}
+              {t.label}
             </button>
           ))}
         </div>
@@ -246,6 +245,7 @@ const SalesFunnelView: React.FC<SalesFunnelViewProps> = ({ deals, clients, users
           <ModuleCreateIconButton
             accent="violet"
             label="Новая сделка"
+            size="sm"
             onClick={() => handleOpenCreateRef.current?.()}
           />
         </div>
@@ -641,7 +641,7 @@ const SalesFunnelView: React.FC<SalesFunnelViewProps> = ({ deals, clients, users
     <ModulePageShell className="flex-1 min-h-0 flex flex-col overflow-hidden">
       <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
         <div
-          className={`${MODULE_PAGE_GUTTER} pt-3 h-full min-h-0 flex flex-col ${
+          className={`${MODULE_PAGE_GUTTER} pt-1 h-full min-h-0 flex flex-col ${
             viewMode === 'kanban'
               ? 'overflow-hidden pb-0'
               : 'pb-24 md:pb-32 overflow-y-auto overflow-x-hidden custom-scrollbar'

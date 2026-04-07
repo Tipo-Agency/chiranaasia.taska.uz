@@ -23,6 +23,8 @@ interface ModuleCreateDropdownProps {
   disabled?: boolean;
   /** Подсказка на кнопке */
   label?: string;
+  /** Компактная кнопка для верхней панели */
+  buttonSize?: 'md' | 'sm';
 }
 
 export const ModuleCreateDropdown: React.FC<ModuleCreateDropdownProps> = ({
@@ -31,6 +33,7 @@ export const ModuleCreateDropdown: React.FC<ModuleCreateDropdownProps> = ({
   align = 'right',
   disabled = false,
   label = 'Создать',
+  buttonSize = 'md',
 }) => {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -52,6 +55,7 @@ export const ModuleCreateDropdown: React.FC<ModuleCreateDropdownProps> = ({
         accent={accent}
         label={label}
         disabled={disabled}
+        size={buttonSize}
         onClick={() => setOpen((o) => !o)}
       />
 

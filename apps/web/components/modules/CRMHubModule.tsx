@@ -1,5 +1,4 @@
 import React, { useLayoutEffect, useMemo } from 'react';
-import { BarChart3, Briefcase, MessageCircle } from 'lucide-react';
 import {
   Deal,
   Client,
@@ -82,32 +81,23 @@ export const CRMHubModule: React.FC<CRMHubModuleProps> = ({
       return () => setLeading(null);
     }
     const activeBox = 'bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-300';
-    const idleBox = 'text-gray-500 dark:text-gray-400';
+    const idleBox = 'text-gray-600 dark:text-gray-400';
     setLeading(
-      <div className="flex items-center gap-1 shrink-0" role="tablist" aria-label="CRM">
+      <div className="flex items-center gap-0.5 sm:gap-1 shrink-0 flex-wrap sm:flex-nowrap" role="tablist" aria-label="CRM">
         {options.map((o) => {
           const active = effectiveTab === o.value;
-          const icon =
-            o.value === 'funnel' ? (
-              <BarChart3 size={17} />
-            ) : o.value === 'chats' ? (
-              <MessageCircle size={17} />
-            ) : (
-              <Briefcase size={17} />
-            );
           return (
             <button
               key={o.value}
               type="button"
               role="tab"
               aria-selected={active}
-              title={o.label}
               onClick={() => onTabChange(o.value)}
-              className={`h-8 w-8 rounded-xl flex items-center justify-center shrink-0 transition-colors ${
-                active ? activeBox : idleBox + ' hover:bg-gray-100 dark:hover:bg-[#252525]'
+              className={`px-2 sm:px-2.5 py-1 rounded-lg text-[11px] sm:text-xs font-medium whitespace-nowrap shrink-0 transition-colors ${
+                active ? activeBox : `${idleBox} hover:bg-gray-100 dark:hover:bg-[#252525]`
               }`}
             >
-              {icon}
+              {o.label}
             </button>
           );
         })}

@@ -2,7 +2,7 @@ import React, { useState, useEffect, useLayoutEffect, useRef } from 'react';
 import { TableCollection, User } from '../types';
 import { hasPermission } from '../utils/permissions';
 import { DynamicIcon } from './AppIcons';
-import { Instagram, Archive, Layers, Edit2, Trash2, LayoutGrid, List } from 'lucide-react';
+import { Instagram, Archive, Layers, Edit2, Trash2 } from 'lucide-react';
 import { ModulePageShell, MODULE_PAGE_GUTTER, ModuleCreateIconButton } from './ui';
 import { useAppToolbar } from '../contexts/AppToolbarContext';
 
@@ -73,14 +73,14 @@ export const SpacesTabsView: React.FC<SpacesTabsViewProps> = ({
 
   useLayoutEffect(() => {
     const indigo = 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300';
-    const idle = 'text-gray-500 dark:text-gray-400';
-    const types: { id: SpaceType; title: string; icon: React.ReactNode }[] = [
-      { id: 'content-plan', title: 'Контент планы', icon: <Instagram size={17} /> },
-      { id: 'backlog', title: 'Бэклог', icon: <Archive size={17} /> },
-      { id: 'functionality', title: 'Функционал', icon: <Layers size={17} /> },
+    const idle = 'text-gray-600 dark:text-gray-400';
+    const types: { id: SpaceType; label: string }[] = [
+      { id: 'content-plan', label: 'Контент' },
+      { id: 'backlog', label: 'Бэклог' },
+      { id: 'functionality', label: 'Функционал' },
     ];
     setLeading(
-      <div className="flex items-center gap-1 shrink-0" role="tablist" aria-label="Тип пространства">
+      <div className="flex items-center gap-0.5 sm:gap-1 shrink-0 flex-wrap sm:flex-nowrap" role="tablist" aria-label="Тип пространства">
         {types.map((t) => {
           const active = activeTab === t.id;
           return (
@@ -89,22 +89,22 @@ export const SpacesTabsView: React.FC<SpacesTabsViewProps> = ({
               type="button"
               role="tab"
               aria-selected={active}
-              title={t.title}
+              title={getTypeLabel(t.id)}
               onClick={() => setActiveTab(t.id)}
-              className={`h-8 w-8 rounded-xl flex items-center justify-center shrink-0 transition-colors ${
+              className={`px-2 sm:px-2.5 py-1 rounded-lg text-[11px] sm:text-xs font-medium whitespace-nowrap shrink-0 transition-colors ${
                 active ? indigo : `${idle} hover:bg-gray-100 dark:hover:bg-[#252525]`
               }`}
             >
-              {t.icon}
+              {t.label}
             </button>
           );
         })}
       </div>
     );
     setModule(
-      <div className="flex items-center gap-2 shrink-0">
+      <div className="flex items-center gap-1.5 shrink-0">
         <span
-          className="text-xs text-gray-500 dark:text-gray-400 tabular-nums max-w-[4rem] truncate hidden sm:inline"
+          className="text-[11px] text-gray-500 dark:text-gray-400 tabular-nums hidden sm:inline"
           title={`${getTypeLabel(activeTab)}: ${currentSpaces.length}`}
         >
           {currentSpaces.length}
@@ -112,31 +112,30 @@ export const SpacesTabsView: React.FC<SpacesTabsViewProps> = ({
         <div className="flex items-center rounded-lg border border-gray-200 dark:border-[#333] p-0.5 gap-0.5">
           <button
             type="button"
-            title="Плитка"
             aria-pressed={viewMode === 'grid'}
             onClick={() => setViewMode('grid')}
-            className={`p-1.5 rounded-md transition-colors ${
+            className={`px-2 py-0.5 rounded-md text-[11px] font-medium transition-colors ${
               viewMode === 'grid' ? indigo : `${idle} hover:bg-gray-100 dark:hover:bg-[#252525]`
             }`}
           >
-            <LayoutGrid size={16} />
+            Плитка
           </button>
           <button
             type="button"
-            title="Список"
             aria-pressed={viewMode === 'list'}
             onClick={() => setViewMode('list')}
-            className={`p-1.5 rounded-md transition-colors ${
+            className={`px-2 py-0.5 rounded-md text-[11px] font-medium transition-colors ${
               viewMode === 'list' ? indigo : `${idle} hover:bg-gray-100 dark:hover:bg-[#252525]`
             }`}
           >
-            <List size={16} />
+            Список
           </button>
         </div>
         {hasPermission(currentUser, 'settings.general') && (
           <ModuleCreateIconButton
             accent="indigo"
             label="Создать пространство"
+            size="sm"
             onClick={() => onCreateTable(activeTab)}
           />
         )}
@@ -151,7 +150,7 @@ export const SpacesTabsView: React.FC<SpacesTabsViewProps> = ({
   return (
     <ModulePageShell>
       <div className="flex-1 overflow-y-auto overflow-x-hidden custom-scrollbar min-h-0">
-        <div className={`${MODULE_PAGE_GUTTER} pt-3 py-4 pb-24 md:pb-32`}>
+        <div className={`${MODULE_PAGE_GUTTER} pt-1 py-2 pb-24 md:pb-32`}>
           {currentSpaces.length === 0 ? (
             <div className="text-center py-20">
               <div className="text-gray-400 dark:text-gray-500 mb-4 inline-block">

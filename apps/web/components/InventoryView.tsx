@@ -5,7 +5,6 @@ import {
   Package,
   ArrowLeftRight,
   ClipboardCheck,
-  BarChart3,
   Upload,
   X,
 } from 'lucide-react';
@@ -397,14 +396,14 @@ const InventoryView: React.FC<InventoryViewProps> = ({
   useLayoutEffect(() => {
     const em = 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300';
     const idle = 'text-gray-500 dark:text-gray-400';
-    const tabs: { id: typeof activeTab; title: string; node: React.ReactNode }[] = [
-      { id: 'balances', title: 'Остатки', node: <BarChart3 size={17} /> },
-      { id: 'items', title: 'Номенклатура', node: <Package size={17} /> },
-      { id: 'movements', title: 'Журнал', node: <ArrowLeftRight size={17} /> },
-      { id: 'revisions', title: 'Ревизии', node: <ClipboardCheck size={17} /> },
+    const tabs: { id: typeof activeTab; label: string }[] = [
+      { id: 'balances', label: 'Остатки' },
+      { id: 'items', label: 'Номенклатура' },
+      { id: 'movements', label: 'Журнал' },
+      { id: 'revisions', label: 'Ревизии' },
     ];
     setLeading(
-      <div className="flex items-center gap-1 shrink-0" role="tablist" aria-label="Склад">
+      <div className="flex items-center gap-0.5 sm:gap-1 shrink-0 flex-wrap sm:flex-nowrap" role="tablist" aria-label="Склад">
         {tabs.map((t) => {
           const on = activeTab === t.id;
           return (
@@ -413,13 +412,12 @@ const InventoryView: React.FC<InventoryViewProps> = ({
               type="button"
               role="tab"
               aria-selected={on}
-              title={t.title}
               onClick={() => setActiveTab(t.id)}
-              className={`h-8 w-8 rounded-xl flex items-center justify-center shrink-0 transition-colors ${
+              className={`px-2 sm:px-2.5 py-1 rounded-lg text-[11px] sm:text-xs font-medium whitespace-nowrap shrink-0 transition-colors ${
                 on ? em : `${idle} hover:bg-gray-100 dark:hover:bg-[#252525]`
               }`}
             >
-              {t.node}
+              {t.label}
             </button>
           );
         })}
@@ -441,6 +439,8 @@ const InventoryView: React.FC<InventoryViewProps> = ({
         />
         <ModuleCreateDropdown
           accent="emerald"
+          align="left"
+          buttonSize="sm"
           items={[
             {
               id: 'wh',
@@ -508,7 +508,7 @@ const InventoryView: React.FC<InventoryViewProps> = ({
   return (
     <ModulePageShell>
       <div className="flex-1 overflow-y-auto custom-scrollbar min-h-0">
-        <div className={`${MODULE_PAGE_GUTTER} pt-3 pb-20`}>
+        <div className={`${MODULE_PAGE_GUTTER} pt-1 pb-20`}>
           {activeWarehouses.length === 0 && (
             <div className="rounded-2xl border border-emerald-200/70 dark:border-emerald-900/40 bg-emerald-50/60 dark:bg-emerald-950/20 p-4 sm:p-5 mb-4">
               <p className="text-sm font-semibold text-emerald-900 dark:text-emerald-100">

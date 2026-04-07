@@ -7,8 +7,6 @@ import {
   Briefcase,
   FileText,
   Network,
-  LayoutDashboard,
-  Users,
   X,
   Save,
   AlertCircle,
@@ -302,17 +300,17 @@ export const WorkdeskView: React.FC<WorkdeskViewProps> = ({
 
   useLayoutEffect(() => {
     const activeBox = 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300';
-    const idleBox = 'text-gray-500 dark:text-gray-400';
-    const tabs: { id: WorkdeskTab; title: string; node: React.ReactNode }[] = [
-      { id: 'dashboard', title: 'Дашборд', node: <LayoutDashboard size={17} /> },
-      { id: 'weekly', title: 'Планы', node: <Calendar size={17} /> },
-      { id: 'tasks', title: 'Задачи', node: <CheckSquare size={17} /> },
-      { id: 'deals', title: 'Сделки', node: <Briefcase size={17} /> },
-      { id: 'meetings', title: 'Календарь', node: <Users size={17} /> },
-      { id: 'documents', title: 'Документы', node: <FileText size={17} /> },
+    const idleBox = 'text-gray-600 dark:text-gray-400';
+    const tabs: { id: WorkdeskTab; label: string }[] = [
+      { id: 'dashboard', label: 'Дашборд' },
+      { id: 'weekly', label: 'Планы' },
+      { id: 'tasks', label: 'Задачи' },
+      { id: 'deals', label: 'Сделки' },
+      { id: 'meetings', label: 'Календарь' },
+      { id: 'documents', label: 'Документы' },
     ];
     setLeading(
-      <div className="flex items-center gap-1 shrink-0" role="tablist" aria-label="Рабочий стол">
+      <div className="flex items-center gap-0.5 sm:gap-1 shrink-0 flex-wrap sm:flex-nowrap" role="tablist" aria-label="Рабочий стол">
         {tabs.map((t) => {
           const active = activeTab === t.id;
           return (
@@ -321,13 +319,12 @@ export const WorkdeskView: React.FC<WorkdeskViewProps> = ({
               type="button"
               role="tab"
               aria-selected={active}
-              title={t.title}
               onClick={() => setActiveTab(t.id)}
-              className={`h-8 w-8 rounded-xl flex items-center justify-center shrink-0 transition-colors ${
-                active ? activeBox : idleBox + ' hover:bg-gray-100 dark:hover:bg-[#252525]'
+              className={`px-2 sm:px-2.5 py-1 rounded-lg text-[11px] sm:text-xs font-medium whitespace-nowrap transition-colors shrink-0 ${
+                active ? activeBox : `${idleBox} hover:bg-gray-100 dark:hover:bg-[#252525]`
               }`}
             >
-              {t.node}
+              {t.label}
             </button>
           );
         })}
@@ -337,6 +334,8 @@ export const WorkdeskView: React.FC<WorkdeskViewProps> = ({
       <ModuleCreateDropdown
         accent="indigo"
         label="Создать"
+        align="left"
+        buttonSize="sm"
         items={[
           {
             id: 'create-task',
@@ -408,7 +407,7 @@ export const WorkdeskView: React.FC<WorkdeskViewProps> = ({
   return (
     <ModulePageShell>
       <div className="flex-1 min-h-0 overflow-hidden">
-        <div className={`${MODULE_PAGE_GUTTER} pt-3 pb-24 md:pb-32 h-full overflow-y-auto overflow-x-hidden custom-scrollbar space-y-4`}>
+        <div className={`${MODULE_PAGE_GUTTER} pt-1 pb-24 md:pb-32 h-full overflow-y-auto overflow-x-hidden custom-scrollbar space-y-4`}>
           {activeTab === 'dashboard' && (
             <div className="space-y-4">
               <StatsCards
