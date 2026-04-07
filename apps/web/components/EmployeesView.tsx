@@ -1,8 +1,9 @@
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useLayoutEffect, useCallback } from 'react';
 import { EmployeeInfo, User, OrgPosition, Department } from '../types';
-import { UserCheck, Search, Trash2, Edit2, Calendar, FileText, X, Save, User as UserIcon, Phone, Send, Cake, Network, Building2, UserPlus, ChevronDown, ChevronRight, FolderTree } from 'lucide-react';
-import { ModuleCreateDropdown, ModulePageShell, ModulePageHeader, ModuleSegmentedControl, MODULE_PAGE_GUTTER } from './ui';
+import { Search, Trash2, Edit2, Calendar, FileText, X, Save, User as UserIcon, Phone, Send, Cake, Network, Building2, UserPlus, ChevronDown, ChevronRight, FolderTree } from 'lucide-react';
+import { ModuleCreateDropdown, ModulePageShell, MODULE_PAGE_GUTTER } from './ui';
+import { useAppToolbar } from '../contexts/AppToolbarContext';
 import { TaskSelect } from './TaskSelect';
 import { getDefaultAvatarForId } from '../constants/avatars';
 import { formatDate, normalizeDateForInput } from '../utils/dateUtils';
@@ -24,6 +25,7 @@ const EmployeesView: React.FC<EmployeesViewProps> = ({
     departments = [], orgPositions = [], 
     onSave, onDelete, onSavePosition, onDeletePosition 
 }) => {
+  const { setLeading, setModule } = useAppToolbar();
   const [activeTab, setActiveTab] = useState<'cards' | 'orgchart' | 'structure'>('cards');
   
   // Card Modals
@@ -60,13 +62,13 @@ const EmployeesView: React.FC<EmployeesViewProps> = ({
   const getEmployeeUser = (uid: string) => users.find(u => u.id === uid);
 
   // --- Handlers Cards ---
-  const handleOpenCreate = () => {
+  const handleOpenCreate = useCallback(() => {
       setEditingInfo(null);
       setUserId(users[0]?.id || '');
       setOrgPositionId('');
       setPosition(''); setHireDate(''); setBirthDate('');
       setIsModalOpen(true);
-  };
+  }, [users]);
 
   const handleOpenEdit = (info: EmployeeInfo) => {
       const byLink = info.orgPositionId ? orgPositions.find((p) => p.id === info.orgPositionId) : undefined;
@@ -137,12 +139,12 @@ const EmployeesView: React.FC<EmployeesViewProps> = ({
   };
 
   // --- Handlers OrgChart ---
-  const handleOpenPosCreate = () => {
+  const handleOpenPosCreate = useCallback(() => {
       setEditingPos(null);
       setPosTitle(''); setPosDep(''); setPosManager(''); setPosHolder(''); setPosOrder(0);
       setPosTaskMode('round_robin');
       setIsPosModalOpen(true);
-  };
+  }, []);
 
   const handleOpenPosEdit = (pos: OrgPosition) => {
       setEditingPos(pos);
@@ -531,51 +533,63 @@ const EmployeesView: React.FC<EmployeesViewProps> = ({
       );
   };
 
+  useLayoutEffect(() => {
+    const orange = 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300';
+    const idle = 'text-gray-600 dark:text-gray-400';
+    const tabs: { id: 'cards' | 'orgchart' | 'structure'; label: string }[] = [
+      { id: 'cards', label: 'Карточки' },
+      { id: 'orgchart', label: 'Оргсхема' },
+      { id: 'structure', label: 'Структура' },
+    ];
+    setLeading(
+      <div className="flex items-center gap-0.5 shrink-0 flex-wrap sm:flex-nowrap" role="tablist" aria-label="Сотрудники">
+        {tabs.map((t) => (
+          <button
+            key={t.id}
+            type="button"
+            role="tab"
+            aria-selected={activeTab === t.id}
+            onClick={() => setActiveTab(t.id)}
+            className={`px-2 sm:px-2.5 py-1 rounded-lg text-[11px] sm:text-xs font-medium whitespace-nowrap transition-colors ${
+              activeTab === t.id ? orange : `${idle} hover:bg-gray-100 dark:hover:bg-[#252525]`
+            }`}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
+    );
+    setModule(
+      <ModuleCreateDropdown
+        accent="orange"
+        align="left"
+        buttonSize="sm"
+        items={[
+          {
+            id: 'employee',
+            label: 'Сотрудник',
+            icon: UserPlus,
+            onClick: handleOpenCreate,
+          },
+          {
+            id: 'position',
+            label: 'Должность в оргсхеме',
+            icon: Building2,
+            onClick: handleOpenPosCreate,
+          },
+        ]}
+      />
+    );
+    return () => {
+      setLeading(null);
+      setModule(null);
+    };
+  }, [activeTab, setLeading, setModule, handleOpenCreate, handleOpenPosCreate]);
+
   return (
     <ModulePageShell>
-      <div className={`${MODULE_PAGE_GUTTER} pt-6 md:pt-8 flex-shrink-0`}>
-        <div className="mb-6 space-y-5">
-          <ModulePageHeader
-            accent="orange"
-            icon={<UserCheck size={24} strokeWidth={2} />}
-            title="Сотрудники"
-            description="Управление сотрудниками и организационной структурой"
-            tabs={
-              <ModuleSegmentedControl
-                variant="neutral"
-                value={activeTab}
-                onChange={(v) => setActiveTab(v as 'cards' | 'orgchart' | 'structure')}
-                options={[
-                  { value: 'cards', label: 'Карточки' },
-                  { value: 'orgchart', label: 'Оргсхема' },
-                  { value: 'structure', label: 'Структура' },
-                ]}
-              />
-            }
-            controls={
-              <ModuleCreateDropdown
-                accent="orange"
-                items={[
-                  {
-                    id: 'employee',
-                    label: 'Сотрудник',
-                    icon: UserPlus,
-                    onClick: handleOpenCreate,
-                  },
-                  {
-                    id: 'position',
-                    label: 'Должность в оргсхеме',
-                    icon: Building2,
-                    onClick: handleOpenPosCreate,
-                  },
-                ]}
-              />
-            }
-          />
-        </div>
-      </div>
        <div className="flex-1 min-h-0 overflow-hidden">
-         <div className={`${MODULE_PAGE_GUTTER} pb-20 h-full overflow-y-auto custom-scrollbar`}>
+         <div className={`${MODULE_PAGE_GUTTER} pt-1 pb-20 h-full overflow-y-auto custom-scrollbar`}>
        {activeTab === 'cards' && renderCards()}
        {activeTab === 'orgchart' && renderOrgChart()}
        {activeTab === 'structure' && renderStructure()}

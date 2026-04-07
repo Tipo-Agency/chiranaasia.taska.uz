@@ -23,6 +23,36 @@ import { TableCollection, User } from '../types';
 import { LogoIcon, DynamicIcon } from './AppIcons';
 import { hasPermission } from '../utils/permissions';
 
+/** Подсветка активной иконки в стиле чипов верхнего меню */
+const ICON_ACTIVE: Record<string, string> = {
+  indigo: 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300',
+  violet: 'bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-300',
+  emerald: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300',
+  blue: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300',
+  orange: 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300',
+  slate: 'bg-slate-100 text-slate-700 dark:bg-slate-900/30 dark:text-slate-300',
+};
+
+function NavIcon({
+  active,
+  accent,
+  children,
+}: {
+  active: boolean;
+  accent: keyof typeof ICON_ACTIVE;
+  children: React.ReactNode;
+}) {
+  return (
+    <span
+      className={`flex shrink-0 items-center justify-center w-8 h-8 rounded-xl transition-colors ${
+        active ? ICON_ACTIVE[accent] : 'text-gray-500 dark:text-gray-400 group-hover:text-gray-700 dark:group-hover:text-gray-200'
+      }`}
+    >
+      {children}
+    </span>
+  );
+}
+
 export interface SidebarProps {
   isOpen: boolean; // Mobile state
   onClose: () => void; // Mobile close handler
@@ -132,10 +162,11 @@ const Sidebar: React.FC<SidebarProps> = ({
             {can('core.home') && (
             <div 
                 onClick={() => handleNav(() => onNavigate('home'))}
-                className={`flex items-center ${isCollapsed ? 'justify-center' : 'gap-2'} ${isCollapsed ? 'px-2' : 'px-3'} py-1.5 rounded cursor-pointer transition-colors ${currentView === 'home' ? 'bg-notion-hover dark:bg-[#252525] text-notion-text dark:text-white font-medium' : 'text-notion-text/70 dark:text-gray-400 hover:bg-notion-hover dark:hover:bg-[#252525] hover:text-notion-text dark:hover:text-gray-200'}`}
+                className={`group flex items-center ${isCollapsed ? 'justify-center' : 'gap-2'} ${isCollapsed ? 'px-2' : 'px-3'} py-1.5 rounded-lg cursor-pointer transition-colors ${currentView === 'home' ? 'text-gray-900 dark:text-white' : 'text-notion-text/70 dark:text-gray-400 hover:bg-notion-hover dark:hover:bg-[#252525] hover:text-notion-text dark:hover:text-gray-200'}`}
                 title={isCollapsed ? "Рабочий стол" : ""}
             >
-            <Home size={18} /> {!isCollapsed && <span className="text-sm">Рабочий стол</span>}
+            <NavIcon active={currentView === 'home'} accent="indigo"><Home size={18} /></NavIcon>
+            {!isCollapsed && <span className={`text-sm ${currentView === 'home' ? 'font-semibold' : ''}`}>Рабочий стол</span>}
             </div>
             )}
             
@@ -143,10 +174,11 @@ const Sidebar: React.FC<SidebarProps> = ({
             {can('core.tasks') && (
             <div 
                 onClick={() => handleNav(() => onNavigate('tasks'))}
-                className={`flex items-center ${isCollapsed ? 'justify-center' : 'gap-2'} ${isCollapsed ? 'px-2' : 'px-3'} py-1.5 rounded cursor-pointer transition-colors ${currentView === 'tasks' ? 'bg-notion-hover dark:bg-[#252525] text-notion-text dark:text-white font-medium' : 'text-notion-text/70 dark:text-gray-400 hover:bg-notion-hover dark:hover:bg-[#252525] hover:text-notion-text dark:hover:text-gray-200'}`}
+                className={`group flex items-center ${isCollapsed ? 'justify-center' : 'gap-2'} ${isCollapsed ? 'px-2' : 'px-3'} py-1.5 rounded-lg cursor-pointer transition-colors ${currentView === 'tasks' ? 'text-gray-900 dark:text-white' : 'text-notion-text/70 dark:text-gray-400 hover:bg-notion-hover dark:hover:bg-[#252525] hover:text-notion-text dark:hover:text-gray-200'}`}
                 title={isCollapsed ? "Задачи" : ""}
             >
-                <CheckSquare size={18} /> {!isCollapsed && <span className="text-sm">Задачи</span>}
+                <NavIcon active={currentView === 'tasks'} accent="indigo"><CheckSquare size={18} /></NavIcon>
+                {!isCollapsed && <span className={`text-sm ${currentView === 'tasks' ? 'font-semibold' : ''}`}>Задачи</span>}
             </div>
             )}
 
@@ -154,10 +186,11 @@ const Sidebar: React.FC<SidebarProps> = ({
             {(can('crm.sales_funnel') || can('crm.client_chats') || can('crm.clients')) && (
             <div 
                 onClick={() => handleNav(() => onNavigate('sales-funnel'))}
-                className={`flex items-center ${isCollapsed ? 'justify-center' : 'gap-2'} ${isCollapsed ? 'px-2' : 'px-3'} py-1.5 rounded cursor-pointer transition-colors ${currentView === 'sales-funnel' ? 'bg-notion-hover dark:bg-[#252525] text-notion-text dark:text-white font-medium' : 'text-notion-text/70 dark:text-gray-400 hover:bg-notion-hover dark:hover:bg-[#252525] hover:text-notion-text dark:hover:text-gray-200'}`}
+                className={`group flex items-center ${isCollapsed ? 'justify-center' : 'gap-2'} ${isCollapsed ? 'px-2' : 'px-3'} py-1.5 rounded-lg cursor-pointer transition-colors ${currentView === 'sales-funnel' ? 'text-gray-900 dark:text-white' : 'text-notion-text/70 dark:text-gray-400 hover:bg-notion-hover dark:hover:bg-[#252525] hover:text-notion-text dark:hover:text-gray-200'}`}
                 title={isCollapsed ? "Воронка продаж" : ""}
             >
-                <BarChart3 size={18} /> {!isCollapsed && <span className="text-sm">Воронка продаж</span>}
+                <NavIcon active={currentView === 'sales-funnel'} accent="violet"><BarChart3 size={18} /></NavIcon>
+                {!isCollapsed && <span className={`text-sm ${currentView === 'sales-funnel' ? 'font-semibold' : ''}`}>Воронка продаж</span>}
             </div>
             )}
 
@@ -165,10 +198,11 @@ const Sidebar: React.FC<SidebarProps> = ({
             {can('finance.finance') && (
             <div 
                 onClick={() => handleNav(() => onNavigate('finance'))}
-                className={`flex items-center ${isCollapsed ? 'justify-center' : 'gap-2'} ${isCollapsed ? 'px-2' : 'px-3'} py-1.5 rounded cursor-pointer transition-colors ${currentView === 'finance' ? 'bg-notion-hover dark:bg-[#252525] text-notion-text dark:text-white font-medium' : 'text-notion-text/70 dark:text-gray-400 hover:bg-notion-hover dark:hover:bg-[#252525] hover:text-notion-text dark:hover:text-gray-200'}`}
+                className={`group flex items-center ${isCollapsed ? 'justify-center' : 'gap-2'} ${isCollapsed ? 'px-2' : 'px-3'} py-1.5 rounded-lg cursor-pointer transition-colors ${currentView === 'finance' ? 'text-gray-900 dark:text-white' : 'text-notion-text/70 dark:text-gray-400 hover:bg-notion-hover dark:hover:bg-[#252525] hover:text-notion-text dark:hover:text-gray-200'}`}
                 title={isCollapsed ? "Фин. планирование" : ""}
             >
-                <Wallet size={18} /> {!isCollapsed && <span className="text-sm">Фин. планирование</span>}
+                <NavIcon active={currentView === 'finance'} accent="emerald"><Wallet size={18} /></NavIcon>
+                {!isCollapsed && <span className={`text-sm ${currentView === 'finance' ? 'font-semibold' : ''}`}>Фин. планирование</span>}
             </div>
             )}
 
@@ -177,52 +211,60 @@ const Sidebar: React.FC<SidebarProps> = ({
               <div className="space-y-0.5">
                 <div
                   onClick={() => handleNav(() => onNavigate('business-processes'))}
-                  className={`flex items-center ${isCollapsed ? 'justify-center' : 'gap-2'} ${isCollapsed ? 'px-2' : 'px-3'} py-1.5 rounded cursor-pointer transition-colors ${
+                  className={`group flex items-center ${isCollapsed ? 'justify-center' : 'gap-2'} ${isCollapsed ? 'px-2' : 'px-3'} py-1.5 rounded-lg cursor-pointer transition-colors ${
                     currentView === 'business-processes'
-                      ? 'bg-notion-hover dark:bg-[#252525] text-notion-text dark:text-white font-medium'
+                      ? 'text-gray-900 dark:text-white'
                       : 'text-notion-text/70 dark:text-gray-400 hover:bg-notion-hover dark:hover:bg-[#252525] hover:text-notion-text dark:hover:text-gray-200'
                   }`}
                   title={isCollapsed ? 'Бизнес-процессы' : ''}
                 >
-                  <Network size={18} /> {!isCollapsed && <span className="text-sm">Бизнес-процессы</span>}
+                  <NavIcon active={currentView === 'business-processes'} accent="blue"><Network size={18} /></NavIcon>
+                  {!isCollapsed && (
+                    <span className={`text-sm ${currentView === 'business-processes' ? 'font-semibold' : ''}`}>Бизнес-процессы</span>
+                  )}
                 </div>
                 <div
                   onClick={() => handleNav(() => onNavigate('inventory'))}
-                  className={`flex items-center ${isCollapsed ? 'justify-center' : 'gap-2'} ${isCollapsed ? 'px-2' : 'pl-7 pr-3'} py-1.5 rounded cursor-pointer transition-colors ${
+                  className={`group flex items-center ${isCollapsed ? 'justify-center' : 'gap-2'} ${isCollapsed ? 'px-2' : 'px-3'} py-1.5 rounded-lg cursor-pointer transition-colors ${
                     currentView === 'inventory'
-                      ? 'bg-notion-hover dark:bg-[#252525] text-notion-text dark:text-white font-medium'
+                      ? 'text-gray-900 dark:text-white'
                       : 'text-notion-text/70 dark:text-gray-400 hover:bg-notion-hover dark:hover:bg-[#252525] hover:text-notion-text dark:hover:text-gray-200'
                   }`}
                   title={isCollapsed ? 'Склад' : ''}
                 >
-                  <Package size={17} className="shrink-0" /> {!isCollapsed && <span className="text-sm">Склад</span>}
+                  <NavIcon active={currentView === 'inventory'} accent="emerald"><Package size={18} className="shrink-0" /></NavIcon>
+                  {!isCollapsed && <span className={`text-sm ${currentView === 'inventory' ? 'font-semibold' : ''}`}>Склад</span>}
                 </div>
               </div>
             )}
             {can('org.bpm') && !can('org.inventory') && (
               <div
                 onClick={() => handleNav(() => onNavigate('business-processes'))}
-                className={`flex items-center ${isCollapsed ? 'justify-center' : 'gap-2'} ${isCollapsed ? 'px-2' : 'px-3'} py-1.5 rounded cursor-pointer transition-colors ${
+                className={`group flex items-center ${isCollapsed ? 'justify-center' : 'gap-2'} ${isCollapsed ? 'px-2' : 'px-3'} py-1.5 rounded-lg cursor-pointer transition-colors ${
                   currentView === 'business-processes'
-                    ? 'bg-notion-hover dark:bg-[#252525] text-notion-text dark:text-white font-medium'
+                    ? 'text-gray-900 dark:text-white'
                     : 'text-notion-text/70 dark:text-gray-400 hover:bg-notion-hover dark:hover:bg-[#252525] hover:text-notion-text dark:hover:text-gray-200'
                 }`}
                 title={isCollapsed ? 'Бизнес-процессы' : ''}
               >
-                <Network size={18} /> {!isCollapsed && <span className="text-sm">Бизнес-процессы</span>}
+                <NavIcon active={currentView === 'business-processes'} accent="blue"><Network size={18} /></NavIcon>
+                {!isCollapsed && (
+                  <span className={`text-sm ${currentView === 'business-processes' ? 'font-semibold' : ''}`}>Бизнес-процессы</span>
+                )}
               </div>
             )}
             {!can('org.bpm') && can('org.inventory') && (
               <div
                 onClick={() => handleNav(() => onNavigate('inventory'))}
-                className={`flex items-center ${isCollapsed ? 'justify-center' : 'gap-2'} ${isCollapsed ? 'px-2' : 'px-3'} py-1.5 rounded cursor-pointer transition-colors ${
+                className={`group flex items-center ${isCollapsed ? 'justify-center' : 'gap-2'} ${isCollapsed ? 'px-2' : 'px-3'} py-1.5 rounded-lg cursor-pointer transition-colors ${
                   currentView === 'inventory'
-                    ? 'bg-notion-hover dark:bg-[#252525] text-notion-text dark:text-white font-medium'
+                    ? 'text-gray-900 dark:text-white'
                     : 'text-notion-text/70 dark:text-gray-400 hover:bg-notion-hover dark:hover:bg-[#252525] hover:text-notion-text dark:hover:text-gray-200'
                 }`}
                 title={isCollapsed ? 'Склад' : ''}
               >
-                <Package size={18} /> {!isCollapsed && <span className="text-sm">Склад</span>}
+                <NavIcon active={currentView === 'inventory'} accent="emerald"><Package size={18} /></NavIcon>
+                {!isCollapsed && <span className={`text-sm ${currentView === 'inventory' ? 'font-semibold' : ''}`}>Склад</span>}
               </div>
             )}
 
@@ -232,10 +274,11 @@ const Sidebar: React.FC<SidebarProps> = ({
             {can('org.employees') && (
                 <div 
                     onClick={() => handleNav(() => onNavigate('employees'))}
-                    className={`flex items-center ${isCollapsed ? 'justify-center' : 'gap-2'} ${isCollapsed ? 'px-2' : 'px-3'} py-1.5 rounded cursor-pointer transition-colors ${currentView === 'employees' ? 'bg-notion-hover dark:bg-[#252525] text-notion-text dark:text-white font-medium' : 'text-notion-text/70 dark:text-gray-400 hover:bg-notion-hover dark:hover:bg-[#252525] hover:text-notion-text dark:hover:text-gray-200'}`}
+                    className={`group flex items-center ${isCollapsed ? 'justify-center' : 'gap-2'} ${isCollapsed ? 'px-2' : 'px-3'} py-1.5 rounded-lg cursor-pointer transition-colors ${currentView === 'employees' ? 'text-gray-900 dark:text-white' : 'text-notion-text/70 dark:text-gray-400 hover:bg-notion-hover dark:hover:bg-[#252525] hover:text-notion-text dark:hover:text-gray-200'}`}
                     title={isCollapsed ? "Сотрудники" : ""}
                 >
-                    <UserCheck size={18} /> {!isCollapsed && <span className="text-sm">Сотрудники</span>}
+                    <NavIcon active={currentView === 'employees'} accent="orange"><UserCheck size={18} /></NavIcon>
+                    {!isCollapsed && <span className={`text-sm ${currentView === 'employees' ? 'font-semibold' : ''}`}>Сотрудники</span>}
                 </div>
             )}
 
@@ -247,10 +290,11 @@ const Sidebar: React.FC<SidebarProps> = ({
               <div className="space-y-0.5 mb-3">
                 <div 
                   onClick={() => handleNav(() => onNavigateToType?.('content-plan'))}
-                  className={`flex items-center ${isCollapsed ? 'justify-center' : 'gap-2'} ${isCollapsed ? 'px-2' : 'px-3'} py-1.5 rounded cursor-pointer transition-colors ${(currentView === 'spaces' && activeSpaceTab === 'content-plan') || (currentView === 'table' && activeTableId && tables.find(t => t.id === activeTableId)?.type === 'content-plan') ? 'bg-notion-hover dark:bg-[#252525] text-notion-text dark:text-white font-medium' : 'text-notion-text/70 dark:text-gray-400 hover:bg-notion-hover dark:hover:bg-[#252525] hover:text-notion-text dark:hover:text-gray-200'}`}
+                  className={`group flex items-center ${isCollapsed ? 'justify-center' : 'gap-2'} ${isCollapsed ? 'px-2' : 'px-3'} py-1.5 rounded-lg cursor-pointer transition-colors ${(currentView === 'spaces' && activeSpaceTab === 'content-plan') || (currentView === 'table' && activeTableId && tables.find(t => t.id === activeTableId)?.type === 'content-plan') ? 'text-gray-900 dark:text-white' : 'text-notion-text/70 dark:text-gray-400 hover:bg-notion-hover dark:hover:bg-[#252525] hover:text-notion-text dark:hover:text-gray-200'}`}
                   title={isCollapsed ? 'Пространство' : ''}
                 >
-                  <Layers size={isCollapsed ? 18 : 16} /> {!isCollapsed && <span className="text-sm">Пространство</span>}
+                  <NavIcon active={(currentView === 'spaces' && activeSpaceTab === 'content-plan') || (currentView === 'table' && activeTableId && tables.find(t => t.id === activeTableId)?.type === 'content-plan')} accent="indigo"><Layers size={isCollapsed ? 18 : 16} /></NavIcon>
+                  {!isCollapsed && <span className={`text-sm ${((currentView === 'spaces' && activeSpaceTab === 'content-plan') || (currentView === 'table' && activeTableId && tables.find(t => t.id === activeTableId)?.type === 'content-plan')) ? 'font-semibold' : ''}`}>Пространство</span>}
                 </div>
               </div>
             )}
@@ -261,12 +305,13 @@ const Sidebar: React.FC<SidebarProps> = ({
         {can('settings.general') && (
             <div className={`${isCollapsed ? 'p-2' : 'p-3'} mt-auto border-t border-notion-border dark:border-[#333] shrink-0 bg-white dark:bg-[#191919]`}>
                 <button 
+                    type="button"
                     onClick={() => { handleNav(() => onOpenSettings()); }}
-                    className={`w-full ${isCollapsed ? 'flex justify-center' : 'text-left flex items-center gap-2'} ${isCollapsed ? 'px-2' : 'px-3'} py-2 rounded cursor-pointer text-sm transition-colors font-medium ${currentView === 'settings' ? 'bg-notion-hover dark:bg-[#252525] text-notion-text dark:text-white' : 'text-notion-text dark:text-gray-300 hover:bg-notion-hover dark:hover:bg-[#252525]'}`}
+                    className={`group w-full ${isCollapsed ? 'flex justify-center' : 'text-left flex items-center gap-2'} ${isCollapsed ? 'px-2' : 'px-3'} py-2 rounded-lg cursor-pointer text-sm transition-colors ${currentView === 'settings' ? 'text-gray-900 dark:text-white' : 'text-notion-text dark:text-gray-300 hover:bg-notion-hover dark:hover:bg-[#252525]'}`}
                     title={isCollapsed ? "Настройки" : ""}
                 >
-                    <Settings size={18} />
-                    {!isCollapsed && <span>Настройки</span>}
+                    <NavIcon active={currentView === 'settings'} accent="slate"><Settings size={18} /></NavIcon>
+                    {!isCollapsed && <span className={currentView === 'settings' ? 'font-semibold' : ''}>Настройки</span>}
                 </button>
             </div>
         )}

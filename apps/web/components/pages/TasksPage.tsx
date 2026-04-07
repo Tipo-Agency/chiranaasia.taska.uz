@@ -6,7 +6,7 @@
  * - Не содержит бизнес-логику
  * - Использует переиспользуемые компоненты
  */
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useCallback, useLayoutEffect } from 'react';
 import {
   Task,
   User,
@@ -17,13 +17,9 @@ import {
   BusinessProcess,
   ViewMode,
 } from '../../types';
-import { ModulePageShell, MODULE_PAGE_GUTTER } from '../ui';
-import {
-  TasksHeader,
-  ViewModeToggle,
-  TasksFilters,
-  TasksList,
-} from '../features/tasks';
+import { ModulePageShell, MODULE_PAGE_GUTTER, ModuleFilterIconButton, ModuleCreateIconButton } from '../ui';
+import { TasksFilters } from '../features/tasks';
+import { useAppToolbar } from '../../contexts/AppToolbarContext';
 import TableView from '../TableView';
 import KanbanBoard from '../KanbanBoard';
 import GanttView from '../GanttView';
@@ -60,6 +56,7 @@ export const TasksPage: React.FC<TasksPageProps> = ({
   onOpenTask,
   onCreateTask,
 }) => {
+  const { setLeading, setModule } = useAppToolbar();
   const [viewMode, setViewMode] = useState<ViewMode>(ViewMode.TABLE);
   const [showFilters, setShowFilters] = useState(false);
 
@@ -204,30 +201,67 @@ export const TasksPage: React.FC<TasksPageProps> = ({
     setHideCompleted('hide');
   }, []);
 
+  useLayoutEffect(() => {
+    const indigo = 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300';
+    const idle = 'text-gray-600 dark:text-gray-400';
+    const modes: { id: ViewMode; label: string }[] = [
+      { id: ViewMode.TABLE, label: 'Таблица' },
+      { id: ViewMode.KANBAN, label: 'Канбан' },
+      { id: ViewMode.GANTT, label: 'Гант' },
+    ];
+    setLeading(
+      <div className="flex items-center gap-0.5 shrink-0 flex-wrap" role="tablist" aria-label="Вид задач">
+        {modes.map((m) => (
+          <button
+            key={m.id}
+            type="button"
+            role="tab"
+            aria-selected={viewMode === m.id}
+            onClick={() => setViewMode(m.id)}
+            className={`px-2 sm:px-2.5 py-1 rounded-lg text-[11px] sm:text-xs font-medium whitespace-nowrap transition-colors ${
+              viewMode === m.id ? indigo : `${idle} hover:bg-gray-100 dark:hover:bg-[#252525]`
+            }`}
+          >
+            {m.label}
+          </button>
+        ))}
+      </div>
+    );
+    setModule(
+      <div className="flex items-center gap-1 shrink-0">
+        <ModuleFilterIconButton
+          accent="indigo"
+          active={showFilters || hasActiveFilters}
+          activeCount={activeFiltersCount}
+          onClick={() => setShowFilters((v) => !v)}
+        />
+        <ModuleCreateIconButton accent="indigo" label="Новая задача" size="sm" onClick={onCreateTask} />
+      </div>
+    );
+    return () => {
+      setLeading(null);
+      setModule(null);
+    };
+  }, [
+    viewMode,
+    showFilters,
+    hasActiveFilters,
+    activeFiltersCount,
+    onCreateTask,
+    setLeading,
+    setModule,
+  ]);
+
   return (
     <ModulePageShell className="flex-1 min-h-0 flex flex-col overflow-hidden">
-      <div className={`${MODULE_PAGE_GUTTER} pt-6 md:pt-8 flex-shrink-0`}>
-        <div className="mb-5">
-          <TasksHeader
-            showFilters={showFilters}
-            hasActiveFilters={hasActiveFilters}
-            activeFiltersCount={activeFiltersCount}
-            onToggleFilters={() => setShowFilters(!showFilters)}
-            onCreateTask={onCreateTask}
-            tabs={<ViewModeToggle viewMode={viewMode} onViewModeChange={setViewMode} />}
-          />
+      {showFilters && (
+        <div className={`${MODULE_PAGE_GUTTER} pt-1 pb-2 flex-shrink-0 border-b border-gray-200 dark:border-[#333]`}>
+          <TasksFilters filters={taskFilters} onClear={clearFilters} />
         </div>
-
-        {showFilters && (
-          <TasksFilters
-            filters={taskFilters}
-            onClear={clearFilters}
-          />
-        )}
-      </div>
+      )}
 
       <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
-        <div className={`${MODULE_PAGE_GUTTER} mt-3 flex-1 min-h-0 flex flex-col overflow-hidden pb-4`}>
+        <div className={`${MODULE_PAGE_GUTTER} pt-1 flex-1 min-h-0 flex flex-col overflow-hidden pb-4`}>
           {viewMode === ViewMode.TABLE && (
             <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
             <TableView

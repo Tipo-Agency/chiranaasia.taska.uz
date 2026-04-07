@@ -1,4 +1,4 @@
-import React, { lazy, Suspense } from 'react';
+import React, { lazy, Suspense, useCallback } from 'react';
 import { 
   Task, User, Project, StatusOption, PriorityOption, ActivityLog, 
   Deal, Client, Contract, EmployeeInfo, Meeting, ContentPost, ShootPlan,
@@ -19,7 +19,11 @@ import { MiniMessenger } from './features/chat/MiniMessenger';
 import { PageLayout } from './ui/PageLayout';
 import { Container } from './ui/Container';
 import { RouteFallback } from './ui/RouteFallback';
-import { resolveAssigneesForOrgPosition } from '../utils/orgPositionAssignee';
+import {
+  createEntityFromChat as createEntityFromChatBridge,
+  updateEntityFromChat as updateEntityFromChatBridge,
+  startBusinessProcessFromTemplate as startBusinessProcessFromTemplateBridge,
+} from '../utils/miniMessengerBridge';
 
 /** Тяжёлые экраны подгружаются отдельными чанками (меньше initial JS). */
 const SettingsViewLazy = lazy(() => import('./SettingsView'));
@@ -84,168 +88,73 @@ interface AppRouterProps {
 
 export const AppRouter: React.FC<AppRouterProps> = (props) => {
   const { currentView, activeTable, actions } = props;
-  const createEntityFromChat = async (
-    type: 'task' | 'deal' | 'meeting' | 'doc',
-    title: string
-  ): Promise<{ id: string; label: string } | null> => {
-    const now = new Date();
-    const today = now.toISOString().slice(0, 10);
-    const nowIso = now.toISOString();
-    if (type === 'task') {
-      const task = {
-        id: `chat-task-${Date.now()}`,
-        entityType: 'task',
-        tableId: '',
-        title,
-        status: props.statuses?.[0]?.name || 'Не начато',
-        priority: props.priorities?.[1]?.name || props.priorities?.[0]?.name || 'Средний',
-        assigneeId: props.currentUser.id,
-        projectId: null,
-        startDate: today,
-        endDate: today,
-        description: '',
-        createdByUserId: props.currentUser.id,
-        createdAt: nowIso,
-      };
-      await actions.saveTask(task);
-      return { id: task.id, label: task.title };
-    }
-    if (type === 'deal') {
-      const deal = {
-        id: `chat-deal-${Date.now()}`,
-        title,
-        amount: 0,
-        currency: 'UZS',
-        stage: 'new',
-        assigneeId: props.currentUser.id,
-        createdAt: nowIso,
-      };
-      await actions.saveDeal(deal);
-      return { id: deal.id, label: deal.title };
-    }
-    if (type === 'meeting') {
-      const meeting = {
-        id: `chat-meeting-${Date.now()}`,
-        tableId: 'meetings-system',
-        title,
-        date: today,
-        time: '10:00',
-        participantIds: [props.currentUser.id],
-        summary: '',
-        type: 'work',
-      };
-      await actions.saveMeeting(meeting);
-      return { id: meeting.id, label: meeting.title };
-    }
-    const doc = {
-      id: `chat-doc-${Date.now()}`,
-      tableId: 'docs-system',
-      title,
-      type: 'internal',
-      tags: [],
-      content: '',
-    };
-    await actions.saveDoc(doc);
-    return { id: doc.id, label: doc.title };
+
+  const messengerBridgeDeps = {
+    currentUser: props.currentUser,
+    statuses: props.statuses,
+    priorities: props.priorities,
+    tasks: props.allTasks,
+    deals: props.deals,
+    meetings: props.meetings,
+    docs: props.docs,
+    orgPositions: props.orgPositions,
+    employeeInfos: props.employeeInfos,
+    businessProcesses: props.businessProcesses,
+    actions,
   };
 
-  const updateEntityFromChat = async (
-    type: 'task' | 'deal' | 'meeting' | 'doc',
-    id: string,
-    patch: Record<string, unknown>
-  ): Promise<boolean> => {
-    if (type === 'task') {
-      const current = props.allTasks.find((t) => t.id === id);
-      if (!current) return false;
-      await actions.saveTask({ ...current, ...patch });
-      return true;
-    }
-    if (type === 'deal') {
-      const current = props.deals.find((d) => d.id === id);
-      if (!current) return false;
-      await actions.saveDeal({ ...current, ...patch });
-      return true;
-    }
-    if (type === 'meeting') {
-      const current = props.meetings.find((m) => m.id === id);
-      if (!current) return false;
-      await actions.saveMeeting({ ...current, ...patch });
-      return true;
-    }
-    const current = props.docs.find((d) => d.id === id);
-    if (!current) return false;
-    await actions.saveDoc({ ...current, ...patch });
-    return true;
-  };
+  const createEntityFromChat = useCallback(
+    (type: 'task' | 'deal' | 'meeting' | 'doc', title: string) =>
+      createEntityFromChatBridge(messengerBridgeDeps, type, title),
+    [
+      props.currentUser,
+      props.statuses,
+      props.priorities,
+      props.allTasks,
+      props.deals,
+      props.meetings,
+      props.docs,
+      props.orgPositions,
+      props.employeeInfos,
+      props.businessProcesses,
+      actions,
+    ]
+  );
 
-  const startBusinessProcessFromTemplate = async (processId: string): Promise<{ id: string; label: string } | null> => {
-    const selected = props.businessProcesses.find((p) => p.id === processId && !p.isArchived);
-    if (!selected || !selected.steps?.length) return null;
-    const firstStep = selected.steps[0];
-    let assigneeId: string | null = null;
-    let assigneeIds: string[] | undefined;
-    if (firstStep.assigneeType === 'position') {
-      const position = props.orgPositions.find((p) => p.id === firstStep.assigneeId);
-      const resolved = resolveAssigneesForOrgPosition(position, props.employeeInfos);
-      assigneeId = resolved.assigneeId;
-      assigneeIds = resolved.assigneeIds;
-      if (resolved.positionPatch && position) {
-        actions.savePosition({ ...position, ...resolved.positionPatch });
-      }
-    } else {
-      assigneeId = firstStep.assigneeId || null;
-    }
-    if (!assigneeId) return null;
+  const updateEntityFromChat = useCallback(
+    (type: 'task' | 'deal' | 'meeting' | 'doc', id: string, patch: Record<string, unknown>) =>
+      updateEntityFromChatBridge(messengerBridgeDeps, type, id, patch),
+    [
+      props.currentUser,
+      props.statuses,
+      props.priorities,
+      props.allTasks,
+      props.deals,
+      props.meetings,
+      props.docs,
+      props.orgPositions,
+      props.employeeInfos,
+      props.businessProcesses,
+      actions,
+    ]
+  );
 
-    const instanceId = `inst-${Date.now()}`;
-    const taskId = `task-${Date.now()}`;
-    const now = new Date();
-    const today = now.toISOString().slice(0, 10);
-    const nextWeek = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
-
-    const latestVersion =
-      props.businessProcesses
-        .filter((p) => p.id === selected.id)
-        .sort((a, b) => (b.version || 1) - (a.version || 1))[0] || selected;
-
-    const updatedProcess: BusinessProcess = {
-      ...latestVersion,
-      instances: [
-        ...(latestVersion.instances || []),
-        {
-          id: instanceId,
-          processId: latestVersion.id,
-          processVersion: latestVersion.version || 1,
-          currentStepId: firstStep.id,
-          status: 'active',
-          startedAt: now.toISOString(),
-          taskIds: [taskId],
-        },
-      ],
-    };
-
-    await actions.saveProcess(updatedProcess);
-    await actions.saveTask({
-      id: taskId,
-      entityType: 'task',
-      tableId: '',
-      title: `${latestVersion.title}: ${firstStep.title}`,
-      description: firstStep.description || '',
-      status: 'Не начато',
-      priority: props.priorities?.[1]?.name || props.priorities?.[0]?.name || 'Средний',
-      assigneeId,
-      assigneeIds,
-      source: 'Процесс',
-      startDate: today,
-      endDate: nextWeek,
-      processId: latestVersion.id,
-      processInstanceId: instanceId,
-      stepId: firstStep.id,
-      createdAt: now.toISOString(),
-      createdByUserId: props.currentUser.id,
-    });
-    return { id: taskId, label: `${latestVersion.title}: ${firstStep.title}` };
-  };
+  const startBusinessProcessFromTemplate = useCallback(
+    (processId: string) => startBusinessProcessFromTemplateBridge(messengerBridgeDeps, processId),
+    [
+      props.currentUser,
+      props.statuses,
+      props.priorities,
+      props.allTasks,
+      props.deals,
+      props.meetings,
+      props.docs,
+      props.orgPositions,
+      props.employeeInfos,
+      props.businessProcesses,
+      actions,
+    ]
+  );
 
   // Проверка на наличие currentUser
   if (!props.currentUser) {

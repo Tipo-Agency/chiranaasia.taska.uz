@@ -1,10 +1,11 @@
 
-import React, { useState, useRef, useMemo, useEffect, useCallback } from 'react';
+import React, { useState, useRef, useMemo, useEffect, useCallback, useLayoutEffect } from 'react';
 import { TaskSelect } from './TaskSelect';
 import { FinanceCategory, Fund, FinancePlan, PurchaseRequest, Department, User, FinancialPlanDocument, FinancialPlanning, Bdr } from '../types';
 import { hasPermission } from '../utils/permissions';
-import { Wallet, Plus, X, Edit2, Trash2, PieChart, TrendingUp, DollarSign, Check, AlertCircle, Calendar, Settings, ArrowLeft, ArrowRight, Save, FileText, Clock, CheckCircle2, ChevronDown, Upload, Archive, RotateCcw } from 'lucide-react';
-import { Button, ModulePageShell, ModulePageHeader, MODULE_PAGE_GUTTER, ModuleCreateDropdown, ModuleFilterIconButton, DateInput, ModuleSegmentedControl, SystemAlertDialog } from './ui';
+import { Plus, X, Edit2, Trash2, PieChart, TrendingUp, DollarSign, Check, AlertCircle, Calendar, Settings, ArrowLeft, ArrowRight, Save, FileText, Clock, CheckCircle2, ChevronDown, Upload, Archive, RotateCcw } from 'lucide-react';
+import { Button, ModulePageShell, MODULE_PAGE_GUTTER, ModuleCreateDropdown, ModuleFilterIconButton, DateInput, ModuleSegmentedControl, SystemAlertDialog } from './ui';
+import { useAppToolbar } from '../contexts/AppToolbarContext';
 import { BankStatementsView, type BankStatementsViewHandle } from './finance/BankStatementsView';
 import { BdrView } from './finance/BdrView';
 import { FilterConfig } from './FiltersPanel';
@@ -37,6 +38,7 @@ const FinanceView: React.FC<FinanceViewProps> = ({
     onSaveRequest, onDeleteRequest,
     onSaveFinancialPlanDocument, onDeleteFinancialPlanDocument, onSaveFinancialPlanning, onDeleteFinancialPlanning
 }) => {
+  const { setLeading, setModule } = useAppToolbar();
   const [activeTab, setActiveTab] = useState<'planning' | 'requests' | 'plan' | 'statements' | 'bdr'>('planning');
   
   // Состояния для детальных страниц
@@ -1772,7 +1774,7 @@ const FinanceView: React.FC<FinanceViewProps> = ({
     [currentUser.permissions]
   );
 
-  const handleFinanceTabChange = (tabId: string) => {
+  const handleFinanceTabChange = useCallback((tabId: string) => {
     setPlanningSubView('list');
     setPlanSubView('list');
     setSelectedPlanning(null);
@@ -1788,171 +1790,206 @@ const FinanceView: React.FC<FinanceViewProps> = ({
     } else {
       setActiveTab('requests');
     }
-  };
+  }, []);
+
+  useLayoutEffect(() => {
+    if (financeFullScreen) {
+      setLeading(null);
+      setModule(null);
+      return;
+    }
+    const emerald = 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300';
+    const idle = 'text-gray-600 dark:text-gray-400';
+    setLeading(
+      <div className="flex items-center gap-0.5 shrink-0 flex-wrap sm:flex-nowrap" role="tablist" aria-label="Финансы">
+        {financeTabOptions.map((opt) => (
+          <button
+            key={opt.value}
+            type="button"
+            role="tab"
+            aria-selected={activeTab === opt.value}
+            onClick={() => handleFinanceTabChange(opt.value)}
+            className={`px-2 sm:px-2.5 py-1 rounded-lg text-[11px] sm:text-xs font-medium whitespace-nowrap transition-colors ${
+              activeTab === opt.value ? emerald : `${idle} hover:bg-gray-100 dark:hover:bg-[#252525]`
+            }`}
+          >
+            {opt.label}
+          </button>
+        ))}
+      </div>
+    );
+    setModule(
+      <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap justify-end shrink-0">
+        {((activeTab === 'planning' && planningSubView === 'list') ||
+          (activeTab === 'plan' && planSubView === 'list') ||
+          activeTab === 'requests') && (
+          <ModuleSegmentedControl
+            variant="neutral"
+            value={financeArchiveScope}
+            onChange={(v) => setFinanceArchiveScope(v as 'active' | 'archived')}
+            options={[
+              { value: 'active', label: 'Активные' },
+              { value: 'archived', label: 'Архив' },
+            ]}
+          />
+        )}
+        {activeTab === 'planning' && planningSubView === 'list' && (
+          <ModuleFilterIconButton
+            accent="emerald"
+            active={showPlanningFilters || hasActivePlanningFilters}
+            activeCount={planningFilters.filter((f) => f.value && f.value !== 'all' && f.value !== '' && f.value !== 'hide').length}
+            onClick={() => setShowPlanningFilters(!showPlanningFilters)}
+          />
+        )}
+        {activeTab === 'plan' && planSubView === 'list' && (
+          <ModuleFilterIconButton
+            accent="emerald"
+            active={showPlanFilters || hasActivePlanFilters}
+            activeCount={planFilters.filter((f) => f.value && f.value !== 'all' && f.value !== '' && f.value !== 'hide').length}
+            onClick={() => setShowPlanFilters(!showPlanFilters)}
+          />
+        )}
+        {activeTab === 'requests' && (
+          <ModuleFilterIconButton
+            accent="emerald"
+            active={showRequestFilters || hasActiveRequestFilters}
+            activeCount={requestFilters.filter((f) => f.value && f.value !== 'all' && f.value !== '' && f.value !== 'hide').length}
+            onClick={() => setShowRequestFilters(!showRequestFilters)}
+          />
+        )}
+        <ModuleCreateDropdown
+          accent="emerald"
+          buttonSize="sm"
+          label={activeTab === 'statements' ? 'Действия' : 'Создать'}
+          items={[
+            ...(activeTab === 'statements'
+              ? [
+                  {
+                    id: 'upload-statement',
+                    label: 'Загрузить выписку',
+                    icon: Upload,
+                    onClick: () => bankStatementsRef.current?.triggerUpload(),
+                  },
+                ]
+              : []),
+            {
+              id: 'create-request',
+              label: 'Заявка на приобретение',
+              icon: DollarSign,
+              onClick: handleOpenRequestCreate,
+            },
+            {
+              id: 'create-fin-plan',
+              label: 'Финансовый план',
+              icon: FileText,
+              onClick: () => {
+                handleQuickCreatePlan();
+              },
+            },
+            {
+              id: 'create-fin-planning',
+              label: 'Финансовое планирование',
+              icon: PieChart,
+              onClick: () => {
+                handleQuickCreatePlanning();
+              },
+            },
+          ]}
+        />
+      </div>
+    );
+    return () => {
+      setLeading(null);
+      setModule(null);
+    };
+  }, [
+    financeFullScreen,
+    financeTabOptions,
+    activeTab,
+    planningSubView,
+    planSubView,
+    financeArchiveScope,
+    handleFinanceTabChange,
+    showPlanningFilters,
+    hasActivePlanningFilters,
+    planningFilters,
+    showPlanFilters,
+    hasActivePlanFilters,
+    planFilters,
+    showRequestFilters,
+    hasActiveRequestFilters,
+    requestFilters,
+    setLeading,
+    setModule,
+  ]);
 
   return (
     <ModulePageShell className="flex-1 min-h-0 flex flex-col overflow-hidden">
-      {!financeFullScreen && (
-      <div className={`${MODULE_PAGE_GUTTER} pt-6 md:pt-8 pb-4 flex-shrink-0`}>
-       <div className="mb-5 space-y-5">
-            <ModulePageHeader
-              icon={<Wallet size={24} strokeWidth={2} />}
-              title="Финансы"
-              description="Планирование, заявки, БДР и выписки"
-              accent="emerald"
-              tabs={
-                <ModuleSegmentedControl
-                  variant="neutral"
-                  value={activeTab}
-                  onChange={(v) => handleFinanceTabChange(String(v))}
-                  options={financeTabOptions}
-                />
-              }
-              controls={
-                <div className="flex items-center gap-2 flex-wrap lg:justify-end">
-                    {((activeTab === 'planning' && planningSubView === 'list') ||
-                      (activeTab === 'plan' && planSubView === 'list') ||
-                      activeTab === 'requests') && (
-                      <ModuleSegmentedControl
-                        variant="neutral"
-                        value={financeArchiveScope}
-                        onChange={(v) => setFinanceArchiveScope(v as 'active' | 'archived')}
-                        options={[
-                          { value: 'active', label: 'Активные' },
-                          { value: 'archived', label: 'Архив' },
-                        ]}
-                      />
-                    )}
-                    {activeTab === 'planning' && planningSubView === 'list' && (
-                      <ModuleFilterIconButton
-                        accent="emerald"
-                        active={showPlanningFilters || hasActivePlanningFilters}
-                        activeCount={planningFilters.filter(f => f.value && f.value !== 'all' && f.value !== '' && f.value !== 'hide').length}
-                        onClick={() => setShowPlanningFilters(!showPlanningFilters)}
-                      />
-                    )}
-                    {activeTab === 'plan' && planSubView === 'list' && (
-                      <ModuleFilterIconButton
-                        accent="emerald"
-                        active={showPlanFilters || hasActivePlanFilters}
-                        activeCount={planFilters.filter(f => f.value && f.value !== 'all' && f.value !== '' && f.value !== 'hide').length}
-                        onClick={() => setShowPlanFilters(!showPlanFilters)}
-                      />
-                    )}
-                    {activeTab === 'requests' && (
-                      <ModuleFilterIconButton
-                        accent="emerald"
-                        active={showRequestFilters || hasActiveRequestFilters}
-                        activeCount={requestFilters.filter(f => f.value && f.value !== 'all' && f.value !== '' && f.value !== 'hide').length}
-                        onClick={() => setShowRequestFilters(!showRequestFilters)}
-                      />
-                    )}
-                    <ModuleCreateDropdown
-                      accent="emerald"
-                      label={activeTab === 'statements' ? 'Действия' : 'Создать'}
-                      items={[
-                        ...(activeTab === 'statements'
-                          ? [
-                              {
-                                id: 'upload-statement',
-                                label: 'Загрузить выписку',
-                                icon: Upload,
-                                onClick: () => bankStatementsRef.current?.triggerUpload(),
-                              },
-                            ]
-                          : []),
-                        {
-                          id: 'create-request',
-                          label: 'Заявка на приобретение',
-                          icon: DollarSign,
-                          onClick: handleOpenRequestCreate,
-                        },
-                        {
-                          id: 'create-fin-plan',
-                          label: 'Финансовый план',
-                          icon: FileText,
-                          onClick: () => {
-                            handleQuickCreatePlan();
-                          },
-                        },
-                        {
-                          id: 'create-fin-planning',
-                          label: 'Финансовое планирование',
-                          icon: PieChart,
-                          onClick: () => {
-                            handleQuickCreatePlanning();
-                          },
-                        },
-                      ]}
-                    />
+      {!financeFullScreen && showPlanningFilters && activeTab === 'planning' && planningSubView === 'list' && (
+        <div className={`${MODULE_PAGE_GUTTER} pt-1 pb-2 flex-shrink-0 border-b border-gray-200 dark:border-[#333]`}>
+          <div className="p-4 bg-gray-50 dark:bg-[#252525] rounded-lg border border-gray-200 dark:border-[#333]">
+            <div className="grid gap-3" style={{ gridTemplateColumns: `repeat(auto-fit, minmax(150px, 1fr))`, maxWidth: '100%' }}>
+              {planningFilters.map((filter, index) => (
+                <div key={index}>
+                  <label className="block text-xs font-semibold text-gray-600 dark:text-gray-400 mb-1">{filter.label}</label>
+                  <TaskSelect value={filter.value} onChange={filter.onChange} options={filter.options} />
                 </div>
-              }
-            />
-            
-            <div className="mt-1">
-                {showPlanningFilters && activeTab === 'planning' && planningSubView === 'list' && (
-                    <div className="mt-4 p-4 bg-gray-50 dark:bg-[#252525] rounded-lg border border-gray-200 dark:border-[#333]">
-                        <div className="grid gap-3" style={{ gridTemplateColumns: `repeat(auto-fit, minmax(150px, 1fr))`, maxWidth: '100%' }}>
-                            {planningFilters.map((filter, index) => (
-                                <div key={index}>
-                                    <label className="block text-xs font-semibold text-gray-600 dark:text-gray-400 mb-1">{filter.label}</label>
-                                    <TaskSelect value={filter.value} onChange={filter.onChange} options={filter.options} />
-                                </div>
-                            ))}
-                        </div>
-                        {hasActivePlanningFilters && (
-                            <div className="mt-3 flex justify-end">
-                                <button onClick={clearPlanningFilters} className="text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200 flex items-center gap-1">
-                                    <X size={14} /> Очистить фильтры
-                                </button>
-                            </div>
-                        )}
-                    </div>
-                )}
-                {showPlanFilters && activeTab === 'plan' && planSubView === 'list' && (
-                    <div className="mt-4 p-4 bg-gray-50 dark:bg-[#252525] rounded-lg border border-gray-200 dark:border-[#333]">
-                        <div className="grid gap-3" style={{ gridTemplateColumns: `repeat(auto-fit, minmax(150px, 1fr))`, maxWidth: '100%' }}>
-                            {planFilters.map((filter, index) => (
-                                <div key={index}>
-                                    <label className="block text-xs font-semibold text-gray-600 dark:text-gray-400 mb-1">{filter.label}</label>
-                                    <TaskSelect value={filter.value} onChange={filter.onChange} options={filter.options} />
-                                </div>
-                            ))}
-                        </div>
-                        {hasActivePlanFilters && (
-                            <div className="mt-3 flex justify-end">
-                                <button onClick={clearPlanFilters} className="text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200 flex items-center gap-1">
-                                    <X size={14} /> Очистить фильтры
-                                </button>
-                            </div>
-                        )}
-                    </div>
-                )}
-                {showRequestFilters && activeTab === 'requests' && (
-                    <div className="mt-4 p-4 bg-gray-50 dark:bg-[#252525] rounded-lg border border-gray-200 dark:border-[#333]">
-                        <div className="grid gap-3" style={{ gridTemplateColumns: `repeat(auto-fit, minmax(150px, 1fr))`, maxWidth: '100%' }}>
-                            {requestFilters.map((filter, index) => (
-                                <div key={index}>
-                                    <label className="block text-xs font-semibold text-gray-600 dark:text-gray-400 mb-1">{filter.label}</label>
-                                    <TaskSelect value={filter.value} onChange={filter.onChange} options={filter.options} />
-                                </div>
-                            ))}
-                        </div>
-                        {hasActiveRequestFilters && (
-                            <div className="mt-3 flex justify-end">
-                                <button onClick={clearRequestFilters} className="text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200 flex items-center gap-1">
-                                    <X size={14} /> Очистить фильтры
-                                </button>
-                            </div>
-                        )}
-                    </div>
-                )}
+              ))}
             </div>
-       </div>
-       </div>
+            {hasActivePlanningFilters && (
+              <div className="mt-3 flex justify-end">
+                <button onClick={clearPlanningFilters} className="text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200 flex items-center gap-1">
+                  <X size={14} /> Очистить фильтры
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+      {!financeFullScreen && showPlanFilters && activeTab === 'plan' && planSubView === 'list' && (
+        <div className={`${MODULE_PAGE_GUTTER} pt-1 pb-2 flex-shrink-0 border-b border-gray-200 dark:border-[#333]`}>
+          <div className="p-4 bg-gray-50 dark:bg-[#252525] rounded-lg border border-gray-200 dark:border-[#333]">
+            <div className="grid gap-3" style={{ gridTemplateColumns: `repeat(auto-fit, minmax(150px, 1fr))`, maxWidth: '100%' }}>
+              {planFilters.map((filter, index) => (
+                <div key={index}>
+                  <label className="block text-xs font-semibold text-gray-600 dark:text-gray-400 mb-1">{filter.label}</label>
+                  <TaskSelect value={filter.value} onChange={filter.onChange} options={filter.options} />
+                </div>
+              ))}
+            </div>
+            {hasActivePlanFilters && (
+              <div className="mt-3 flex justify-end">
+                <button onClick={clearPlanFilters} className="text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200 flex items-center gap-1">
+                  <X size={14} /> Очистить фильтры
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+      {!financeFullScreen && showRequestFilters && activeTab === 'requests' && (
+        <div className={`${MODULE_PAGE_GUTTER} pt-1 pb-2 flex-shrink-0 border-b border-gray-200 dark:border-[#333]`}>
+          <div className="p-4 bg-gray-50 dark:bg-[#252525] rounded-lg border border-gray-200 dark:border-[#333]">
+            <div className="grid gap-3" style={{ gridTemplateColumns: `repeat(auto-fit, minmax(150px, 1fr))`, maxWidth: '100%' }}>
+              {requestFilters.map((filter, index) => (
+                <div key={index}>
+                  <label className="block text-xs font-semibold text-gray-600 dark:text-gray-400 mb-1">{filter.label}</label>
+                  <TaskSelect value={filter.value} onChange={filter.onChange} options={filter.options} />
+                </div>
+              ))}
+            </div>
+            {hasActiveRequestFilters && (
+              <div className="mt-3 flex justify-end">
+                <button onClick={clearRequestFilters} className="text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200 flex items-center gap-1">
+                  <X size={14} /> Очистить фильтры
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
       )}
        <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
-         <div className={`${MODULE_PAGE_GUTTER} pb-20 h-full overflow-y-auto custom-scrollbar flex-1 flex flex-col min-h-0`}>
+         <div className={`${MODULE_PAGE_GUTTER} pt-1 pb-20 h-full overflow-y-auto custom-scrollbar flex-1 flex flex-col min-h-0`}>
            {activeTab === 'planning' && planningSubView === 'list' && renderPlanningList()}
            {/* creation planning moved to modal */}
            {activeTab === 'planning' && planningSubView === 'detail' && selectedPlanning && renderPlanningDetail()}

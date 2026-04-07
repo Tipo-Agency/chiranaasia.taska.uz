@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import Sidebar from './components/Sidebar';
 import type { SidebarProps } from './components/Sidebar';
 import { AppRouter } from './components/AppRouter';
@@ -14,12 +14,16 @@ import SettingsModal from './components/SettingsModal';
 import CreateTableModal from './components/CreateTableModal';
 import PublicContentPlanView from './components/PublicContentPlanView';
 import { MiniMessenger } from './components/features/chat/MiniMessenger';
-import { MessageCircle } from 'lucide-react';
+import { ChatFloatingButton } from './components/features/chat/ChatFloatingButton';
 import { useAppLogic } from './frontend/hooks/useAppLogic';
 import { NotificationCenterProvider, useNotificationCenter } from './frontend/contexts/NotificationCenterContext';
 import { AppToolbarProvider } from './contexts/AppToolbarContext';
 import { StandardModal, Input, Button } from './components/ui';
-import { resolveAssigneesForOrgPosition } from './utils/orgPositionAssignee';
+import {
+  createEntityFromChat as createEntityFromChatBridge,
+  updateEntityFromChat as updateEntityFromChatBridge,
+  startBusinessProcessFromTemplate as startBusinessProcessFromTemplateBridge,
+} from './utils/miniMessengerBridge';
 
 /** Синхронно из pathname — чтобы не монтировать useAppLogic на публичной странице (избегаем React #310). */
 function getPublicContentPlanIdFromPath(): string | null {
@@ -31,25 +35,6 @@ function getPublicContentPlanIdFromPath(): string | null {
 function SidebarWithUnread(props: Omit<SidebarProps, 'unreadCount'>) {
   const { unreadCount } = useNotificationCenter();
   return <Sidebar {...props} unreadCount={unreadCount} />;
-}
-
-function ChatFloatingButton({ onOpen }: { onOpen: () => void }) {
-  const { unreadCount } = useNotificationCenter();
-  return (
-    <button
-      type="button"
-      onClick={onOpen}
-      className="hidden md:flex fixed bottom-6 right-6 z-40 w-14 h-14 rounded-full bg-[#3337AD] text-white shadow-lg hover:bg-[#292b8a] items-center justify-center"
-      title={unreadCount > 0 ? `Чат — непрочитанных: ${unreadCount}` : 'Чат'}
-    >
-      <MessageCircle size={24} />
-      {unreadCount > 0 && (
-        <span className="absolute top-1 right-1 min-w-[1.125rem] h-[1.125rem] px-1 flex items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white border-2 border-white dark:border-[#191919]">
-          {unreadCount > 99 ? '99+' : unreadCount}
-        </span>
-      )}
-    </button>
-  );
 }
 
 function MainApp() {
@@ -145,75 +130,72 @@ function MainApp() {
     .filter((m) => !m.isArchived && (m.participantIds || []).includes(state.currentUser.id))
     .slice(0, 30);
 
-  const createEntityFromChat = async (
-    type: 'task' | 'deal' | 'meeting' | 'doc',
-    title: string
-  ): Promise<{ id: string; label: string } | null> => {
-    const now = new Date();
-    const today = now.toISOString().slice(0, 10);
-    const nowIso = now.toISOString();
-
-    if (type === 'task') {
-      const task = {
-        id: `chat-task-${Date.now()}`,
-        entityType: 'task' as const,
-        tableId: '',
-        title,
-        status: state.statuses?.[0]?.name || 'Не начато',
-        priority: state.priorities?.[1]?.name || state.priorities?.[0]?.name || 'Средний',
-        assigneeId: state.currentUser.id,
-        projectId: null,
-        startDate: today,
-        endDate: today,
-        description: '',
-        createdByUserId: state.currentUser.id,
-        createdAt: nowIso,
-      };
-      await actions.saveTask(task);
-      return { id: task.id, label: task.title };
-    }
-
-    if (type === 'deal') {
-      const deal = {
-        id: `chat-deal-${Date.now()}`,
-        dealKind: 'funnel' as const,
-        title,
-        amount: 0,
-        currency: 'UZS',
-        stage: 'new',
-        assigneeId: state.currentUser.id,
-        createdAt: nowIso,
-      };
-      await actions.saveDeal(deal);
-      return { id: deal.id, label: deal.title || title };
-    }
-
-    if (type === 'meeting') {
-      const meeting = {
-        id: `chat-meeting-${Date.now()}`,
-        tableId: 'meetings-system',
-        title,
-        date: today,
-        time: '10:00',
-        participantIds: [state.currentUser.id],
-        summary: '',
-        type: 'work' as const,
-      };
-      await actions.saveMeeting(meeting);
-      return { id: meeting.id, label: meeting.title };
-    }
-
-    const doc = {
-      id: `chat-doc-${Date.now()}`,
-      tableId: 'docs-system',
-      title,
-      type: 'internal',
-      tags: [],
-      content: '',
-    };
-    await actions.saveDoc(doc);
-    return { id: doc.id, label: doc.title };
+  const messengerBridgeDeps = {
+    currentUser: state.currentUser,
+    statuses: state.statuses,
+    priorities: state.priorities,
+    tasks: state.tasks,
+    deals: state.deals,
+    meetings: state.meetings,
+    docs: state.docs,
+    orgPositions: state.orgPositions,
+    employeeInfos: state.employeeInfos,
+    businessProcesses: state.businessProcesses,
+    actions,
   };
+
+  const createEntityFromChat = useCallback(
+    (type: 'task' | 'deal' | 'meeting' | 'doc', title: string) =>
+      createEntityFromChatBridge(messengerBridgeDeps, type, title),
+    [
+      state.currentUser,
+      state.statuses,
+      state.priorities,
+      state.tasks,
+      state.deals,
+      state.meetings,
+      state.docs,
+      state.orgPositions,
+      state.employeeInfos,
+      state.businessProcesses,
+      actions,
+    ]
+  );
+
+  const updateEntityFromChat = useCallback(
+    (type: 'task' | 'deal' | 'meeting' | 'doc', id: string, patch: Record<string, unknown>) =>
+      updateEntityFromChatBridge(messengerBridgeDeps, type, id, patch),
+    [
+      state.currentUser,
+      state.statuses,
+      state.priorities,
+      state.tasks,
+      state.deals,
+      state.meetings,
+      state.docs,
+      state.orgPositions,
+      state.employeeInfos,
+      state.businessProcesses,
+      actions,
+    ]
+  );
+
+  const onStartProcessTemplate = useCallback(
+    (processId: string) => startBusinessProcessFromTemplateBridge(messengerBridgeDeps, processId),
+    [
+      state.currentUser,
+      state.statuses,
+      state.priorities,
+      state.tasks,
+      state.deals,
+      state.meetings,
+      state.docs,
+      state.orgPositions,
+      state.employeeInfos,
+      state.businessProcesses,
+      actions,
+    ]
+  );
 
   return (
     <NotificationCenterProvider userId={state.currentUser.id}>
@@ -275,17 +257,17 @@ function MainApp() {
                 </div>
             )}
 
-            {/* Чат в модальном окне (десктоп) */}
+            {/* Чат: полноэкран на мобильных, модалка на md+ */}
             {chatPanelOpen && (
               <div
-                className="hidden md:flex fixed inset-0 z-50 items-center justify-center p-3 sm:p-6 bg-black/45 backdrop-blur-md animate-in fade-in duration-200"
+                className="fixed inset-0 z-50 flex flex-col md:items-center md:justify-center md:p-3 sm:p-6 bg-black/45 backdrop-blur-md animate-in fade-in duration-200"
                 role="dialog"
                 aria-modal="true"
                 aria-label="Чат"
                 onClick={() => setChatPanelOpen(false)}
               >
                 <div
-                  className="w-full max-w-5xl max-h-[min(720px,92vh)] h-[min(640px,90vh)] flex flex-col rounded-2xl shadow-2xl overflow-hidden bg-white dark:bg-[#252525] border border-gray-200/90 dark:border-[#333]"
+                  className="flex flex-col flex-1 min-h-0 w-full md:flex-none md:max-w-5xl md:max-h-[min(720px,92vh)] md:h-[min(640px,90vh)] h-full md:rounded-2xl shadow-2xl overflow-hidden bg-white dark:bg-[#252525] border-0 md:border border-gray-200/90 dark:border-[#333]"
                   onClick={e => e.stopPropagation()}
                 >
                   <MiniMessenger
@@ -327,94 +309,10 @@ function MainApp() {
                     }}
                     onCreateEntity={createEntityFromChat}
                     processTemplates={state.businessProcesses}
-                    onStartProcessTemplate={async (processId) => {
-                      const selected = state.businessProcesses.find((p) => p.id === processId && !p.isArchived);
-                      if (!selected) return null;
-                      if (!selected.steps?.length) return null;
-                      const firstStep = selected.steps[0];
-                      let assigneeId: string | null = null;
-                      let assigneeIds: string[] | undefined;
-                      if (firstStep.assigneeType === 'position') {
-                        const position = state.orgPositions.find((p) => p.id === firstStep.assigneeId);
-                        const resolved = resolveAssigneesForOrgPosition(position, state.employeeInfos);
-                        assigneeId = resolved.assigneeId;
-                        assigneeIds = resolved.assigneeIds;
-                        if (resolved.positionPatch && position) {
-                          actions.savePosition({ ...position, ...resolved.positionPatch });
-                        }
-                      } else {
-                        assigneeId = firstStep.assigneeId || null;
-                      }
-                      if (!assigneeId) return null;
-                      const instanceId = `inst-${Date.now()}`;
-                      const taskId = `task-${Date.now()}`;
-                      const now = new Date();
-                      const latestVersion =
-                        state.businessProcesses
-                          .filter((p) => p.id === selected.id)
-                          .sort((a, b) => (b.version || 1) - (a.version || 1))[0] || selected;
-                      await actions.saveProcess({
-                        ...latestVersion,
-                        instances: [
-                          ...(latestVersion.instances || []),
-                          {
-                            id: instanceId,
-                            processId: latestVersion.id,
-                            processVersion: latestVersion.version || 1,
-                            currentStepId: firstStep.id,
-                            status: 'active',
-                            startedAt: now.toISOString(),
-                            taskIds: [taskId],
-                          },
-                        ],
-                      });
-                      await actions.saveTask({
-                        id: taskId,
-                        entityType: 'task',
-                        tableId: '',
-                        title: `${latestVersion.title}: ${firstStep.title}`,
-                        description: firstStep.description || '',
-                        status: 'Не начато',
-                        priority: state.priorities?.[1]?.name || state.priorities?.[0]?.name || 'Средний',
-                        assigneeId,
-                        assigneeIds,
-                        source: 'Процесс',
-                        startDate: now.toISOString().slice(0, 10),
-                        endDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10),
-                        processId: latestVersion.id,
-                        processInstanceId: instanceId,
-                        stepId: firstStep.id,
-                        createdAt: now.toISOString(),
-                        createdByUserId: state.currentUser.id,
-                      });
-                      return { id: taskId, label: `${latestVersion.title}: ${firstStep.title}` };
-                    }}
+                    onStartProcessTemplate={onStartProcessTemplate}
                     initialOpenSystemFeed={chatOpenToSystemFeed}
                     onConsumedInitialSystemFeed={() => setChatOpenToSystemFeed(false)}
-                    onUpdateEntity={async (type, id, patch) => {
-                      if (type === 'task') {
-                        const current = state.tasks.find((t) => t.id === id);
-                        if (!current) return false;
-                        await actions.saveTask({ ...current, ...patch });
-                        return true;
-                      }
-                      if (type === 'deal') {
-                        const current = state.deals.find((d) => d.id === id);
-                        if (!current) return false;
-                        await actions.saveDeal({ ...current, ...patch });
-                        return true;
-                      }
-                      if (type === 'meeting') {
-                        const current = state.meetings.find((m) => m.id === id);
-                        if (!current) return false;
-                        await actions.saveMeeting({ ...current, ...patch });
-                        return true;
-                      }
-                      const current = state.docs.find((d) => d.id === id);
-                      if (!current) return false;
-                      await actions.saveDoc({ ...current, ...patch });
-                      return true;
-                    }}
+                    onUpdateEntity={updateEntityFromChat}
                     onClose={() => setChatPanelOpen(false)}
                   />
                 </div>
@@ -477,14 +375,15 @@ function MainApp() {
                 actions={actions}
             />
             </div>
-        </div>
 
-        <ChatFloatingButton
-          onOpen={() => {
-            setChatOpenToSystemFeed(false);
-            setChatPanelOpen(true);
-          }}
-        />
+            <ChatFloatingButton
+              hidden={state.currentView === 'chat' || chatPanelOpen}
+              onOpen={() => {
+                setChatOpenToSystemFeed(false);
+                setChatPanelOpen(true);
+              }}
+            />
+        </div>
 
         {/* Modals */}
         {state.isTaskModalOpen && (
