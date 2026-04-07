@@ -1,24 +1,33 @@
 import React, { useLayoutEffect, useMemo, useState } from 'react';
-import type { User } from '../types';
-import { ModulePageShell } from './ui';
+import type { Department, User } from '../types';
+import { ModulePageShell, ModuleSegmentedControl } from './ui';
 import { MODULE_PAGE_GUTTER, MODULE_PAGE_TOP_PAD } from './ui/moduleAccent';
 import { useAppToolbar } from '../contexts/AppToolbarContext';
+import { useProductionStore } from './production/useProductionStore';
+import { ProductionMonitorPanel } from './production/ProductionMonitorPanel';
+import { ProductionOrdersPanel } from './production/ProductionOrdersPanel';
+import { ProductionPlanningPanel } from './production/ProductionPlanningPanel';
+import { ProductionReportsPanel } from './production/ProductionReportsPanel';
 
-type ProductionTab = 'orders' | 'work' | 'reports';
+type ProductionTab = 'monitor' | 'orders' | 'planning' | 'reports';
 
 interface ProductionViewProps {
   users: User[];
+  departments: Department[];
   currentUser: User;
 }
 
-export default function ProductionView({ users, currentUser }: ProductionViewProps) {
+export default function ProductionView({ users, departments, currentUser }: ProductionViewProps) {
   const { setLeading, setModule } = useAppToolbar();
-  const [tab, setTab] = useState<ProductionTab>('orders');
+  const [tab, setTab] = useState<ProductionTab>('monitor');
+  const { orders, operations, shiftLogs, stats, setStatus, createOrder, updateOrder, createOperation, updateOperation, logShift } =
+    useProductionStore();
 
   const tabs = useMemo(
     () => [
+      { id: 'monitor' as const, label: 'Монитор производства' },
       { id: 'orders' as const, label: 'Заказы' },
-      { id: 'work' as const, label: 'Смена / работы' },
+      { id: 'planning' as const, label: 'Планирование' },
       { id: 'reports' as const, label: 'Отчёты' },
     ],
     []
@@ -62,17 +71,40 @@ export default function ProductionView({ users, currentUser }: ProductionViewPro
     <ModulePageShell>
       <div className="flex-1 min-h-0 overflow-hidden">
         <div className={`${MODULE_PAGE_GUTTER} ${MODULE_PAGE_TOP_PAD} pb-24 md:pb-32 h-full overflow-y-auto overflow-x-hidden custom-scrollbar`}>
-          <div className="bg-white dark:bg-[#252525] border border-gray-200 dark:border-[#333] rounded-2xl p-4 md:p-6">
-            <div className="text-sm font-semibold text-gray-900 dark:text-white">Производство</div>
-            <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-              Вкладка: <span className="font-medium">{tabs.find((x) => x.id === tab)?.label}</span>
-            </div>
-            <div className="mt-4 text-sm text-gray-700 dark:text-gray-200">
-              Здесь будет полноценный модуль: заказы, загрузка, смены, материалы, себестоимость и отчёты.
-            </div>
-            <div className="mt-4 text-xs text-gray-500 dark:text-gray-400">
-              Пользователь: {currentUser.name} · Пользователей в системе: {users.length}
-            </div>
+          {tab === 'monitor' && <ProductionMonitorPanel orders={orders} operations={operations} users={users} onSetStatus={setStatus} />}
+          {tab === 'orders' && (
+            <ProductionOrdersPanel
+              orders={orders}
+              users={users}
+              departments={departments}
+              onCreateOrder={createOrder}
+              onUpdateOrder={updateOrder}
+            />
+          )}
+          {tab === 'planning' && (
+            <ProductionPlanningPanel
+              orders={orders}
+              operations={operations}
+              shiftLogs={shiftLogs}
+              users={users}
+              onCreateOperation={createOperation}
+              onUpdateOperation={updateOperation}
+              onLogShift={logShift}
+            />
+          )}
+          {tab === 'reports' && (
+            <ProductionReportsPanel orders={orders} operations={operations} shiftLogs={shiftLogs} departments={departments} />
+          )}
+          <div className="mt-3 rounded-xl border border-gray-200 dark:border-[#333] bg-gray-50 dark:bg-[#1a1a1a] p-3">
+            <ModuleSegmentedControl
+              variant="neutral"
+              value={tab}
+              onChange={(v) => setTab(v as ProductionTab)}
+              options={tabs.map((t) => ({ value: t.id, label: t.label }))}
+            />
+          </div>
+          <div className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+            Ответственный: {currentUser.name} · Активных заказов: {stats.total}
           </div>
         </div>
       </div>

@@ -560,7 +560,7 @@ export const AppRouter: React.FC<AppRouterProps> = (props) => {
   if (view === 'production') {
     return (
       <Suspense fallback={<RouteFallback />}>
-        <ProductionViewLazy users={props.users} currentUser={props.currentUser} />
+        <ProductionViewLazy users={props.users} departments={props.departments} currentUser={props.currentUser} />
       </Suspense>
     );
   }
