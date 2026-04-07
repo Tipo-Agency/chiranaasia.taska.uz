@@ -1,17 +1,10 @@
 
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useCallback, useLayoutEffect } from 'react';
 import { Meeting, User, TableCollection, Client, Deal, Project, NotificationPreferences, ShootPlan, ContentPost, ShootPlanItem } from '../types';
 import {
-  Calendar,
   Camera,
   X,
-  List,
-  LayoutGrid,
-  Clock,
-  Repeat,
   Check,
-  Trash2,
-  Box,
   Briefcase,
   Building2,
   Clapperboard,
@@ -20,9 +13,11 @@ import {
   ChevronRight,
 } from 'lucide-react';
 import { TaskSelect } from './TaskSelect';
-import { normalizeDateForInput, parseLocalDate, compareDates, getTodayLocalDate } from '../utils/dateUtils';
-import { ModulePageShell, ModulePageHeader, ModuleSegmentedControl, MODULE_PAGE_GUTTER } from './ui';
+import { normalizeDateForInput, compareDates, getTodayLocalDate } from '../utils/dateUtils';
+import { ModulePageShell, MODULE_PAGE_GUTTER } from './ui';
 import { ModuleCreateDropdown } from './ui/ModuleCreateDropdown';
+import { ModuleSelectDropdown } from './ui/ModuleSelectDropdown';
+import { useAppToolbar } from '../contexts/AppToolbarContext';
 import { DateInput } from './ui/DateInput';
 import { ShootPlanModal, type ShootPostFormatFilter } from './ShootPlanModal';
 import { getPostIdsReservedInOtherShootPlans } from '../utils/shootPlanUtils';
@@ -88,7 +83,7 @@ const MeetingsView: React.FC<MeetingsViewProps> = ({
   contentPosts = [],
   onSaveShootPlan,
 }) => {
-  const [calendarTab, setCalendarTab] = useState<'calendar' | 'list'>('calendar');
+  const { setModule } = useAppToolbar();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingMeeting, setEditingMeeting] = useState<Meeting | null>(null);
   const [meetingTypeLocked, setMeetingTypeLocked] = useState(false);
@@ -136,15 +131,6 @@ const MeetingsView: React.FC<MeetingsViewProps> = ({
     return () => window.removeEventListener('openMeetingFromChat', handleOpenMeetingById as EventListener);
   }, [meetings]);
 
-  React.useEffect(() => {
-    const handleOpenCreateMeeting = (event: Event) => {
-      const custom = event as CustomEvent<{ type?: 'client' | 'work' | 'project'; date?: string }>;
-      openMeetingCreate(custom.detail?.type || 'work', custom.detail?.date || getTodayLocalDate());
-    };
-    window.addEventListener('openCreateMeetingModal', handleOpenCreateMeeting as EventListener);
-    return () => window.removeEventListener('openCreateMeetingModal', handleOpenCreateMeeting as EventListener);
-  }, []);
-
   const calColors = useMemo(() => {
     const c = notificationPrefs?.calendarColors || {};
     return { ...DEFAULT_CAL_COLORS, ...c };
@@ -180,8 +166,6 @@ const MeetingsView: React.FC<MeetingsViewProps> = ({
     });
   }, [meetings, tableId, showAll, meetingTypeFilter]);
 
-  const getTableName = (id: string) => tables.find(t => t.id === id)?.name || '';
-
   const contentPlanTables = useMemo(
     () => tables.filter((t) => t.type === 'content-plan' && !t.isArchived),
     [tables]
@@ -207,7 +191,7 @@ const MeetingsView: React.FC<MeetingsViewProps> = ({
     [shootPlans, shootModalDraft]
   );
 
-  const openMeetingCreate = (type: 'client' | 'work' | 'project', presetDate?: string) => {
+  const openMeetingCreate = useCallback((type: 'client' | 'work' | 'project', presetDate?: string) => {
     setEditingMeeting(null);
     setMeetingType(type);
     setMeetingTypeLocked(true);
@@ -219,30 +203,42 @@ const MeetingsView: React.FC<MeetingsViewProps> = ({
     setSelectedProjectId('');
     setSelectedParticipants([]);
     setIsModalOpen(true);
-  };
+  }, []);
 
-  const openNewShootPlan = (presetDate: string) => {
-    if (!onSaveShootPlan) {
-      alert('Сохранение плана съёмки недоступно.');
-      return;
-    }
-    const tid = defaultShootTableId;
-    if (!tid) {
-      alert('Нет контент-плана. Создайте страницу «Контент-план» в пространстве проекта.');
-      return;
-    }
-    const id = `sp-${Date.now()}`;
-    setShootModalDraft({
-      id,
-      tableId: tid,
-      title: 'Съёмка',
-      date: presetDate,
-      time: '10:00',
-      participantIds: [],
-      items: [emptyShootItem()],
-    });
-    setShootPostFormatFilter('all');
-  };
+  const openNewShootPlan = useCallback(
+    (presetDate: string) => {
+      if (!onSaveShootPlan) {
+        alert('Сохранение плана съёмки недоступно.');
+        return;
+      }
+      const tid = defaultShootTableId;
+      if (!tid) {
+        alert('Нет контент-плана. Создайте страницу «Контент-план» в пространстве проекта.');
+        return;
+      }
+      const id = `sp-${Date.now()}`;
+      setShootModalDraft({
+        id,
+        tableId: tid,
+        title: 'Съёмка',
+        date: presetDate,
+        time: '10:00',
+        participantIds: [],
+        items: [emptyShootItem()],
+      });
+      setShootPostFormatFilter('all');
+    },
+    [onSaveShootPlan, defaultShootTableId, emptyShootItem]
+  );
+
+  React.useEffect(() => {
+    const handleOpenCreateMeeting = (event: Event) => {
+      const custom = event as CustomEvent<{ type?: 'client' | 'work' | 'project'; date?: string }>;
+      openMeetingCreate(custom.detail?.type || 'work', custom.detail?.date || getTodayLocalDate());
+    };
+    window.addEventListener('openCreateMeetingModal', handleOpenCreateMeeting as EventListener);
+    return () => window.removeEventListener('openCreateMeetingModal', handleOpenCreateMeeting as EventListener);
+  }, [openMeetingCreate]);
 
   const saveShootFromCalendar = () => {
     if (!shootModalDraft || !onSaveShootPlan) return;
@@ -442,7 +438,7 @@ const MeetingsView: React.FC<MeetingsViewProps> = ({
       const monthLabel = new Date(currentYear, currentMonth, 1).toLocaleString('ru-RU', { month: 'long', year: 'numeric' });
 
       return (
-          <div className="rounded-2xl border border-gray-200 dark:border-[#333] bg-white dark:bg-[#191919] shadow-sm overflow-hidden">
+          <div className="overflow-hidden">
               <div className="flex flex-col sm:flex-row sm:flex-wrap items-stretch sm:items-center justify-between gap-3 border-b border-gray-100 dark:border-[#333] bg-gradient-to-r from-teal-50/90 to-cyan-50/80 dark:from-teal-950/40 dark:to-cyan-950/30 px-4 sm:px-5 py-3 sm:py-4">
                   <div className="flex items-center justify-between sm:justify-start gap-2 min-w-0 flex-1">
                     <button
@@ -579,208 +575,86 @@ const MeetingsView: React.FC<MeetingsViewProps> = ({
       );
   };
 
+  const meetingFilterLabel = useMemo(() => {
+    const labels: Record<typeof meetingTypeFilter, string> = {
+      all: 'Все',
+      client: 'С клиентами',
+      work: 'Команда',
+      project: 'Проекты',
+      shoot: 'Съёмки',
+    };
+    return labels[meetingTypeFilter];
+  }, [meetingTypeFilter]);
+
+  useLayoutEffect(() => {
+    setModule(
+      <div className="flex items-center gap-2 shrink-0">
+        <ModuleSelectDropdown
+          accent="teal"
+          size="xs"
+          prefixLabel="Тип"
+          valueLabel={meetingFilterLabel}
+          selectedId={meetingTypeFilter}
+          items={[
+            { id: 'all', label: 'Все', onClick: () => setMeetingTypeFilter('all') },
+            { id: 'client', label: 'С клиентами', onClick: () => setMeetingTypeFilter('client') },
+            { id: 'work', label: 'Команда', onClick: () => setMeetingTypeFilter('work') },
+            { id: 'project', label: 'Проекты', onClick: () => setMeetingTypeFilter('project') },
+            { id: 'shoot', label: 'Съёмки', onClick: () => setMeetingTypeFilter('shoot') },
+          ]}
+        />
+        <ModuleCreateDropdown
+          accent="teal"
+          label="Новое событие"
+          items={[
+            {
+              id: 'work',
+              label: 'Рабочая встреча',
+              icon: Building2,
+              onClick: () => openMeetingCreate('work', getTodayLocalDate()),
+            },
+            {
+              id: 'client',
+              label: 'Встреча с клиентом',
+              icon: Briefcase,
+              onClick: () => openMeetingCreate('client', getTodayLocalDate()),
+            },
+            {
+              id: 'project',
+              label: 'Событие по проекту',
+              icon: Clapperboard,
+              onClick: () => openMeetingCreate('project', getTodayLocalDate()),
+            },
+            ...(onSaveShootPlan && contentPlanTables.length > 0
+              ? [
+                  {
+                    id: 'shoot',
+                    label: 'План съёмки',
+                    icon: Camera,
+                    onClick: () => openNewShootPlan(getTodayLocalDate()),
+                  },
+                ]
+              : []),
+          ]}
+        />
+      </div>
+    );
+    return () => setModule(null);
+  }, [
+    meetingFilterLabel,
+    meetingTypeFilter,
+    setModule,
+    openMeetingCreate,
+    openNewShootPlan,
+    onSaveShootPlan,
+    contentPlanTables.length,
+  ]);
+
   return (
     <ModulePageShell>
-      <div className={`${MODULE_PAGE_GUTTER} pt-6 md:pt-8 flex-shrink-0`}>
-        <div className="mb-5 space-y-5">
-          <ModulePageHeader
-            accent="teal"
-            icon={<CalendarDays size={24} strokeWidth={2} />}
-            title="Календарь"
-            description="Встречи, планёрки и события по проектам — в списке и в календаре"
-            hideTitleBlock
-            tabs={
-              <ModuleSegmentedControl<'all' | 'client' | 'work' | 'project' | 'shoot'>
-                variant="neutral"
-                value={meetingTypeFilter}
-                onChange={setMeetingTypeFilter}
-                options={[
-                  { value: 'all', label: 'Все' },
-                  { value: 'client', label: 'С клиентами' },
-                  { value: 'work', label: 'Команда' },
-                  { value: 'project', label: 'Проекты' },
-                  { value: 'shoot', label: 'Съёмки' },
-                ]}
-              />
-            }
-            controls={
-              <>
-                <ModuleSegmentedControl<'calendar' | 'list'>
-                  variant="accent"
-                  accent="teal"
-                  value={calendarTab}
-                  onChange={setCalendarTab}
-                  options={[
-                    { value: 'calendar', label: 'Календарь', icon: <LayoutGrid size={16} /> },
-                    { value: 'list', label: 'Список', icon: <List size={16} /> },
-                  ]}
-                />
-                <ModuleCreateDropdown
-                  accent="teal"
-                  label="Новое событие"
-                  items={[
-                    {
-                      id: 'work',
-                      label: 'Рабочая встреча',
-                      icon: Building2,
-                      onClick: () => openMeetingCreate('work', getTodayLocalDate()),
-                    },
-                    {
-                      id: 'client',
-                      label: 'Встреча с клиентом',
-                      icon: Briefcase,
-                      onClick: () => openMeetingCreate('client', getTodayLocalDate()),
-                    },
-                    {
-                      id: 'project',
-                      label: 'Событие по проекту',
-                      icon: Clapperboard,
-                      onClick: () => openMeetingCreate('project', getTodayLocalDate()),
-                    },
-                    ...(onSaveShootPlan && contentPlanTables.length > 0
-                      ? [
-                          {
-                            id: 'shoot',
-                            label: 'План съёмки',
-                            icon: Camera,
-                            onClick: () => openNewShootPlan(getTodayLocalDate()),
-                          },
-                        ]
-                      : []),
-                  ]}
-                />
-              </>
-            }
-          />
-        </div>
-      </div>
       <div className="flex-1 min-h-0 overflow-hidden">
-        <div className={`${MODULE_PAGE_GUTTER} pb-20 h-full overflow-y-auto custom-scrollbar`}>
-      {calendarTab === 'list' ? (
-        <div className="grid gap-4">
-            {filteredMeetings.length === 0 ? (
-                <div className="rounded-2xl border-2 border-dashed border-gray-200 dark:border-[#333] bg-white dark:bg-[#1a1a1a] px-8 py-16 text-center">
-                    <CalendarDays className="mx-auto text-gray-300 dark:text-gray-600 mb-4" size={48} strokeWidth={1.25} />
-                    <p className="text-gray-800 dark:text-gray-200 font-semibold text-lg">Нет событий по фильтру</p>
-                    <p className="text-gray-500 dark:text-gray-400 text-sm mt-2 max-w-md mx-auto">Добавьте встречу с клиентом, планёрку или событие по проекту (например съёмку).</p>
-                    <button
-                      type="button"
-                      onClick={() => openCreateFlowForDate(getTodayLocalDate())}
-                      className="mt-6 inline-flex items-center gap-2 rounded-xl bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 text-sm font-semibold px-5 py-2.5 shadow-sm hover:bg-slate-800 dark:hover:bg-white"
-                    >
-                      <Calendar size={16} /> Запланировать
-                    </button>
-                </div>
-            ) : (
-                filteredMeetings.map(meeting => {
-                  const dateKey = normalizeDateForInput(meeting.date);
-                  const d = dateKey ? parseLocalDate(dateKey) : new Date();
-                  const dayNum = d.getDate();
-                  const monthShort = d.toLocaleString('ru-RU', { month: 'short' });
-                  return (
-                    <div
-                      key={meeting.id}
-                      className="group relative overflow-hidden rounded-2xl border border-gray-200 dark:border-[#333] bg-white dark:bg-[#1a1a1a] shadow-sm transition-all hover:shadow-md hover:border-teal-300/60 dark:hover:border-teal-800"
-                      style={{ borderLeftWidth: 4, borderLeftColor: getTypeColor(meeting) }}
-                    >
-                        {showAll && (
-                            <div className="absolute top-3 right-3 z-10 text-[10px] bg-gray-100/95 dark:bg-[#252525] text-gray-600 dark:text-gray-300 px-2 py-1 rounded-lg flex items-center gap-1 border border-gray-200 dark:border-[#444]">
-                                <Box size={10} /> {getTableName(meeting.tableId)}
-                            </div>
-                        )}
-                        <div className="flex flex-col sm:flex-row sm:items-stretch">
-                          <div className="flex sm:flex-col items-center justify-center gap-0.5 px-5 py-4 sm:py-5 bg-gradient-to-br from-teal-500/12 to-cyan-500/10 dark:from-teal-900/40 dark:to-cyan-950/30 border-b sm:border-b-0 sm:border-r border-gray-100 dark:border-[#333] min-w-[100px] shrink-0">
-                            <span className="text-3xl font-bold tabular-nums text-teal-700 dark:text-teal-300 leading-none">{dayNum}</span>
-                            <span className="text-[11px] font-semibold uppercase tracking-wide text-teal-600/90 dark:text-teal-400/90">{monthShort}</span>
-                          </div>
-                          <div className="flex-1 p-4 sm:p-5 min-w-0">
-                        <div className="flex justify-between items-start gap-3">
-                            <div className="flex-1 cursor-pointer min-w-0" onClick={() => handleOpenEdit(meeting)}>
-                                <div className="flex flex-wrap items-center gap-2 mb-2">
-                                    <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-wide ${
-                                      meeting.type === 'client'
-                                        ? 'bg-sky-100 text-sky-800 dark:bg-sky-900/40 dark:text-sky-200'
-                                        : meeting.type === 'project'
-                                          ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-200'
-                                        : meeting.type === 'shoot'
-                                          ? 'bg-orange-100 text-orange-900 dark:bg-orange-900/40 dark:text-orange-200'
-                                        : 'bg-violet-100 text-violet-800 dark:bg-violet-900/40 dark:text-violet-200'
-                                    }`}>
-                                    {meeting.type === 'client' ? <Briefcase size={12} /> : meeting.type === 'project' ? <Clapperboard size={12} /> : meeting.type === 'shoot' ? <Camera size={12} /> : <Building2 size={12} />}
-                                    {meeting.type === 'client' ? 'С клиентом' : meeting.type === 'project' ? 'Проект' : meeting.type === 'shoot' ? 'Съёмка' : 'Команда'}
-                                    </span>
-                                    {meeting.recurrence && meeting.recurrence !== 'none' && (
-                                        <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 dark:bg-amber-950/40 text-amber-800 dark:text-amber-200 px-2 py-0.5 text-[11px] font-medium">
-                                            <Repeat size={10} /> {meeting.recurrence === 'daily' ? 'Каждый день' : meeting.recurrence === 'weekly' ? 'Раз в неделю' : 'Раз в месяц'}
-                                        </span>
-                                    )}
-                                </div>
-                                <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-2 group-hover:text-teal-700 dark:group-hover:text-teal-300 transition-colors">
-                                    {meeting.title}
-                                </h3>
-                                {meeting.type === 'client' && meeting.dealId && (
-                                        <span className="inline-block mb-2 text-xs bg-sky-50 dark:bg-sky-900/40 text-sky-700 dark:text-sky-200 px-2 py-1 rounded-lg border border-sky-100 dark:border-sky-800">
-                                            Сделка: {deals.find(d => d.id === meeting.dealId)?.title || '—'}
-                                        </span>
-                                    )}
-                                {meeting.type === 'project' && meeting.projectId && (
-                                        <span className="inline-block mb-2 text-xs bg-emerald-50 dark:bg-emerald-900/40 text-emerald-800 dark:text-emerald-200 px-2 py-1 rounded-lg border border-emerald-100 dark:border-emerald-800">
-                                            Проект: {projects.find((p) => p.id === meeting.projectId)?.name || '—'}
-                                        </span>
-                                    )}
-                                <div className="flex flex-wrap items-center gap-2 text-sm text-gray-600 dark:text-gray-300">
-                                    <span className="inline-flex items-center gap-1.5 rounded-lg bg-gray-100 dark:bg-[#252525] px-2.5 py-1 text-xs font-medium">
-                                      <Clock size={14} className="text-gray-400" /> {meeting.time}
-                                    </span>
-                                </div>
-                            </div>
-                            <div className="flex items-center gap-2 shrink-0">
-                                <div className="flex -space-x-2">
-                                    {(meeting.participantIds || []).map(uid => {
-                                        const u = users.find(user => user.id === uid);
-                                        if (!u) return null;
-                                        return (
-                                            <img key={uid} src={u.avatar} className="w-9 h-9 rounded-full border-2 border-white dark:border-[#1a1a1a] object-cover object-center ring-2 ring-gray-100 dark:ring-[#333]" title={u.name} alt="" />
-                                        );
-                                    })}
-                                </div>
-                                {onDeleteMeeting && (
-                                    <button
-                                        type="button"
-                                        onClick={(e) => {
-                                            e.stopPropagation();
-                                            if (confirm('Удалить встречу?')) {
-                                                onDeleteMeeting(meeting.id);
-                                            }
-                                        }}
-                                        className="p-2 text-gray-400 hover:text-red-500 rounded-xl hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
-                                        title="Удалить встречу"
-                                    >
-                                        <Trash2 size={18} />
-                                    </button>
-                                )}
-                            </div>
-                        </div>
-
-                        <div className="mt-4 pt-4 border-t border-gray-100 dark:border-[#2a2a2a]" onClick={(e) => e.stopPropagation()}>
-                            <label className="block text-[11px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-2">Итоги и резюме</label>
-                            <textarea 
-                                className="w-full rounded-xl border border-gray-200 dark:border-[#333] bg-gray-50/80 dark:bg-[#141414] text-gray-900 dark:text-gray-100 px-3 py-2.5 text-sm focus:ring-2 focus:ring-teal-500/30 focus:border-teal-500/50 outline-none min-h-[96px] resize-y placeholder-gray-400 dark:placeholder-gray-600"
-                                placeholder="Кратко зафиксируйте договорённости и следующие шаги…"
-                                defaultValue={meeting.summary}
-                                onBlur={(e) => onUpdateSummary(meeting.id, e.target.value)}
-                            />
-                        </div>
-                          </div>
-                        </div>
-                    </div>
-                  );
-                })
-            )}
-        </div>
-      ) : (
-        renderCalendar()
-      )}
+        <div className={`${MODULE_PAGE_GUTTER} pt-6 md:pt-8 pb-20 h-full overflow-y-auto custom-scrollbar`}>
+      {renderCalendar()}
         </div>
       </div>
 

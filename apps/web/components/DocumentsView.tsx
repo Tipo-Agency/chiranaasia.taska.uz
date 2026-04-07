@@ -1,16 +1,15 @@
 
-import React, { useState, useMemo, useRef } from 'react';
+import React, { useState, useRef, useLayoutEffect } from 'react';
 import { Doc, Folder, TableCollection, Task, TaskAttachment, User, Department, EmployeeInfo } from '../types';
-import { FileText, Folder as FolderIcon, Plus, LayoutGrid, List as ListIcon, Trash2, ExternalLink, ChevronRight, FolderPlus, X, Save, Box, FileText as FileTextIcon, Paperclip, Image as ImageIcon, Download, File as FileIcon, Edit2, Calendar, Users } from 'lucide-react';
+import { FileText, Folder as FolderIcon, Trash2, ExternalLink, ChevronRight, FolderPlus, Box, FileText as FileTextIcon, Paperclip, File as FileIcon, Edit2, Calendar, Users } from 'lucide-react';
 import {
-  Tabs,
   Button,
   ModuleCreateDropdown,
   ModulePageShell,
-  ModulePageHeader,
   ModuleSegmentedControl,
   MODULE_PAGE_GUTTER,
 } from './ui';
+import { useAppToolbar } from '../contexts/AppToolbarContext';
 import { FilePreviewModal } from './FilePreviewModal';
 import { isImageFile } from '../utils/fileUtils';
 import { WeeklyPlansView, type WeeklyPlansViewHandle } from './documents/WeeklyPlansView';
@@ -62,9 +61,10 @@ const DocumentsView: React.FC<DocumentsViewProps> = ({
     onUpdateTask,
     onDeleteAttachment
 }) => {
+  const { setModule } = useAppToolbar();
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('list');
   const [folderPath, setFolderPath] = useState<string[]>([]);
-  const [activeTab, setActiveTab] = useState<'docs' | 'attachments' | 'weekly' | 'protocols'>('docs');
+  const [docSection, setDocSection] = useState<'docs' | 'attachments' | 'weekly' | 'protocols'>('docs');
   const [previewFile, setPreviewFile] = useState<{ url: string; name: string; type: string } | null>(null);
   const weeklyPlansRef = useRef<WeeklyPlansViewHandle>(null);
   const protocolsRef = useRef<ProtocolsViewHandle>(null);
@@ -136,6 +136,11 @@ const DocumentsView: React.FC<DocumentsViewProps> = ({
 
   const handleBackToRoot = () => {
       setFolderPath([]);
+  };
+
+  const goToDocsRoot = () => {
+    setDocSection('docs');
+    setFolderPath([]);
   };
 
   const handleDeleteFolderSafe = (folder: Folder) => {
@@ -245,123 +250,172 @@ const DocumentsView: React.FC<DocumentsViewProps> = ({
     );
   };
 
-  const renderBreadcrumbs = () => (
-      <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400 mb-4 bg-white dark:bg-[#1e1e1e] p-2 rounded-lg border border-gray-100 dark:border-[#333] shadow-sm w-fit flex-wrap">
-          <span 
-            className={`cursor-pointer hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30 px-2 py-1 rounded transition-colors ${!currentFolderId ? 'font-bold text-gray-800 dark:text-gray-200 bg-gray-100 dark:bg-[#252525]' : ''}`}
-            onClick={handleBackToRoot}
-          >
-              {showAll ? 'Все документы' : 'Документы'}
-          </span>
-          {folderPathArray.map((folder, index) => (
-              <React.Fragment key={folder.id}>
-                  <ChevronRight size={14} className="text-gray-400" />
-                  <span 
-                      className={`cursor-pointer hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30 px-2 py-1 rounded transition-colors flex items-center gap-2 ${index === folderPathArray.length - 1 ? 'font-bold text-gray-800 dark:text-gray-200 bg-gray-100 dark:bg-[#252525]' : ''}`}
-                      onClick={() => handleBreadcrumbClick(index)}
-                  >
-                      <FolderIcon size={14} className="text-blue-500"/>
-                      {folder.name}
-                  </span>
-              </React.Fragment>
-          ))}
+  const renderBreadcrumbs = () => {
+    if (docSection === 'attachments') {
+      return (
+        <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400 mb-4 flex-wrap">
+          <button type="button" className="cursor-pointer hover:text-blue-600 dark:hover:text-blue-400 px-1 py-0.5 rounded transition-colors text-left" onClick={goToDocsRoot}>
+            Документы
+          </button>
+          <ChevronRight size={14} className="text-gray-400 shrink-0" />
+          <span className="font-semibold text-gray-800 dark:text-gray-200">Вложения</span>
+        </div>
+      );
+    }
+    if (docSection === 'weekly') {
+      return (
+        <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400 mb-4 flex-wrap">
+          <button type="button" className="cursor-pointer hover:text-blue-600 dark:hover:text-blue-400 px-1 py-0.5 rounded transition-colors text-left" onClick={goToDocsRoot}>
+            Документы
+          </button>
+          <ChevronRight size={14} className="text-gray-400 shrink-0" />
+          <span className="font-semibold text-gray-800 dark:text-gray-200">Недельные планы</span>
+        </div>
+      );
+    }
+    if (docSection === 'protocols') {
+      return (
+        <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400 mb-4 flex-wrap">
+          <button type="button" className="cursor-pointer hover:text-blue-600 dark:hover:text-blue-400 px-1 py-0.5 rounded transition-colors text-left" onClick={goToDocsRoot}>
+            Документы
+          </button>
+          <ChevronRight size={14} className="text-gray-400 shrink-0" />
+          <span className="font-semibold text-gray-800 dark:text-gray-200">Протоколы</span>
+        </div>
+      );
+    }
+    return (
+      <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400 mb-4 flex-wrap">
+        <button
+          type="button"
+          className={`cursor-pointer hover:text-blue-600 dark:hover:text-blue-400 px-1 py-0.5 rounded transition-colors text-left ${!currentFolderId ? 'font-semibold text-gray-800 dark:text-gray-200' : ''}`}
+          onClick={handleBackToRoot}
+        >
+          {showAll ? 'Все документы' : 'Документы'}
+        </button>
+        {folderPathArray.map((folder, index) => (
+          <React.Fragment key={folder.id}>
+            <ChevronRight size={14} className="text-gray-400 shrink-0" />
+            <button
+              type="button"
+              className={`cursor-pointer hover:text-blue-600 dark:hover:text-blue-400 px-1 py-0.5 rounded transition-colors flex items-center gap-2 text-left ${
+                index === folderPathArray.length - 1 ? 'font-semibold text-gray-800 dark:text-gray-200' : ''
+              }`}
+              onClick={() => handleBreadcrumbClick(index)}
+            >
+              <FolderIcon size={14} className="text-blue-500 shrink-0" />
+              {folder.name}
+            </button>
+          </React.Fragment>
+        ))}
       </div>
-  );
+    );
+  };
+
+  const systemFolderCards: { id: 'attachments' | 'weekly' | 'protocols'; label: string; desc: string; icon: typeof Paperclip }[] = [
+    { id: 'attachments', label: 'Вложения', desc: 'Файлы из задач', icon: Paperclip },
+    { id: 'weekly', label: 'Недельные планы', desc: 'Планы по неделям', icon: Calendar },
+    { id: 'protocols', label: 'Протоколы', desc: 'Записи встреч', icon: Users },
+  ];
+
+  useLayoutEffect(() => {
+    setModule(
+      <div className="flex items-center gap-2 shrink-0">
+        {docSection === 'docs' && (
+          <ModuleSegmentedControl
+            variant="accent"
+            accent="slate"
+            value={viewMode}
+            onChange={(v) => setViewMode(v)}
+            options={[
+              { value: 'grid', label: 'Плитка' },
+              { value: 'list', label: 'Список' },
+            ]}
+          />
+        )}
+        {(docSection === 'weekly' || docSection === 'protocols') && (
+          <ModuleFilterIconButton
+            active={false}
+            onClick={() => {
+              if (docSection === 'weekly') weeklyPlansRef.current?.toggleFilters();
+              else protocolsRef.current?.toggleFilters();
+            }}
+            title={docSection === 'weekly' ? 'Фильтры недельных планов' : 'Фильтры протоколов'}
+          />
+        )}
+        <ModuleCreateDropdown
+          accent="slate"
+          items={[
+            {
+              id: 'doc',
+              label: 'Документ',
+              icon: FileTextIcon,
+              onClick: () => onAddDoc(currentFolderId || undefined),
+            },
+            {
+              id: 'weekly-plan',
+              label: 'Недельный план',
+              icon: Calendar,
+              onClick: () => weeklyPlansRef.current?.openCreateModal(),
+            },
+            {
+              id: 'protocol',
+              label: 'Протокол',
+              icon: Users,
+              onClick: () => protocolsRef.current?.createProtocol(),
+            },
+            ...(docSection === 'docs'
+              ? [
+                  {
+                    id: 'folder',
+                    label: 'Папка',
+                    icon: FolderPlus,
+                    onClick: () => setIsFolderModalOpen(true),
+                  },
+                ]
+              : []),
+          ]}
+        />
+      </div>
+    );
+    return () => setModule(null);
+  }, [docSection, viewMode, currentFolderId, setModule, onAddDoc]);
 
   return (
     <>
     <ModulePageShell>
-      <div className={`${MODULE_PAGE_GUTTER} pt-6 md:pt-8 flex-shrink-0`}>
-        <div className="mb-6 space-y-5">
-          <ModulePageHeader
-            accent="slate"
-            icon={<FileTextIcon size={24} strokeWidth={2} />}
-            title="Документы"
-            description="Управление документами и папками"
-            hideTitleBlock
-            tabs={
-              <Tabs
-                tabs={[
-                  { id: 'docs', label: 'Документы' },
-                  { id: 'attachments', label: 'Вложения' },
-                  { id: 'weekly', label: 'Недельные планы' },
-                  { id: 'protocols', label: 'Протоколы' },
-                ]}
-                activeTab={activeTab}
-                onChange={(tabId) => setActiveTab(tabId as 'docs' | 'attachments' | 'weekly' | 'protocols')}
-              />
-            }
-            controls={
-              <>
-                {activeTab === 'docs' && (
-                  <ModuleSegmentedControl
-                    variant="accent"
-                    accent="slate"
-                    value={viewMode}
-                    onChange={(v) => setViewMode(v)}
-                    options={[
-                      { value: 'grid', label: 'Плитка' },
-                      { value: 'list', label: 'Список' },
-                    ]}
-                  />
-                )}
-                {(activeTab === 'weekly' || activeTab === 'protocols') && (
-                  <ModuleFilterIconButton
-                    active={false}
-                    onClick={() => {
-                      if (activeTab === 'weekly') {
-                        weeklyPlansRef.current?.toggleFilters();
-                        return;
-                      }
-                      protocolsRef.current?.toggleFilters();
-                    }}
-                    title={activeTab === 'weekly' ? 'Фильтры недельных планов' : 'Фильтры протоколов'}
-                  />
-                )}
-                <ModuleCreateDropdown
-                  accent="slate"
-                  items={[
-                    {
-                      id: 'doc',
-                      label: 'Документ',
-                      icon: FileTextIcon,
-                      onClick: () => onAddDoc(currentFolderId || undefined),
-                    },
-                    {
-                      id: 'weekly-plan',
-                      label: 'Недельный план',
-                      icon: Calendar,
-                      onClick: () => weeklyPlansRef.current?.openCreateModal(),
-                    },
-                    {
-                      id: 'protocol',
-                      label: 'Протокол',
-                      icon: Users,
-                      onClick: () => protocolsRef.current?.createProtocol(),
-                    },
-                    ...(activeTab === 'docs'
-                      ? [
-                          {
-                            id: 'folder',
-                            label: 'Папка',
-                            icon: FolderPlus,
-                            onClick: () => setIsFolderModalOpen(true),
-                          },
-                        ]
-                      : []),
-                  ]}
-                />
-              </>
-            }
-          />
-
-        </div>
-      </div>
       <div className="flex-1 min-h-0 overflow-hidden">
-        <div className={`${MODULE_PAGE_GUTTER} pb-20 h-full overflow-y-auto custom-scrollbar`}>
-          {activeTab === 'docs' ? (
+        <div className={`${MODULE_PAGE_GUTTER} pt-6 md:pt-8 pb-20 h-full overflow-y-auto custom-scrollbar`}>
+          {docSection === 'docs' ? (
             <>
               {renderBreadcrumbs()}
+              {!currentFolderId && (
+                <div className="mb-8">
+                  <h3 className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase mb-3 ml-1">Системные папки</h3>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+                    {systemFolderCards.map((sys) => {
+                      const Icon = sys.icon;
+                      return (
+                        <button
+                          key={sys.id}
+                          type="button"
+                          onClick={() => {
+                            setDocSection(sys.id);
+                            setFolderPath([]);
+                          }}
+                          className="flex flex-col items-start gap-2 rounded-xl border border-gray-200 dark:border-[#333] bg-white dark:bg-[#252525] p-4 text-left hover:border-blue-300 dark:hover:border-blue-700 hover:shadow-md transition-all"
+                        >
+                          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400">
+                            <Icon size={20} />
+                          </div>
+                          <span className="font-semibold text-gray-800 dark:text-gray-200 text-sm">{sys.label}</span>
+                          <span className="text-xs text-gray-500 dark:text-gray-400">{sys.desc}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
               {viewMode === 'grid' ? (
                <div className="space-y-8">
                    {/* FOLDERS GRID */}
@@ -423,13 +477,13 @@ const DocumentsView: React.FC<DocumentsViewProps> = ({
                    <div>
                        {visibleFolders.length > 0 && visibleDocs.length > 0 && <h3 className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase mb-3 mt-6 ml-1">Файлы</h3>}
                        
-                       {visibleDocs.length === 0 && visibleFolders.length === 0 ? (
+                       {visibleDocs.length === 0 && visibleFolders.length === 0 && currentFolderId ? (
                            <div className="text-center py-12 border-2 border-dashed border-gray-100 dark:border-[#333] rounded-xl bg-gray-50/50 dark:bg-[#202020] flex flex-col items-center">
                                <FileText size={48} className="text-gray-300 dark:text-gray-600 mb-3" />
                                <p className="text-gray-500 dark:text-gray-400 font-medium">Здесь пока пусто</p>
                                <p className="text-gray-400 dark:text-gray-500 text-sm">Создайте папку или добавьте документ</p>
                            </div>
-                       ) : (
+                       ) : visibleDocs.length === 0 && visibleFolders.length === 0 ? null : (
                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                                {visibleDocs.map(doc => (
                                     <div key={doc.id} className="bg-white dark:bg-[#252525] border border-gray-200 dark:border-[#333] rounded-lg p-4 hover:shadow-md transition-all group relative">
@@ -469,7 +523,7 @@ const DocumentsView: React.FC<DocumentsViewProps> = ({
                </div>
            ) : (
                // LIST VIEW (TABLE)
-               <div className="bg-white dark:bg-[#1e1e1e] border border-gray-200 dark:border-[#333] rounded-xl shadow-sm overflow-hidden">
+               <div className="overflow-hidden">
                    <table className="w-full text-left text-sm">
                        <thead className="bg-gray-50 dark:bg-[#252525] border-b border-gray-200 dark:border-[#333] text-gray-500 dark:text-gray-400">
                            <tr>
@@ -558,43 +612,54 @@ const DocumentsView: React.FC<DocumentsViewProps> = ({
                                    </tr>
                                );
                            })}
-                           {visibleDocs.length === 0 && visibleFolders.length === 0 && <tr><td colSpan={showAll ? 6 : 5} className="text-center py-8 text-gray-400 dark:text-gray-500">Нет документов</td></tr>}
+                           {visibleDocs.length === 0 && visibleFolders.length === 0 && currentFolderId && (
+                             <tr><td colSpan={showAll ? 6 : 5} className="text-center py-8 text-gray-400 dark:text-gray-500">Нет документов</td></tr>
+                           )}
                        </tbody>
                    </table>
                </div>
            )}
             </>
-          ) : activeTab === 'attachments' ? (
-            renderAttachmentsTab()
-          ) : activeTab === 'weekly' ? (
-            currentUser ? (
-              <WeeklyPlansView
-                ref={weeklyPlansRef}
+          ) : docSection === 'attachments' ? (
+            <>
+              {renderBreadcrumbs()}
+              {renderAttachmentsTab()}
+            </>
+          ) : docSection === 'weekly' ? (
+            <>
+              {renderBreadcrumbs()}
+              {currentUser ? (
+                <WeeklyPlansView
+                  ref={weeklyPlansRef}
+                  layout="embedded"
+                  hideEmbeddedToolbar
+                  scope="all"
+                  currentUser={currentUser}
+                  users={users}
+                  tasks={tasks}
+                  onOpenTask={onOpenTask}
+                  onUpdateTask={onUpdateTask}
+                />
+              ) : (
+                <div className="rounded-2xl border border-dashed border-gray-200 dark:border-[#333] bg-gray-50/60 dark:bg-[#202020] p-8 text-center text-sm text-gray-500 dark:text-gray-400">
+                  Нужна авторизация пользователя для просмотра недельных планов.
+                </div>
+              )}
+            </>
+          ) : (
+            <>
+              {renderBreadcrumbs()}
+              <ProtocolsView
+                ref={protocolsRef}
                 layout="embedded"
                 hideEmbeddedToolbar
-                scope="all"
-                currentUser={currentUser}
                 users={users}
                 tasks={tasks}
+                departments={departments}
+                employees={employees}
                 onOpenTask={onOpenTask}
-                onUpdateTask={onUpdateTask}
               />
-            ) : (
-              <div className="rounded-2xl border border-dashed border-gray-200 dark:border-[#333] bg-gray-50/60 dark:bg-[#202020] p-8 text-center text-sm text-gray-500 dark:text-gray-400">
-                Нужна авторизация пользователя для просмотра недельных планов.
-              </div>
-            )
-          ) : (
-            <ProtocolsView
-              ref={protocolsRef}
-              layout="embedded"
-              hideEmbeddedToolbar
-              users={users}
-              tasks={tasks}
-              departments={departments}
-              employees={employees}
-              onOpenTask={onOpenTask}
-            />
+            </>
           )}
         </div>
       </div>
