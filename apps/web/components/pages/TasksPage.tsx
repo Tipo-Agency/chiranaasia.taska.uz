@@ -6,7 +6,7 @@
  * - Не содержит бизнес-логику
  * - Использует переиспользуемые компоненты
  */
-import React, { useState, useMemo, useCallback, useLayoutEffect } from 'react';
+import React, { useState, useMemo, useCallback, useLayoutEffect, useEffect } from 'react';
 import {
   Task,
   User,
@@ -200,6 +200,12 @@ export const TasksPage: React.FC<TasksPageProps> = ({
     setFilterSource('');
     setHideCompleted('hide');
   }, []);
+
+  useEffect(() => {
+    const handleOpenCreate = () => onCreateTask();
+    window.addEventListener('openCreateTaskModal', handleOpenCreate as EventListener);
+    return () => window.removeEventListener('openCreateTaskModal', handleOpenCreate as EventListener);
+  }, [onCreateTask]);
 
   useLayoutEffect(() => {
     const indigo = 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300';

@@ -136,6 +136,15 @@ const MeetingsView: React.FC<MeetingsViewProps> = ({
     return () => window.removeEventListener('openMeetingFromChat', handleOpenMeetingById as EventListener);
   }, [meetings]);
 
+  React.useEffect(() => {
+    const handleOpenCreateMeeting = (event: Event) => {
+      const custom = event as CustomEvent<{ type?: 'client' | 'work' | 'project'; date?: string }>;
+      openMeetingCreate(custom.detail?.type || 'work', custom.detail?.date || getTodayLocalDate());
+    };
+    window.addEventListener('openCreateMeetingModal', handleOpenCreateMeeting as EventListener);
+    return () => window.removeEventListener('openCreateMeetingModal', handleOpenCreateMeeting as EventListener);
+  }, []);
+
   const calColors = useMemo(() => {
     const c = notificationPrefs?.calendarColors || {};
     return { ...DEFAULT_CAL_COLORS, ...c };

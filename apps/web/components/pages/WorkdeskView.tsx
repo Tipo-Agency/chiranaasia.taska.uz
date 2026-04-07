@@ -339,7 +339,10 @@ export const WorkdeskView: React.FC<WorkdeskViewProps> = ({
             label: 'Новая задача',
             icon: CheckSquare,
             onClick: () => {
-              void onCreateEntity?.('task', `Задача ${new Date().toLocaleTimeString('ru-RU')}`);
+              onNavigateToTasks();
+              window.setTimeout(() => {
+                window.dispatchEvent(new CustomEvent('openCreateTaskModal'));
+              }, 0);
             },
           },
           {
@@ -347,7 +350,10 @@ export const WorkdeskView: React.FC<WorkdeskViewProps> = ({
             label: 'Новая сделка',
             icon: Briefcase,
             onClick: () => {
-              void onCreateEntity?.('deal', `Сделка ${new Date().toLocaleTimeString('ru-RU')}`);
+              onNavigateToDeals();
+              window.setTimeout(() => {
+                window.dispatchEvent(new CustomEvent('openCreateDealModal'));
+              }, 0);
             },
           },
           {
@@ -364,7 +370,10 @@ export const WorkdeskView: React.FC<WorkdeskViewProps> = ({
             label: 'Новая встреча',
             icon: Calendar,
             onClick: () => {
-              void onCreateEntity?.('meeting', `Встреча ${new Date().toLocaleTimeString('ru-RU')}`);
+              onNavigateToMeetings();
+              window.setTimeout(() => {
+                window.dispatchEvent(new CustomEvent('openCreateMeetingModal', { detail: { type: 'work' } }));
+              }, 0);
             },
           },
           {
@@ -442,9 +451,6 @@ export const WorkdeskView: React.FC<WorkdeskViewProps> = ({
                     {pipelineAmountSum.toLocaleString('ru-RU')} UZS
                   </span>
                 </div>
-                <p className="text-xs text-gray-500 dark:text-gray-400">
-                  Чат с коллегами и системная лента — кнопка «Чат» внизу справа на экране.
-                </p>
               </div>
 
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">

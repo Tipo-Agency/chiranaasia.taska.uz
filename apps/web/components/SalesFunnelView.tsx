@@ -199,9 +199,9 @@ const SalesFunnelView: React.FC<SalesFunnelViewProps> = ({ deals, clients, users
     const violet = 'bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-300';
     const idle = 'text-gray-500 dark:text-gray-400';
     setModule(
-      <div className="flex items-center gap-2 flex-wrap min-w-0">
+      <div className="flex w-full min-w-0 flex-wrap items-center gap-1.5 sm:gap-2">
         {!forcedViewMode && (
-          <div className="flex items-center gap-0.5 shrink-0" role="tablist" aria-label="Вид воронки">
+          <div className="flex w-full items-center gap-0.5 sm:w-auto sm:shrink-0" role="tablist" aria-label="Вид воронки">
             {(
               [
                 { id: 'kanban' as const, label: 'Канбан' },
@@ -223,7 +223,7 @@ const SalesFunnelView: React.FC<SalesFunnelViewProps> = ({ deals, clients, users
             ))}
           </div>
         )}
-        <div className="flex items-center gap-2 flex-wrap min-w-0 flex-1">
+        <div className="flex w-full min-w-0 items-center gap-2 sm:w-auto sm:flex-1 sm:flex-nowrap">
           <ModuleSelectDropdown
             accent="violet"
             size="xs"
@@ -238,12 +238,13 @@ const SalesFunnelView: React.FC<SalesFunnelViewProps> = ({ deals, clients, users
               { id: 'all', label: `Все (${activeFunnels.length})`, onClick: () => setSelectedFunnelId('all') },
               ...activeFunnels.map((f) => ({ id: f.id, label: f.name, onClick: () => setSelectedFunnelId(f.id) })),
             ]}
-            className="min-w-[min(100%,180px)]"
+            className="w-full min-w-0 sm:w-auto sm:min-w-[220px] sm:max-w-[340px]"
           />
           <ModuleCreateIconButton
             accent="violet"
             label="Новая сделка"
             size="sm"
+            className="shrink-0"
             onClick={() => handleOpenCreateRef.current?.()}
           />
         </div>
