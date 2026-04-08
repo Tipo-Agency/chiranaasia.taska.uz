@@ -2,7 +2,7 @@
 
 Префикс REST API задаётся `**API_PREFIX**` (по умолчанию `**/api**`). В продакшене базовый URL обычно: `https://tipa.taska.uz/api`.
 
-Детали полей и тел запросов — в роутерах `apps/api/app/routers/*.py` и моделях `apps/api/app/models/`. OpenAPI: `GET /openapi.json` при запущенном сервере.
+Детали полей и тел запросов — в роутерах `apps/api/app/routers/*.py` и моделях `apps/api/app/models/`. Сводка таблиц БД: [ENTITIES.md](./ENTITIES.md) (генерируется скриптом `apps/api/scripts/generate_entities_doc.py`). OpenAPI: `GET /openapi.json` при запущенном сервере.
 
 ## 1. Авторизация
 
@@ -83,5 +83,6 @@
 
 ## 8. Связанные документы
 
+- [ENTITIES.md](./ENTITIES.md) — таблицы и поля БД (автогенерация из моделей).
 - [ARCHITECTURE.md](./ARCHITECTURE.md) — события, уведомления, realtime.
 - [OPERATIONS.md](./OPERATIONS.md) — порты и переменные окружения.

@@ -71,6 +71,9 @@ jobs:
             export META_UCHETGRAM="${{ secrets.META_UCHETGRAM }}"
             export BACKEND_URL="${{ secrets.BACKEND_URL }}"
             export NGINX_SITE_NAME="${{ secrets.NGINX_SITE_NAME }}"
+            # MTProto (личный Telegram в CRM): my.telegram.org → api_id / api_hash
+            export TELEGRAM_API_ID="${{ secrets.TELEGRAM_API_ID }}"
+            export TELEGRAM_API_HASH="${{ secrets.TELEGRAM_API_HASH }}"
             cd "$SERVER_PATH"
             chmod +x ops/scripts/deploy.sh
             ./ops/scripts/deploy.sh

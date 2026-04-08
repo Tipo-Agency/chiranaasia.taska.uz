@@ -37,6 +37,7 @@ import {
   integrationsMetaEndpoint,
   integrationsSiteEndpoint,
   integrationsTelegramEndpoint,
+  integrationsTelegramPersonalEndpoint,
   publicContentPlanEndpoint,
 } from "../services/apiClient";
 
@@ -81,6 +82,7 @@ export const api = {
   integrationsMeta: integrationsMetaEndpoint,
   integrationsSite: integrationsSiteEndpoint,
   integrationsTelegram: integrationsTelegramEndpoint,
+  integrationsTelegramPersonal: integrationsTelegramPersonalEndpoint,
 
   publicContentPlan: publicContentPlanEndpoint,
 };

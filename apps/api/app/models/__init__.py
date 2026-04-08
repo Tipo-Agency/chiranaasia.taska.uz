@@ -32,6 +32,7 @@ from app.models.site_integration import SiteIntegrationKey
 from app.models.system_log import SystemLog
 from app.models.task import Project, Task
 from app.models.telegram_integration import TelegramIntegrationState
+from app.models.telegram_personal import TelegramPersonalSession
 from app.models.user import User
 from app.models.weekly_plan import Protocol, WeeklyPlan
 
@@ -84,4 +85,5 @@ __all__ = [
     "SystemLog",
     "WeeklyPlan",
     "Protocol",
+    "TelegramPersonalSession",
 ]

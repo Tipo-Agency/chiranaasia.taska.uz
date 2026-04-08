@@ -10,6 +10,8 @@ META_MARKER="${META_MARKER:-}"
 META_TASKA="${META_TASKA:-}"
 META_TIPA="${META_TIPA:-}"
 META_UCHETGRAM="${META_UCHETGRAM:-}"
+TELEGRAM_API_ID="${TELEGRAM_API_ID:-}"
+TELEGRAM_API_HASH="${TELEGRAM_API_HASH:-}"
 BACKEND_URL="${BACKEND_URL:-http://127.0.0.1:8003}"
 
 echo "🚀 Starting deployment..."
@@ -70,6 +72,21 @@ for _meta_key in META_MARKER META_TASKA META_TIPA META_UCHETGRAM; do
 done
 if [ -z "$META_MARKER" ]; then
   echo "   ⚠️ META_MARKER пуст — GET /webhook/meta вернёт 503 (задайте тот же секрет, что «Подтверждение маркера» в Meta)"
+fi
+
+# MTProto (личный Telegram): TELEGRAM_API_ID + TELEGRAM_API_HASH из GitHub Secrets
+for _k in TELEGRAM_API_ID TELEGRAM_API_HASH; do
+  _val="${!_k}"
+  if [ -n "$_val" ]; then
+    if grep -q "^${_k}=" .env 2>/dev/null; then
+      grep -v "^${_k}=" .env > .env.tmp && mv .env.tmp .env
+    fi
+    printf '%s=%s\n' "$_k" "$_val" >> .env
+    echo "   ${_k} written to .env"
+  fi
+done
+if [ -z "$TELEGRAM_API_ID" ] || [ -z "$TELEGRAM_API_HASH" ]; then
+  echo "   ⚠️ TELEGRAM_API_ID / TELEGRAM_API_HASH пусты — личный Telegram в профиле не активируется (задайте в GitHub Actions Secrets)"
 fi
 
 sudo chown "$USER:$USER" .env 2>/dev/null || true

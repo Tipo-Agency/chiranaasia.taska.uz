@@ -32,6 +32,7 @@ from app.routers import (
     integrations_meta,
     integrations_site,
     integrations_telegram,
+    integrations_telegram_personal,
     inventory,
     meetings,
     messages,
@@ -160,6 +161,7 @@ app.include_router(meta_webhook.router)
 app.include_router(integrations_meta.router, prefix=settings.API_PREFIX)
 app.include_router(integrations_site.router, prefix=settings.API_PREFIX)
 app.include_router(integrations_telegram.router, prefix=settings.API_PREFIX)
+app.include_router(integrations_telegram_personal.router, prefix=settings.API_PREFIX)
 
 # Routers (prefix already in router)
 app.include_router(admin.router, prefix=settings.API_PREFIX)

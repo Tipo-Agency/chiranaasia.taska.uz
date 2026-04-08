@@ -331,6 +331,26 @@ export const integrationsSiteEndpoint = {
   keyStatus: (funnelId: string) => get<{ ok: boolean; funnelId: string; active: boolean; keyLast4?: string | null }>(`/integrations/site/keys/status?funnel_id=${encodeURIComponent(funnelId)}`),
 };
 
+export const integrationsTelegramPersonalEndpoint = {
+  status: () =>
+    get<{
+      connected: boolean;
+      apiConfigured: boolean;
+      phoneMasked?: string | null;
+      status?: string;
+    }>('/integrations/telegram-personal/status'),
+  sendCode: (body: { phone: string }) =>
+    post<{ ok: boolean; phoneMasked?: string }>('/integrations/telegram-personal/auth/send-code', body),
+  signIn: (body: { phone: string; code: string }) =>
+    post<{ ok: boolean; needPassword?: boolean }>('/integrations/telegram-personal/auth/sign-in', body),
+  password: (body: { password: string }) => post<{ ok: boolean }>('/integrations/telegram-personal/auth/password', body),
+  disconnect: () => del<{ ok: boolean }>('/integrations/telegram-personal/session'),
+  syncMessages: (dealId: string, body?: { limit?: number }) =>
+    post<unknown>(`/integrations/telegram-personal/deals/${encodeURIComponent(dealId)}/sync-messages`, body ?? {}),
+  sendDeal: (dealId: string, body: { text: string }) =>
+    post<unknown>(`/integrations/telegram-personal/deals/${encodeURIComponent(dealId)}/send`, body),
+};
+
 export const integrationsTelegramEndpoint = {
   sendToLead: (body: { dealId: string; text: string }) =>
     post<unknown>('/integrations/telegram/send', body),

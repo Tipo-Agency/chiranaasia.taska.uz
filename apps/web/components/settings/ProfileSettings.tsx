@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { User } from '../../types';
-import { Save, KeyRound, Trash2, Upload, User as UserIcon, Phone, AtSign, Mail, Send, Calendar, Copy, RefreshCw } from 'lucide-react';
+import { Save, KeyRound, Trash2, Upload, User as UserIcon, Phone, AtSign, Mail, Send, Calendar, Copy, RefreshCw, MessageCircle } from 'lucide-react';
 import { Button, Input, StandardModal } from '../ui';
 import { uploadAvatar } from '../../services/localStorageService';
 import { getDefaultAvatarForId } from '../../constants/avatars';
@@ -32,7 +32,24 @@ export const ProfileSettings: React.FC<ProfileSettingsProps> = ({ currentUser, u
   const [confirmPassword, setConfirmPassword] = useState('');
   const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
   const [calendarBusy, setCalendarBusy] = useState(false);
+  const [tgPhone, setTgPhone] = useState('');
+  const [tgCode, setTgCode] = useState('');
+  const [tgPassword, setTgPassword] = useState('');
+  const [tgNeedPassword, setTgNeedPassword] = useState(false);
+  const [tgBusy, setTgBusy] = useState(false);
+  const [tgStatus, setTgStatus] = useState<{
+    connected: boolean;
+    apiConfigured: boolean;
+    phoneMasked?: string | null;
+  } | null>(null);
   const avatarInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    void api.integrationsTelegramPersonal
+      .status()
+      .then((s) => setTgStatus({ connected: s.connected, apiConfigured: s.apiConfigured, phoneMasked: s.phoneMasked }))
+      .catch(() => setTgStatus({ connected: false, apiConfigured: false }));
+  }, []);
 
   const calendarSubscribeUrl = useMemo(() => {
     if (currentUser.calendarExportUrl) return currentUser.calendarExportUrl;
@@ -146,6 +163,78 @@ export const ProfileSettings: React.FC<ProfileSettingsProps> = ({ currentUser, u
       alert('Не удалось получить ссылку для календаря. Проверьте сеть и авторизацию.');
     } finally {
       setCalendarBusy(false);
+    }
+  };
+
+  const handleTgSendCode = async () => {
+    const p = tgPhone.trim();
+    if (!p) {
+      alert('Укажите номер в международном формате, например +998901234567');
+      return;
+    }
+    setTgBusy(true);
+    try {
+      await api.integrationsTelegramPersonal.sendCode({ phone: p });
+      alert('Код отправлен в Telegram.');
+    } catch {
+      alert('Не удалось отправить код. Проверьте номер и настройки API на сервере.');
+    } finally {
+      setTgBusy(false);
+    }
+  };
+
+  const handleTgSignIn = async () => {
+    setTgBusy(true);
+    try {
+      const r = await api.integrationsTelegramPersonal.signIn({ phone: tgPhone.trim(), code: tgCode.trim() });
+      if (r.needPassword) {
+        setTgNeedPassword(true);
+        return;
+      }
+      setTgNeedPassword(false);
+      setTgCode('');
+      const s = await api.integrationsTelegramPersonal.status();
+      setTgStatus({ connected: s.connected, apiConfigured: s.apiConfigured, phoneMasked: s.phoneMasked });
+      alert('Telegram подключён.');
+    } catch {
+      alert('Неверный код или сессия устарела. Запросите код снова.');
+    } finally {
+      setTgBusy(false);
+    }
+  };
+
+  const handleTgPassword = async () => {
+    const p = tgPassword.trim();
+    if (!p) return;
+    setTgBusy(true);
+    try {
+      await api.integrationsTelegramPersonal.password({ password: p });
+      setTgNeedPassword(false);
+      setTgPassword('');
+      const s = await api.integrationsTelegramPersonal.status();
+      setTgStatus({ connected: s.connected, apiConfigured: s.apiConfigured, phoneMasked: s.phoneMasked });
+      alert('Telegram подключён.');
+    } catch {
+      alert('Неверный пароль 2FA.');
+    } finally {
+      setTgBusy(false);
+    }
+  };
+
+  const handleTgDisconnect = async () => {
+    if (!confirm('Отключить личный Telegram? Понадобится войти снова.')) return;
+    setTgBusy(true);
+    try {
+      await api.integrationsTelegramPersonal.disconnect();
+      const s = await api.integrationsTelegramPersonal.status();
+      setTgStatus({ connected: s.connected, apiConfigured: s.apiConfigured, phoneMasked: s.phoneMasked });
+      setTgCode('');
+      setTgPassword('');
+      setTgNeedPassword(false);
+    } catch {
+      alert('Не удалось отключить.');
+    } finally {
+      setTgBusy(false);
     }
   };
 
@@ -324,6 +413,102 @@ export const ProfileSettings: React.FC<ProfileSettingsProps> = ({ currentUser, u
                             Эта вкладка будет открываться первой в чате.
                         </p>
                     </div>
+                </div>
+
+                <div className="bg-sky-50/90 dark:bg-[#1a2430] p-5 rounded-xl border border-sky-200/80 dark:border-sky-900/40 space-y-3">
+                  <div className="flex items-start gap-3">
+                    <MessageCircle className="text-sky-600 dark:text-sky-400 shrink-0 mt-0.5" size={20} />
+                    <div className="min-w-0 flex-1 space-y-3">
+                      <div>
+                        <div className="text-sm font-bold text-gray-900 dark:text-white">Telegram — личный аккаунт</div>
+                        <p className="text-xs text-gray-600 dark:text-gray-400 mt-0.5 leading-relaxed">
+                          Переписка с клиентами в разделе «Клиенты» от вашего пользователя Telegram. Нужны{' '}
+                          <code className="text-[11px]">TELEGRAM_API_ID</code> и{' '}
+                          <code className="text-[11px]">TELEGRAM_API_HASH</code> в окружении сервера (сайт my.telegram.org).
+                        </p>
+                      </div>
+                      {tgStatus && !tgStatus.apiConfigured && (
+                        <p className="text-xs text-amber-800 dark:text-amber-200/90">
+                          API не настроен на сервере — интеграция недоступна, пока админ не задаст переменные.
+                        </p>
+                      )}
+                      {tgStatus?.connected ? (
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="text-sm text-gray-800 dark:text-gray-200">
+                            Подключено{tgStatus.phoneMasked ? ` (${tgStatus.phoneMasked})` : ''}
+                          </span>
+                          <button
+                            type="button"
+                            disabled={tgBusy}
+                            onClick={() => void handleTgDisconnect()}
+                            className="px-3 py-1.5 rounded-lg text-xs font-semibold border border-sky-300 dark:border-sky-700 text-sky-900 dark:text-sky-100 hover:bg-sky-100/80 dark:hover:bg-sky-950/50 disabled:opacity-50"
+                          >
+                            Отключить
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="space-y-2">
+                          {!tgNeedPassword ? (
+                            <>
+                              <input
+                                value={tgPhone}
+                                onChange={(e) => setTgPhone(e.target.value)}
+                                className="w-full border border-sky-200 dark:border-sky-800 rounded-lg px-3 py-2 text-sm bg-white dark:bg-[#1a1a1a] text-gray-900 dark:text-gray-100"
+                                placeholder="+998… номер Telegram"
+                                disabled={tgBusy}
+                              />
+                              <div className="flex gap-2">
+                                <button
+                                  type="button"
+                                  disabled={tgBusy}
+                                  onClick={() => void handleTgSendCode()}
+                                  className="px-3 py-2 rounded-lg text-xs font-semibold bg-sky-600 hover:bg-sky-700 text-white disabled:opacity-50"
+                                >
+                                  Получить код
+                                </button>
+                              </div>
+                              <div className="flex gap-2 items-center">
+                                <input
+                                  value={tgCode}
+                                  onChange={(e) => setTgCode(e.target.value)}
+                                  className="flex-1 border border-sky-200 dark:border-sky-800 rounded-lg px-3 py-2 text-sm bg-white dark:bg-[#1a1a1a]"
+                                  placeholder="Код из Telegram"
+                                  disabled={tgBusy}
+                                />
+                                <button
+                                  type="button"
+                                  disabled={tgBusy || !tgCode.trim()}
+                                  onClick={() => void handleTgSignIn()}
+                                  className="px-3 py-2 rounded-lg text-xs font-semibold bg-[#3337AD] text-white hover:opacity-95 disabled:opacity-50"
+                                >
+                                  Войти
+                                </button>
+                              </div>
+                            </>
+                          ) : (
+                            <div className="flex gap-2 items-center">
+                              <input
+                                type="password"
+                                value={tgPassword}
+                                onChange={(e) => setTgPassword(e.target.value)}
+                                className="flex-1 border border-sky-200 dark:border-sky-800 rounded-lg px-3 py-2 text-sm bg-white dark:bg-[#1a1a1a]"
+                                placeholder="Пароль двухэтапной аутентификации"
+                                disabled={tgBusy}
+                              />
+                              <button
+                                type="button"
+                                disabled={tgBusy || !tgPassword.trim()}
+                                onClick={() => void handleTgPassword()}
+                                className="px-3 py-2 rounded-lg text-xs font-semibold bg-[#3337AD] text-white disabled:opacity-50"
+                              >
+                                OK
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </div>
                 </div>
 
                 <div className="bg-gray-50 dark:bg-[#202020] p-5 rounded-xl border border-gray-200 dark:border-[#333] space-y-3">

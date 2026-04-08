@@ -161,6 +161,7 @@ export const ClientChatsPage: React.FC<ClientChatsPageProps> = ({
   const [activeId, setActiveId] = useState<string | null>(null);
   const [input, setInput] = useState('');
   const [sending, setSending] = useState(false);
+  const [tgPersonal, setTgPersonal] = useState<{ connected: boolean; apiConfigured: boolean } | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -193,6 +194,27 @@ export const ClientChatsPage: React.FC<ClientChatsPageProps> = ({
     if (el) el.scrollTop = el.scrollHeight;
   }, [activeId, sortedComments.length, sending]);
 
+  useEffect(() => {
+    void api.integrationsTelegramPersonal
+      .status()
+      .then((s) => setTgPersonal({ connected: s.connected, apiConfigured: s.apiConfigured }))
+      .catch(() => setTgPersonal({ connected: false, apiConfigured: false }));
+  }, []);
+
+  useEffect(() => {
+    if (!active || active.source !== 'telegram' || !tgPersonal?.connected) return;
+    let cancelled = false;
+    void api.integrationsTelegramPersonal
+      .syncMessages(active.id)
+      .then((up) => {
+        if (!cancelled) onSaveDeal(up as Deal);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [active?.id, active?.source, tgPersonal?.connected]);
+
   const getAuthorLabel = (c: Comment) => {
     if (c.type === 'instagram_in' || c.type === 'telegram_in') {
       if (c.authorId?.startsWith('ig_user:')) return 'Клиент (Direct)';
@@ -220,6 +242,10 @@ export const ClientChatsPage: React.FC<ClientChatsPageProps> = ({
     if (d.source === 'instagram') return Boolean(d.telegramChatId?.startsWith('ig:'));
     if (d.source === 'telegram') {
       const id = String(d.telegramChatId || '').trim();
+      const un = String(d.telegramUsername || '').trim();
+      const peerOk =
+        (id.length > 0 && /^-?\d+$/.test(id)) || (un.length > 0 && !un.startsWith('ig:'));
+      if (tgPersonal?.connected && peerOk) return true;
       return id.length > 0 && /^-?\d+$/.test(id);
     }
     return false;
@@ -246,7 +272,9 @@ export const ClientChatsPage: React.FC<ClientChatsPageProps> = ({
         return;
       }
       if (active.source === 'telegram' && canSendExternal(active)) {
-        const updated = (await api.integrationsTelegram.sendToLead({ dealId: active.id, text })) as Deal;
+        const updated = (await (tgPersonal?.connected
+          ? api.integrationsTelegramPersonal.sendDeal(active.id, { text })
+          : api.integrationsTelegram.sendToLead({ dealId: active.id, text }))) as Deal;
         onSaveDeal({ ...active, ...updated });
         setInput('');
         if (textareaRef.current) textareaRef.current.style.height = 'auto';
@@ -287,7 +315,9 @@ export const ClientChatsPage: React.FC<ClientChatsPageProps> = ({
     : active.source === 'instagram' && !canSendExternal(active)
       ? 'Нет привязки Instagram Direct — только внутренние заметки.'
       : active.source === 'telegram' && !canSendExternal(active)
-        ? 'Нет chat id или бот выключен — проверьте настройки воронки.'
+        ? tgPersonal?.connected
+          ? 'У сделки нет Telegram username или числового chat id.'
+          : 'Нет chat id, бот выключен или не подключён личный Telegram в профиле.'
         : active.source === 'instagram' && canSendExternal(active)
           ? 'Сообщение уйдёт клиенту в Instagram.'
           : active.source === 'telegram' && canSendExternal(active)
