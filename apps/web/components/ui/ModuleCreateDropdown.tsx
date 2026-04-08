@@ -69,7 +69,7 @@ export const ModuleCreateDropdown: React.FC<ModuleCreateDropdownProps> = ({
             onClick={() => setOpen(false)}
           />
           <div
-            className={`absolute top-full mt-2 w-56 bg-white dark:bg-[#252525] border border-gray-200 dark:border-[#333] rounded-xl shadow-xl py-1 z-[110] ${
+            className={`absolute top-full mt-[3px] w-56 bg-white dark:bg-[#252525] border border-gray-200 dark:border-[#333] rounded-xl shadow-xl py-1 z-[110] ${
               align === 'right' ? 'right-0' : 'left-0'
             }`}
           >

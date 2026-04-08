@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback, useEffect } from 'react';
+import React, { useState, useMemo, useCallback, useEffect, useLayoutEffect } from 'react';
 import { Client, Deal, Contract, OneTimeDeal, AccountsReceivable, SalesFunnel, User } from '../types';
 import { FilterConfig } from './FiltersPanel';
 import {
@@ -13,7 +13,16 @@ import {
   OneTimeDealModal,
   AccountsReceivableModal,
 } from './clients';
-import { ModulePageShell, MODULE_PAGE_GUTTER } from './ui';
+import {
+  ModulePageShell,
+  MODULE_PAGE_GUTTER,
+  ModuleCreateDropdown,
+  ModuleFilterIconButton,
+  APP_TOOLBAR_MODULE_CLUSTER,
+} from './ui';
+import { ModuleSelectDropdown } from './ui/ModuleSelectDropdown';
+import { useAppToolbar } from '../contexts/AppToolbarContext';
+import { AlertCircle, Briefcase, Building2, FileText } from 'lucide-react';
 
 interface ClientsViewProps {
   clients: Client[];
@@ -51,6 +60,7 @@ const ClientsView: React.FC<ClientsViewProps> = ({
   onDeleteAccountsReceivable,
   embedInCrmHub = false,
 }) => {
+  const { setModule } = useAppToolbar();
   const [activeTab, setActiveTab] = useState<'clients' | 'contracts' | 'finance' | 'receivables'>('clients');
   const [contractStatusFilter, setContractStatusFilter] = useState<string>('all');
   const [selectedFunnelId, setSelectedFunnelId] = useState<string>('');
@@ -183,6 +193,68 @@ const ClientsView: React.FC<ClientsViewProps> = ({
     });
   };
 
+  useLayoutEffect(() => {
+    if (!embedInCrmHub) return;
+
+    setModule(
+      <div className={APP_TOOLBAR_MODULE_CLUSTER}>
+        {(activeTab === 'clients' || activeTab === 'contracts') && salesFunnels.length > 0 && (
+          <ModuleSelectDropdown
+            accent="violet"
+            size="xs"
+            align="right"
+            selectedId={selectedFunnelId || 'all'}
+            valueLabel={
+              selectedFunnelId
+                ? (salesFunnels.find((f) => f.id === selectedFunnelId)?.name || '—')
+                : `Все (${salesFunnels.length})`
+            }
+            items={[
+              { id: 'all', label: `Все (${salesFunnels.length})`, onClick: () => setSelectedFunnelId('') },
+              ...salesFunnels.map((f) => ({
+                id: f.id,
+                label: f.name,
+                onClick: () => setSelectedFunnelId(f.id),
+              })),
+            ]}
+          />
+        )}
+        {activeTab === 'contracts' && (
+          <ModuleFilterIconButton
+            accent="violet"
+            size="sm"
+            active={showFilters || hasActiveContractFilters}
+            activeCount={activeFiltersCount}
+            onClick={() => setShowFilters((v) => !v)}
+            label="Фильтры"
+          />
+        )}
+        <ModuleCreateDropdown
+          accent="violet"
+          buttonSize="sm"
+          label="Создать"
+          items={[
+            { id: 'create-client', label: 'Клиент', icon: Building2, onClick: handleOpenClientCreate },
+            { id: 'create-contract', label: 'Договор', icon: FileText, onClick: () => handleOpenContractCreate('') },
+            { id: 'create-sale', label: 'Продажа', icon: Briefcase, onClick: () => handleOpenOneTimeDealCreate('') },
+            { id: 'create-receivable', label: 'Задолженность', icon: AlertCircle, onClick: () => handleOpenReceivableCreate('') },
+          ]}
+        />
+      </div>
+    );
+
+    return () => setModule(null);
+  }, [
+    embedInCrmHub,
+    activeTab,
+    salesFunnels,
+    selectedFunnelId,
+    showFilters,
+    hasActiveContractFilters,
+    activeFiltersCount,
+    setModule,
+  ]);
+
   return (
     <ModulePageShell className="flex-1 min-h-0 flex flex-col overflow-hidden">
       <div className={`${MODULE_PAGE_GUTTER} pt-6 md:pt-8 flex-shrink-0 space-y-5`}>
@@ -190,14 +262,14 @@ const ClientsView: React.FC<ClientsViewProps> = ({
           salesFunnels={salesFunnels}
           selectedFunnelId={selectedFunnelId}
           onFunnelChange={setSelectedFunnelId}
-          showFunnelFilter={activeTab === 'clients' || activeTab === 'contracts'}
+          showFunnelFilter={!embedInCrmHub && (activeTab === 'clients' || activeTab === 'contracts')}
           hideCreateActions={embedInCrmHub}
           activeTab={activeTab}
           onCreateClient={handleOpenClientCreate}
           onCreateContract={() => handleOpenContractCreate('')}
           onCreateSale={() => handleOpenOneTimeDealCreate('')}
           onCreateReceivable={() => handleOpenReceivableCreate('')}
-          onFiltersClick={activeTab === 'contracts' ? () => setShowFilters(!showFilters) : undefined}
+          onFiltersClick={!embedInCrmHub && activeTab === 'contracts' ? () => setShowFilters(!showFilters) : undefined}
           showFilters={showFilters}
           hasActiveFilters={hasActiveContractFilters}
           activeFiltersCount={activeFiltersCount}

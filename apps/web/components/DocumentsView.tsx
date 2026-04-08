@@ -6,7 +6,6 @@ import {
   Button,
   ModuleCreateDropdown,
   ModulePageShell,
-  ModuleSegmentedControl,
   MODULE_PAGE_GUTTER,
   APP_TOOLBAR_MODULE_CLUSTER,
 } from './ui';
@@ -321,18 +320,30 @@ const DocumentsView: React.FC<DocumentsViewProps> = ({
 
   useLayoutEffect(() => {
     if (docSection === 'docs') {
+      const indigo = 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300';
+      const idle = 'text-gray-600 dark:text-gray-400';
       setLeading(
-        <ModuleSegmentedControl
-          size="sm"
-          variant="accent"
-          accent="indigo"
-          value={viewMode}
-          onChange={(v) => setViewMode(v)}
-          options={[
-            { value: 'grid', label: 'Плитка' },
-            { value: 'list', label: 'Список' },
-          ]}
-        />
+        <div className="flex items-center gap-0.5 shrink-0 flex-wrap sm:flex-nowrap" role="tablist" aria-label="Вид документов">
+          {(
+            [
+              { id: 'grid' as const, label: 'Плитка' },
+              { id: 'list' as const, label: 'Список' },
+            ] as const
+          ).map((t) => (
+            <button
+              key={t.id}
+              type="button"
+              role="tab"
+              aria-selected={viewMode === t.id}
+              onClick={() => setViewMode(t.id)}
+              className={`px-2 sm:px-2.5 py-1 rounded-lg text-[11px] sm:text-xs font-medium whitespace-nowrap transition-colors ${
+                viewMode === t.id ? indigo : `${idle} hover:bg-gray-100 dark:hover:bg-[#252525]`
+              }`}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
       );
     } else {
       setLeading(null);
@@ -341,6 +352,8 @@ const DocumentsView: React.FC<DocumentsViewProps> = ({
       <div className={APP_TOOLBAR_MODULE_CLUSTER}>
         {(docSection === 'weekly' || docSection === 'protocols') && (
           <ModuleFilterIconButton
+            accent="slate"
+            size="sm"
             active={false}
             onClick={() => {
               if (docSection === 'weekly') weeklyPlansRef.current?.toggleFilters();

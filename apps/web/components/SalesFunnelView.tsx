@@ -233,7 +233,7 @@ const SalesFunnelView: React.FC<SalesFunnelViewProps> = ({ deals, clients, users
                 aria-hidden
                 onClick={() => setFunnelMenuOpen(false)}
               />
-              <div className="absolute right-0 top-full mt-1.5 w-[min(100vw-2rem,18rem)] max-h-[min(70vh,20rem)] overflow-y-auto overscroll-contain bg-white dark:bg-[#1f1f1f] border border-gray-200 dark:border-[#333] rounded-xl shadow-xl py-1 z-[110]">
+              <div className="absolute right-0 top-full mt-[3px] w-[min(100vw-2rem,18rem)] max-h-[min(70vh,20rem)] overflow-y-auto overscroll-contain bg-white dark:bg-[#1f1f1f] border border-gray-200 dark:border-[#333] rounded-xl shadow-xl py-1 z-[110]">
                 {[
                   { id: 'all', label: `Все воронки (${activeFunnels.length})`, onClick: () => setSelectedFunnelId('all') },
                   ...activeFunnels.map((f) => ({ id: f.id, label: f.name, onClick: () => setSelectedFunnelId(f.id) })),

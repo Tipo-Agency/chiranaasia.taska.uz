@@ -484,7 +484,11 @@ function MainApp() {
             </div>
 
             <ChatFloatingButton
-              hidden={state.currentView === 'chat' || chatPanelOpen}
+              hidden={
+                state.currentView === 'chat' ||
+                chatPanelOpen ||
+                (state.currentView === 'sales-funnel' && state.crmHubTab === 'chats')
+              }
               onOpen={() => {
                 setChatOpenToSystemFeed(false);
                 if (state.currentUser) setChatMainTab(getChatDefaultTab(state.currentUser.id));

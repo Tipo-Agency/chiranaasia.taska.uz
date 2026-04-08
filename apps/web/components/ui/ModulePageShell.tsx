@@ -8,7 +8,7 @@ export const ModulePageShell: React.FC<{
   className?: string;
 }> = ({ children, className = '' }) => (
   <div
-    className={`h-full flex flex-col min-h-0 bg-gray-50/50 dark:bg-[#282828] ${className}`}
+    className={`h-full flex flex-col min-h-0 bg-gray-50/50 dark:bg-[#191919] ${className}`}
   >
     {children}
   </div>

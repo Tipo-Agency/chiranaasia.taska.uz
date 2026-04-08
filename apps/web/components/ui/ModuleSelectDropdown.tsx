@@ -110,7 +110,7 @@ export const ModuleSelectDropdown: React.FC<ModuleSelectDropdownProps> = ({
             onClick={() => setOpen(false)}
           />
           <div
-            className={`absolute top-full mt-1.5 w-[min(100vw-2rem,20rem)] max-w-[min(100vw-2rem,20rem)] max-h-[min(70vh,22rem)] overflow-y-auto overscroll-contain bg-white dark:bg-[#1f1f1f] border border-gray-200 dark:border-[#333] rounded-xl shadow-xl py-1 z-[110] ${
+            className={`absolute top-full mt-[3px] w-[min(100vw-2rem,20rem)] max-w-[min(100vw-2rem,20rem)] max-h-[min(70vh,22rem)] overflow-y-auto overscroll-contain bg-white dark:bg-[#1f1f1f] border border-gray-200 dark:border-[#333] rounded-xl shadow-xl py-1 z-[110] ${
               align === 'right' ? 'right-0' : 'left-0'
             }`}
           >

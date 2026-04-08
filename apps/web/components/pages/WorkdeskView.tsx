@@ -797,7 +797,7 @@ export const WorkdeskView: React.FC<WorkdeskViewProps> = ({
           )}
 
           {activeTab === 'meetings' && (
-            <div className="rounded-2xl border border-gray-200 dark:border-[#333] overflow-hidden bg-white dark:bg-[#191919] min-h-[min(70vh,720px)] flex flex-col">
+            <div className="min-h-[min(70vh,720px)] flex flex-col">
               {meetingsSlot ?? (
                 <div className="p-4 text-sm text-gray-500 dark:text-gray-400">Календарь недоступен.</div>
               )}
@@ -805,7 +805,7 @@ export const WorkdeskView: React.FC<WorkdeskViewProps> = ({
           )}
 
           {activeTab === 'documents' && (
-            <div className="rounded-2xl border border-gray-200 dark:border-[#333] overflow-hidden bg-white dark:bg-[#191919] min-h-[min(70vh,720px)] flex flex-col">
+            <div className="min-h-[min(70vh,720px)] flex flex-col">
               {documentsSlot ?? (
                 <div className="p-4 text-sm text-gray-500 dark:text-gray-400">Документы недоступны.</div>
               )}

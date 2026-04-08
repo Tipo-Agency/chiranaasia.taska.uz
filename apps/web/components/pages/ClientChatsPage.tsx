@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Instagram, Send, ExternalLink, MessageCircle, Globe, UserRound } from 'lucide-react';
+import { Instagram, Send, MessageCircle, Globe, UserRound } from 'lucide-react';
 import type { Deal, User, Comment, SalesFunnel } from '../../types';
 import { PageLayout } from '../ui/PageLayout';
 import { api } from '../../backend/api';
@@ -144,7 +144,6 @@ export const ClientChatsPage: React.FC<ClientChatsPageProps> = ({
   currentUser,
   salesFunnels = [],
   onSaveDeal,
-  onOpenInFunnel,
   layout = 'page',
 }) => {
   const [channelFilter, setChannelFilter] = useState<ChannelFilter>('all');
@@ -283,12 +282,6 @@ export const ClientChatsPage: React.FC<ClientChatsPageProps> = ({
     { id: 'other', label: 'Прочее' },
   ];
 
-  const headerSubtitle = active
-    ? `${SOURCE_META[(active.source || 'manual') as NonNullable<Deal['source']>]?.label || 'Лид'} · ${funnelNameForDeal(active, salesFunnels) || 'Сделка'}`
-    : threads.length
-      ? `${threads.length} в списке`
-      : 'Выберите лид слева';
-
   const footerNotice = !active
     ? ''
     : active.source === 'instagram' && !canSendExternal(active)
@@ -315,48 +308,26 @@ export const ClientChatsPage: React.FC<ClientChatsPageProps> = ({
     <div
       className={`flex h-full min-h-0 w-full flex-1 flex-col overflow-hidden bg-gradient-to-b from-gray-50/95 to-white dark:from-[#1c1c1c] dark:to-[#252525] ${shellOuter}`}
     >
-      {/* Верхняя полоса — как в чате сотрудников */}
-      <div className="flex shrink-0 items-center justify-between gap-3 border-b border-gray-200/80 dark:border-[#333] bg-white/70 px-4 py-3 backdrop-blur-sm dark:bg-[#252525]/90">
-        <div className="flex min-w-0 flex-1 items-center gap-3">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#3337AD]/12 text-[#3337AD]">
-            <MessageCircle size={20} strokeWidth={2} />
-          </div>
-          <div className="min-w-0">
-            <h2 className="truncate text-base font-semibold leading-tight text-gray-900 dark:text-white">Диалоги с лидами</h2>
-            <p className="truncate text-xs text-gray-500 dark:text-gray-400">{headerSubtitle}</p>
-          </div>
-        </div>
-        {active && onOpenInFunnel && (
-          <button
-            type="button"
-            onClick={() => onOpenInFunnel(active)}
-            className="inline-flex shrink-0 items-center gap-1.5 rounded-xl border border-gray-200 bg-white px-3 py-2 text-xs font-medium text-[#3337AD] shadow-sm transition-colors hover:bg-gray-50 dark:border-[#444] dark:bg-[#1a1a1a] dark:text-[#8b8ee0] dark:hover:bg-[#252525]"
-          >
-            <ExternalLink size={14} />
-            Воронка
-          </button>
-        )}
-      </div>
-
       <div className="flex min-h-0 flex-1 gap-0 overflow-hidden">
         <aside className="flex w-full max-w-[100vw] shrink-0 flex-col border-r border-gray-200/80 dark:border-[#333] bg-white/50 dark:bg-[#1f1f1f]/80 sm:w-56 md:w-60 min-h-0">
           <div className="shrink-0 border-b border-gray-100 p-2 dark:border-[#333]">
-            <p className="px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-gray-400">Канал</p>
-            <div className="mt-1 flex flex-wrap gap-1">
+            <div className="rounded-xl border border-gray-200/90 bg-white/90 p-1 dark:border-[#3a3a3a] dark:bg-[#262626]">
+              <div className="flex flex-wrap gap-1">
               {filterTabs.map((t) => (
                 <button
                   key={t.id}
                   type="button"
                   onClick={() => setChannelFilter(t.id)}
-                  className={`rounded-lg px-2 py-1 text-[10px] font-semibold transition-colors ${
+                  className={`rounded-md px-2 py-1 text-[10px] font-semibold transition-colors ${
                     channelFilter === t.id
                       ? 'bg-[#3337AD] text-white shadow-sm'
-                      : 'bg-white text-gray-600 hover:bg-gray-100 dark:bg-[#2a2a2a] dark:text-gray-300 dark:hover:bg-[#333]'
+                      : 'text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-[#333]'
                   }`}
                 >
                   {t.label}
                 </button>
               ))}
+              </div>
             </div>
           </div>
           <div className="min-h-0 flex-1 overflow-y-auto custom-scrollbar p-2">
