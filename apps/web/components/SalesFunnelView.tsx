@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useLayoutEffect, useMemo, useRef } from 'react';
 import { Deal, Client, User, Comment, Task, Project, SalesFunnel, Meeting, NotificationPreferences } from '../types';
-import { Plus, KanbanSquare, X, Send, MessageSquare, Instagram, Globe, UserPlus, Bot, Edit2, TrendingUp, CheckSquare, CheckCircle2, XCircle, Trash2, Calendar, Clock, Users, Tag, GitBranch, Filter, User as UserIcon, Building2, Briefcase, FileText, AlertCircle, Check } from 'lucide-react';
+import { Plus, KanbanSquare, X, Send, MessageSquare, MessageCircle, Instagram, Globe, UserPlus, Bot, Edit2, TrendingUp, CheckSquare, CheckCircle2, XCircle, Trash2, Calendar, Clock, Users, Tag, GitBranch, Filter, User as UserIcon, Building2, Briefcase, FileText, AlertCircle, Check } from 'lucide-react';
 // Клиентский Telegram/Instagram — при необходимости подключать через api/telegramService.
 import { DynamicIcon } from './AppIcons';
 import {
@@ -95,8 +95,37 @@ const SalesFunnelView: React.FC<SalesFunnelViewProps> = ({ deals, clients, users
   const [confirmState, setConfirmState] = useState<{ open: boolean; title: string; message: string; onConfirm?: () => void }>({ open: false, title: '', message: '' });
   const [tgPersonal, setTgPersonal] = useState<{ connected: boolean; apiConfigured: boolean } | null>(null);
   const [chatSending, setChatSending] = useState(false);
+  /** Черновик Telegram @username для карточки привязанного клиента (сохраняется в сущность Client) */
+  const [clientTelegramDraft, setClientTelegramDraft] = useState('');
 
   const activeFunnels = useMemo(() => salesFunnels.filter((f) => !f.isArchived), [salesFunnels]);
+
+  const linkedClientForDeal = useMemo(
+    () => (editingDeal?.clientId ? clients.find((c) => c.id === editingDeal.clientId) : undefined),
+    [editingDeal?.clientId, clients]
+  );
+
+  useEffect(() => {
+    if (!isModalOpen || !linkedClientForDeal) {
+      setClientTelegramDraft('');
+      return;
+    }
+    const raw = (linkedClientForDeal.telegram || '').trim().replace(/^@+/u, '');
+    setClientTelegramDraft(raw);
+  }, [isModalOpen, linkedClientForDeal?.id, linkedClientForDeal?.telegram]);
+
+  const flushLinkedClientTelegram = () => {
+    if (!linkedClientForDeal || !onCreateClient) return;
+    const next = clientTelegramDraft.trim().replace(/^@+/u, '');
+    const prev = (linkedClientForDeal.telegram || '').trim().replace(/^@+/u, '');
+    if (next === prev) return;
+    onCreateClient({
+      ...linkedClientForDeal,
+      telegram: next || undefined,
+      updatedAt: new Date().toISOString(),
+    });
+  };
+
   const selectedFunnelIds = useMemo(() => {
     if (selectedFunnelId === 'all') return activeFunnels.map((f) => f.id);
     return activeFunnels.some((f) => f.id === selectedFunnelId) ? [selectedFunnelId] : activeFunnels.map((f) => f.id);
@@ -395,7 +424,8 @@ const SalesFunnelView: React.FC<SalesFunnelViewProps> = ({ deals, clients, users
 
   const handleSubmit = async (e?: React.FormEvent) => {
       if (e) e.preventDefault();
-      
+      flushLinkedClientTelegram();
+
       try {
           // Проверяем обязательные поля
           const trimmedTitle = title.trim();
@@ -436,23 +466,26 @@ const SalesFunnelView: React.FC<SalesFunnelViewProps> = ({ deals, clients, users
               finalStage = 'new';
           }
           
+          const prev = editingDeal;
           const dealData: Deal = {
-              id: editingDeal ? editingDeal.id : `deal-${Date.now()}`,
-              title: trimmedTitle, 
-              clientId: undefined, // Клиент создается только при успешной сделке
-              contactName: contactName.trim() || undefined, 
-              amount: parseFloat(amount) || 0, 
-              currency: 'UZS', 
-              stage: finalStage, 
+              ...(prev || {}),
+              id: prev?.id ?? `deal-${Date.now()}`,
+              title: trimmedTitle,
+              clientId: prev?.clientId,
+              contactName: contactName.trim() || undefined,
+              amount: parseFloat(amount) || 0,
+              currency: prev?.currency || 'UZS',
+              stage: finalStage,
               funnelId: finalFunnelId || undefined,
-              source: source || 'manual', 
-              assigneeId: assigneeId || undefined, 
+              source: source || 'manual',
+              assigneeId: assigneeId || undefined,
               notes: notes.trim() || undefined,
               projectId: dealProjectId || undefined,
-              telegramChatId: editingDeal?.telegramChatId, 
-              telegramUsername: editingDeal?.telegramUsername, 
-              createdAt: editingDeal ? editingDeal.createdAt : new Date().toISOString(), 
-              comments: comments || []
+              telegramChatId: prev?.telegramChatId,
+              telegramUsername: prev?.telegramUsername,
+              createdAt: prev?.createdAt ?? new Date().toISOString(),
+              comments: comments || [],
+              updatedAt: new Date().toISOString(),
           };
           
           onSaveDeal(dealData);
@@ -1093,6 +1126,89 @@ const SalesFunnelView: React.FC<SalesFunnelViewProps> = ({ deals, clients, users
                                       className="w-full border border-gray-300 dark:border-gray-600 rounded-md px-2.5 py-1.5 min-h-[32px] text-sm bg-white dark:bg-[#333] text-gray-900 dark:text-gray-100"
                                       placeholder="ФИО, телефон"
                                   />
+                              </div>
+                              {editingDeal && (
+                                <div className="md:col-span-2 flex flex-col gap-1">
+                                  <label className="block text-[10px] font-bold text-gray-500 dark:text-gray-400 uppercase">
+                                    Привязка к клиенту (справочник)
+                                  </label>
+                                  <TaskSelect
+                                    size="compact"
+                                    value={editingDeal.clientId || ''}
+                                    onChange={(val) => {
+                                      const cid = String(val || '').trim();
+                                      const c = clients.find((cl) => cl.id === cid);
+                                      setEditingDeal((prev) =>
+                                        prev ? { ...prev, clientId: cid || undefined } : prev
+                                      );
+                                      if (c) {
+                                        setClientName(c.name);
+                                        if (c.contactPerson) setContactName(c.contactPerson);
+                                      }
+                                    }}
+                                    placeholder="Не привязан"
+                                    options={[
+                                      { value: '', label: 'Не привязан' },
+                                      ...clients
+                                        .filter((cl) => !cl.isArchived)
+                                        .map((cl) => ({ value: cl.id, label: cl.name })),
+                                    ]}
+                                  />
+                                  <p className="text-[10px] leading-snug text-gray-500 dark:text-gray-400">
+                                    Отдельно от поля «Клиент» выше: здесь связь с сущностью клиента (как в разделе «Клиенты»). От неё зависит Telegram ниже.
+                                  </p>
+                                </div>
+                              )}
+                              <div className="md:col-span-2 space-y-1">
+                                  <label className="flex items-center gap-1.5 text-[10px] font-bold text-gray-500 dark:text-gray-400 uppercase">
+                                      <MessageCircle size={14} className="text-sky-500 shrink-0" />
+                                      Telegram (@username)
+                                  </label>
+                                  {linkedClientForDeal ? (
+                                    <>
+                                      <input
+                                        value={clientTelegramDraft}
+                                        onChange={(e) => setClientTelegramDraft(e.target.value)}
+                                        onBlur={flushLinkedClientTelegram}
+                                        className="w-full border border-gray-300 dark:border-gray-600 rounded-md px-2.5 py-1.5 min-h-[32px] text-sm bg-white dark:bg-[#333] text-gray-900 dark:text-gray-100"
+                                        placeholder="username или @username — для диалогов"
+                                      />
+                                      <p className="text-[10px] leading-snug text-gray-500 dark:text-gray-400">
+                                        То же поле, что в карточке клиента: используется для чата сделки и раздела «Диалоги».
+                                      </p>
+                                    </>
+                                  ) : editingDeal?.clientId && !linkedClientForDeal ? (
+                                    <p className="text-xs text-amber-700 dark:text-amber-300/90">
+                                      Клиент с этой привязкой не найден в списке — обновите страницу или пересоздайте связь.
+                                    </p>
+                                  ) : editingDeal &&
+                                    (editingDeal.telegramUsername || editingDeal.telegramChatId) ? (
+                                    <div className="rounded-lg border border-gray-200 dark:border-gray-600 bg-gray-50/90 dark:bg-[#2a2a2a] px-2.5 py-2 text-xs text-gray-800 dark:text-gray-200 space-y-1">
+                                      <div className="font-semibold text-gray-600 dark:text-gray-400">Канал лида (сделка)</div>
+                                      {editingDeal.telegramUsername &&
+                                        !String(editingDeal.telegramUsername).startsWith('ig:') && (
+                                          <div>
+                                            Telegram: @
+                                            {String(editingDeal.telegramUsername).replace(/^@+/, '')}
+                                          </div>
+                                        )}
+                                      {editingDeal.telegramChatId?.startsWith('ig:') && (
+                                        <div className="break-all">Instagram Direct: {editingDeal.telegramChatId}</div>
+                                      )}
+                                      {editingDeal.telegramChatId &&
+                                        !editingDeal.telegramChatId.startsWith('ig:') && (
+                                          <div className="break-all">Chat ID: {editingDeal.telegramChatId}</div>
+                                        )}
+                                      <p className="text-[10px] text-gray-500 dark:text-gray-400 pt-1">
+                                        После привязки клиента к сделке Telegram для переписки берётся из карточки клиента (поле выше).
+                                      </p>
+                                    </div>
+                                  ) : (
+                                    <p className="text-xs leading-snug text-gray-500 dark:text-gray-400">
+                                      При появлении привязанного клиента здесь будет тот же Telegram, что в карточке клиента.
+                                      У лидов из Instagram/Telegram канал показывается в блоке «Канал лида», когда клиент ещё не привязан.
+                                    </p>
+                                  )}
                               </div>
                               <div className="md:col-span-2">
                                   <label className="block text-[10px] font-bold text-gray-500 dark:text-gray-400 mb-1 uppercase">Сумма (UZS)</label>
