@@ -19,13 +19,20 @@ interface AccessSettingsProps {
   currentUser: User;
   users: User[];
   onUpdateUsers: (users: User[]) => void;
+  /** Сигнал от кнопки "+" в верхней панели для открытия формы создания */
+  openNewUserSignal?: number;
 }
 
 function normalizeLegacyRole(meta: AppRole | undefined): LegacyRole {
   return meta?.slug === 'admin' ? LegacyRole.ADMIN : LegacyRole.EMPLOYEE;
 }
 
-export const AccessSettings: React.FC<AccessSettingsProps> = ({ currentUser, users, onUpdateUsers }) => {
+export const AccessSettings: React.FC<AccessSettingsProps> = ({
+  currentUser,
+  users,
+  onUpdateUsers,
+  openNewUserSignal = 0,
+}) => {
   const canUsers = hasPermission(currentUser, 'access.users');
   const canRoles = hasPermission(currentUser, 'access.roles');
 
@@ -108,6 +115,13 @@ export const AccessSettings: React.FC<AccessSettingsProps> = ({ currentUser, use
       });
     }
   }, [selectedUser?.id]);
+
+  useEffect(() => {
+    if (!canUsers) return;
+    if (openNewUserSignal > 0) {
+      setPanel('new');
+    }
+  }, [openNewUserSignal, canUsers]);
 
   const handleResetPassword = (id: string) => {
     if (!confirm('Сбросить пароль на «123»?')) return;

@@ -20,6 +20,12 @@ import { DateInput } from './ui/DateInput';
 import { TaskSelect } from './TaskSelect';
 import { api } from '../backend/api';
 import { isFunnelDeal } from '../utils/dealModel';
+import {
+  canSendExternalTelegram,
+  canSendTelegramFromClientCard,
+  dealChatInputPlaceholder,
+  shouldSyncTelegramDealMessages,
+} from '../utils/dealChatIntegration';
 import { getFunnelKanbanCardAccent } from '../utils/funnelVisual';
 import { devWarn } from '../utils/devLog';
 import { formatDate } from '../utils/dateUtils';
@@ -29,6 +35,8 @@ interface SalesFunnelViewProps {
   deals: Deal[];
   clients: Client[];
   users: User[];
+  /** Текущий пользователь — для внутренних комментариев в чате сделки */
+  currentUser?: User | null;
   projects?: Project[];
   tasks?: Task[];
   meetings?: Meeting[];
@@ -85,6 +93,8 @@ const SalesFunnelView: React.FC<SalesFunnelViewProps> = ({ deals, clients, users
   const [defaultFunnelId, setDefaultFunnelId] = useState<string | undefined>(undefined);
   const [alertState, setAlertState] = useState<{ open: boolean; title: string; message: string }>({ open: false, title: '', message: '' });
   const [confirmState, setConfirmState] = useState<{ open: boolean; title: string; message: string; onConfirm?: () => void }>({ open: false, title: '', message: '' });
+  const [tgPersonal, setTgPersonal] = useState<{ connected: boolean; apiConfigured: boolean } | null>(null);
+  const [chatSending, setChatSending] = useState(false);
 
   const activeFunnels = useMemo(() => salesFunnels.filter((f) => !f.isArchived), [salesFunnels]);
   const selectedFunnelIds = useMemo(() => {
@@ -176,6 +186,32 @@ const SalesFunnelView: React.FC<SalesFunnelViewProps> = ({ deals, clients, users
     window.addEventListener('openDealFromChat', handleOpenDealById as EventListener);
     return () => window.removeEventListener('openDealFromChat', handleOpenDealById as EventListener);
   }, [funnelDeals, selectedFunnelId]);
+
+  useEffect(() => {
+    void api.integrationsTelegramPersonal
+      .status()
+      .then((s) => setTgPersonal({ connected: s.connected, apiConfigured: s.apiConfigured }))
+      .catch(() => setTgPersonal({ connected: false, apiConfigured: false }));
+  }, []);
+
+  useEffect(() => {
+    if (!isModalOpen || modalTab !== 'chat' || !editingDeal || !tgPersonal?.connected) return;
+    if (!shouldSyncTelegramDealMessages(editingDeal, clients, tgPersonal.connected)) return;
+    let cancelled = false;
+    void api.integrationsTelegramPersonal
+      .syncMessages(editingDeal.id)
+      .then((up) => {
+        if (cancelled) return;
+        const deal = up as Deal;
+        setComments(deal.comments || []);
+        setEditingDeal((prev) => (prev && prev.id === deal.id ? { ...prev, ...deal } : prev));
+        onSaveDeal(deal);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [isModalOpen, modalTab, editingDeal?.id, editingDeal?.source, editingDeal?.clientId, tgPersonal?.connected, clients]);
 
   const handleOpenCreate = (presetStageId?: string) => { 
     setEditingDeal(null); 
@@ -428,40 +464,61 @@ const SalesFunnelView: React.FC<SalesFunnelViewProps> = ({ deals, clients, users
   };
 
   const handleSendChat = async () => {
-      if (!chatMessage.trim() || !editingDeal) return;
+      if (!chatMessage.trim() || !editingDeal || chatSending) return;
 
       const deal = editingDeal;
       const text = chatMessage.trim();
+      const tgOk = Boolean(tgPersonal?.connected);
+      setChatSending(true);
 
-      if (deal.source === 'instagram' && deal.telegramChatId?.startsWith('ig:')) {
-          try {
-              const updated = (await api.integrationsMeta.sendInstagram({ dealId: deal.id, text })) as Deal;
-              const next = updated.comments || [];
-              setComments(next);
-              onSaveDeal({ ...deal, ...updated, comments: next });
-              setChatMessage('');
-          } catch (e) {
-              devWarn('[DEAL] Instagram send failed:', e);
-              setAlertState({
-                  open: true,
-                  title: 'Не удалось отправить в Instagram',
-                  message: e instanceof Error ? e.message : 'Проверьте токены страниц и права приложения.',
-              });
-          }
+      const applyUpdatedDeal = (updated: Deal) => {
+        const next = updated.comments || [];
+        setComments(next);
+        setEditingDeal((prev) => (prev && prev.id === updated.id ? { ...prev, ...updated, comments: next } : prev));
+        onSaveDeal({ ...deal, ...updated, comments: next });
+        setChatMessage('');
+      };
+
+      try {
+        if (deal.source === 'instagram' && deal.telegramChatId?.startsWith('ig:')) {
+          const updated = (await api.integrationsMeta.sendInstagram({ dealId: deal.id, text })) as Deal;
+          applyUpdatedDeal(updated);
           return;
-      }
+        }
+        if (deal.source === 'telegram' && canSendExternalTelegram(deal, clients, tgOk)) {
+          const updated = (await (tgPersonal?.connected
+            ? api.integrationsTelegramPersonal.sendDeal(deal.id, { text })
+            : api.integrationsTelegram.sendToLead({ dealId: deal.id, text }))) as Deal;
+          applyUpdatedDeal(updated);
+          return;
+        }
+        if (canSendTelegramFromClientCard(deal, clients, tgOk)) {
+          const updated = (await api.integrationsTelegramPersonal.sendDeal(deal.id, { text })) as Deal;
+          applyUpdatedDeal(updated);
+          return;
+        }
 
-      const c: Comment = {
+        const c: Comment = {
           id: `c-${Date.now()}`,
           text,
           authorId: currentUser?.id || 'demo-user',
           createdAt: new Date().toISOString(),
           type: 'internal',
-      };
-      const nextComments = [...(comments || []), c];
-      setComments(nextComments);
-      onSaveDeal({ ...deal, comments: nextComments });
-      setChatMessage('');
+        };
+        const nextComments = [...(comments || []), c];
+        setComments(nextComments);
+        onSaveDeal({ ...deal, comments: nextComments, updatedAt: new Date().toISOString() });
+        setChatMessage('');
+      } catch (e) {
+        devWarn('[DEAL] chat send failed:', e);
+        setAlertState({
+          open: true,
+          title: 'Не удалось отправить сообщение',
+          message: e instanceof Error ? e.message : 'Проверьте интеграции и настройки Telegram / Instagram.',
+        });
+      } finally {
+        setChatSending(false);
+      }
   };
 
   const onDragStart = (e: React.DragEvent, id: string) => { setDraggedDealId(id); e.dataTransfer.effectAllowed = 'move'; };
@@ -562,7 +619,8 @@ const SalesFunnelView: React.FC<SalesFunnelViewProps> = ({ deals, clients, users
   });
   const getCommentAuthorName = (comment: Comment) => {
     if (comment.type === 'instagram_in' || comment.type === 'telegram_in') {
-      if (comment.authorId?.startsWith('ig_user:')) return 'Клиент (Instagram)';
+      if (comment.authorId?.startsWith('ig_user:')) return 'Клиент (Direct)';
+      if (comment.authorId === 'tg_user') return 'Клиент (Telegram)';
     }
     const user = users.find((u) => u.id === comment.authorId);
     return user?.name || 'Система';
@@ -1140,14 +1198,22 @@ const SalesFunnelView: React.FC<SalesFunnelViewProps> = ({ deals, clients, users
                                       <input
                                           value={chatMessage}
                                           onChange={(e) => setChatMessage(e.target.value)}
-                                          className="flex-1 border border-gray-300 dark:border-gray-600 rounded-lg px-2.5 py-1.5 min-h-[36px] text-sm bg-white dark:bg-[#333] text-gray-900 dark:text-gray-100"
-                                          placeholder={
-                                              editingDeal?.source === 'instagram' && editingDeal.telegramChatId?.startsWith('ig:')
-                                                  ? 'Ответ в Instagram…'
-                                                  : 'Сообщение по сделке…'
-                                          }
+                                          disabled={chatSending}
+                                          className="flex-1 border border-gray-300 dark:border-gray-600 rounded-lg px-2.5 py-1.5 min-h-[36px] text-sm bg-white dark:bg-[#333] text-gray-900 dark:text-gray-100 disabled:opacity-60"
+                                          placeholder={dealChatInputPlaceholder(
+                                            editingDeal || undefined,
+                                            clients,
+                                            Boolean(tgPersonal?.connected)
+                                          )}
                                       />
-                                      <button onClick={handleSendChat} className="bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 p-2 rounded-lg"><Send size={16}/></button>
+                                      <button
+                                        type="button"
+                                        disabled={chatSending}
+                                        onClick={() => void handleSendChat()}
+                                        className="bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 p-2 rounded-lg disabled:opacity-60"
+                                      >
+                                        <Send size={16} />
+                                      </button>
                                   </div>
                               </>
                           ) : modalTab === 'tasks' ? (

@@ -90,7 +90,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
         <Menu size={20} />
       </button>
 
-      <div className="flex-1 min-w-0 flex items-center gap-1.5 overflow-x-auto scrollbar-none py-0.5">
+      <div className="flex-1 min-w-0 flex items-center gap-1.5 overflow-x-auto custom-scrollbar py-0.5">
         {canGoBack && (
           <button
             type="button"

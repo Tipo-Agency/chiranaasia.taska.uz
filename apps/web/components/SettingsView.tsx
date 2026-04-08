@@ -205,7 +205,10 @@ const SettingsView: React.FC<SettingsViewProps> = ({
 
     const canCreate =
       !showArchiveScreen &&
-      (activeTab === 'users' || activeTab === 'structure' || activeTab === 'finance-setup' || activeTab === 'sales-funnels');
+      ((activeTab === 'users' && hasPermission(currentUser, 'access.users')) ||
+        activeTab === 'structure' ||
+        activeTab === 'finance-setup' ||
+        activeTab === 'sales-funnels');
 
     setModule(
       <div className={APP_TOOLBAR_MODULE_CLUSTER}>
