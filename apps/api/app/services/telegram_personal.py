@@ -211,6 +211,12 @@ async def _resolve_peer(tg: TelegramClient, deal: Deal, linked_client: Client | 
     if not un:
         un = _username_from_client(linked_client)
     if un:
+        # Числовой peer (user/chat id) в поле username — иначе Telethon ищет @username из цифр
+        if un.isdigit():
+            try:
+                return await tg.get_entity(int(un))
+            except Exception:
+                pass
         return await tg.get_entity(un)
     cid = str(deal.telegram_chat_id or "").strip()
     if not cid:

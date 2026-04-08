@@ -9,6 +9,7 @@ import {
   canSendExternalTelegram,
   canSendTelegramFromClientCard,
   dealChatInputPlaceholder,
+  hasLinkedClientTelegramPeer,
   linkedClientTelegram,
   shouldSyncTelegramDealMessages,
 } from '../../utils/dealChatIntegration';
@@ -177,6 +178,7 @@ export const ClientChatsPage: React.FC<ClientChatsPageProps> = ({
   const [activeId, setActiveId] = useState<string | null>(null);
   const [input, setInput] = useState('');
   const [sending, setSending] = useState(false);
+  const [sendError, setSendError] = useState<string | null>(null);
   const [tgPersonal, setTgPersonal] = useState<{ connected: boolean; apiConfigured: boolean } | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -261,11 +263,17 @@ export const ClientChatsPage: React.FC<ClientChatsPageProps> = ({
   };
 
   const inputHint = (d: Deal | undefined): string =>
-    dealChatInputPlaceholder(d, clients, Boolean(tgPersonal?.connected));
+    dealChatInputPlaceholder(
+      d,
+      clients,
+      Boolean(tgPersonal?.connected),
+      tgPersonal?.apiConfigured
+    );
 
   const handleSend = async () => {
     if (!active || !input.trim()) return;
     const text = input.trim();
+    setSendError(null);
     setSending(true);
     try {
       if (active.source === 'instagram' && active.telegramChatId?.startsWith('ig:')) {
@@ -284,7 +292,19 @@ export const ClientChatsPage: React.FC<ClientChatsPageProps> = ({
         if (textareaRef.current) textareaRef.current.style.height = 'auto';
         return;
       }
-      if (canSendFromClientCard(active)) {
+      if (hasLinkedClientTelegramPeer(active, clients)) {
+        if (tgPersonal?.apiConfigured === false) {
+          setSendError(
+            'На сервере не заданы TELEGRAM_API_ID / TELEGRAM_API_HASH — отправка через личный Telegram невозможна.'
+          );
+          return;
+        }
+        if (!tgPersonal?.connected) {
+          setSendError(
+            'Подключите личный Telegram в Профиле — иначе сообщения сохраняются только как внутренние заметки.'
+          );
+          return;
+        }
         const updated = (await api.integrationsTelegramPersonal.sendDeal(active.id, { text })) as Deal;
         onSaveDeal({ ...active, ...updated });
         setInput('');
@@ -308,6 +328,11 @@ export const ClientChatsPage: React.FC<ClientChatsPageProps> = ({
       if (textareaRef.current) textareaRef.current.style.height = 'auto';
     } catch (e) {
       devWarn('[Диалоги] send failed:', e);
+      const msg =
+        e && typeof e === 'object' && 'message' in e && typeof (e as Error).message === 'string'
+          ? (e as Error).message
+          : 'Не удалось отправить. Проверьте личный Telegram в профиле и username клиента.';
+      setSendError(msg);
     } finally {
       setSending(false);
     }
@@ -323,6 +348,7 @@ export const ClientChatsPage: React.FC<ClientChatsPageProps> = ({
 
   const footerNotice = useMemo(() => {
     if (!active) return '';
+    const hasPeer = hasLinkedClientTelegramPeer(active, clients);
     if (active.source === 'instagram' && !canSendExternal(active)) {
       return 'Нет привязки Instagram Direct — только внутренние заметки.';
     }
@@ -330,6 +356,12 @@ export const ClientChatsPage: React.FC<ClientChatsPageProps> = ({
       return tgPersonal?.connected
         ? 'У сделки нет Telegram username/chat id и у клиента в карточке нет @username.'
         : 'Нет chat id, бот выключен или не подключён личный Telegram в профиле.';
+    }
+    if (hasPeer && tgPersonal?.apiConfigured === false) {
+      return 'На сервере не заданы TELEGRAM_API_ID / TELEGRAM_API_HASH — личный Telegram недоступен.';
+    }
+    if (hasPeer && !tgPersonal?.connected) {
+      return 'В карточке клиента указан Telegram — подключите личный аккаунт в Профиле, иначе сообщения остаются только заметками в CRM.';
     }
     if (canSendFromClientCard(active)) {
       return 'Сообщение уйдёт в Telegram (username из карточки клиента).';
@@ -341,6 +373,12 @@ export const ClientChatsPage: React.FC<ClientChatsPageProps> = ({
       tgPersonal?.connected
     ) {
       return 'Укажите Telegram @username в карточке клиента.';
+    }
+    if (
+      (active.source === 'manual' || active.source === 'recommendation' || active.source === 'vk') &&
+      !active.clientId
+    ) {
+      return 'Чтобы писать в Telegram как в карточке клиента, привяжите сделку к клиенту в воронке и сохраните сделку.';
     }
     if (active.source === 'instagram' && canSendExternal(active)) {
       return 'Сообщение уйдёт клиенту в Instagram.';
@@ -504,10 +542,17 @@ export const ClientChatsPage: React.FC<ClientChatsPageProps> = ({
                         ? 'text-amber-700 dark:text-amber-300/90'
                         : active.source === 'telegram' && !canSendExternal(active)
                           ? 'text-amber-700 dark:text-amber-300/90'
-                          : 'text-gray-500 dark:text-gray-400'
+                          : hasLinkedClientTelegramPeer(active, clients) && !tgPersonal?.connected
+                            ? 'text-amber-700 dark:text-amber-300/90'
+                            : 'text-gray-500 dark:text-gray-400'
                     }`}
                   >
                     {footerNotice}
+                  </p>
+                ) : null}
+                {sendError ? (
+                  <p className="mb-2 px-1 text-center text-[11px] leading-snug text-rose-600 dark:text-rose-400">
+                    {sendError}
                   </p>
                 ) : null}
                 <div className="flex items-end gap-2">
@@ -515,6 +560,7 @@ export const ClientChatsPage: React.FC<ClientChatsPageProps> = ({
                     ref={textareaRef}
                     value={input}
                     onChange={(e) => {
+                      setSendError(null);
                       setInput(e.target.value);
                       const el = e.target;
                       el.style.height = 'auto';

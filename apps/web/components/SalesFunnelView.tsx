@@ -22,8 +22,8 @@ import { api } from '../backend/api';
 import { isFunnelDeal } from '../utils/dealModel';
 import {
   canSendExternalTelegram,
-  canSendTelegramFromClientCard,
   dealChatInputPlaceholder,
+  hasLinkedClientTelegramPeer,
   shouldSyncTelegramDealMessages,
 } from '../utils/dealChatIntegration';
 import { getFunnelKanbanCardAccent } from '../utils/funnelVisual';
@@ -525,7 +525,25 @@ const SalesFunnelView: React.FC<SalesFunnelViewProps> = ({ deals, clients, users
           applyUpdatedDeal(updated);
           return;
         }
-        if (canSendTelegramFromClientCard(deal, clients, tgOk)) {
+        if (hasLinkedClientTelegramPeer(deal, clients)) {
+          if (tgPersonal?.apiConfigured === false) {
+            setAlertState({
+              open: true,
+              title: 'Telegram API не настроен',
+              message:
+                'На сервере задайте TELEGRAM_API_ID и TELEGRAM_API_HASH — без них личный Telegram не работает.',
+            });
+            return;
+          }
+          if (!tgPersonal?.connected) {
+            setAlertState({
+              open: true,
+              title: 'Нужен личный Telegram',
+              message:
+                'Подключите личный аккаунт в Профиле — иначе сообщения остаются только внутренними заметками в CRM.',
+            });
+            return;
+          }
           const updated = (await api.integrationsTelegramPersonal.sendDeal(deal.id, { text })) as Deal;
           applyUpdatedDeal(updated);
           return;
@@ -1319,7 +1337,8 @@ const SalesFunnelView: React.FC<SalesFunnelViewProps> = ({ deals, clients, users
                                           placeholder={dealChatInputPlaceholder(
                                             editingDeal || undefined,
                                             clients,
-                                            Boolean(tgPersonal?.connected)
+                                            Boolean(tgPersonal?.connected),
+                                            tgPersonal?.apiConfigured
                                           )}
                                       />
                                       <button

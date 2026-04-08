@@ -31,6 +31,13 @@ export function canSendExternalTelegram(
   return false;
 }
 
+/** Есть clientId и непустой Telegram в карточке клиента (ещё без проверки личного аккаунта). Не для IG/TG-лида. */
+export function hasLinkedClientTelegramPeer(deal: Deal | undefined, clients: Client[]): boolean {
+  if (!deal?.clientId) return false;
+  if (deal.source === 'instagram' || deal.source === 'site' || deal.source === 'telegram') return false;
+  return Boolean(linkedClientTelegram(clients, deal));
+}
+
 /** Личный Telegram + @username в карточке клиента (сделка не из канала Telegram). */
 export function canSendTelegramFromClientCard(
   deal: Deal | undefined,
@@ -55,11 +62,17 @@ export function shouldSyncTelegramDealMessages(
 export function dealChatInputPlaceholder(
   deal: Deal | undefined,
   clients: Client[],
-  tgPersonalConnected: boolean
+  tgPersonalConnected: boolean,
+  tgApiConfigured?: boolean
 ): string {
   if (!deal) return '';
   if (deal.source === 'instagram') return 'Написать в Instagram…';
   if (deal.source === 'telegram') return 'Написать в Telegram…';
+  if (hasLinkedClientTelegramPeer(deal, clients)) {
+    if (tgApiConfigured === false) return 'На сервере не настроен Telegram API (TELEGRAM_API_ID)…';
+    if (!tgPersonalConnected) return 'Подключите личный Telegram в профиле, чтобы писать клиенту…';
+    if (canSendTelegramFromClientCard(deal, clients, tgPersonalConnected)) return 'Написать в Telegram…';
+  }
   if (canSendTelegramFromClientCard(deal, clients, tgPersonalConnected)) return 'Написать в Telegram…';
   if (deal.source === 'site') return 'Внутренняя заметка (клиент с сайта не видит)…';
   return 'Внутренняя заметка по сделке…';
