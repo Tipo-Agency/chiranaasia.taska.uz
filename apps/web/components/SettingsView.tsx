@@ -171,7 +171,7 @@ const SettingsView: React.FC<SettingsViewProps> = ({
   }, []);
 
   useLayoutEffect(() => {
-    const activeBox = 'bg-slate-100 text-slate-800 dark:bg-slate-800/40 dark:text-slate-100';
+    const activeBox = 'bg-[#3337AD] text-white shadow-sm';
     const idleBox = 'text-gray-600 dark:text-gray-400';
     const leadingTabs = showArchiveScreen
       ? ARCHIVE_TAB_OPTIONS.map((t) => ({ id: t.id as string, label: t.label }))

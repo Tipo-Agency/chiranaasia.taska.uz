@@ -208,7 +208,7 @@ const SalesFunnelView: React.FC<SalesFunnelViewProps> = ({ deals, clients, users
     if (forcedViewMode && viewMode !== forcedViewMode) {
       setViewMode(forcedViewMode);
     }
-    const violet = 'bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-300';
+    const violet = 'bg-[#3337AD] text-white shadow-sm';
     const idle = 'text-gray-500 dark:text-gray-400';
     setModule(
       <div className={APP_TOOLBAR_MODULE_CLUSTER}>

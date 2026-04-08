@@ -559,7 +559,7 @@ const EmployeesView: React.FC<EmployeesViewProps> = ({
   };
 
   useLayoutEffect(() => {
-    const orange = 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300';
+    const orange = 'bg-[#3337AD] text-white shadow-sm';
     const idle = 'text-gray-600 dark:text-gray-400';
     const tabs: { id: 'cards' | 'orgchart' | 'structure'; label: string }[] = [
       { id: 'cards', label: 'Карточки' },

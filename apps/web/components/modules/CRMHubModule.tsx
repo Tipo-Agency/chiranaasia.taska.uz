@@ -95,7 +95,7 @@ export const CRMHubModule: React.FC<CRMHubModuleProps> = ({
       setLeading(null);
       return () => setLeading(null);
     }
-    const activeBox = 'bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-300';
+    const activeBox = 'bg-[#3337AD] text-white shadow-sm';
     const idleBox = 'text-gray-600 dark:text-gray-400';
     setLeading(
       <div className="flex items-center gap-0.5 sm:gap-1 shrink-0 flex-wrap sm:flex-nowrap" role="tablist" aria-label="CRM">

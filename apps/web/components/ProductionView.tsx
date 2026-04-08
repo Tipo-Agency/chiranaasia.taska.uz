@@ -36,7 +36,7 @@ export default function ProductionView({ users, departments, currentUser }: Prod
   );
 
   useLayoutEffect(() => {
-    const emerald = 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300';
+    const emerald = 'bg-[#3337AD] text-white shadow-sm';
     const idle = 'text-gray-600 dark:text-gray-400';
 
     setLeading(
