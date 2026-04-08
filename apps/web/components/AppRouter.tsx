@@ -394,6 +394,7 @@ export const AppRouter: React.FC<AppRouterProps> = (props) => {
                         <ClientChatsPage
                           layout="embedded"
                           deals={props.deals}
+                          clients={props.clients}
                           users={props.users}
                           currentUser={props.currentUser}
                           salesFunnels={props.salesFunnels}

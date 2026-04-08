@@ -1,6 +1,6 @@
 import React from 'react';
 import { Client, Contract, OneTimeDeal, User } from '../../types';
-import { Edit2, Phone, Plus } from 'lucide-react';
+import { Edit2, MessageCircle, Phone, Plus } from 'lucide-react';
 
 interface ClientsTabProps {
   clients: Client[];
@@ -28,7 +28,7 @@ export const ClientsTab: React.FC<ClientsTabProps> = ({
   return (
     <div className="bg-white dark:bg-[#252525] border border-gray-200 dark:border-[#333] rounded-xl shadow-sm overflow-hidden">
       <div className="overflow-x-auto">
-        <table className="w-full text-left text-sm min-w-[720px]">
+        <table className="w-full text-left text-sm min-w-[820px]">
           <thead className="bg-gray-50 dark:bg-[#202020] border-b border-gray-200 dark:border-[#333]">
             <tr>
               <th className="px-4 py-3 text-gray-600 dark:text-gray-400 font-semibold">Клиент</th>
@@ -67,6 +67,16 @@ export const ClientsTab: React.FC<ClientsTabProps> = ({
                       </span>
                     ) : (
                       '—'
+                    )}
+                  </td>
+                  <td className="px-4 py-3 text-gray-600 dark:text-gray-400 align-top max-w-[140px]">
+                    {client.telegram ? (
+                      <span className="inline-flex items-center gap-1 text-sky-700 dark:text-sky-300 truncate" title={client.telegram}>
+                        <MessageCircle size={12} className="opacity-70 shrink-0" />
+                        {client.telegram.startsWith('@') ? client.telegram : `@${client.telegram.replace(/^@+/, '')}`}
+                      </span>
+                    ) : (
+                      <span className="text-gray-400">—</span>
                     )}
                   </td>
                   <td className="px-4 py-3 text-gray-600 dark:text-gray-400 align-top">

@@ -17,7 +17,7 @@ from telethon.errors import PhoneCodeInvalidError, SessionPasswordNeededError
 from telethon.sessions import StringSession
 
 from app.config import get_settings
-from app.models.client import Deal
+from app.models.client import Client, Deal
 from app.models.telegram_personal import TelegramPersonalSession
 
 log = logging.getLogger("uvicorn.error")
@@ -200,15 +200,23 @@ async def disconnect_session(db: AsyncSession, user_id: str) -> None:
     await db.flush()
 
 
-async def _resolve_peer(client: TelegramClient, deal: Deal):
+def _username_from_client(linked: Client | None) -> str:
+    if not linked or not linked.telegram:
+        return ""
+    return (linked.telegram or "").strip().lstrip("@").split()[0]
+
+
+async def _resolve_peer(tg: TelegramClient, deal: Deal, linked_client: Client | None = None):
     un = (deal.telegram_username or "").strip().lstrip("@")
+    if not un:
+        un = _username_from_client(linked_client)
     if un:
-        return await client.get_entity(un)
+        return await tg.get_entity(un)
     cid = str(deal.telegram_chat_id or "").strip()
     if not cid:
         raise ValueError("no_peer")
     try:
-        return await client.get_entity(int(cid))
+        return await tg.get_entity(int(cid))
     except Exception as exc:
         raise ValueError("invalid_peer") from exc
 
@@ -265,6 +273,7 @@ async def sync_deal_messages(
     user_id: str,
     deal: Deal,
     limit: int = 50,
+    linked_client: Client | None = None,
 ) -> dict[str, Any]:
     if not mtproto_configured():
         return {"ok": False, "error": "telegram_api_not_configured"}
@@ -276,7 +285,7 @@ async def sync_deal_messages(
     client = _new_client(_decrypt(row.encrypted_session))
     await client.connect()
     try:
-        peer = await _resolve_peer(client, deal)
+        peer = await _resolve_peer(client, deal, linked_client)
         msgs = await client.get_messages(peer, limit=lim)
         incoming: list[dict] = []
         for m in msgs:
@@ -306,6 +315,7 @@ async def send_deal_message(
     user_id: str,
     deal: Deal,
     text: str,
+    linked_client: Client | None = None,
 ) -> dict[str, Any]:
     if not mtproto_configured():
         return {"ok": False, "error": "telegram_api_not_configured"}
@@ -316,7 +326,7 @@ async def send_deal_message(
     client = _new_client(_decrypt(row.encrypted_session))
     await client.connect()
     try:
-        peer = await _resolve_peer(client, deal)
+        peer = await _resolve_peer(client, deal, linked_client)
         sent = await client.send_message(peer, text[:4000])
         mid = getattr(sent, "id", None)
         cid = f"tg-out-{mid}" if mid else f"tg-out-{int(datetime.now(UTC).timestamp() * 1000)}"

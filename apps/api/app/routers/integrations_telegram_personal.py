@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth import get_current_user
 from app.database import get_db
-from app.models.client import Deal
+from app.models.client import Client, Deal
 from app.models.telegram_personal import TelegramPersonalSession
 from app.models.user import User
 from app.services import telegram_personal as tgp
@@ -17,8 +17,14 @@ from app.utils import row_to_deal
 router = APIRouter(prefix="/integrations/telegram-personal", tags=["integrations-telegram-personal"])
 
 
-def _peer_ok(deal: Deal) -> bool:
-    return bool(str(deal.telegram_chat_id or "").strip() or str(deal.telegram_username or "").strip())
+def _peer_ok(deal: Deal, linked: Client | None = None) -> bool:
+    if str(deal.telegram_chat_id or "").strip():
+        return True
+    if str(deal.telegram_username or "").strip().lstrip("@"):
+        return True
+    if linked and str(linked.telegram or "").strip().lstrip("@"):
+        return True
+    return False
 
 
 @router.get("/status")
@@ -104,7 +110,8 @@ async def sync_messages(
     deal = await db.get(Deal, deal_id)
     if not deal or deal.is_archived:
         raise HTTPException(status_code=404, detail="deal_not_found")
-    if not _peer_ok(deal):
+    linked = await db.get(Client, deal.client_id) if deal.client_id else None
+    if not _peer_ok(deal, linked):
         raise HTTPException(status_code=400, detail="no_telegram_peer")
     limit = 50
     if isinstance(body, dict) and body.get("limit") is not None:
@@ -112,7 +119,7 @@ async def sync_messages(
             limit = int(body["limit"])
         except Exception:
             pass
-    res = await tgp.sync_deal_messages(db, current_user.id, deal, limit=limit)
+    res = await tgp.sync_deal_messages(db, current_user.id, deal, limit=limit, linked_client=linked)
     if not res.get("ok"):
         _raise_tgp(res)
     await db.commit()
@@ -133,9 +140,10 @@ async def send_personal(
     deal = await db.get(Deal, deal_id)
     if not deal or deal.is_archived:
         raise HTTPException(status_code=404, detail="deal_not_found")
-    if not _peer_ok(deal):
+    linked = await db.get(Client, deal.client_id) if deal.client_id else None
+    if not _peer_ok(deal, linked):
         raise HTTPException(status_code=400, detail="no_telegram_peer")
-    res = await tgp.send_deal_message(db, current_user.id, deal, text)
+    res = await tgp.send_deal_message(db, current_user.id, deal, text, linked_client=linked)
     if not res.get("ok"):
         _raise_tgp(res)
     await db.commit()

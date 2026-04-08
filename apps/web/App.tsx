@@ -408,6 +408,7 @@ function MainApp() {
                       <ClientChatsPage
                         layout="embedded"
                         deals={state.deals}
+                        clients={state.clients}
                         users={state.users}
                         currentUser={state.currentUser}
                         salesFunnels={state.salesFunnels}

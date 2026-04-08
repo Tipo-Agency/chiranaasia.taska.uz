@@ -152,6 +152,7 @@ export const CRMHubModule: React.FC<CRMHubModuleProps> = ({
           <ClientChatsPage
             layout="embedded"
             deals={deals}
+            clients={clients}
             users={users}
             currentUser={currentUser}
             salesFunnels={salesFunnels}

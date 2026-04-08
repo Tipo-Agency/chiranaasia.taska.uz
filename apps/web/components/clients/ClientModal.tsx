@@ -205,12 +205,14 @@ export const ClientModal: React.FC<ClientModalProps> = ({
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 mb-1">Telegram</label>
+                    <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 mb-1">
+                      Telegram (@username)
+                    </label>
                     <input 
                       value={clientTelegram} 
                       onChange={e => setClientTelegram(e.target.value)} 
                       className="w-full border border-gray-300 dark:border-gray-600 rounded px-3 py-2 text-sm bg-white dark:bg-[#333] text-gray-900 dark:text-gray-100" 
-                      placeholder="@username"
+                      placeholder="username или @username — для диалогов в CRM"
                     />
                   </div>
                   <div>

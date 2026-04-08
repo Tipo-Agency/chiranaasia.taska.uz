@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Instagram, Send, MessageCircle, Globe, UserRound } from 'lucide-react';
-import type { Deal, User, Comment, SalesFunnel } from '../../types';
+import type { Client, Deal, User, Comment, SalesFunnel } from '../../types';
 import { PageLayout } from '../ui/PageLayout';
 import { api } from '../../backend/api';
 import { devWarn } from '../../utils/devLog';
@@ -8,6 +8,8 @@ import { isFunnelDeal } from '../../utils/dealModel';
 
 interface ClientChatsPageProps {
   deals: Deal[];
+  /** Карточки клиентов — для @username в Telegram, если не продублирован в сделке */
+  clients?: Client[];
   users: User[];
   currentUser: User;
   salesFunnels?: SalesFunnel[];
@@ -70,11 +72,26 @@ function formatCommentTime(iso?: string): string {
   return dt.toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
 }
 
-function matchChannelFilter(d: Deal, f: ChannelFilter): boolean {
+/** @username из карточки клиента (без ведущего @) */
+function linkedClientTelegram(clients: Client[], deal: Deal): string {
+  if (!deal.clientId) return '';
+  const c = clients.find((x) => x.id === deal.clientId);
+  const t = (c?.telegram || '').trim();
+  if (!t || t.startsWith('ig:')) return '';
+  return t.replace(/^@+/u, '');
+}
+
+function matchChannelFilter(d: Deal, f: ChannelFilter, clients: Client[]): boolean {
   if (f === 'all') return true;
   const s = (d.source || 'manual') as NonNullable<Deal['source']>;
   if (f === 'other') {
     return !['instagram', 'telegram', 'site'].includes(s);
+  }
+  if (f === 'telegram') {
+    if (s === 'telegram') return true;
+    const tg = linkedClientTelegram(clients, d);
+    if (tg && (s === 'manual' || s === 'recommendation' || s === 'vk')) return true;
+    return false;
   }
   return s === f;
 }
@@ -140,6 +157,7 @@ function funnelNameForDeal(deal: Deal, funnels: SalesFunnel[] | undefined): stri
 
 export const ClientChatsPage: React.FC<ClientChatsPageProps> = ({
   deals,
+  clients = [],
   users,
   currentUser,
   salesFunnels = [],
@@ -150,13 +168,13 @@ export const ClientChatsPage: React.FC<ClientChatsPageProps> = ({
 
   const threads = useMemo(() => {
     return deals
-      .filter((d) => !d.isArchived && isFunnelDeal(d) && matchChannelFilter(d, channelFilter))
+      .filter((d) => !d.isArchived && isFunnelDeal(d) && matchChannelFilter(d, channelFilter, clients))
       .sort((a, b) => {
         const ta = new Date(a.updatedAt || a.createdAt || 0).getTime();
         const tb = new Date(b.updatedAt || b.createdAt || 0).getTime();
         return tb - ta;
       });
-  }, [deals, channelFilter]);
+  }, [deals, channelFilter, clients]);
 
   const [activeId, setActiveId] = useState<string | null>(null);
   const [input, setInput] = useState('');
@@ -164,6 +182,30 @@ export const ClientChatsPage: React.FC<ClientChatsPageProps> = ({
   const [tgPersonal, setTgPersonal] = useState<{ connected: boolean; apiConfigured: boolean } | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  const canSendExternal = (d: Deal | undefined): boolean => {
+    if (!d) return false;
+    if (d.source === 'instagram') return Boolean(d.telegramChatId?.startsWith('ig:'));
+    if (d.source === 'telegram') {
+      const id = String(d.telegramChatId || '').trim();
+      const un = String(d.telegramUsername || '').trim();
+      const fromClient = linkedClientTelegram(clients, d);
+      const peerOk =
+        (id.length > 0 && /^-?\d+$/.test(id)) ||
+        (un.length > 0 && !un.startsWith('ig:')) ||
+        (fromClient.length > 0 && !fromClient.startsWith('ig:'));
+      if (tgPersonal?.connected && peerOk) return true;
+      return id.length > 0 && /^-?\d+$/.test(id);
+    }
+    return false;
+  };
+
+  const canSendTelegramFromClientCard = (d: Deal | undefined): boolean => {
+    if (!d || !tgPersonal?.connected || !d.clientId) return false;
+    if (d.source === 'instagram' || d.source === 'site') return false;
+    if (d.source === 'telegram') return false;
+    return Boolean(linkedClientTelegram(clients, d));
+  };
 
   useEffect(() => {
     if (!threads.length) {
@@ -202,7 +244,9 @@ export const ClientChatsPage: React.FC<ClientChatsPageProps> = ({
   }, []);
 
   useEffect(() => {
-    if (!active || active.source !== 'telegram' || !tgPersonal?.connected) return;
+    if (!active || !tgPersonal?.connected) return;
+    const syncTg = active.source === 'telegram' || canSendTelegramFromClientCard(active);
+    if (!syncTg) return;
     let cancelled = false;
     void api.integrationsTelegramPersonal
       .syncMessages(active.id)
@@ -213,7 +257,7 @@ export const ClientChatsPage: React.FC<ClientChatsPageProps> = ({
     return () => {
       cancelled = true;
     };
-  }, [active?.id, active?.source, tgPersonal?.connected]);
+  }, [active?.id, active?.source, tgPersonal?.connected, clients]);
 
   const getAuthorLabel = (c: Comment) => {
     if (c.type === 'instagram_in' || c.type === 'telegram_in') {
@@ -237,24 +281,11 @@ export const ClientChatsPage: React.FC<ClientChatsPageProps> = ({
     return t.length > 72 ? `${t.slice(0, 69)}…` : t || '…';
   };
 
-  const canSendExternal = (d: Deal | undefined): boolean => {
-    if (!d) return false;
-    if (d.source === 'instagram') return Boolean(d.telegramChatId?.startsWith('ig:'));
-    if (d.source === 'telegram') {
-      const id = String(d.telegramChatId || '').trim();
-      const un = String(d.telegramUsername || '').trim();
-      const peerOk =
-        (id.length > 0 && /^-?\d+$/.test(id)) || (un.length > 0 && !un.startsWith('ig:'));
-      if (tgPersonal?.connected && peerOk) return true;
-      return id.length > 0 && /^-?\d+$/.test(id);
-    }
-    return false;
-  };
-
   const inputHint = (d: Deal | undefined): string => {
     if (!d) return '';
     if (d.source === 'instagram') return 'Написать в Instagram…';
     if (d.source === 'telegram') return 'Написать в Telegram…';
+    if (canSendTelegramFromClientCard(d)) return 'Написать в Telegram…';
     if (d.source === 'site') return 'Внутренняя заметка (клиент с сайта не видит)…';
     return 'Внутренняя заметка по сделке…';
   };
@@ -275,6 +306,13 @@ export const ClientChatsPage: React.FC<ClientChatsPageProps> = ({
         const updated = (await (tgPersonal?.connected
           ? api.integrationsTelegramPersonal.sendDeal(active.id, { text })
           : api.integrationsTelegram.sendToLead({ dealId: active.id, text }))) as Deal;
+        onSaveDeal({ ...active, ...updated });
+        setInput('');
+        if (textareaRef.current) textareaRef.current.style.height = 'auto';
+        return;
+      }
+      if (canSendTelegramFromClientCard(active)) {
+        const updated = (await api.integrationsTelegramPersonal.sendDeal(active.id, { text })) as Deal;
         onSaveDeal({ ...active, ...updated });
         setInput('');
         if (textareaRef.current) textareaRef.current.style.height = 'auto';
@@ -310,24 +348,43 @@ export const ClientChatsPage: React.FC<ClientChatsPageProps> = ({
     { id: 'other', label: 'Прочее' },
   ];
 
-  const footerNotice = !active
-    ? ''
-    : active.source === 'instagram' && !canSendExternal(active)
-      ? 'Нет привязки Instagram Direct — только внутренние заметки.'
-      : active.source === 'telegram' && !canSendExternal(active)
-        ? tgPersonal?.connected
-          ? 'У сделки нет Telegram username или числового chat id.'
-          : 'Нет chat id, бот выключен или не подключён личный Telegram в профиле.'
-        : active.source === 'instagram' && canSendExternal(active)
-          ? 'Сообщение уйдёт клиенту в Instagram.'
-          : active.source === 'telegram' && canSendExternal(active)
-            ? 'Сообщение уйдёт в Telegram.'
-            : active.source === 'site' ||
-                active.source === 'manual' ||
-                active.source === 'recommendation' ||
-                active.source === 'vk'
-              ? 'Внешний чат недоступен — сохраняются только внутренние заметки по сделке.'
-              : '';
+  const footerNotice = useMemo(() => {
+    if (!active) return '';
+    if (active.source === 'instagram' && !canSendExternal(active)) {
+      return 'Нет привязки Instagram Direct — только внутренние заметки.';
+    }
+    if (active.source === 'telegram' && !canSendExternal(active)) {
+      return tgPersonal?.connected
+        ? 'У сделки нет Telegram username/chat id и у клиента в карточке нет @username.'
+        : 'Нет chat id, бот выключен или не подключён личный Telegram в профиле.';
+    }
+    if (canSendTelegramFromClientCard(active)) {
+      return 'Сообщение уйдёт в Telegram (username из карточки клиента).';
+    }
+    if (
+      (active.source === 'manual' || active.source === 'recommendation' || active.source === 'vk') &&
+      active.clientId &&
+      !linkedClientTelegram(clients, active) &&
+      tgPersonal?.connected
+    ) {
+      return 'Укажите Telegram @username в карточке клиента.';
+    }
+    if (active.source === 'instagram' && canSendExternal(active)) {
+      return 'Сообщение уйдёт клиенту в Instagram.';
+    }
+    if (active.source === 'telegram' && canSendExternal(active)) {
+      return 'Сообщение уйдёт в Telegram.';
+    }
+    if (
+      active.source === 'site' ||
+      active.source === 'manual' ||
+      active.source === 'recommendation' ||
+      active.source === 'vk'
+    ) {
+      return 'Внешний чат недоступен — сохраняются только внутренние заметки по сделке.';
+    }
+    return '';
+  }, [active, clients, tgPersonal]);
 
   const shellOuter =
     layout === 'page'
