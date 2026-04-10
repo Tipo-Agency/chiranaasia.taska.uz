@@ -1323,7 +1323,7 @@ const SalesFunnelView: React.FC<SalesFunnelViewProps> = ({ deals, clients, users
                                                   {getCommentAuthorName(c)}{formatCommentTime(c.createdAt) ? ` • ${formatCommentTime(c.createdAt)}` : ''}
                                                 </div>
                                                 <div className="whitespace-pre-wrap break-words">{c.text}</div>
-                                                <DealCommentAttachments items={c.attachments} />
+                                                <DealCommentAttachments items={c.attachments} dealId={editingDeal.id} />
                                               </div>
                                             </div>
                                           );

@@ -34,6 +34,20 @@ async function fetchJson<T>(url: string, options?: RequestInit): Promise<T> {
   return text ? JSON.parse(text) : ({} as T);
 }
 
+/** GET с Bearer (для бинарных ответов, например медиа из личного Telegram). */
+export async function fetchAuthenticatedBlob(path: string): Promise<Blob> {
+  const res = await fetch(`${API_BASE}${path}`, {
+    method: 'GET',
+    headers: { ...getAuthHeaders() },
+    credentials: 'include',
+  });
+  if (!res.ok) {
+    const err = await res.text();
+    throw new Error(err || `HTTP ${res.status}`);
+  }
+  return res.blob();
+}
+
 async function get<T>(path: string): Promise<T> {
   return fetchJson<T>(path, { method: 'GET' });
 }
@@ -349,6 +363,10 @@ export const integrationsTelegramPersonalEndpoint = {
     post<unknown>(`/integrations/telegram-personal/deals/${encodeURIComponent(dealId)}/sync-messages`, body ?? {}),
   sendDeal: (dealId: string, body: { text: string }) =>
     post<unknown>(`/integrations/telegram-personal/deals/${encodeURIComponent(dealId)}/send`, body),
+  fetchDealMediaBlob: (dealId: string, messageId: number) =>
+    fetchAuthenticatedBlob(
+      `/integrations/telegram-personal/deals/${encodeURIComponent(dealId)}/media/${messageId}`
+    ),
 };
 
 export const integrationsTelegramEndpoint = {

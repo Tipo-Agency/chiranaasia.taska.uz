@@ -153,8 +153,20 @@ export interface Comment {
   type?: 'internal' | 'telegram_in' | 'telegram_out' | 'instagram_in' | 'instagram_out';
   /** id сообщения Meta (дедуп вебхука) */
   metaMid?: string;
-  /** Ссылки из Instagram / др. (сохраняет бэкенд) */
-  attachments?: { type?: string; url?: string; title?: string }[];
+  /** Ссылки из Instagram / медиа из личного Telegram (kind + tgMessageId) */
+  attachments?: {
+    type?: string;
+    kind?: string;
+    url?: string;
+    title?: string;
+    mime?: string;
+    fileName?: string;
+    durationSec?: number;
+    size?: number;
+    tgMessageId?: number;
+  }[];
+  /** id сообщения Telegram для скачивания медиа (дублируется в attachments при синке) */
+  tgMessageId?: number;
 }
 
 export interface FunnelStage {

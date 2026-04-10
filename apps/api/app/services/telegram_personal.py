@@ -3,7 +3,9 @@ from __future__ import annotations
 
 import base64
 import hashlib
+import io
 import logging
+import mimetypes
 import re
 import uuid
 from datetime import UTC, datetime
@@ -237,30 +239,187 @@ def _fmt_msg_time(msg) -> str:
     return _now_iso()
 
 
+def _telegram_media_attachments(msg) -> list[dict[str, Any]]:
+    """Метаданные вложений Telethon для UI и скачивания по tgMessageId."""
+    from telethon.tl.types import (
+        DocumentAttributeAudio,
+        DocumentAttributeFilename,
+        DocumentAttributeSticker,
+        DocumentAttributeVideo,
+        MessageMediaContact,
+        MessageMediaDocument,
+        MessageMediaGeo,
+        MessageMediaGeoLive,
+        MessageMediaPhoto,
+        MessageMediaPoll,
+        MessageMediaVenue,
+        MessageMediaWebPage,
+    )
+
+    out: list[dict[str, Any]] = []
+    media = getattr(msg, "media", None)
+    if not media:
+        return out
+    mid = getattr(msg, "id", None)
+
+    if isinstance(media, MessageMediaPhoto):
+        out.append({"kind": "image", "tgMessageId": mid})
+        return out
+
+    if isinstance(media, MessageMediaDocument):
+        doc = media.document
+        if not doc:
+            return out
+        mime = (getattr(doc, "mime_type", None) or "").strip() or "application/octet-stream"
+        fname = None
+        voice = False
+        duration = None
+        round_message = False
+        sticker = False
+        for attr in getattr(doc, "attributes", []) or []:
+            if isinstance(attr, DocumentAttributeAudio):
+                voice = bool(getattr(attr, "voice", False))
+                duration = getattr(attr, "duration", None)
+            elif isinstance(attr, DocumentAttributeFilename):
+                fname = attr.file_name
+            elif isinstance(attr, DocumentAttributeVideo):
+                round_message = bool(getattr(attr, "round_message", False))
+            elif isinstance(attr, DocumentAttributeSticker):
+                sticker = True
+        if sticker:
+            kind = "sticker"
+        elif voice:
+            kind = "voice"
+        elif round_message:
+            kind = "video_note"
+        elif mime.startswith("audio/"):
+            kind = "audio"
+        elif mime.startswith("video/"):
+            kind = "video"
+        elif mime.startswith("image/"):
+            kind = "image"
+        else:
+            kind = "file"
+        item: dict[str, Any] = {"kind": kind, "tgMessageId": mid, "mime": mime}
+        if duration is not None:
+            try:
+                item["durationSec"] = int(duration)
+            except (TypeError, ValueError):
+                pass
+        if fname:
+            item["fileName"] = str(fname)[:200]
+        if getattr(doc, "size", None) is not None:
+            try:
+                item["size"] = int(doc.size)
+            except (TypeError, ValueError):
+                pass
+        out.append(item)
+        return out
+
+    if isinstance(media, MessageMediaGeo | MessageMediaGeoLive):
+        out.append({"kind": "location", "tgMessageId": mid})
+        return out
+
+    if isinstance(media, MessageMediaVenue):
+        out.append({"kind": "venue", "tgMessageId": mid})
+        return out
+
+    if isinstance(media, MessageMediaContact):
+        fn = getattr(media, "first_name", "") or ""
+        ln = getattr(media, "last_name", "") or ""
+        phone = getattr(media, "phone_number", "") or ""
+        title = " ".join(x for x in (fn, ln) if x).strip() or phone or "Контакт"
+        out.append({"kind": "contact", "tgMessageId": mid, "title": title})
+        return out
+
+    if isinstance(media, MessageMediaPoll):
+        out.append({"kind": "poll", "tgMessageId": mid})
+        return out
+
+    if isinstance(media, MessageMediaWebPage):
+        wp = media.webpage
+        if wp and getattr(wp, "photo", None):
+            out.append({"kind": "image", "tgMessageId": mid})
+        elif wp and getattr(wp, "document", None):
+            out.append({"kind": "file", "tgMessageId": mid, "mime": "application/octet-stream"})
+        return out
+
+    return out
+
+
+def _fallback_text_for_media(atts: list[dict[str, Any]]) -> str:
+    labels: list[str] = []
+    kind_label = {
+        "image": "Фото",
+        "voice": "Голосовое",
+        "audio": "Аудио",
+        "video": "Видео",
+        "video_note": "Видеосообщение",
+        "file": "Файл",
+        "sticker": "Стикер",
+        "location": "Геолокация",
+        "venue": "Место",
+        "contact": "Контакт",
+        "poll": "Опрос",
+    }
+    for a in atts:
+        k = str(a.get("kind") or "file").lower()
+        labels.append(kind_label.get(k, k))
+    return "[" + " · ".join(labels) + "]"
+
+
+def _guess_ext(mime: str) -> str:
+    ext = mimetypes.guess_extension(mime.split(";")[0].strip()) or ""
+    if ext in (".jpe",):
+        return ".jpg"
+    return ext or ".bin"
+
+
+def _telegram_media_response_meta(msg) -> tuple[str, str]:
+    """Content-Type и имя файла для ответа HTTP."""
+    from telethon.tl.types import DocumentAttributeFilename, MessageMediaDocument, MessageMediaPhoto
+
+    mid = getattr(msg, "id", 0)
+    media = getattr(msg, "media", None)
+    if isinstance(media, MessageMediaPhoto):
+        return "image/jpeg", f"telegram-{mid}.jpg"
+    if isinstance(media, MessageMediaDocument) and media.document:
+        doc = media.document
+        mime = (getattr(doc, "mime_type", None) or "").strip() or "application/octet-stream"
+        fname = None
+        for attr in getattr(doc, "attributes", []) or []:
+            if isinstance(attr, DocumentAttributeFilename):
+                fname = attr.file_name
+                break
+        if fname:
+            return mime, str(fname)[:200]
+        return mime, f"telegram-{mid}{_guess_ext(mime)}"
+    return "application/octet-stream", f"telegram-{mid}.bin"
+
+
 def _msg_to_comment(msg, session_user_id: str) -> dict[str, Any] | None:
     mid = getattr(msg, "id", None)
     if mid is None:
         return None
-    raw = (getattr(msg, "message", None) or "").strip()
-    if not raw and getattr(msg, "media", None):
-        raw = "[вложение]"
-    if not raw:
+    if getattr(msg, "action", None):
         return None
-    if getattr(msg, "out", False):
-        return {
-            "id": f"tg-out-{mid}",
-            "text": raw[:8000],
-            "authorId": session_user_id,
-            "createdAt": _fmt_msg_time(msg),
-            "type": "telegram_out",
-        }
-    return {
-        "id": f"tg-in-{mid}",
-        "text": raw[:8000],
-        "authorId": "tg_user",
+    atts = _telegram_media_attachments(msg)
+    raw = (getattr(msg, "message", None) or "").strip()
+    if not raw and not atts:
+        return None
+    display = raw[:8000] if raw else _fallback_text_for_media(atts)[:8000]
+    is_out = bool(getattr(msg, "out", False))
+    comment: dict[str, Any] = {
+        "id": f"tg-out-{mid}" if is_out else f"tg-in-{mid}",
+        "text": display,
+        "authorId": session_user_id if is_out else "tg_user",
         "createdAt": _fmt_msg_time(msg),
-        "type": "telegram_in",
+        "type": "telegram_out" if is_out else "telegram_in",
     }
+    if atts:
+        comment["attachments"] = atts
+        comment["tgMessageId"] = mid
+    return comment
 
 
 def _merge_comments(existing: list, incoming: list[dict]) -> list:
@@ -353,6 +512,45 @@ async def send_deal_message(
     except Exception as exc:
         log.warning("telegram_personal send: %s", exc)
         return {"ok": False, "error": "send_failed", "detail": str(exc)[:200]}
+    finally:
+        await client.disconnect()
+
+
+async def download_deal_message_media(
+    db: AsyncSession,
+    user_id: str,
+    deal: Deal,
+    message_id: int,
+    linked_client: Client | None = None,
+) -> dict[str, Any]:
+    """Скачать медиа сообщения из диалога сделки (личная сессия MTProto)."""
+    if not mtproto_configured():
+        return {"ok": False, "error": "telegram_api_not_configured"}
+    row = await _get_row(db, user_id)
+    if not row or row.status != "active" or not row.encrypted_session:
+        return {"ok": False, "error": "session_not_active"}
+
+    client = _new_client(_decrypt(row.encrypted_session))
+    await client.connect()
+    try:
+        peer = await _resolve_peer(client, deal, linked_client)
+        msgs = await client.get_messages(peer, ids=message_id)
+        if not msgs:
+            return {"ok": False, "error": "message_not_found"}
+        msg = msgs[0]
+        if not getattr(msg, "media", None):
+            return {"ok": False, "error": "no_media"}
+        bio = io.BytesIO()
+        await client.download_media(msg, file=bio)
+        bio.seek(0)
+        data = bio.getvalue()
+        if not data:
+            return {"ok": False, "error": "download_empty"}
+        content_type, filename = _telegram_media_response_meta(msg)
+        return {"ok": True, "data": data, "content_type": content_type, "filename": filename}
+    except Exception as exc:
+        log.warning("telegram_personal download: %s", exc)
+        return {"ok": False, "error": "download_failed", "detail": str(exc)[:200]}
     finally:
         await client.disconnect()
 

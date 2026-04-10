@@ -100,3 +100,15 @@ def require_permission(permission: str):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Permission denied")
 
     return _dep
+
+
+async def require_crm_messaging_access(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> User:
+    """Доступ к операциям чата CRM (личный Telegram, Instagram send и т.п.)."""
+    from app.services.rbac import user_has_crm_messaging_access
+
+    if await user_has_crm_messaging_access(db, current_user):
+        return current_user
+    raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Permission denied")

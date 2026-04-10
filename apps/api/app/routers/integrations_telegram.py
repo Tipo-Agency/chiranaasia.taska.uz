@@ -12,7 +12,7 @@ import httpx
 from fastapi import APIRouter, Depends, Header, HTTPException, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.auth import get_current_user, require_permission
+from app.auth import require_crm_messaging_access, require_permission
 from app.config import get_settings
 from app.database import get_db
 from app.models.client import Deal
@@ -48,7 +48,7 @@ async def _call_telegram(token: str, method: str, data: dict[str, Any]) -> dict[
 async def send_telegram_to_lead(
     body: dict,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_crm_messaging_access),
 ):
     """Ответ клиенту в Telegram: тело { dealId, text }. Использует botToken воронки сделки."""
     deal_id = str(body.get("dealId") or "").strip()

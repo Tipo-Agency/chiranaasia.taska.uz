@@ -2,11 +2,14 @@
 
 from __future__ import annotations
 
+import io
+
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import StreamingResponse
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.auth import get_current_user
+from app.auth import get_current_user, require_crm_messaging_access
 from app.database import get_db
 from app.models.client import Client, Deal
 from app.models.telegram_personal import TelegramPersonalSession
@@ -105,7 +108,7 @@ async def sync_messages(
     deal_id: str,
     body: dict | None = None,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_crm_messaging_access),
 ):
     deal = await db.get(Deal, deal_id)
     if not deal or deal.is_archived:
@@ -132,7 +135,7 @@ async def send_personal(
     deal_id: str,
     body: dict,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_crm_messaging_access),
 ):
     text = str(body.get("text") or "").strip()
     if not text:
@@ -149,6 +152,33 @@ async def send_personal(
     await db.commit()
     await db.refresh(deal)
     return row_to_deal(deal)
+
+
+@router.get("/deals/{deal_id}/media/{message_id}")
+async def download_deal_media(
+    deal_id: str,
+    message_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_crm_messaging_access),
+):
+    deal = await db.get(Deal, deal_id)
+    if not deal or deal.is_archived:
+        raise HTTPException(status_code=404, detail="deal_not_found")
+    linked = await db.get(Client, deal.client_id) if deal.client_id else None
+    if not _peer_ok(deal, linked):
+        raise HTTPException(status_code=400, detail="no_telegram_peer")
+    res = await tgp.download_deal_message_media(
+        db, current_user.id, deal, message_id, linked_client=linked
+    )
+    if not res.get("ok"):
+        _raise_tgp(res)
+    return StreamingResponse(
+        io.BytesIO(res["data"]),
+        media_type=res["content_type"],
+        headers={
+            "Content-Disposition": f'attachment; filename="{res["filename"]}"',
+        },
+    )
 
 
 def _raise_tgp(res: dict):
@@ -170,4 +200,12 @@ def _raise_tgp(res: dict):
         raise HTTPException(status_code=400, detail=err)
     if err == "invalid_phone":
         raise HTTPException(status_code=400, detail=err)
+    if err == "message_not_found":
+        raise HTTPException(status_code=404, detail=err)
+    if err == "no_media":
+        raise HTTPException(status_code=400, detail=err)
+    if err == "download_empty":
+        raise HTTPException(status_code=502, detail=err)
+    if err == "download_failed":
+        raise HTTPException(status_code=502, detail=f"{err}:{detail or ''}")
     raise HTTPException(status_code=502, detail=f"{err}:{detail or ''}")

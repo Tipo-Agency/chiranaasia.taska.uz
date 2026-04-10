@@ -15,7 +15,21 @@ async def user_has_permission(db: AsyncSession, user: User, permission: str) -> 
     if not r:
         return False
     perms = normalize_permissions(r.permissions)
+    # Как на фронте: роль admin без явного списка прав — полный доступ
+    if (r.slug or "").strip().lower() == "admin" and not perms:
+        return True
     return role_has_permission(perms, permission)
+
+
+async def user_has_crm_messaging_access(db: AsyncSession, user: User) -> bool:
+    """Синхрон/отправка в мессенджеры и выдача вложений по сделке."""
+    if await user_has_permission(db, user, "system.full_access"):
+        return True
+    if await user_has_permission(db, user, "crm.client_chats"):
+        return True
+    if await user_has_permission(db, user, "crm.sales_funnel"):
+        return True
+    return False
 
 
 async def get_role_permissions_list(db: AsyncSession, role_id: str | None) -> list[str]:

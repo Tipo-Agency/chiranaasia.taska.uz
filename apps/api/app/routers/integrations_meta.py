@@ -5,7 +5,7 @@ from datetime import UTC, datetime
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.auth import get_current_user
+from app.auth import require_crm_messaging_access
 from app.config import get_settings
 from app.database import get_db
 from app.models.client import Deal
@@ -20,7 +20,7 @@ router = APIRouter(prefix="/integrations/meta", tags=["integrations-meta"])
 async def instagram_send(
     body: dict,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_crm_messaging_access),
 ):
     """Ответ клиенту в Instagram: тело { dealId, text }."""
     deal_id = body.get("dealId")
