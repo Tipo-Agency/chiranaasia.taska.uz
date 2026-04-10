@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import logging
+import time
 import uuid
 from datetime import UTC, datetime
 from typing import Any
@@ -13,6 +14,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import Settings, get_settings
+from app.models.client import Client as ClientRow
 from app.models.client import Deal
 from app.models.funnel import SalesFunnel
 from app.models.notification import NotificationPreferences as NPrefModel
@@ -23,6 +25,8 @@ log = logging.getLogger("uvicorn.error")
 
 # Кэш: Instagram Business Account id → Facebook Page id (из Graph)
 _ig_entry_to_page: dict[str, str] = {}
+_ig_map_fetched_at: float = 0.0
+IG_MAP_TTL_SEC = 300.0
 
 
 def _page_token_pairs(settings: Settings) -> list[tuple[str, str]]:
@@ -42,7 +46,10 @@ def page_access_token(page_id: str, settings: Settings) -> str | None:
 
 async def refresh_ig_entry_map(settings: Settings) -> dict[str, str]:
     """Заполняет маппинг id из webhook entry → Page id (для подписки на instagram)."""
-    global _ig_entry_to_page
+    global _ig_entry_to_page, _ig_map_fetched_at
+    now = time.time()
+    if _ig_entry_to_page and (now - _ig_map_fetched_at) < IG_MAP_TTL_SEC:
+        return _ig_entry_to_page
     out: dict[str, str] = {}
     async with httpx.AsyncClient(timeout=20.0) as client:
         for page_id, token in _page_token_pairs(settings):
@@ -65,6 +72,7 @@ async def refresh_ig_entry_map(settings: Settings) -> dict[str, str]:
             if ig_id:
                 out[str(ig_id)] = str(page_id)
     _ig_entry_to_page = out
+    _ig_map_fetched_at = time.time()
     return out
 
 
@@ -100,6 +108,37 @@ def parse_thread_key(key: str) -> tuple[str, str] | None:
     return parts[1], parts[2]
 
 
+def _attachments_from_meta_message(msg: dict[str, Any]) -> list[dict[str, str]]:
+    out: list[dict[str, str]] = []
+    for att in msg.get("attachments") or []:
+        if not isinstance(att, dict):
+            continue
+        typ = str(att.get("type") or "file").strip().lower()
+        payload = att.get("payload")
+        if not isinstance(payload, dict):
+            payload = {}
+        url = str(payload.get("url") or "").strip()
+        if not url:
+            continue
+        title = str(payload.get("title") or "").strip()
+        item: dict[str, str] = {"type": typ, "url": url}
+        if title:
+            item["title"] = title
+        out.append(item)
+    return out
+
+
+def _message_text_and_attachments(msg: dict[str, Any]) -> tuple[str, list[dict[str, str]]]:
+    text = (msg.get("text") or "").strip()
+    attachments = _attachments_from_meta_message(msg)
+    if text:
+        return text, attachments
+    if attachments:
+        labels = [f"[{a.get('type') or 'file'}]" for a in attachments]
+        return (" ".join(labels) if labels else "[вложение]"), attachments
+    return "", []
+
+
 def _comment_has_mid(comments: list[Any] | None, mid: str | None) -> bool:
     if not mid or not comments:
         return False
@@ -127,6 +166,35 @@ async def _first_assignee_id(db: AsyncSession) -> str:
     result = await db.execute(select(User.id).where(User.is_archived.is_(False)).limit(1))
     uid = result.scalar_one_or_none()
     return uid or ""
+
+
+async def _ensure_instagram_client(
+    db: AsyncSession,
+    *,
+    customer_psid: str,
+    page_id: str,
+    funnel_id: str | None,
+) -> str:
+    """Один клиент на PSID (ig:psid), чтобы не плодить дубли при повторных диалогах."""
+    marker = f"ig:{customer_psid}"
+    result = await db.execute(
+        select(ClientRow).where(ClientRow.instagram == marker, ClientRow.is_archived.is_(False)).limit(1)
+    )
+    row = result.scalar_one_or_none()
+    if row:
+        return row.id
+    cid = str(uuid.uuid4())
+    short = customer_psid[-8:] if len(customer_psid) >= 8 else customer_psid
+    cl = ClientRow(
+        id=cid,
+        name=f"Instagram · {short}",
+        instagram=marker,
+        notes=f"Instagram Direct, PSID {customer_psid}, страница {page_id}",
+        funnel_id=funnel_id,
+    )
+    db.add(cl)
+    await db.flush()
+    return cid
 
 
 async def send_instagram_text(page_id: str, recipient_psid: str, text: str, settings: Settings) -> dict[str, Any]:
@@ -238,13 +306,9 @@ async def process_instagram_webhook(db: AsyncSession, body: dict[str, Any]) -> i
             if not customer_psid:
                 continue
 
-            text = (msg.get("text") or "").strip()
+            text, attachments = _message_text_and_attachments(msg)
             if not text:
-                atts = msg.get("attachments") or []
-                if atts:
-                    text = "[вложение]"
-                else:
-                    continue
+                continue
 
             ts = m.get("timestamp")
             try:
@@ -264,26 +328,37 @@ async def process_instagram_webhook(db: AsyncSession, body: dict[str, Any]) -> i
             deal = result.scalar_one_or_none()
 
             if deal:
+                if not deal.client_id:
+                    cid = await _ensure_instagram_client(
+                        db,
+                        customer_psid=customer_psid,
+                        page_id=page_id,
+                        funnel_id=deal.funnel_id,
+                    )
+                    deal.client_id = cid
+                    if not (deal.contact_name or "").strip():
+                        deal.contact_name = f"Instagram · {customer_psid[-8:]}"
                 comments = list(deal.comments or [])
                 if _comment_has_mid(comments, mid):
                     continue
-                comments.append(
-                    {
-                        "id": f"ig-{mid or uuid.uuid4().hex[:12]}",
-                        "text": text,
-                        "authorId": f"ig_user:{customer_psid}",
-                        "createdAt": created_at,
-                        "type": "instagram_in",
-                        "metaMid": mid,
-                    }
-                )
+                row: dict[str, Any] = {
+                    "id": f"ig-{mid or uuid.uuid4().hex[:12]}",
+                    "text": text,
+                    "authorId": f"ig_user:{customer_psid}",
+                    "createdAt": created_at,
+                    "type": "instagram_in",
+                    "metaMid": mid,
+                }
+                if attachments:
+                    row["attachments"] = attachments
+                comments.append(row)
                 deal.comments = comments
                 deal.updated_at = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3] + "Z"
                 await db.flush()
                 n += 1
                 continue
 
-            # Новый диалог → новая сделка
+            # Новый диалог → клиент + сделка (поток = thread_key, дублей сделок по тому же PSID+странице нет)
             funnel_id, stage_id = await _default_funnel_stage(db)
             assignee_id = None
             funnel = None
@@ -293,13 +368,30 @@ async def process_instagram_webhook(db: AsyncSession, body: dict[str, Any]) -> i
                     assignee_id = funnel.owner_user_id
             if not assignee_id:
                 assignee_id = await _first_assignee_id(db)
+            client_id = await _ensure_instagram_client(
+                db,
+                customer_psid=customer_psid,
+                page_id=page_id,
+                funnel_id=funnel_id,
+            )
             did = str(uuid.uuid4())
             title = f"Instagram · {customer_psid[-8:]}"
             now = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3] + "Z"
+            first_comment: dict[str, Any] = {
+                "id": f"ig-{mid or uuid.uuid4().hex[:12]}",
+                "text": text,
+                "authorId": f"ig_user:{customer_psid}",
+                "createdAt": created_at,
+                "type": "instagram_in",
+                "metaMid": mid,
+            }
+            if attachments:
+                first_comment["attachments"] = attachments
             deal = Deal(
                 id=did,
                 title=title,
-                contact_name=f"Instagram {customer_psid}",
+                client_id=client_id,
+                contact_name=f"Instagram · {customer_psid[-8:]}",
                 amount="0",
                 currency="UZS",
                 stage=stage_id,
@@ -310,16 +402,7 @@ async def process_instagram_webhook(db: AsyncSession, body: dict[str, Any]) -> i
                 assignee_id=assignee_id,
                 created_at=now,
                 notes=f"Автоматически из Instagram (page {page_id})",
-                comments=[
-                    {
-                        "id": f"ig-{mid or uuid.uuid4().hex[:12]}",
-                        "text": text,
-                        "authorId": f"ig_user:{customer_psid}",
-                        "createdAt": created_at,
-                        "type": "instagram_in",
-                        "metaMid": mid,
-                    }
-                ],
+                comments=[first_comment],
                 is_archived=False,
             )
             db.add(deal)

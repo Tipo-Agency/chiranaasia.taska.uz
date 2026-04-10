@@ -30,6 +30,7 @@ import { getFunnelKanbanCardAccent } from '../utils/funnelVisual';
 import { devWarn } from '../utils/devLog';
 import { formatDate } from '../utils/dateUtils';
 import { useAppToolbar } from '../contexts/AppToolbarContext';
+import { DealCommentAttachments } from './DealCommentAttachments';
 
 interface SalesFunnelViewProps {
   deals: Deal[];
@@ -1322,6 +1323,7 @@ const SalesFunnelView: React.FC<SalesFunnelViewProps> = ({ deals, clients, users
                                                   {getCommentAuthorName(c)}{formatCommentTime(c.createdAt) ? ` • ${formatCommentTime(c.createdAt)}` : ''}
                                                 </div>
                                                 <div className="whitespace-pre-wrap break-words">{c.text}</div>
+                                                <DealCommentAttachments items={c.attachments} />
                                               </div>
                                             </div>
                                           );

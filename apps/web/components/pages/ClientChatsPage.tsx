@@ -13,6 +13,7 @@ import {
   linkedClientTelegram,
   shouldSyncTelegramDealMessages,
 } from '../../utils/dealChatIntegration';
+import { DealCommentAttachments } from '../DealCommentAttachments';
 
 interface ClientChatsPageProps {
   deals: Deal[];
@@ -527,6 +528,7 @@ export const ClientChatsPage: React.FC<ClientChatsPageProps> = ({
                             {formatCommentTime(c.createdAt) ? ` · ${formatCommentTime(c.createdAt)}` : ''}
                           </div>
                           <div className="whitespace-pre-wrap break-words">{c.text}</div>
+                          <DealCommentAttachments items={c.attachments} />
                         </div>
                       </div>
                     );

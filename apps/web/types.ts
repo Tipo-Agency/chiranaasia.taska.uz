@@ -153,6 +153,8 @@ export interface Comment {
   type?: 'internal' | 'telegram_in' | 'telegram_out' | 'instagram_in' | 'instagram_out';
   /** id сообщения Meta (дедуп вебхука) */
   metaMid?: string;
+  /** Ссылки из Instagram / др. (сохраняет бэкенд) */
+  attachments?: { type?: string; url?: string; title?: string }[];
 }
 
 export interface FunnelStage {
