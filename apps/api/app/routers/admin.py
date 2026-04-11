@@ -17,6 +17,7 @@ from app.models import Base
 from app.models.notification import Notification, NotificationDelivery
 from app.models.notification import NotificationPreferences as NPrefModel
 from app.models.user import User
+from app.routers.system import SystemLogEntry, fetch_system_log_entries
 from app.services.event_bus import _get_redis
 from app.services.notification_delivery import run_pending_deliveries
 from app.services.notification_retention import run_notification_retention
@@ -156,6 +157,17 @@ class RequeueFailedResponse(BaseModel):
 
 
 # --- Endpoints ---
+
+
+@router.get("/logs", response_model=list[SystemLogEntry])
+async def get_admin_logs(
+    limit: int = Query(50, ge=1, le=200),
+    level: str | None = Query(None, description="Filter by level: ERROR, CRITICAL, WARNING"),
+    db: AsyncSession = Depends(get_db),
+    _user: User = Depends(get_current_user_admin),
+):
+    """Системные логи (ошибки/аудит). Канонический путь; legacy: GET /api/system/logs."""
+    return await fetch_system_log_entries(db, limit, level)
 
 
 @router.get("/tables", response_model=list[TableInfo])

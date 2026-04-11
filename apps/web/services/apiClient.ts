@@ -75,7 +75,7 @@ export const systemEndpoint = {
     if (params?.limit != null) sp.set('limit', String(params.limit));
     if (params?.level) sp.set('level', params.level);
     const q = sp.toString();
-    return get<Array<{ id: number; created_at: string; level: string; message: string; logger_name?: string; path?: string; request_id?: string; payload?: string }>>(`/system/logs${q ? `?${q}` : ''}`);
+    return get<Array<{ id: number; created_at: string; level: string; message: string; logger_name?: string; path?: string; request_id?: string; payload?: string }>>(`/admin/logs${q ? `?${q}` : ''}`);
   },
 };
 

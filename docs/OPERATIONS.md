@@ -33,7 +33,7 @@ Adminer / pgAdmin — порты и пароли из `docker-compose.yml` и п
 ## 2. Проверка здоровья
 
 - `**GET /health**` — `{"status":"ok",...,"db":"ok"}`.
-- **Логи приложения:** таблица `system_logs`; в UI — **Настройки → Система / Логи** или `GET /api/system/logs?limit=50`.
+- **Логи приложения:** таблица `system_logs`; в UI — **Настройки → Система / Логи** или `GET /api/admin/logs?limit=50` (JWT + право системной админки; legacy: `/api/system/logs`).
 - **Telegram-алерты по CRITICAL:** при настроенных `TELEGRAM_EMPLOYEE_BOT_TOKEN` и `TELEGRAM_ALERT_CHAT_ID` в окружении backend.
 
 ## 3. CI и деплой

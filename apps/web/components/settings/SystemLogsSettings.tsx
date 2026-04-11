@@ -1,5 +1,5 @@
 /**
- * System logs (errors) viewer for Settings. Fetches GET /api/system/logs.
+ * System logs (errors) viewer for Settings. Fetches GET /api/admin/logs.
  */
 import React, { useEffect, useState } from 'react';
 import { AlertCircle, RefreshCw } from 'lucide-react';

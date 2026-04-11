@@ -5,8 +5,10 @@ from pydantic import BaseModel
 from sqlalchemy import desc, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.auth import get_current_user_admin
 from app.database import get_db
 from app.models.system_log import SystemLog
+from app.models.user import User
 
 router = APIRouter(tags=["system"])
 
@@ -25,13 +27,12 @@ class SystemLogEntry(BaseModel):
         from_attributes = True
 
 
-@router.get("/system/logs", response_model=list[SystemLogEntry])
-async def get_system_logs(
-    limit: int = Query(50, ge=1, le=200),
-    level: str | None = Query(None, description="Filter by level: ERROR, CRITICAL, WARNING"),
-    db: AsyncSession = Depends(get_db),
-):
-    """Return recent system log entries (errors/audit) for admin UI."""
+async def fetch_system_log_entries(
+    db: AsyncSession,
+    limit: int,
+    level: str | None,
+) -> list[SystemLogEntry]:
+    """Чтение system_logs для админ-UI (общая логика для /admin/logs и legacy /system/logs)."""
     q = select(SystemLog).order_by(desc(SystemLog.created_at)).limit(limit)
     if level:
         q = q.where(SystemLog.level == level.upper())
@@ -50,3 +51,19 @@ async def get_system_logs(
         )
         for r in rows
     ]
+
+
+@router.get(
+    "/system/logs",
+    response_model=list[SystemLogEntry],
+    deprecated=True,
+    summary="Системные логи (legacy)",
+)
+async def get_system_logs_legacy(
+    limit: int = Query(50, ge=1, le=200),
+    level: str | None = Query(None, description="Filter by level: ERROR, CRITICAL, WARNING"),
+    db: AsyncSession = Depends(get_db),
+    _user: User = Depends(get_current_user_admin),
+):
+    """Используйте `GET /api/admin/logs`. Требует право системной админки (`admin.system`)."""
+    return await fetch_system_log_entries(db, limit, level)

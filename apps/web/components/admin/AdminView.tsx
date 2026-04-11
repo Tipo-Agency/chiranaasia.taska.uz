@@ -772,7 +772,7 @@ function TestsTab({ onAuthError }: { onAuthError: (msg: string | null) => void }
         </button>
       </div>
       <p className="text-sm text-gray-500 dark:text-gray-400">
-        Запускаются тесты из <code className="bg-gray-100 dark:bg-[#252525] px-1 rounded">apps/api/tests</code> (smoke: health, auth, tasks, system/logs).
+        Запускаются тесты из <code className="bg-gray-100 dark:bg-[#252525] px-1 rounded">apps/api/tests</code> (smoke: health, auth, tasks, admin/logs).
       </p>
       {result && (
         <div className={`p-4 rounded-xl border overflow-hidden ${result.ok ? 'border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-900/20' : 'border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/20'}`}>
