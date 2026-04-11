@@ -14,14 +14,15 @@
 - **HR** — сотрудники, оргструктура, бизнес-процессы.
 - **Производство и склад** — при наличии прав.
 
-Детали в **[ARCHITECTURE.md](./ARCHITECTURE.md)** и **[FRONTEND.md](./FRONTEND.md)**.
+Детали в **[ARCHITECTURE.md](./ARCHITECTURE.md)** (целевое ТЗ + as-built), **[FRONTEND.md](./FRONTEND.md)** и **[ENTITIES.md](./ENTITIES.md)**.
 
 ## 2. Оглавление
 
 
 | Документ                             | Описание                                                                             |
 | ------------------------------------ | ------------------------------------------------------------------------------------ |
-| [ARCHITECTURE.md](./ARCHITECTURE.md) | Компоненты системы, поток данных, уведомления, Redis, WebSocket, честные ограничения |
+| [ARCHITECTURE.md](./ARCHITECTURE.md) | **ТЗ на целевую архитектуру** (hub, домен, очереди, state machine, NFR) и **текущая реализация**; Redis, WebSocket, интеграции, ограничения |
+| [ENTITIES.md](./ENTITIES.md)         | Таблицы и поля БД (генерация из SQLAlchemy-моделей)                                   |
 | [FRONTEND.md](./FRONTEND.md)         | Архитектура SPA: роутинг, `AppRouter`, модули, хуки, контексты, UI-кит, права        |
 | [COMPONENTS.md](./COMPONENTS.md)     | Карта папок и ключевых компонентов `components/`                                     |
 | [API.md](./API.md)                   | REST-префиксы, авторизация, WebSocket, вебхуки, модули роутеров                      |
