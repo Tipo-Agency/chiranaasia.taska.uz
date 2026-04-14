@@ -164,6 +164,10 @@ export const AppRouter: React.FC<AppRouterProps> = (props) => {
     return <HrRoutesView {...props} hrView="employees" />;
   }
 
+  if (view === 'payroll') {
+    return <HrRoutesView {...props} hrView="payroll" />;
+  }
+
   if (view === 'business-processes') {
     return <HrRoutesView {...props} hrView="business-processes" />;
   }

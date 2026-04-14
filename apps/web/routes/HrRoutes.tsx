@@ -6,7 +6,7 @@ const HRModuleLazy = lazy(() =>
   import('../components/modules/HRModule').then((m) => ({ default: m.HRModule }))
 );
 
-type HrRoutesViewProps = AppRouterProps & { hrView: 'employees' | 'business-processes' };
+type HrRoutesViewProps = AppRouterProps & { hrView: 'employees' | 'business-processes' | 'payroll' };
 
 export function HrRoutesView(props: HrRoutesViewProps) {
   const { actions, hrView } = props;

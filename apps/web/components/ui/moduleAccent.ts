@@ -71,6 +71,7 @@ export function resolveModuleAccentKey(view: string, ctx?: ModuleViewContext): M
     production: 'amber',
     inventory: 'teal',
     employees: 'orange',
+    payroll: 'orange',
     analytics: 'yellow',
     settings: 'slate',
     meetings: 'teal',
