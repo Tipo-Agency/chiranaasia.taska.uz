@@ -13,7 +13,7 @@ export const NOTIFICATION_MESSAGES = {
   
   // Сотрудники
   EMPLOYEE_SAVED: 'Сотрудник обновлен',
-  EMPLOYEE_DELETED: 'Карточка удалена',
+  EMPLOYEE_DELETED: 'Карточка перенесена в архив',
   
   // Финансы
   DEPARTMENT_SAVED: 'Подразделение сохранено',

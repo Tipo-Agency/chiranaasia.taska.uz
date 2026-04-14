@@ -2,39 +2,227 @@
  * HTTP API client for Python FastAPI backend.
  * Replaces localStorage-backed backend with REST calls.
  */
+import type {
+  Bdr,
+  Client,
+  Deal,
+  EntityType,
+  IntegrationsRoadmapResponse,
+  PurchaseRequest,
+  Task,
+  TaskAttachment,
+  TaskComment,
+} from '../types';
+
 // VITE_API_URL: full base (e.g. http://localhost:8000/api) or empty for same-origin /api (proxied)
 const env = typeof import.meta !== 'undefined' && (import.meta as { env?: Record<string, string> }).env;
 const API_BASE = (env?.VITE_API_URL ?? '/api').replace(/\/$/, '');
 
+const CSRF_COOKIE = 'csrf_token';
+
+function readCookie(name: string): string | null {
+  if (typeof document === 'undefined') return null;
+  const safe = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const m = document.cookie.match(new RegExp(`(?:^|; )${safe}=([^;]*)`));
+  return m ? decodeURIComponent(m[1]) : null;
+}
+
+function getCsrfHeaders(method: string): Record<string, string> {
+  const m = (method || 'GET').toUpperCase();
+  if (m === 'GET' || m === 'HEAD' || m === 'OPTIONS') return {};
+  const t = readCookie(CSRF_COOKIE);
+  if (!t) return {};
+  return { 'X-CSRF-Token': t };
+}
+
+/** JWT в HttpOnly cookie; Bearer не используем (кроме внешних интеграций на бэкенде). */
 function getAuthHeaders(): Record<string, string> {
-  try {
-    const token = typeof window !== 'undefined' ? sessionStorage.getItem('access_token') : null;
-    if (token) return { Authorization: `Bearer ${token}` };
-  } catch {
-    // ignore
-  }
   return {};
 }
 
-async function fetchJson<T>(url: string, options?: RequestInit): Promise<T> {
-  const res = await fetch(`${API_BASE}${url}`, {
-    ...options,
-    headers: {
-      'Content-Type': 'application/json',
+/** Если csrf cookie нет, но есть сессия (access cookie), бэкенд выставит csrf через GET /auth/csrf. */
+export async function ensureAuthCsrfCookie(): Promise<void> {
+  if (typeof window === 'undefined') return;
+  if (readCookie(CSRF_COOKIE)) return;
+  try {
+    await fetch(`${API_BASE}/auth/csrf`, {
+      method: 'GET',
+      credentials: 'include',
+    });
+  } catch {
+    // ignore
+  }
+}
+
+type FetchJsonOpts = RequestInit & { skipAuthRefresh?: boolean };
+
+let unauthorizedHandler: (() => void) | null = null;
+let apiErrorNotifier: ((message: string) => void) | null = null;
+
+/** Сброс сессии в UI после окончательного 401 (после неудачного refresh). */
+export function setApiUnauthorizedHandler(fn: (() => void) | null): void {
+  unauthorizedHandler = fn;
+}
+
+/** Тосты для 403 / 422 / 5xx (регистрирует useAuthLogic через showNotification). */
+export function setApiErrorNotifier(fn: ((message: string) => void) | null): void {
+  apiErrorNotifier = fn;
+}
+
+function formatFastApiValidationDetail(detail: unknown): string | null {
+  if (!Array.isArray(detail)) return null;
+  const parts: string[] = [];
+  for (const item of detail) {
+    if (item && typeof item === 'object' && 'msg' in item) {
+      const m = (item as { msg?: unknown }).msg;
+      if (typeof m === 'string' && m.trim()) parts.push(m);
+    }
+  }
+  return parts.length ? parts.join('; ') : null;
+}
+
+let refreshInFlight: Promise<boolean> | null = null;
+
+async function tryRefreshAccessToken(): Promise<boolean> {
+  if (refreshInFlight) return refreshInFlight;
+  const p = (async (): Promise<boolean> => {
+    try {
+      const res = await fetch(`${API_BASE}/auth/refresh`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: '{}',
+        credentials: 'include',
+      });
+      return res.ok;
+    } catch {
+      return false;
+    } finally {
+      refreshInFlight = null;
+    }
+  })();
+  refreshInFlight = p;
+  return p;
+}
+
+async function fetchJson<T>(url: string, options?: FetchJsonOpts): Promise<T> {
+  const method = (options?.method || 'GET').toUpperCase();
+  const mutating = ['POST', 'PUT', 'PATCH', 'DELETE'].includes(method);
+  if (
+    mutating &&
+    typeof window !== 'undefined' &&
+    !readCookie(CSRF_COOKIE) &&
+    !url.startsWith('/auth/login') &&
+    !url.startsWith('/auth/refresh')
+  ) {
+    await ensureAuthCsrfCookie();
+  }
+  const buildHeaders = (): HeadersInit => {
+    const h: Record<string, string> = {
       ...getAuthHeaders(),
-      ...(options?.headers || {}),
-    },
-    credentials: 'include',
-  });
+      ...getCsrfHeaders(method),
+      ...(options?.headers as Record<string, string> | undefined),
+    };
+    if (options?.body != null && typeof options.body === 'string' && !h['Content-Type']) {
+      h['Content-Type'] = 'application/json';
+    }
+    return h;
+  };
+
+  const doFetch = () =>
+    fetch(`${API_BASE}${url}`, {
+      ...options,
+      headers: buildHeaders(),
+      credentials: 'include',
+    });
+
+  let res = await doFetch();
+  const canRefresh =
+    !options?.skipAuthRefresh &&
+    res.status === 401 &&
+    !url.startsWith('/auth/refresh') &&
+    !url.startsWith('/auth/login');
+  if (canRefresh) {
+    const ok = await tryRefreshAccessToken();
+    if (ok) res = await doFetch();
+  }
   if (!res.ok) {
-    const err = await res.text();
+    const reqId = res.headers.get('X-Request-ID') || res.headers.get('x-request-id') || '';
+    const bodyText = await res.text();
+    let err = bodyText;
+    try {
+      const j = JSON.parse(bodyText) as { message?: unknown; detail?: unknown };
+      if (j.message !== undefined && typeof j.message === 'string') {
+        err = j.message;
+      } else if (j.detail !== undefined) {
+        if (typeof j.detail === 'string') {
+          err = j.detail;
+        } else if (res.status === 422) {
+          const v = formatFastApiValidationDetail(j.detail);
+          err = v || JSON.stringify(j.detail);
+        } else {
+          err = JSON.stringify(j.detail);
+        }
+      }
+    } catch {
+      /* keep body as err */
+    }
+
+    if (
+      res.status === 401 &&
+      typeof window !== 'undefined' &&
+      unauthorizedHandler &&
+      !url.startsWith('/auth/login') &&
+      !url.startsWith('/auth/refresh')
+    ) {
+      try {
+        unauthorizedHandler();
+      } catch {
+        /* noop */
+      }
+    }
+
+    if (typeof window !== 'undefined' && apiErrorNotifier) {
+      if (res.status === 403) {
+        apiErrorNotifier(err && err.length < 240 ? err : 'Нет доступа');
+      } else if (res.status === 422) {
+        apiErrorNotifier(err || 'Ошибка валидации');
+      } else if (res.status === 409) {
+        let msg409 =
+          'Данные уже изменены (другая вкладка или пользователь). Обновите страницу и повторите.';
+        try {
+          const j409 = JSON.parse(bodyText) as { detail?: unknown };
+          const d = j409.detail;
+          if (d && typeof d === 'object' && d !== null && 'message' in d) {
+            const m = (d as { message?: unknown }).message;
+            if (typeof m === 'string' && m.trim()) msg409 = m;
+          }
+        } catch {
+          /* оставляем msg409 по умолчанию */
+        }
+        apiErrorNotifier(msg409);
+      } else if (res.status >= 500) {
+        apiErrorNotifier(
+          reqId ? `Сервер временно недоступен (requestId: ${reqId})` : 'Сервер временно недоступен',
+        );
+      }
+    }
+
+    if (res.status >= 500 && reqId) {
+      err = `${err || 'HTTP error'} [requestId: ${reqId}]`;
+    }
     throw new Error(err || `HTTP ${res.status}`);
   }
   const text = await res.text();
-  return text ? JSON.parse(text) : ({} as T);
+  let parsed: T;
+  try {
+    parsed = text ? (JSON.parse(text) as T) : ({} as T);
+  } catch {
+    throw new Error('Invalid JSON response');
+  }
+  return parsed;
 }
 
-/** GET с Bearer (для бинарных ответов, например медиа из личного Telegram). */
+/** GET с cookie-сессией (бинарные ответы, например медиа из личного Telegram). */
 export async function fetchAuthenticatedBlob(path: string): Promise<Blob> {
   const res = await fetch(`${API_BASE}${path}`, {
     method: 'GET',
@@ -52,23 +240,24 @@ async function get<T>(path: string): Promise<T> {
   return fetchJson<T>(path, { method: 'GET' });
 }
 
-async function put<T>(path: string, body: unknown): Promise<T> {
-  return fetchJson<T>(path, { method: 'PUT', body: JSON.stringify(body) });
+async function put<T>(path: string, body: unknown, init?: Omit<FetchJsonOpts, 'method' | 'body'>): Promise<T> {
+  return fetchJson<T>(path, { method: 'PUT', body: JSON.stringify(body), ...init });
 }
 
-async function post<T>(path: string, body?: unknown): Promise<T> {
-  return fetchJson<T>(path, { method: 'POST', body: body ? JSON.stringify(body) : undefined });
+async function post<T>(path: string, body?: unknown, init?: Omit<FetchJsonOpts, 'method' | 'body'>): Promise<T> {
+  const serialized = body === undefined || body === null ? undefined : JSON.stringify(body);
+  return fetchJson<T>(path, { method: 'POST', body: serialized, ...init });
 }
 
-async function patch<T>(path: string, body: unknown): Promise<T> {
-  return fetchJson<T>(path, { method: 'PATCH', body: JSON.stringify(body) });
+async function patch<T>(path: string, body: unknown, init?: Omit<FetchJsonOpts, 'method' | 'body'>): Promise<T> {
+  return fetchJson<T>(path, { method: 'PATCH', body: JSON.stringify(body), ...init });
 }
 
-async function del<T>(path: string): Promise<T> {
-  return fetchJson<T>(path, { method: 'DELETE' });
+async function del<T>(path: string, init?: Omit<FetchJsonOpts, 'method' | 'body'>): Promise<T> {
+  return fetchJson<T>(path, { method: 'DELETE', ...init });
 }
 
-// System (health, logs for admin)
+// Системные логи: GET /admin/logs — JWT (cookie) + RBAC admin.system (не путать с публичным /health)
 export const systemEndpoint = {
   getLogs: (params?: { limit?: number; level?: string }) => {
     const sp = new URLSearchParams();
@@ -79,7 +268,7 @@ export const systemEndpoint = {
   },
 };
 
-// Admin (requires ADMIN role + JWT)
+// Admin: JWT + RBAC (в т.ч. admin.system для логов/БД/тестов)
 export const adminEndpoint = {
   getTables: () => get<Array<{ name: string; row_count?: number }>>('/admin/tables'),
   getTableData: (tableName: string, offset = 0, limit = 100) =>
@@ -118,7 +307,7 @@ export const adminEndpoint = {
       }>;
     }>('/admin/redis/monitor'),
   runNotificationDeliveries: (limit = 500) =>
-    post<{ ok: boolean; processed: number; sent: number; failed: number; skipped: number }>(
+    post<{ ok: boolean; queued: number }>(
       `/admin/notifications/run-deliveries?limit=${encodeURIComponent(String(limit))}`
     ),
   runNotificationRetention: (days?: number) =>
@@ -130,24 +319,46 @@ export const adminEndpoint = {
       id: string;
       notification_id: string;
       channel: string;
-      attempts: string;
+      recipient?: string | null;
+      attempts: number;
       last_error?: string;
-      updated_at?: string;
       notification_title?: string;
-      recipient_id?: string;
+      user_id?: string;
     }>>(`/admin/notifications/failed-deliveries?limit=${encodeURIComponent(String(limit))}${channel ? `&channel=${encodeURIComponent(channel)}` : ''}${query ? `&q=${encodeURIComponent(query)}` : ''}`),
   requeueFailedDeliveries: (limit = 200) =>
     post<{ ok: boolean; requeued: number }>(`/admin/notifications/requeue-failed?limit=${encodeURIComponent(String(limit))}`),
   requeueFailedDeliveryById: (deliveryId: string) =>
     post<{ ok: boolean; requeued: number }>(`/admin/notifications/requeue-failed/${encodeURIComponent(deliveryId)}`),
+  getDlqRows: (params?: { limit?: number; unresolvedOnly?: boolean }) => {
+    const sp = new URLSearchParams();
+    if (params?.limit != null) sp.set('limit', String(params.limit));
+    if (params?.unresolvedOnly === false) sp.set('unresolved_only', 'false');
+    const q = sp.toString();
+    return get<
+      Array<{
+        id: string;
+        queue_name: string;
+        payload: Record<string, unknown>;
+        error?: string | null;
+        created_at: string;
+        resolved: boolean;
+      }>
+    >(`/admin/dlq/rows${q ? `?${q}` : ''}`);
+  },
+  resolveDlqRow: (id: string) =>
+    post<{ ok: boolean; message?: string | null }>(`/admin/dlq/${encodeURIComponent(id)}/resolve`),
+  requeueDlqRow: (id: string) =>
+    post<{ ok: boolean; message?: string | null }>(`/admin/dlq/${encodeURIComponent(id)}/requeue`),
 };
 
 // Auth / Users
 export const authEndpoint = {
   getAll: () => get<unknown[]>('/auth/users'),
   updateAll: (users: unknown[]) => put<{ ok: boolean }>('/auth/users', users),
+  /** Токены только в HttpOnly cookies; в JSON приходит только `user`. */
   login: (login: string, password: string) =>
-    post<{ access_token: string; token_type: string; user: unknown }>('/auth/login', { login, password }),
+    post<{ user: unknown }>('/auth/login', { login, password }, { skipAuthRefresh: true }),
+  logout: () => post<{ ok: boolean }>('/auth/logout', {}, { skipAuthRefresh: true }),
   getMe: () => get<unknown>('/auth/me'),
   getPermissionsCatalog: () =>
     get<{ groups: Array<{ id: string; label: string; items: Array<{ key: string; label: string }> }>; allKeys: string[] }>(
@@ -161,10 +372,159 @@ export const authEndpoint = {
   deleteRole: (id: string) => del<{ ok: boolean }>(`/auth/roles/${encodeURIComponent(id)}`),
 };
 
-// Tasks
+type TaskListPage = {
+  items: Record<string, unknown>[];
+  total: number;
+  limit: number;
+  next_cursor?: string | null;
+};
+
+const TASK_PAGE_LIMIT = 500;
+const TASK_BATCH_MAX = 100;
+
+function mapTaskCommentFromApi(c: Record<string, unknown>): TaskComment {
+  return {
+    id: String(c.id ?? ''),
+    taskId: String(c.task_id ?? c.taskId ?? ''),
+    userId: String(c.user_id ?? c.userId ?? ''),
+    text: String(c.text ?? ''),
+    createdAt: String(c.created_at ?? c.createdAt ?? ''),
+    isSystem: Boolean(c.is_system ?? c.isSystem),
+    attachmentId: (c.attachment_id ?? c.attachmentId) as string | undefined,
+  };
+}
+
+function mapTaskAttachmentFromApi(a: Record<string, unknown>): TaskAttachment {
+  return {
+    id: String(a.id ?? ''),
+    taskId: String(a.task_id ?? a.taskId ?? ''),
+    name: String(a.name ?? ''),
+    url: String(a.url ?? ''),
+    type: String(a.mime_type ?? a.type ?? ''),
+    uploadedAt: String(a.uploaded_at ?? a.uploadedAt ?? ''),
+    docId: (a.doc_id ?? a.docId) as string | undefined,
+    attachmentType: (a.attachment_type ?? a.attachmentType) as 'file' | 'doc' | undefined,
+    storagePath: (a.storage_path ?? a.storagePath) as string | undefined,
+  };
+}
+
+function taskFromApi(r: Record<string, unknown>): Task {
+  const assigneeObj = r.assignee as { id?: string } | null | undefined;
+  const end = (r.end_date as string | undefined) || (r.due_date as string | undefined) || '';
+  const start = (r.start_date as string | undefined) || '';
+  const amt = r.amount;
+  return {
+    id: String(r.id ?? ''),
+    entityType: (r.entity_type as EntityType) || 'task',
+    tableId: String(r.table_id ?? ''),
+    title: String(r.title ?? ''),
+    status: String(r.status ?? ''),
+    priority: String(r.priority ?? ''),
+    assigneeId: (r.assignee_id as string | null | undefined) ?? assigneeObj?.id ?? null,
+    assigneeIds: Array.isArray(r.assignee_ids) ? (r.assignee_ids as string[]) : undefined,
+    projectId: (r.project_id as string | null | undefined) ?? null,
+    startDate: start || end,
+    endDate: end || start,
+    description: r.description as string | undefined,
+    isArchived: Boolean(r.is_archived),
+    comments: Array.isArray(r.comments)
+      ? (r.comments as Record<string, unknown>[]).map(mapTaskCommentFromApi)
+      : [],
+    attachments: Array.isArray(r.attachments)
+      ? (r.attachments as Record<string, unknown>[]).map(mapTaskAttachmentFromApi)
+      : [],
+    contentPostId: r.content_post_id as string | undefined,
+    processId: r.process_id as string | undefined,
+    processInstanceId: r.process_instance_id as string | undefined,
+    stepId: r.step_id as string | undefined,
+    dealId: r.deal_id as string | undefined,
+    source: r.source as string | undefined,
+    category: r.category as string | undefined,
+    taskId: r.task_id as string | undefined,
+    parentTaskId: undefined,
+    createdByUserId: r.created_by_user_id as string | undefined,
+    createdAt: r.created_at as string | undefined,
+    requesterId: r.requester_id as string | undefined,
+    departmentId: r.department_id as string | undefined,
+    categoryId: r.category_id as string | undefined,
+    amount: amt != null && amt !== '' ? Number(amt) : undefined,
+    decisionDate: r.decision_date as string | undefined,
+    updatedAt: (r.updated_at as string | undefined) ?? undefined,
+    version:
+      typeof r.version === 'number'
+        ? r.version
+        : r.version != null && r.version !== ''
+          ? Number(r.version) || undefined
+          : undefined,
+    linkedFeatureId: undefined,
+    linkedIdeaId: undefined,
+  };
+}
+
+function taskToBatchItem(t: Task): Record<string, unknown> {
+  return {
+    id: t.id,
+    table_id: t.tableId,
+    entity_type: t.entityType,
+    title: t.title,
+    status: t.status,
+    priority: t.priority,
+    assignee_id: t.assigneeId,
+    assignee_ids: t.assigneeIds,
+    project_id: t.projectId,
+    start_date: t.startDate,
+    end_date: t.endDate,
+    description: t.description,
+    is_archived: t.isArchived,
+    comments: t.comments,
+    attachments: t.attachments,
+    content_post_id: t.contentPostId,
+    process_id: t.processId,
+    process_instance_id: t.processInstanceId,
+    step_id: t.stepId,
+    deal_id: t.dealId,
+    source: t.source,
+    category: t.category,
+    task_id: t.taskId,
+    created_by_user_id: t.createdByUserId,
+    created_at: t.createdAt,
+    requester_id: t.requesterId,
+    department_id: t.departmentId,
+    category_id: t.categoryId,
+    amount: t.amount != null && !Number.isNaN(t.amount) ? String(t.amount) : undefined,
+    decision_date: t.decisionDate,
+  };
+}
+
+// Tasks (REST: GET пагинация, PUT /tasks/batch — snake_case)
 export const tasksEndpoint = {
-  getAll: () => get<unknown[]>('/tasks'),
-  updateAll: (tasks: unknown[]) => put<{ ok: boolean }>('/tasks', tasks),
+  getAll: async (): Promise<Task[]> => {
+    const all: Task[] = [];
+    let cursor: string | undefined;
+    while (true) {
+      const sp = new URLSearchParams();
+      sp.set('limit', String(TASK_PAGE_LIMIT));
+      if (cursor) sp.set('cursor', cursor);
+      const page = await get<TaskListPage>(`/tasks?${sp.toString()}`);
+      for (const row of page.items) {
+        all.push(taskFromApi(row));
+      }
+      const next = page.next_cursor;
+      if (!next || page.items.length < TASK_PAGE_LIMIT) break;
+      cursor = next;
+    }
+    return all;
+  },
+  updateAll: async (tasks: Task[]) => {
+    for (let i = 0; i < tasks.length; i += TASK_BATCH_MAX) {
+      const chunk = tasks.slice(i, i + TASK_BATCH_MAX).map(taskToBatchItem);
+      await put<{ ok: boolean; updated: number }>('/tasks/batch', chunk);
+    }
+    return { ok: true as const };
+  },
+  patch: (id: string, body: Record<string, unknown>) =>
+    patch<Record<string, unknown>>(`/tasks/${encodeURIComponent(id)}`, body),
+  remove: (id: string) => del<{ ok: boolean }>(`/tasks/${encodeURIComponent(id)}`),
 };
 
 // Projects
@@ -186,12 +546,77 @@ export const activityEndpoint = {
   add: (log: unknown) => post<{ ok: boolean }>('/activity', log),
 };
 
+/** Ответ GET /messages (пагинация) */
+export type MessagesListResponse = {
+  items: unknown[];
+  total: number;
+  limit: number;
+  next_cursor?: string | null;
+};
+
+function _messagesListParams(
+  folder: 'inbox' | 'outbox',
+  userId: string,
+  opts?: {
+    dealId?: string;
+    limit?: number;
+    cursor?: string;
+    order?: 'asc' | 'desc';
+  }
+): string {
+  const sp = new URLSearchParams({
+    folder,
+    user_id: userId,
+    limit: String(opts?.limit ?? 500),
+    order: opts?.order ?? 'desc',
+  });
+  if (opts?.dealId) sp.set('deal_id', opts.dealId);
+  if (opts?.cursor) sp.set('cursor', opts.cursor);
+  return sp.toString();
+}
+
+function _unwrapMessagesList(data: unknown): unknown[] {
+  if (Array.isArray(data)) return data;
+  if (data && typeof data === 'object' && Array.isArray((data as MessagesListResponse).items)) {
+    return (data as MessagesListResponse).items;
+  }
+  return [];
+}
+
 // Messages (inbox/outbox)
 export const messagesEndpoint = {
-  getInbox: (userId: string) => get<unknown[]>(`/messages?folder=inbox&user_id=${encodeURIComponent(userId)}`),
-  getOutbox: (userId: string) => get<unknown[]>(`/messages?folder=outbox&user_id=${encodeURIComponent(userId)}`),
-  add: (body: { id?: string; createdAt?: string; senderId: string; recipientId?: string | null; text: string; attachments?: unknown[] }) =>
-    post<{ ok: boolean; id: string }>('/messages', body),
+  /** Полный ответ с total/limit/next_cursor */
+  list: (opts: {
+    folder: 'inbox' | 'outbox';
+    userId: string;
+    dealId?: string;
+    limit?: number;
+    cursor?: string;
+    order?: 'asc' | 'desc';
+  }) =>
+    get<MessagesListResponse>(`/messages?${_messagesListParams(opts.folder, opts.userId, opts)}`),
+
+  getInbox: (userId: string, opts?: { dealId?: string; limit?: number; cursor?: string; order?: 'asc' | 'desc' }) =>
+    get<MessagesListResponse | unknown[]>(`/messages?${_messagesListParams('inbox', userId, opts)}`).then(_unwrapMessagesList),
+
+  getOutbox: (userId: string, opts?: { dealId?: string; limit?: number; cursor?: string; order?: 'asc' | 'desc' }) =>
+    get<MessagesListResponse | unknown[]>(`/messages?${_messagesListParams('outbox', userId, opts)}`).then(_unwrapMessagesList),
+
+  add: (body: {
+    id?: string;
+    createdAt?: string;
+    senderId: string;
+    recipientId?: string | null;
+    text: string;
+    attachments?: unknown[];
+    dealId?: string;
+    funnelId?: string;
+    channel?: string;
+    direction?: string;
+    body?: string;
+    externalMsgId?: string;
+    mediaUrl?: string;
+  }) => post<{ ok: boolean; id: string; deduplicated?: boolean }>('/messages', body),
   markRead: (messageId: string, read: boolean) => patch<{ ok: boolean }>(`/messages/${messageId}`, { read }),
 };
 
@@ -244,7 +669,7 @@ export const notificationsEndpoint = {
   markRead: (notificationId: string, isRead = true) =>
     post<{ ok: boolean }>(`/notifications/${encodeURIComponent(notificationId)}/read`, { isRead }),
   runDeliveries: (limit = 100) =>
-    post<{ ok: boolean; processed: number; sent: number; failed: number; skipped: number }>(
+    post<{ ok: boolean; queued: number }>(
       `/notifications/deliveries/run?limit=${String(limit)}`
     ),
   unreadCount: (userId: string) =>
@@ -265,7 +690,63 @@ export const notificationsEndpoint = {
 
 // Clients
 export const clientsEndpoint = {
-  getAll: () => get<unknown[]>('/clients'),
+  list: (params?: {
+    search?: string;
+    limit?: number;
+    cursor?: string;
+    is_archived?: boolean;
+    sort?: string;
+    order?: string;
+  }) => {
+    const sp = new URLSearchParams();
+    const limit = params?.limit ?? 50;
+    sp.set('limit', String(limit));
+    if (params?.cursor) sp.set('cursor', params.cursor);
+    if (params?.search != null && params.search !== '') sp.set('search', params.search);
+    if (params?.is_archived === true) sp.set('is_archived', 'true');
+    if (params?.is_archived === false) sp.set('is_archived', 'false');
+    if (params?.sort) sp.set('sort', params.sort);
+    if (params?.order) sp.set('order', params.order);
+    return get<ClientListPage>(`/clients?${sp.toString()}`);
+  },
+  getAll: async (): Promise<Client[]> => {
+    const out: Client[] = [];
+    let cursor: string | undefined;
+    while (true) {
+      const sp = new URLSearchParams();
+      sp.set('limit', String(CLIENT_PAGE_LIMIT));
+      if (cursor) sp.set('cursor', cursor);
+      const page = await get<ClientListPage>(`/clients?${sp.toString()}`);
+      const items = page.items ?? [];
+      for (const row of items) {
+        out.push(clientFromApi(row as Record<string, unknown>));
+      }
+      const next = page.next_cursor;
+      if (!next || items.length < CLIENT_PAGE_LIMIT) break;
+      cursor = next;
+    }
+    return out;
+  },
+  getById: (id: string) =>
+    get<Record<string, unknown>>(`/clients/${encodeURIComponent(id)}`).then((r) => clientFromApi(r)),
+  create: (c: Client) =>
+    post<Record<string, unknown>>('/clients', clientToApiWrite(c)).then((r) => clientFromApi(r)),
+  patch: (id: string, partial: Partial<Client>) => {
+    const body: Record<string, unknown> = {};
+    if (partial.name !== undefined) body.name = partial.name;
+    if (partial.phone !== undefined) body.phone = partial.phone?.trim() ? partial.phone : null;
+    if (partial.email !== undefined) body.email = partial.email?.trim() ? partial.email : null;
+    if (partial.telegram !== undefined) body.telegram = partial.telegram?.trim() ? partial.telegram : null;
+    if (partial.instagram !== undefined) body.instagram = partial.instagram?.trim() ? partial.instagram : null;
+    if (partial.companyName !== undefined)
+      body.companyName = partial.companyName?.trim() ? partial.companyName : null;
+    if (partial.notes !== undefined) body.notes = partial.notes ?? null;
+    if (partial.tags !== undefined) body.tags = partial.tags ?? [];
+    if (partial.isArchived !== undefined) body.isArchived = partial.isArchived;
+    return patch<Record<string, unknown>>(`/clients/${encodeURIComponent(id)}`, body).then((r) =>
+      clientFromApi(r)
+    );
+  },
   updateAll: (clients: unknown[]) => put<{ ok: boolean }>('/clients', clients),
 };
 
@@ -303,6 +784,138 @@ const isOneTimeSale = (item: unknown): boolean => {
   return deal.recurring === false;
 };
 
+type DealListPage = {
+  items: Record<string, unknown>[];
+  total: number;
+  limit: number;
+  next_cursor?: string | null;
+};
+
+export type ClientListPage = {
+  items: Record<string, unknown>[];
+  total: number;
+  limit: number;
+  next_cursor?: string | null;
+};
+
+const CLIENT_PAGE_LIMIT = 500;
+
+/** Ответ GET /clients (snake_case) → Client для UI. */
+export function clientFromApi(r: Record<string, unknown>): Client {
+  const tagsRaw = r.tags;
+  return {
+    id: String(r.id ?? ''),
+    name: String(r.name ?? ''),
+    phone: (r.phone as string | undefined) ?? undefined,
+    email: (r.email as string | undefined) ?? undefined,
+    telegram: (r.telegram as string | undefined) ?? undefined,
+    instagram: (r.instagram as string | undefined) ?? undefined,
+    companyName: (r.company_name as string | undefined) ?? undefined,
+    notes: (r.notes as string | undefined) ?? undefined,
+    tags: Array.isArray(tagsRaw) ? (tagsRaw as unknown[]).map(String) : [],
+    isArchived: Boolean(r.is_archived),
+    updatedAt: (r.updated_at as string | undefined) ?? undefined,
+    version:
+      typeof r.version === 'number'
+        ? r.version
+        : r.version != null && r.version !== ''
+          ? Number(r.version) || undefined
+          : undefined,
+  };
+}
+
+function clientToApiWrite(c: Client): Record<string, unknown> {
+  return {
+    id: c.id || undefined,
+    name: c.name,
+    phone: c.phone ?? null,
+    email: c.email ?? null,
+    telegram: c.telegram ?? null,
+    instagram: c.instagram ?? null,
+    companyName: c.companyName ?? null,
+    notes: c.notes ?? null,
+    tags: c.tags ?? [],
+    isArchived: c.isArchived ?? false,
+  };
+}
+
+const DEAL_PAGE_LIMIT = 500;
+
+/** Ответ GET /deals (snake_case) → тип Deal (camelCase) для UI. */
+export function dealFromApi(r: Record<string, unknown>): Deal {
+  const amt = r.amount;
+  return {
+    id: String(r.id ?? ''),
+    title: (r.title as string | undefined) ?? '',
+    stage: r.stage as string | undefined,
+    assigneeId: (r.assignee_id as string | null | undefined) ?? undefined,
+    contactName: (r.contact_name as string | undefined) ?? undefined,
+    source: r.source as Deal['source'],
+    telegramChatId:
+      (r.telegram_chat_id as string | undefined) ?? (r.source_chat_id as string | undefined) ?? undefined,
+    telegramUsername: (r.telegram_username as string | undefined) ?? undefined,
+    projectId: (r.project_id as string | undefined) ?? undefined,
+    comments: (r.comments as Deal['comments']) ?? [],
+    clientId: (r.client_id as string | undefined) ?? undefined,
+    client:
+      r.client && typeof r.client === 'object'
+        ? clientFromApi(r.client as Record<string, unknown>)
+        : undefined,
+    recurring: Boolean(r.recurring),
+    number: r.number as string | undefined,
+    status: r.status as Deal['status'],
+    description: r.description as string | undefined,
+    amount: amt != null && amt !== '' ? Number(amt) : 0,
+    currency: String(r.currency ?? 'UZS'),
+    funnelId: (r.funnel_id as string | undefined) ?? undefined,
+    notes: r.notes as string | undefined,
+    isArchived: Boolean(r.is_archived),
+    createdAt: r.created_at as string | undefined,
+    updatedAt: r.updated_at as string | undefined,
+    date: r.date as string | undefined,
+    dueDate: r.due_date as string | undefined,
+    paidAmount:
+      r.paid_amount != null && r.paid_amount !== ''
+        ? typeof r.paid_amount === 'number'
+          ? r.paid_amount
+          : Number(r.paid_amount)
+        : undefined,
+    paidDate: r.paid_date as string | undefined,
+    startDate: r.start_date as string | undefined,
+    endDate: r.end_date as string | undefined,
+    paymentDay:
+      r.payment_day != null && r.payment_day !== ''
+        ? typeof r.payment_day === 'number'
+          ? r.payment_day
+          : Number(r.payment_day)
+        : undefined,
+    version:
+      typeof r.version === 'number'
+        ? r.version
+        : r.version != null && r.version !== ''
+          ? Number(r.version) || undefined
+          : undefined,
+  };
+}
+
+async function fetchAllDealsPages(): Promise<Deal[]> {
+  const all: Deal[] = [];
+  let cursor: string | undefined;
+  while (true) {
+    const sp = new URLSearchParams();
+    sp.set('limit', String(DEAL_PAGE_LIMIT));
+    if (cursor) sp.set('cursor', cursor);
+    const page = await get<DealListPage>(`/deals?${sp.toString()}`);
+    for (const row of page.items) {
+      all.push(dealFromApi(row));
+    }
+    const next = page.next_cursor;
+    if (!next || page.items.length < DEAL_PAGE_LIMIT) break;
+    cursor = next;
+  }
+  return all;
+}
+
 const mergeById = (left: unknown[], right: unknown[]): unknown[] => {
   const map = new Map<string, unknown>();
   for (const item of left) {
@@ -316,28 +929,36 @@ const mergeById = (left: unknown[], right: unknown[]): unknown[] => {
   return [...map.values()];
 };
 
-// CRM deals only
+// CRM deals only (GET — пагинация + snake_case, см. dealFromApi)
 export const dealsEndpoint = {
   getAll: async () => {
-    const all = await get<unknown[]>('/deals');
-    // CRM поток: берём всё, что не похоже на договор/продажу.
-    // Не требуем строгую funnel-валидацию, чтобы не терять старые лиды.
-    return (all || []).filter((d) => !isContractLikeDeal(d));
+    const all = await fetchAllDealsPages();
+    return all.filter((d) => !isContractLikeDeal(d));
   },
   updateAll: async (deals: unknown[]) => {
-    const all = await get<unknown[]>('/deals');
-    const preserved = (all || []).filter((d) => isContractLikeDeal(d));
+    const all = await fetchAllDealsPages();
+    const preserved = all.filter((d) => isContractLikeDeal(d));
     return put<{ ok: boolean }>('/deals', mergeById(preserved, deals));
   },
   create: (deal: unknown) => post<unknown>('/deals', deal),
   update: (id: string, updates: unknown) => patch<unknown>(`/deals/${id}`, updates),
-  getById: (id: string) => get<unknown>(`/deals/${id}`),
+  getById: async (id: string): Promise<Deal> =>
+    dealFromApi(await get<Record<string, unknown>>(`/deals/${encodeURIComponent(id)}`)),
   delete: (id: string) => del<{ ok: boolean }>(`/deals/${id}`),
+  /** Presigned GET S3 для вложения сделки (ключ из comment.attachments[].storageKey). */
+  getMediaSignedUrl: (dealId: string, storageKey: string) =>
+    get<{ url: string; expiresIn: number }>(
+      `/deals/${encodeURIComponent(dealId)}/media/signed?${new URLSearchParams({ key: storageKey }).toString()}`
+    ),
 };
 
 export const integrationsMetaEndpoint = {
   sendInstagram: (body: { dealId: string; text: string }) =>
     post<unknown>('/integrations/meta/instagram/send', body),
+};
+
+export const integrationsRoadmapEndpoint = {
+  get: () => get<IntegrationsRoadmapResponse>('/integrations/roadmap'),
 };
 
 export const integrationsSiteEndpoint = {
@@ -359,8 +980,30 @@ export const integrationsTelegramPersonalEndpoint = {
     post<{ ok: boolean; needPassword?: boolean }>('/integrations/telegram-personal/auth/sign-in', body),
   password: (body: { password: string }) => post<{ ok: boolean }>('/integrations/telegram-personal/auth/password', body),
   disconnect: () => del<{ ok: boolean }>('/integrations/telegram-personal/session'),
-  syncMessages: (dealId: string, body?: { limit?: number }) =>
-    post<unknown>(`/integrations/telegram-personal/deals/${encodeURIComponent(dealId)}/sync-messages`, body ?? {}),
+  /** POST 202 → очередь queue.integrations; ждём обновления сделки по GET /deals/:id (без Telethon в HTTP). */
+  syncMessages: async (dealId: string, body?: { limit?: number }): Promise<Deal> => {
+    const path = `/integrations/telegram-personal/deals/${encodeURIComponent(dealId)}/sync-messages`;
+    const res = await post<{ ok?: boolean; queued?: boolean; dealId?: string }>(path, body ?? {});
+    if (!res.queued || res.dealId !== dealId) {
+      return res as unknown as Deal;
+    }
+    const snapshot = (d: Deal) =>
+      `${(d.comments || []).length}\0${d.updatedAt ?? ''}\0${
+        d.comments && d.comments.length > 0 ? (d.comments[d.comments.length - 1]?.id ?? '') : ''
+      }`;
+    const baseline = await dealsEndpoint.getById(dealId);
+    const s0 = snapshot(baseline);
+    for (let i = 0; i < 30; i += 1) {
+      await new Promise<void>((resolve) => {
+        setTimeout(resolve, 800);
+      });
+      const d = await dealsEndpoint.getById(dealId);
+      if (snapshot(d) !== s0) {
+        return d;
+      }
+    }
+    return dealsEndpoint.getById(dealId);
+  },
   sendDeal: (dealId: string, body: { text: string }) =>
     post<unknown>(`/integrations/telegram-personal/deals/${encodeURIComponent(dealId)}/send`, body),
   fetchDealMediaBlob: (dealId: string, messageId: number) =>
@@ -388,31 +1031,98 @@ export const integrationsTelegramEndpoint = {
 
 export const contractsEndpoint = {
   getAll: async () => {
-    const all = await get<unknown[]>('/deals');
-    return (all || []).filter((d) => isContractLikeDeal(d) && isRecurringContract(d));
+    const all = await fetchAllDealsPages();
+    return all.filter((d) => isContractLikeDeal(d) && isRecurringContract(d));
   },
   updateAll: async (contracts: unknown[]) => {
-    const all = await get<unknown[]>('/deals');
-    const preserved = (all || []).filter((d) => !isRecurringContract(d));
+    const all = await fetchAllDealsPages();
+    const preserved = all.filter((d) => !isRecurringContract(d));
     return put<{ ok: boolean }>('/deals', mergeById(preserved, contracts));
   },
 };
 
 export const oneTimeDealsEndpoint = {
   getAll: async () => {
-    const all = await get<unknown[]>('/deals');
-    return (all || []).filter((d) => isContractLikeDeal(d) && isOneTimeSale(d));
+    const all = await fetchAllDealsPages();
+    return all.filter((d) => isContractLikeDeal(d) && isOneTimeSale(d));
   },
   updateAll: async (sales: unknown[]) => {
-    const all = await get<unknown[]>('/deals');
-    const preserved = (all || []).filter((d) => !isOneTimeSale(d));
+    const all = await fetchAllDealsPages();
+    const preserved = all.filter((d) => !isOneTimeSale(d));
     return put<{ ok: boolean }>('/deals', mergeById(preserved, sales));
   },
 };
 
-// Employees
+// Employees (GET — пагинация items/total; по умолчанию без архива)
+export type EmployeeListParams = {
+  limit?: number;
+  cursor?: string;
+  search?: string;
+  departmentId?: string;
+  status?: string;
+  positionId?: string;
+  userId?: string;
+  /** true — включить архивные карточки (настройки / архив) */
+  includeArchived?: boolean;
+  sort?: 'fullName' | 'status' | 'id' | 'hireDate';
+  order?: 'asc' | 'desc';
+};
+
+export type EmployeeListResult = {
+  items: unknown[];
+  total: number;
+  limit: number;
+  next_cursor?: string | null;
+};
+
+function employeesQueryString(params?: EmployeeListParams): string {
+  if (!params) return '';
+  const sp = new URLSearchParams();
+  const add = (k: string, v: string | number | boolean | undefined | null) => {
+    if (v === undefined || v === null || v === '') return;
+    sp.set(k, typeof v === 'boolean' ? (v ? 'true' : 'false') : String(v));
+  };
+  add('limit', params.limit);
+  add('cursor', params.cursor);
+  add('search', params.search);
+  add('departmentId', params.departmentId);
+  add('status', params.status);
+  add('positionId', params.positionId);
+  add('userId', params.userId);
+  add('includeArchived', params.includeArchived);
+  add('sort', params.sort);
+  add('order', params.order);
+  const q = sp.toString();
+  return q ? `?${q}` : '';
+}
+
 export const employeesEndpoint = {
-  getAll: () => get<unknown[]>('/employees'),
+  list: (params?: EmployeeListParams) =>
+    get<EmployeeListResult>(`/employees${employeesQueryString(params)}`),
+  /** Все записи порциями (по умолчанию только неархивные). */
+  getAll: async (opts?: { includeArchived?: boolean; pageSize?: number }) => {
+    const pageSize = opts?.pageSize ?? 500;
+    const all: unknown[] = [];
+    let cursor: string | undefined;
+    for (;;) {
+      const r = await get<EmployeeListResult>(
+        `/employees${employeesQueryString({
+          limit: pageSize,
+          cursor,
+          includeArchived: opts?.includeArchived,
+        })}`
+      );
+      all.push(...r.items);
+      const next = r.next_cursor;
+      if (!next || r.items.length === 0 || r.items.length < pageSize) break;
+      cursor = next;
+    }
+    return all;
+  },
+  getOne: (id: string) => get<unknown>(`/employees/${encodeURIComponent(id)}`),
+  create: (body: unknown) => post<unknown>('/employees', body),
+  update: (id: string, body: unknown) => patch<unknown>(`/employees/${encodeURIComponent(id)}`, body),
+  remove: (id: string) => del<Record<string, never>>(`/employees/${encodeURIComponent(id)}`),
   updateAll: (employees: unknown[]) => put<{ ok: boolean }>('/employees', employees),
 };
 
@@ -481,13 +1191,17 @@ export const weeklyPlansEndpoint = {
 
 // Calendar (iCal export for Google Calendar etc.)
 export const calendarEndpoint = {
-  ensureExportToken: (body?: { rotate?: boolean }) =>
-    post<{ ok: boolean; token: string }>('/calendar/export-token', body ?? {}),
+  ensureExportToken: (body?: { rotate?: boolean; revoke?: boolean }) =>
+    post<{ ok: boolean; token: string | null }>('/calendar/export-token', body ?? {}),
 };
 
 // Meetings
 export const meetingsEndpoint = {
   getAll: () => get<unknown[]>('/meetings'),
+  getOne: (id: string) => get<unknown>(`/meetings/${encodeURIComponent(id)}`),
+  create: (body: unknown) => post<unknown>('/meetings', body),
+  patch: (id: string, body: unknown) => patch<unknown>(`/meetings/${encodeURIComponent(id)}`, body),
+  remove: (id: string) => del<{ ok: boolean; id: string }>(`/meetings/${encodeURIComponent(id)}`),
   updateAll: (meetings: unknown[]) => put<{ ok: boolean }>('/meetings', meetings),
 };
 
@@ -535,6 +1249,67 @@ export interface IncomeReportApi {
   updatedAt?: string;
 }
 
+/** Ответ GET /finance/requests (пагинация). */
+export interface FinanceRequestListResponseApi {
+  items: unknown[];
+  total: number;
+  limit: number;
+  next_cursor?: string | null;
+}
+
+export type FinanceRequestsListQuery = {
+  status?: string;
+  category?: string;
+  /** YYYY-MM-DD — один календарный день по created_at (UTC). */
+  date?: string;
+  dateFrom?: string;
+  dateTo?: string;
+  limit?: number;
+  cursor?: string;
+};
+
+function financeRequestsQueryString(q?: FinanceRequestsListQuery): string {
+  if (!q) return '';
+  const sp = new URLSearchParams();
+  if (q.status) sp.set('status', q.status);
+  if (q.category) sp.set('category', q.category);
+  if (q.date) sp.set('date', q.date);
+  if (q.dateFrom) sp.set('dateFrom', q.dateFrom);
+  if (q.dateTo) sp.set('dateTo', q.dateTo);
+  if (q.limit != null) sp.set('limit', String(q.limit));
+  if (q.cursor) sp.set('cursor', q.cursor);
+  const s = sp.toString();
+  return s ? `?${s}` : '';
+}
+
+/** Ответ GET /finance/requests (camelCase / snake_case) → PurchaseRequest. */
+export function purchaseRequestFromApi(r: Record<string, unknown>): PurchaseRequest {
+  const v = r.version;
+  return {
+    id: String(r.id ?? ''),
+    title: (r.title as string | undefined) ?? undefined,
+    amount: r.amount != null ? String(r.amount) : '0',
+    currency: (r.currency as string | undefined) ?? 'UZS',
+    category: r.category as string | undefined,
+    categoryId: (r.category_id ?? r.categoryId) as string | undefined,
+    counterparty: (r.counterparty as string | null | undefined) ?? null,
+    requestedBy: (r.requested_by ?? r.requestedBy) as string | undefined,
+    requesterId: (r.requester_id ?? r.requesterId) as string | undefined,
+    approvedBy: (r.approved_by ?? r.approvedBy) as string | null | undefined,
+    status: (r.status as PurchaseRequest['status']) ?? 'draft',
+    comment: r.comment as string | undefined,
+    description: r.description as string | undefined,
+    date: r.date as string | undefined,
+    paymentDate: (r.payment_date ?? r.paymentDate) as string | undefined,
+    paidAt: (r.paid_at ?? r.paidAt) as string | null | undefined,
+    decisionDate: (r.decision_date ?? r.decisionDate) as string | undefined,
+    departmentId: (r.department_id ?? r.departmentId) as string | undefined,
+    isArchived: Boolean(r.is_archived ?? r.isArchived),
+    version:
+      typeof v === 'number' ? v : v != null && v !== '' ? Number(v) || undefined : undefined,
+  };
+}
+
 export const financeEndpoint = {
   getCategories: () => get<unknown[]>('/finance/categories'),
   updateCategories: (categories: unknown[]) => put<{ ok: boolean }>('/finance/categories', categories),
@@ -542,8 +1317,33 @@ export const financeEndpoint = {
   updateFunds: (funds: unknown[]) => put<{ ok: boolean }>('/finance/funds', funds),
   getPlan: () => get<unknown | null>('/finance/plan'),
   updatePlan: (plan: unknown) => put<{ ok: boolean }>('/finance/plan', plan),
-  getRequests: () => get<unknown[]>('/finance/requests'),
-  updateRequests: (requests: unknown[]) => put<{ ok: boolean }>('/finance/requests', requests),
+  getRequests: (query?: FinanceRequestsListQuery) =>
+    get<FinanceRequestListResponseApi>(`/finance/requests${financeRequestsQueryString(query)}`),
+  /** Все заявки: обход страниц (limit 500). */
+  getRequestsAll: async (): Promise<PurchaseRequest[]> => {
+    const out: PurchaseRequest[] = [];
+    const limit = 500;
+    let cursor: string | undefined;
+    while (true) {
+      const sp = new URLSearchParams();
+      sp.set('limit', String(limit));
+      if (cursor) sp.set('cursor', cursor);
+      const page = await get<FinanceRequestListResponseApi>(`/finance/requests?${sp.toString()}`);
+      const items = page.items ?? [];
+      for (const row of items) {
+        if (row && typeof row === 'object') {
+          out.push(purchaseRequestFromApi(row as Record<string, unknown>));
+        }
+      }
+      const next = page.next_cursor;
+      if (!next || items.length < limit) break;
+      cursor = next;
+    }
+    return out;
+  },
+  postRequest: (body: Record<string, unknown>) => post<unknown>('/finance/requests', body),
+  patchRequest: (id: string, body: Record<string, unknown>) =>
+    patch<unknown>(`/finance/requests/${encodeURIComponent(id)}`, body),
   getFinancialPlanDocuments: () => get<unknown[]>('/finance/financial-plan-documents'),
   updateFinancialPlanDocuments: (docs: unknown[]) => put<{ ok: boolean }>('/finance/financial-plan-documents', docs),
   getFinancialPlannings: () => get<unknown[]>('/finance/financial-plannings'),
@@ -553,8 +1353,8 @@ export const financeEndpoint = {
   deleteBankStatement: (id: string) => del<{ ok: boolean }>(`/finance/bank-statements/${id}`),
   getIncomeReports: () => get<IncomeReportApi[]>('/finance/income-reports'),
   updateIncomeReports: (reports: IncomeReportApi[]) => put<{ ok: boolean }>('/finance/income-reports', reports),
-  getBdr: (year?: string) => get<{ year: string; rows: unknown[] }>(`/finance/bdr${year ? `?year=${encodeURIComponent(year)}` : ''}`),
-  updateBdr: (payload: { year: string; rows: unknown[] }) => put<{ ok: boolean }>('/finance/bdr', payload),
+  getBdr: (year?: string) => get<Bdr>(`/finance/bdr${year ? `?year=${encodeURIComponent(year)}` : ''}`),
+  updateBdr: (payload: { year: string; rows: unknown[] }) => put<Bdr>('/finance/bdr', payload),
 };
 
 // BPM

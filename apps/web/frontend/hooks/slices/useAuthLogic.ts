@@ -2,8 +2,15 @@
 import { useState, useEffect } from 'react';
 import { User } from '../../../types';
 import { api } from '../../../backend/api';
+import {
+  authEndpoint,
+  ensureAuthCsrfCookie,
+  setApiErrorNotifier,
+  setApiUnauthorizedHandler,
+} from '../../../services/apiClient';
 import { storageService } from '../../../services/storageService';
 import { getDefaultAvatarForId } from '../../../constants/avatars';
+import { resetMustChangePasswordPromptFlag } from '../../../utils/authUiOnce';
 
 export const useAuthLogic = (showNotification: (msg: string) => void) => {
   const [users, setUsers] = useState<User[]>([]);
@@ -29,12 +36,28 @@ export const useAuthLogic = (showNotification: (msg: string) => void) => {
       }
   }, [users, currentUser]);
 
-  // Подтянуть права роли после перезагрузки страницы (JWT в sessionStorage)
+  useEffect(() => {
+    void ensureAuthCsrfCookie();
+  }, []);
+
+  useEffect(() => {
+    setApiUnauthorizedHandler(() => {
+      void authEndpoint.logout();
+      setCurrentUser(null);
+      storageService.clearActiveUserId();
+      showNotification('Сессия истекла — войдите снова');
+    });
+    setApiErrorNotifier((msg) => showNotification(msg));
+    return () => {
+      setApiUnauthorizedHandler(null);
+      setApiErrorNotifier(null);
+    };
+  }, [showNotification]);
+
+  // Подтянуть права роли после перезагрузки (сессия в HttpOnly cookies)
   useEffect(() => {
     if (!currentUser) return;
     let cancelled = false;
-    const token = typeof window !== 'undefined' ? sessionStorage.getItem('access_token') : null;
-    if (!token) return;
     (async () => {
       try {
         const me = (await api.users.getMe()) as User;
@@ -53,22 +76,14 @@ export const useAuthLogic = (showNotification: (msg: string) => void) => {
   const login = (user: User) => {
     setCurrentUser(withAvatarFallback(user));
     storageService.setActiveUserId(user.id);
-    try {
-      sessionStorage.removeItem(`must_change_password_prompt_shown:${user.id}`);
-    } catch {
-      // ignore
-    }
+    resetMustChangePasswordPromptFlag(user.id);
     showNotification(`Добро пожаловать, ${user.name}`);
   };
 
   const logout = () => {
+    void authEndpoint.logout();
     setCurrentUser(null);
     storageService.clearActiveUserId();
-    try {
-      sessionStorage.removeItem('access_token');
-    } catch {
-      // ignore
-    }
   };
 
   const updateUsers = (newUsers: User[]) => {

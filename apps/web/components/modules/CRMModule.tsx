@@ -58,7 +58,6 @@ export const CRMModule: React.FC<CRMModuleProps> = ({ view, embedInCrmHub = fals
         <div className="h-full min-h-0 flex flex-col">
           <ClientsView 
             clients={clients} 
-            users={users}
             contracts={contracts}
             oneTimeDeals={oneTimeDeals}
             accountsReceivable={accountsReceivable}

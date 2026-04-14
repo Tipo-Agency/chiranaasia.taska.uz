@@ -4,7 +4,7 @@ import uuid
 from sqlalchemy import Boolean, Column, String, Text
 from sqlalchemy.dialects.postgresql import JSONB
 
-from app.database import Base
+from app.db import Base
 
 
 def gen_id():
@@ -44,6 +44,7 @@ class Meeting(Base):
     date = Column(String(50), nullable=False)
     time = Column(String(10), nullable=False)
     participant_ids = Column(JSONB, default=list)
+    participants = Column(JSONB, default=list)  # [{ "userId", "role"? }] — канон; participant_ids дублирует id
     summary = Column(Text, nullable=True)
     type = Column(String(20), default="work")  # client, work, project, shoot
     deal_id = Column(String(36), nullable=True)

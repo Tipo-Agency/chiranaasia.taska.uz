@@ -1,20 +1,29 @@
-"""Notification hub: route domain events to user notifications/channels."""
+"""Notification hub: маршрутизация доменных событий → уведомления и побочные эффекты (чат, realtime)."""
 from __future__ import annotations
 
+import logging
 import uuid
-from datetime import UTC, datetime
+from datetime import datetime
 from typing import Any
 
-from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.client import Deal
 from app.models.funnel import SalesFunnel
-from app.models.notification import Notification, NotificationDelivery, NotificationPreferences
 from app.models.settings import InboxMessage
+from app.services.notifications import (
+    channel_flags_from_prefs,
+    create_notification,
+    create_notification_delivery,
+    email_recipient_from,
+    load_user_and_notification_pref_row,
+    prefs_dict_from_pref_row,
+    telegram_recipient_from,
+)
 from app.services.notifications_realtime import realtime_hub
 
 SYSTEM_SENDER_ID = "system"
+_hub_log = logging.getLogger("uvicorn.error")
 
 
 def _format_deal_assigned_body(payload: dict[str, Any]) -> str:
@@ -51,47 +60,6 @@ def _format_deal_assigned_body(payload: dict[str, Any]) -> str:
     return head + "\n\n" + "\n".join(lines)
 
 
-def _mk_notification(
-    *,
-    event_id: str,
-    recipient_id: str,
-    event_type: str,
-    title: str,
-    body: str,
-    priority: str = "normal",
-    entity_type: str | None = None,
-    entity_id: str | None = None,
-    payload: dict[str, Any] | None = None,
-) -> Notification:
-    return Notification(
-        id=str(uuid.uuid4()),
-        event_id=event_id,
-        recipient_id=recipient_id,
-        type=event_type,
-        title=title,
-        body=body,
-        priority=priority,
-        entity_type=entity_type,
-        entity_id=entity_id,
-        payload=payload or {},
-        is_read=False,
-    )
-
-
-def _delivery(notification_id: str, channel: str, status: str = "pending", attempts: int = 0, error: str | None = None) -> NotificationDelivery:
-    now = datetime.now(UTC)
-    return NotificationDelivery(
-        id=str(uuid.uuid4()),
-        notification_id=notification_id,
-        channel=channel,
-        status=status,
-        attempts=str(attempts),
-        last_error=error,
-        delivered_at=now if status == "sent" else None,
-        updated_at=now,
-    )
-
-
 def _route_event(event: dict[str, Any]) -> list[dict[str, Any]]:
     """
     Return recipient notifications.
@@ -110,7 +78,6 @@ def _route_event(event: dict[str, Any]) -> list[dict[str, Any]]:
                     "recipient_id": uid,
                     "title": "Новая задача",
                     "body": f'{actor_name} поставил вам задачу: "{payload.get("title") or "Без названия"}"',
-                    "priority": payload.get("priority") or "high",
                 }
             )
     elif et == "task.status.changed":
@@ -121,21 +88,17 @@ def _route_event(event: dict[str, Any]) -> list[dict[str, Any]]:
                         "recipient_id": uid,
                         "title": "Статус задачи изменен",
                         "body": f'Задача "{payload.get("title") or "Без названия"}" -> {payload.get("status") or "Новый статус"}',
-                        "priority": "normal",
                     }
                 )
     elif et == "deal.assigned":
         uid = payload.get("assigneeId")
         if uid:
             body = _format_deal_assigned_body(payload)
-            if len(body) > 1990:
-                body = body[:1987] + "..."
             routes.append(
                 {
                     "recipient_id": uid,
                     "title": "Новая сделка",
                     "body": body,
-                    "priority": "high",
                 }
             )
     elif et == "meeting.created":
@@ -145,7 +108,6 @@ def _route_event(event: dict[str, Any]) -> list[dict[str, Any]]:
                     "recipient_id": uid,
                     "title": "Календарь: новое событие",
                     "body": f'"{payload.get("title") or "Без названия"}" — {payload.get("date") or ""} {payload.get("time") or ""}'.strip(),
-                    "priority": "normal",
                 }
             )
     elif et == "document.shared":
@@ -155,7 +117,6 @@ def _route_event(event: dict[str, Any]) -> list[dict[str, Any]]:
                     "recipient_id": uid,
                     "title": "Документ открыт вам",
                     "body": f'Документ "{payload.get("title") or "Без названия"}" доступен для просмотра',
-                    "priority": "normal",
                 }
             )
 
@@ -238,8 +199,7 @@ async def _apply_funnel_deal_templates(
         return routes
     chat_tpl = (da.get("chatBody") or da.get("chat") or "").strip()
     title_tpl = (da.get("title") or "").strip()
-    tg_tpl = (da.get("telegramHtml") or da.get("telegram") or "").strip()
-    if not chat_tpl and not title_tpl and not tg_tpl:
+    if not chat_tpl and not title_tpl:
         return routes
     flat = _flatten_payload_for_templates(payload)
     out: list[dict[str, Any]] = []
@@ -251,16 +211,14 @@ async def _apply_funnel_deal_templates(
             nr["body"] = _render_deal_template(chat_tpl, flat)
             if len(nr["body"]) > 4000:
                 nr["body"] = nr["body"][:3997] + "..."
-        if tg_tpl:
-            nr["_telegram_html_override"] = _render_deal_template(tg_tpl, flat)
         out.append(nr)
     return out
 
 
 async def process_domain_event(db: AsyncSession, event: dict[str, Any]) -> int:
     """
-    Build and persist notifications + deliveries for event.
-    Also emits realtime and writes chat mirror message.
+    Для каждого получателя: одно `Notification`, затем отдельно — `NotificationDelivery` (telegram/email),
+    опционально зеркало в internal chat и realtime.
     Returns created notifications count.
     """
     if event.get("type") == "deal.assigned":
@@ -270,54 +228,45 @@ async def process_domain_event(db: AsyncSession, event: dict[str, Any]) -> int:
         routes = await _apply_funnel_deal_templates(db, event, routes)
     created = 0
     for r in routes:
-        prefs_row = (
-            await db.execute(
-                select(NotificationPreferences).where(NotificationPreferences.id == r["recipient_id"]).limit(1)
-            )
-        ).scalar_one_or_none()
-        if not prefs_row:
-            prefs_row = (
-                await db.execute(
-                    select(NotificationPreferences).where(NotificationPreferences.id == "default").limit(1)
-                )
-            ).scalar_one_or_none()
-        prefs = (prefs_row.prefs if prefs_row and prefs_row.prefs else {}) if prefs_row else {}
+        user, pref_row = await load_user_and_notification_pref_row(db, r["recipient_id"])
+        prefs = prefs_dict_from_pref_row(pref_row)
+        flags = channel_flags_from_prefs(prefs)
 
-        channels_cfg = prefs.get("channels", {}) if isinstance(prefs, dict) else {}
-        in_app_enabled = channels_cfg.get("in_app", True)
-        chat_enabled = channels_cfg.get("chat", True)
-        telegram_enabled = channels_cfg.get("telegram", False)
-        email_enabled = channels_cfg.get("email", False)
-
-        n_payload = dict(event.get("payload") or {})
-        tg_ov = r.get("_telegram_html_override")
-        if tg_ov:
-            n_payload["telegramHtmlOverride"] = tg_ov
-        n = _mk_notification(
-            event_id=event["id"],
-            recipient_id=r["recipient_id"],
-            event_type=event["type"],
+        n = create_notification(
+            user_id=r["recipient_id"],
+            notification_type=event["type"],
             title=r["title"],
             body=r["body"],
-            priority=r.get("priority", "normal"),
             entity_type=event.get("entityType"),
             entity_id=event.get("entityId"),
-            payload=n_payload,
         )
         db.add(n)
         await db.flush()
 
-        if in_app_enabled:
-            # in-app delivery is considered sent on persist
-            db.add(_delivery(n.id, "in_app", status="sent"))
+        try:
+            from app.core.redis import get_redis_client
+            from app.services.notifications_stream import ensure_notifications_stream, xadd_notification_job
 
-        if chat_enabled:
-            # mirror to chat (internal inbox_messages)
+            redis = await get_redis_client()
+            if redis:
+                await ensure_notifications_stream(redis)
+                await xadd_notification_job(redis, n.id)
+        except Exception as exc:
+            _hub_log.warning("notification_hub: queue.notifications XADD failed: %s", exc)
+
+        if flags["chat"]:
             msg = InboxMessage(
                 id=str(uuid.uuid4()),
+                deal_id=None,
+                funnel_id=None,
+                direction="in",
+                channel="internal",
                 sender_id=SYSTEM_SENDER_ID,
+                body=r["body"],
+                media_url=None,
+                external_msg_id=None,
+                is_read=False,
                 recipient_id=r["recipient_id"],
-                text=r["body"],
                 attachments=[
                     {
                         "entityType": event.get("entityType"),
@@ -326,29 +275,33 @@ async def process_domain_event(db: AsyncSession, event: dict[str, Any]) -> int:
                     }
                 ],
                 created_at=datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3] + "Z",
-                read=False,
             )
             db.add(msg)
-            db.add(_delivery(n.id, "chat", status="sent"))
 
-        # placeholders for future channel workers
-        if telegram_enabled:
-            db.add(_delivery(n.id, "telegram", status="pending"))
-        if email_enabled:
-            db.add(_delivery(n.id, "email", status="pending"))
+        if flags["telegram"]:
+            tid = telegram_recipient_from(user, pref_row)
+            if tid:
+                db.add(create_notification_delivery(notification_id=n.id, channel="telegram", recipient=tid))
+        if flags["email"]:
+            em = email_recipient_from(user)
+            if em:
+                db.add(create_notification_delivery(notification_id=n.id, channel="email", recipient=em))
 
-        if in_app_enabled:
+        if flags["in_app"]:
             await realtime_hub.emit(
                 r["recipient_id"],
                 {
                     "type": "notification.created",
+                    "userId": r["recipient_id"],
                     "notification": {
                         "id": n.id,
+                        "type": n.type,
                         "title": n.title,
                         "body": n.body,
-                        "priority": n.priority,
                         "entityType": n.entity_type,
                         "entityId": n.entity_id,
+                        "isRead": bool(n.is_read),
+                        "createdAt": n.created_at.isoformat() if n.created_at else None,
                     },
                 },
             )

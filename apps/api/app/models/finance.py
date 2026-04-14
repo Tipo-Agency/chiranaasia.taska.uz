@@ -1,10 +1,11 @@
 """Finance models."""
 import uuid
 
-from sqlalchemy import Boolean, Column, String
+from sqlalchemy import Boolean, Column, Date, DateTime, ForeignKey, Index, Integer, Numeric, String, Text, UniqueConstraint, text
 from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy.sql import func
 
-from app.database import Base
+from app.db import Base
 
 
 def gen_id():
@@ -16,6 +17,7 @@ class Department(Base):
 
     id = Column(String(36), primary_key=True, default=gen_id)
     name = Column(String(255), nullable=False)
+    parent_id = Column(String(36), ForeignKey("departments.id", ondelete="SET NULL"), nullable=True)
     head_id = Column(String(36), nullable=True)
     description = Column(String(500), nullable=True)
     is_archived = Column(Boolean, default=False)
@@ -49,19 +51,36 @@ class FinancePlan(Base):
     current_income = Column(String(50), default="0")
 
 
-class PurchaseRequest(Base):
-    __tablename__ = "purchase_requests"
+class FinanceRequest(Base):
+    """Заявка на оплату (таблица ``finance_requests``)."""
+
+    __tablename__ = "finance_requests"
+    __table_args__ = (
+        Index("idx_finance_requests_created_at_id", "created_at", "id"),
+    )
 
     id = Column(String(36), primary_key=True, default=gen_id)
-    requester_id = Column(String(36), nullable=False)
-    department_id = Column(String(36), nullable=False)
-    category_id = Column(String(36), nullable=False)
-    amount = Column(String(50), nullable=False)
-    description = Column(String(500), nullable=False)
-    status = Column(String(30), nullable=False)
-    date = Column(String(50), nullable=False)
-    decision_date = Column(String(50), nullable=True)
-    is_archived = Column(Boolean, default=False)
+    version = Column(Integer, nullable=False, server_default=text("1"))
+    title = Column(String(500), nullable=False)
+    amount = Column(Numeric(15, 2), nullable=False)
+    currency = Column(String(10), nullable=False, server_default=text("'UZS'"))
+    category = Column(String(100), nullable=True)
+    counterparty = Column(String(255), nullable=True)
+    requested_by = Column(String(36), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    approved_by = Column(String(36), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    status = Column(String(30), nullable=False, server_default=text("'draft'"))
+    comment = Column(Text, nullable=True)
+    payment_date = Column(Date, nullable=True)
+    paid_at = Column(DateTime(timezone=True), nullable=True)
+    created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), nullable=True)
+    is_archived = Column(Boolean, nullable=False, server_default=text("false"))
+
+    __mapper_args__ = {"version_id_col": version}
+
+
+# Обратная совместимость импортов
+PurchaseRequest = FinanceRequest
 
 
 class FinancialPlanDocument(Base):
@@ -136,6 +155,7 @@ class IncomeReport(Base):
 class Bdr(Base):
     """БДР — бюджет доходов и расходов. Один документ на год; данные по строкам и суммам по месяцам в JSONB."""
     __tablename__ = "bdr"
+    __table_args__ = (UniqueConstraint("year", name="uq_bdr_year"),)
 
     id = Column(String(36), primary_key=True, default=gen_id)  # обычно год, например "2025"
     year = Column(String(4), nullable=False)  # год планирования

@@ -52,7 +52,15 @@ export const useSettingsLogic = (showNotification: (msg: string) => void) => {
   const toggleDarkMode = () => setDarkMode(!darkMode);
 
   const createTable = (name: string, type: any, icon: string, color: string) => {
-      const newTable: TableCollection = { id: `t${Date.now()}`, name, type, icon, color, isSystem: false };
+      const newTable: TableCollection = {
+        id: `t${Date.now()}`,
+        name,
+        type,
+        icon,
+        color,
+        isSystem: false,
+        isPublic: false,
+      };
       const newTables = [...tables, newTable]; 
       setTables(newTables);
       api.tables.updateAll(newTables).catch(() => showNotification('Ошибка создания страницы')); 

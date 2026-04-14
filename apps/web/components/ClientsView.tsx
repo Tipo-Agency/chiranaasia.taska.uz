@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useCallback, useEffect, useLayoutEffect } from 'react';
-import { Client, Deal, Contract, OneTimeDeal, AccountsReceivable, SalesFunnel, User } from '../types';
+import { Client, Deal, Contract, OneTimeDeal, AccountsReceivable, SalesFunnel } from '../types';
 import { FilterConfig } from './FiltersPanel';
 import {
   ClientsHeader,
@@ -26,7 +26,6 @@ import { AlertCircle, Briefcase, Building2, FileText } from 'lucide-react';
 
 interface ClientsViewProps {
   clients: Client[];
-  users?: User[];
   contracts: Contract[];
   oneTimeDeals?: OneTimeDeal[];
   accountsReceivable?: AccountsReceivable[];
@@ -45,7 +44,6 @@ interface ClientsViewProps {
 
 const ClientsView: React.FC<ClientsViewProps> = ({ 
   clients,
-  users = [],
   contracts,
   oneTimeDeals = [],
   accountsReceivable = [],
@@ -84,15 +82,22 @@ const ClientsView: React.FC<ClientsViewProps> = ({
 
   // Filtered data
   const filteredClients = useMemo(() => {
-    const activeClients = clients.filter(c => !c.isArchived);
-    let filtered = activeClients;
-    
-    if (selectedFunnelId) {
-      filtered = filtered.filter(c => c.funnelId === selectedFunnelId);
+    const activeClients = clients.filter((c) => !c.isArchived);
+    if (!selectedFunnelId) return activeClients;
+
+    const clientIds = new Set<string>();
+    for (const d of contracts) {
+      if (d.isArchived) continue;
+      if (String(d.funnelId || '') !== String(selectedFunnelId)) continue;
+      if (d.clientId) clientIds.add(d.clientId);
     }
-    
-    return filtered;
-  }, [clients, selectedFunnelId]);
+    for (const d of oneTimeDeals) {
+      if (d.isArchived) continue;
+      if (String(d.funnelId || '') !== String(selectedFunnelId)) continue;
+      if (d.clientId) clientIds.add(d.clientId);
+    }
+    return activeClients.filter((c) => clientIds.has(c.id));
+  }, [clients, selectedFunnelId, contracts, oneTimeDeals]);
 
   const filteredContracts = useMemo(() => {
     const activeContracts = contracts.filter(c => !c.isArchived);
@@ -283,7 +288,6 @@ const ClientsView: React.FC<ClientsViewProps> = ({
           {activeTab === 'clients' && (
             <ClientsTab
               clients={filteredClients}
-              users={users}
               contracts={contracts}
               onEditClient={handleOpenClientEdit}
               onCreateContract={handleOpenContractCreate}
@@ -322,8 +326,6 @@ const ClientsView: React.FC<ClientsViewProps> = ({
       <ClientModal
         isOpen={isClientModalOpen}
         editingClient={editingClient}
-        users={users}
-        salesFunnels={salesFunnels}
         contracts={contracts}
         oneTimeDeals={oneTimeDeals}
         onClose={() => setIsClientModalOpen(false)}

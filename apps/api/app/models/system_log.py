@@ -2,7 +2,7 @@
 from sqlalchemy import Column, DateTime, Integer, String, Text
 from sqlalchemy.sql import func
 
-from app.database import Base
+from app.db import Base
 
 
 class SystemLog(Base):

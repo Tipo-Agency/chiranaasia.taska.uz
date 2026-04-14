@@ -169,8 +169,21 @@ export const formatContractMessage = (contractNumber: string, clientName: string
   return `📄 <b>Новый договор</b>\n\n<b>Номер:</b> ${contractNumber}\n<b>Клиент:</b> ${clientName}\n<b>Сумма:</b> ${amount.toLocaleString()} UZS\n<b>Добавил:</b> ${user}`;
 };
 
-export const formatPurchaseRequestMessage = (requestTitle: string, amount: number, department: string, user: string): string => {
-  return `💰 <b>Новая заявка на покупку</b>\n\n<b>Название:</b> ${requestTitle}\n<b>Сумма:</b> ${amount.toLocaleString()} UZS\n<b>Отдел:</b> ${department}\n<b>Создал:</b> ${user}`;
+export const formatPurchaseRequestMessage = (
+  requestTitle: string,
+  amount: string | number,
+  department: string,
+  user: string
+): string => {
+  const raw = (typeof amount === 'number' ? String(amount) : amount || '0').replace(/\s/g, '').replace(/,/g, '.');
+  const neg = raw.trim().startsWith('-');
+  const [intPart, frac = ''] = (neg ? raw.slice(1) : raw).split('.');
+  const digits = intPart.replace(/\D/g, '') || '0';
+  const n = BigInt(digits);
+  const fmt = n.toLocaleString('ru-RU');
+  const f = frac.replace(/\D/g, '').slice(0, 2);
+  const sum = f ? `${neg ? '−' : ''}${fmt}.${f}` : `${neg ? '−' : ''}${fmt}`;
+  return `💰 <b>Новая заявка на покупку</b>\n\n<b>Название:</b> ${requestTitle}\n<b>Сумма:</b> ${sum} UZS\n<b>Отдел:</b> ${department}\n<b>Создал:</b> ${user}`;
 };
 
 export const formatDocumentMessage = (docTitle: string, user: string): string => {

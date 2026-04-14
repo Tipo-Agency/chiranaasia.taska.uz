@@ -83,8 +83,6 @@ export const OneTimeDealModal: React.FC<OneTimeDealModalProps> = ({
       return;
     }
     
-    // Автоматически берем воронку от клиента
-    const client = clients.find(c => c.id === oneTimeDealClientId);
     const now = new Date().toISOString();
     const deal: Deal = {
       id: editingDeal ? editingDeal.id : `deal-${Date.now()}`,
@@ -100,7 +98,7 @@ export const OneTimeDealModal: React.FC<OneTimeDealModalProps> = ({
       paidAmount: oneTimeDealPaidAmount ? parseFloat(oneTimeDealPaidAmount) : undefined,
       paidDate: oneTimeDealPaidDate || undefined,
       notes: oneTimeDealNotes || undefined,
-      funnelId: client?.funnelId || undefined,
+      funnelId: editingDeal?.funnelId ?? undefined,
       createdAt: editingDeal?.createdAt || now,
       updatedAt: now
     };

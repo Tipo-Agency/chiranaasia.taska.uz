@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime, timezone
+from decimal import Decimal, InvalidOperation
 
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.ext import (
@@ -56,8 +57,8 @@ async def fin_entry(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
 async def fin_amount(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     raw = (update.message.text or "").strip().replace(" ", "").replace(",", ".")
     try:
-        amt = float(raw)
-    except ValueError:
+        amt = Decimal(raw).quantize(Decimal("0.01"))
+    except InvalidOperation:
         await update.message.reply_text("Нужно число. Пример: 250000")
         return FIN_AMOUNT
     if amt <= 0:
@@ -146,20 +147,23 @@ async def fin_desc(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
         return ConversationHandler.END
     rid = str(uuid.uuid4())
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-    ok = await api.put_finance_requests(
-        [
-            {
-                "id": rid,
-                "requesterId": uid,
-                "departmentId": did,
-                "categoryId": cid,
-                "amount": amt,
-                "description": desc,
-                "status": "pending",
-                "date": today,
-                "isArchived": False,
-            }
-        ]
+    title = (desc[:500] if desc else "Заявка") or "Заявка"
+    amt_str = format(amt, "f") if amt is not None else "0"
+    ok = await api.post_finance_request(
+        {
+            "id": rid,
+            "requesterId": uid,
+            "requestedBy": uid,
+            "departmentId": did,
+            "categoryId": cid,
+            "category": cid,
+            "amount": amt_str,
+            "currency": "UZS",
+            "title": title,
+            "comment": desc,
+            "status": "pending",
+            "isArchived": False,
+        }
     )
     context.user_data.pop("fin_new_amount", None)
     context.user_data.pop("fin_pick_categories", None)

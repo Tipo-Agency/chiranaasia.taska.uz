@@ -294,11 +294,6 @@ export const InboxPage: React.FC<InboxPageProps> = ({
                       >
                         <div className="flex items-center justify-between gap-3">
                           <div className="text-sm font-semibold text-gray-900 dark:text-white">{n.title}</div>
-                          {n.priority && (
-                            <span className="text-[10px] px-2 py-0.5 rounded-full bg-gray-100 dark:bg-[#333] text-gray-600 dark:text-gray-300">
-                              {n.priority}
-                            </span>
-                          )}
                         </div>
                         <div className="text-xs text-gray-600 dark:text-gray-300 mt-1">{n.body}</div>
                         {n.createdAt && (

@@ -2,6 +2,7 @@
 import React, { useState, useRef, useMemo, useEffect, useCallback, useLayoutEffect } from 'react';
 import { TaskSelect } from './TaskSelect';
 import { FinanceCategory, Fund, FinancePlan, PurchaseRequest, Department, User, FinancialPlanDocument, FinancialPlanning, Bdr } from '../types';
+import type { SavePurchaseRequestOptions } from '../frontend/hooks/slices/useFinanceLogic';
 import { hasPermission } from '../utils/permissions';
 import { Plus, X, Edit2, Trash2, PieChart, TrendingUp, DollarSign, Check, AlertCircle, Calendar, Settings, ArrowLeft, ArrowRight, Save, FileText, Clock, CheckCircle2, ChevronDown, Upload, Archive, RotateCcw } from 'lucide-react';
 import {
@@ -22,6 +23,42 @@ import { BdrView } from './finance/BdrView';
 import { PayrollView, type PayrollViewHandle } from './finance/PayrollView';
 import { FilterConfig } from './FiltersPanel';
 
+function requestAmountLabel(amount: PurchaseRequest['amount']): string {
+  const raw = (
+    typeof amount === 'number' && !Number.isNaN(amount) ? String(amount) : String(amount ?? '0')
+  )
+    .trim()
+    .replace(/\s/g, '')
+    .replace(/,/g, '.');
+  const neg = raw.startsWith('-');
+  const [intPart, frac = ''] = (neg ? raw.slice(1) : raw).split('.');
+  const digits = intPart.replace(/\D/g, '') || '0';
+  try {
+    const n = BigInt(digits);
+    const fmt = n.toLocaleString('ru-RU');
+    const f = frac.replace(/\D/g, '').slice(0, 2);
+    return f ? `${neg ? '−' : ''}${fmt}.${f}` : `${neg ? '−' : ''}${fmt}`;
+  } catch {
+    return raw || '0';
+  }
+}
+
+function normalizeRequestStatusForFilter(req: PurchaseRequest): string {
+  return req.status === 'deferred' ? 'draft' : req.status;
+}
+
+function sumRequestAmountsUzs(list: PurchaseRequest[]): string {
+  let sum = BigInt(0);
+  for (const r of list) {
+    const s = String(r.amount ?? '0').replace(/\s/g, '').replace(/,/g, '.');
+    const neg = s.startsWith('-');
+    const [intPart] = (neg ? s.slice(1) : s).split('.');
+    const digits = intPart.replace(/\D/g, '') || '0';
+    sum += BigInt(digits);
+  }
+  return sum.toLocaleString('ru-RU');
+}
+
 interface FinanceViewProps {
   categories: FinanceCategory[];
   funds: Fund[];
@@ -35,7 +72,7 @@ interface FinanceViewProps {
   bdr?: Bdr | null;
   onLoadBdr?: (year?: string) => Promise<void>;
   onSaveBdr?: (payload: { year: string; rows: Bdr['rows'] }) => Promise<void>;
-  onSaveRequest: (req: PurchaseRequest) => void;
+  onSaveRequest: (req: PurchaseRequest, opts?: SavePurchaseRequestOptions) => void;
   onDeleteRequest: (id: string) => void;
   onSaveFinancialPlanDocument?: (doc: FinancialPlanDocument) => void;
   onDeleteFinancialPlanDocument?: (id: string) => void;
@@ -70,7 +107,9 @@ const FinanceView: React.FC<FinanceViewProps> = ({
   const [showPlanFilters, setShowPlanFilters] = useState(false);
   
   // Фильтры для заявок
-  const [requestStatusFilter, setRequestStatusFilter] = useState<'all' | 'pending' | 'approved' | 'rejected' | 'deferred'>('all');
+  const [requestStatusFilter, setRequestStatusFilter] = useState<
+    'all' | 'draft' | 'pending' | 'approved' | 'rejected' | 'paid'
+  >('all');
   const [requestDepartmentFilter, setRequestDepartmentFilter] = useState<string>('all');
   const [requestCategoryFilter, setRequestCategoryFilter] = useState<string>('all');
   const [showRequestFilters, setShowRequestFilters] = useState(false);
@@ -104,6 +143,7 @@ const FinanceView: React.FC<FinanceViewProps> = ({
   const [reqDep, setReqDep] = useState('');
   const [reqCat, setReqCat] = useState('');
   const [reqPaymentDate, setReqPaymentDate] = useState('');
+  const [reqTitle, setReqTitle] = useState('');
   
   // Payroll is implemented as a separate component (PayrollView).
 
@@ -463,10 +503,11 @@ const FinanceView: React.FC<FinanceViewProps> = ({
       onChange: (val) => setRequestStatusFilter(val as any),
       options: [
         { value: 'all', label: 'Все статусы' },
+        { value: 'draft', label: 'Черновик' },
         { value: 'pending', label: 'Ожидание' },
         { value: 'approved', label: 'Одобрено' },
         { value: 'rejected', label: 'Отклонено' },
-        { value: 'deferred', label: 'Перенесено' }
+        { value: 'paid', label: 'Оплачено' }
       ]
     },
     {
@@ -502,7 +543,7 @@ const FinanceView: React.FC<FinanceViewProps> = ({
 
   const filteredFinanceRequests = useMemo(() => {
     return requests.filter(req => {
-      if (requestStatusFilter !== 'all' && req.status !== requestStatusFilter) return false;
+      if (requestStatusFilter !== 'all' && normalizeRequestStatusForFilter(req) !== requestStatusFilter) return false;
       if (requestDepartmentFilter !== 'all' && req.departmentId !== requestDepartmentFilter) return false;
       if (requestCategoryFilter !== 'all' && req.categoryId !== requestCategoryFilter) return false;
       if (financeArchiveScope === 'active' && req.isArchived) return false;
@@ -516,41 +557,80 @@ const FinanceView: React.FC<FinanceViewProps> = ({
   const handleOpenRequestCreate = () => {
       setFinanceArchiveScope('active');
       setEditingRequest(null);
-      setReqAmount(''); setReqDesc(''); setReqDep(departments[0]?.id || ''); setReqCat(categories[0]?.id || '');
+      setReqAmount('');
+      setReqTitle('');
+      setReqDesc('');
+      setReqDep(departments[0]?.id || '');
+      setReqCat(categories[0]?.id || '');
       setReqPaymentDate('');
       setIsRequestModalOpen(true);
   };
   
   const handleOpenRequestEdit = (req: PurchaseRequest) => {
       setEditingRequest(req);
-      setReqAmount(req.amount.toString()); 
-      const sourceDesc = req.description || '';
+      setReqAmount(String(req.amount ?? '').replace(/\s/g, ''));
+      setReqTitle(req.title || '');
+      const sourceDesc = req.description ?? req.comment ?? '';
       const m = sourceDesc.match(/\[paymentDate:([0-9]{4}-[0-9]{2}-[0-9]{2})\]/);
-      setReqPaymentDate(m?.[1] || '');
-      setReqDesc(sourceDesc.replace(/\s*\[paymentDate:[0-9]{4}-[0-9]{2}-[0-9]{2}\]\s*/g, '').trim()); 
-      setReqDep(req.departmentId || ''); 
-      setReqCat(req.categoryId || '');
+      setReqPaymentDate(req.paymentDate || m?.[1] || '');
+      setReqDesc(sourceDesc.replace(/\s*\[paymentDate:[0-9]{4}-[0-9]{2}-[0-9]{2}\]\s*/g, '').trim());
+      setReqDep(req.departmentId || '');
+      setReqCat(req.categoryId || req.category || '');
       setIsRequestModalOpen(true);
   };
 
   const handleRequestSubmit = (e?: React.FormEvent) => {
       if (e) e.preventDefault();
+      const amountStr = reqAmount.replace(/\s/g, '').replace(/,/g, '.').trim() || '0';
+      const title =
+        reqTitle.trim() || (reqDesc.trim().slice(0, 500) || 'Заявка');
       onSaveRequest({
           id: editingRequest ? editingRequest.id : `pr-${Date.now()}`,
-          requesterId: editingRequest ? editingRequest.requesterId : currentUser.id,
+          title,
+          comment: reqDesc.trim(),
+          requesterId: editingRequest?.requesterId ?? currentUser.id,
+          requestedBy: editingRequest?.requestedBy ?? editingRequest?.requesterId ?? currentUser.id,
           departmentId: reqDep,
           categoryId: reqCat,
-          amount: parseFloat(reqAmount) || 0,
-          description: `${reqDesc || ''}${reqPaymentDate ? ` [paymentDate:${reqPaymentDate}]` : ''}`.trim(),
+          category: reqCat,
+          amount: amountStr,
+          currency: 'UZS',
+          paymentDate: reqPaymentDate || undefined,
           status: editingRequest ? editingRequest.status : 'pending',
-          date: editingRequest ? editingRequest.date : new Date().toISOString(),
+          date: editingRequest?.date ?? new Date().toISOString(),
           isArchived: editingRequest?.isArchived,
       });
       setIsRequestModalOpen(false);
   };
 
   const handleStatusChange = (req: PurchaseRequest, status: PurchaseRequest['status']) => {
-      onSaveRequest({ ...req, status, decisionDate: new Date().toISOString() });
+      if (status === 'rejected') {
+        const reason = typeof window !== 'undefined' ? window.prompt('Причина отклонения (обязательно):') : null;
+        if (reason === null) return;
+        const trimmed = reason.trim();
+        if (!trimmed) {
+          setAlertText('Укажите причину отклонения');
+          return;
+        }
+        onSaveRequest(
+          { ...req, status: 'rejected', comment: trimmed },
+          { statusPatch: 'reject', rejectComment: trimmed }
+        );
+        return;
+      }
+      if (status === 'approved') {
+        onSaveRequest({ ...req, status }, { statusPatch: 'approve' });
+        return;
+      }
+      if (status === 'paid') {
+        onSaveRequest({ ...req, status }, { statusPatch: 'paid' });
+        return;
+      }
+      if (status === 'pending') {
+        onSaveRequest({ ...req, status }, { statusPatch: 'submit' });
+        return;
+      }
+      onSaveRequest({ ...req, status });
   };
 
   const archiveFinancialPlanning = useCallback((e: React.MouseEvent, p: FinancialPlanning) => {
@@ -786,7 +866,7 @@ const FinanceView: React.FC<FinanceViewProps> = ({
         // Проверяем подразделение
         const isSameDepartment = req.departmentId === (planningDetailDepartmentId || selectedPlanning.departmentId);
         // Проверяем статус (берем все, кроме отклоненных)
-        const isValidStatus = req.status !== 'rejected';
+        const isValidStatus = req.status !== 'rejected' && req.status !== 'paid';
         
         return isInPeriod && isSameDepartment && isValidStatus && !req.isArchived;
       });
@@ -1011,7 +1091,7 @@ const FinanceView: React.FC<FinanceViewProps> = ({
             <h3 className="font-bold text-gray-800 dark:text-white">Заявки в планировании ({planningRequests.length})</h3>
             <div className="flex items-center gap-4">
               <div className="text-xs text-gray-500 dark:text-gray-400">
-                Сумма: {planningRequests.reduce((sum, r) => sum + r.amount, 0).toLocaleString()} UZS
+                Сумма: {sumRequestAmountsUzs(planningRequests)} UZS
               </div>
               <button
                 onClick={handleRefreshRequests}
@@ -1030,8 +1110,8 @@ const FinanceView: React.FC<FinanceViewProps> = ({
             ) : (
               <div className="space-y-2">
                 {planningRequests.map(req => {
-                  const cat = categories.find(c => c.id === req.categoryId);
-                  const user = users.find(u => u.id === req.requesterId);
+                  const cat = categories.find(c => c.id === (req.categoryId || req.category));
+                  const user = users.find(u => u.id === (req.requesterId || req.requestedBy));
                   const activeFundsList = funds.filter(f => !f.isArchived);
                   const requestFundId = planningDetailRequestFundIds[req.id] || '';
                   return (
@@ -1040,16 +1120,16 @@ const FinanceView: React.FC<FinanceViewProps> = ({
                       className="flex items-center justify-between gap-4 p-3 bg-gray-50 dark:bg-[#303030] rounded-lg hover:bg-gray-100 dark:hover:bg-[#404040] transition-colors group"
                     >
                       <div className="flex-1 min-w-0">
-                        <div className="font-medium text-gray-900 dark:text-white">{cat?.name || 'Без категории'}</div>
+                        <div className="font-medium text-gray-900 dark:text-white">{req.title || cat?.name || 'Без названия'}</div>
                         <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                          {user?.name} • {req.amount.toLocaleString()} UZS
+                          {user?.name} • {requestAmountLabel(req.amount)} UZS
                           {req.date && (
                             <> • {new Date(req.date).toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric' }).replace(/\//g, '.')}</>
                           )}
                         </div>
-                        {req.description && (
+                        {(req.description || req.comment) && (
                           <div className="text-xs text-gray-500 dark:text-gray-400 mt-1 line-clamp-1">
-                            {req.description}
+                            {req.description || req.comment}
                           </div>
                         )}
                       </div>
@@ -1069,11 +1149,13 @@ const FinanceView: React.FC<FinanceViewProps> = ({
                       )}
                       <div className="flex items-center gap-2 shrink-0">
                         <span className={`px-2 py-1 rounded text-xs font-bold ${
+                          req.status === 'paid' ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300' :
                           req.status === 'approved' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' :
                           req.status === 'rejected' ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' :
+                          req.status === 'draft' || req.status === 'deferred' ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300' :
                           'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300'
                         }`}>
-                          {req.status === 'approved' ? 'Одобрено' : req.status === 'rejected' ? 'Отклонено' : 'Ожидание'}
+                          {req.status === 'paid' ? 'Оплачено' : req.status === 'approved' ? 'Одобрено' : req.status === 'rejected' ? 'Отклонено' : req.status === 'draft' || req.status === 'deferred' ? 'Черновик' : 'Ожидание'}
                         </span>
                         <button
                           onClick={(e) => {
@@ -1654,34 +1736,56 @@ const FinanceView: React.FC<FinanceViewProps> = ({
                   </thead>
                   <tbody className="divide-y divide-gray-100 dark:divide-[#333]">
                       {filteredFinanceRequests.map(req => {
-                          const cat = categories.find(c => c.id === req.categoryId);
+                          const cat = categories.find(c => c.id === (req.categoryId || req.category));
                           const dep = departments.find(d => d.id === req.departmentId);
-                          const user = users.find(u => u.id === req.requesterId);
+                          const user = users.find(u => u.id === (req.requesterId || req.requestedBy));
+                          const descLine = (req.description ?? req.comment ?? '').replace(/\s*\[paymentDate:[0-9]{4}-[0-9]{2}-[0-9]{2}\]\s*/g, '').trim();
+                          const payHint = req.paymentDate || ((req.description ?? req.comment ?? '').match(/\[paymentDate:([0-9]{4}-[0-9]{2}-[0-9]{2})\]/) || [])[1];
                           
                           return (
                               <tr key={req.id} className="hover:bg-gray-50 dark:hover:bg-[#303030]">
-                                  <td className="px-4 py-3 text-gray-500 dark:text-gray-400 text-xs">{new Date(req.date).toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric' }).replace(/\//g, '.')}</td>
+                                  <td className="px-4 py-3 text-gray-500 dark:text-gray-400 text-xs">{req.date ? new Date(req.date).toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric' }).replace(/\//g, '.') : '—'}</td>
                                   <td className="px-4 py-3 font-medium text-gray-800 dark:text-gray-200">{user?.name}</td>
                                   <td className="px-4 py-3 text-gray-600 dark:text-gray-400 text-xs">{dep?.name}</td>
                                   <td className="px-4 py-3 text-gray-600 dark:text-gray-400 text-xs">{cat?.name}</td>
-                                  <td className="px-4 py-3 font-bold text-gray-900 dark:text-gray-100">{req.amount.toLocaleString()}</td>
+                                  <td className="px-4 py-3 font-bold text-gray-900 dark:text-gray-100">{requestAmountLabel(req.amount)}</td>
                                   <td className="px-4 py-3 text-gray-600 dark:text-gray-400 truncate max-w-xs">
-                                    {(req.description || '').replace(/\s*\[paymentDate:[0-9]{4}-[0-9]{2}-[0-9]{2}\]\s*/g, '')}
-                                    {/\[paymentDate:([0-9]{4}-[0-9]{2}-[0-9]{2})\]/.test(req.description || '') && (
+                                    <span className="font-medium text-gray-800 dark:text-gray-200">{req.title ? `${req.title} — ` : ''}</span>
+                                    {descLine}
+                                    {payHint && (
                                       <span className="ml-1 text-xs text-emerald-600 dark:text-emerald-400">
-                                        • Оплата до {((req.description || '').match(/\[paymentDate:([0-9]{4}-[0-9]{2}-[0-9]{2})\]/) || [])[1]}
+                                        • Оплата до {payHint}
                                       </span>
                                     )}
                                   </td>
                                   <td className="px-4 py-3">
-                                      <span className={`px-2 py-1 rounded text-[10px] font-bold uppercase ${
-                                          req.status === 'approved' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' :
-                                          req.status === 'rejected' ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' :
-                                          req.status === 'deferred' ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400' :
-                                          'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300'
-                                      }`}>
-                                          {req.status === 'approved' ? 'Одобрено' : req.status === 'rejected' ? 'Отклонено' : req.status === 'deferred' ? 'Перенос' : 'Ожидание'}
-                                      </span>
+                                      <div className="flex flex-col gap-1 items-start">
+                                        <span className={`px-2 py-1 rounded text-[10px] font-bold uppercase ${
+                                            req.status === 'paid' ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300' :
+                                            req.status === 'approved' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' :
+                                            req.status === 'rejected' ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' :
+                                            req.status === 'draft' || req.status === 'deferred' ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400' :
+                                            'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300'
+                                        }`}>
+                                            {req.status === 'paid' ? 'Оплачено' : req.status === 'approved' ? 'Одобрено' : req.status === 'rejected' ? 'Отклонено' : req.status === 'draft' || req.status === 'deferred' ? 'Черновик' : 'Ожидание'}
+                                        </span>
+                                        {hasPermission(currentUser, 'finance.approve') && !req.isArchived && (
+                                          <div className="flex flex-wrap gap-1">
+                                            {req.status === 'draft' && (
+                                              <button type="button" className="text-[10px] text-blue-600 dark:text-blue-400 hover:underline" onClick={() => handleStatusChange(req, 'pending')}>На согласование</button>
+                                            )}
+                                            {req.status === 'pending' && (
+                                              <>
+                                                <button type="button" className="text-[10px] text-emerald-600 dark:text-emerald-400 hover:underline" onClick={() => handleStatusChange(req, 'approved')}>Одобрить</button>
+                                                <button type="button" className="text-[10px] text-rose-600 dark:text-rose-400 hover:underline" onClick={() => handleStatusChange(req, 'rejected')}>Отклонить</button>
+                                              </>
+                                            )}
+                                            {req.status === 'approved' && (
+                                              <button type="button" className="text-[10px] text-emerald-700 dark:text-emerald-300 hover:underline" onClick={() => handleStatusChange(req, 'paid')}>Оплачено</button>
+                                            )}
+                                          </div>
+                                        )}
+                                      </div>
                                   </td>
                                   <td className="px-4 py-3 text-right">
                                       <div className="flex items-center justify-end gap-2">
@@ -1709,7 +1813,11 @@ const FinanceView: React.FC<FinanceViewProps> = ({
                                               onClick={() => handleOpenRequestEdit(req)} 
                                               className="text-gray-400 hover:text-blue-600 dark:hover:text-blue-400"
                                               title="Редактировать"
-                                              disabled={req.isArchived === true}
+                                              disabled={
+                                                req.isArchived === true ||
+                                                req.status === 'approved' ||
+                                                req.status === 'paid'
+                                              }
                                             >
                                               <Edit2 size={14}/>
                                           </button>
@@ -2121,13 +2229,25 @@ const FinanceView: React.FC<FinanceViewProps> = ({
                 </div>
                 <form onSubmit={handleRequestSubmit} className="p-6 space-y-4">
                     <div>
+                        <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 mb-1">Название</label>
+                        <input
+                            type="text"
+                            value={reqTitle}
+                            onChange={(e) => setReqTitle(e.target.value)}
+                            className="w-full border border-gray-300 dark:border-gray-600 rounded px-3 py-2 text-sm bg-white dark:bg-[#333] text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500"
+                            placeholder="Кратко, для списка заявок"
+                        />
+                    </div>
+                    <div>
                         <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 mb-1">Сумма (UZS)</label>
                         <input 
-                            type="number" 
+                            type="text" 
+                            inputMode="decimal"
                             required 
                             value={reqAmount} 
                             onChange={e => setReqAmount(e.target.value)} 
-                            className="w-full border border-gray-300 dark:border-gray-600 rounded px-3 py-2 text-sm bg-white dark:bg-[#333] text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none [-moz-appearance:textfield]"
+                            className="w-full border border-gray-300 dark:border-gray-600 rounded px-3 py-2 text-sm bg-white dark:bg-[#333] text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500"
+                            placeholder="Например 1500000.50"
                         />
                     </div>
                     <div className="grid grid-cols-2 gap-4">

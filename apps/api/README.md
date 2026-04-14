@@ -1,6 +1,6 @@
 # Backend — FastAPI (`apps/api`)
 
-REST API, вебхуки, фоновые циклы в процессе приложения, интеграции (Meta, Telegram, сайт).
+REST API, вебхуки, интеграции (Meta, Telegram, сайт). Очереди Redis Streams — см. **[../../docs/QUEUES.md](../../docs/QUEUES.md)**. Доставка telegram/e-mail — `notifications_worker`; доменный hub — `domain_events_worker` при `DOMAIN_EVENTS_HUB_ASYNC=true`; retention — `retention_worker`.
 
 ## Стек
 
@@ -9,16 +9,21 @@ REST API, вебхуки, фоновые циклы в процессе прил
 - SQLAlchemy 2 async, asyncpg
 - Alembic — миграции схемы
 
-## Структура (важное)
+## Структура слоёв
 
 ```
 app/
-  main.py          — точка входа, подключение роутеров
-  config.py        — настройки из окружения
-  routers/         — HTTP-эндпоинты по доменам
-  models/          — ORM-модели
-  services/        — бизнес-логика, события, уведомления
+  main.py              — FastAPI app, middleware, lifespan
+  core/                — config, auth (JWT), permissions, rate_limit, логирование, mappers (row_to_*), seed_data
+  db/                  — engine, Base, AsyncSessionLocal, get_db
+  models/              — SQLAlchemy ORM
+  schemas/             — Pydantic-схемы запросов/ответов (точечно)
+  services/            — use-cases: доменные события, уведомления, интеграции
+  api/routers/         — HTTP: тонкий слой → services / models
+  middleware/          — CSRF, security headers, request id, лимит body
 ```
+
+Импорты: **router → service → model**; `core` и `db` не зависят от роутеров.
 
 Полный обзор префиксов — **[../../docs/API.md](../../docs/API.md)**.
 
@@ -38,9 +43,12 @@ pip install -r requirements.txt
 
 ```
 DATABASE_URL=postgresql+asyncpg://user:pass@localhost:5432/dbname
-SECRET_KEY=your-secret-key
+REDIS_URL=redis://localhost:6379/0
+SECRET_KEY=<минимум 32 символа, см. openssl rand -hex 32>
 CORS_ORIGINS=http://localhost:3000,http://127.0.0.1:3000
 ```
+
+Без `DATABASE_URL`, `REDIS_URL` и `SECRET_KEY` процесс завершится ошибкой валидации при импорте `app` (см. `app.core.config`).
 
 4. Миграции и сервер:
 
@@ -71,6 +79,19 @@ pytest tests/ -v
 ## Telegram-бот
 
 Отдельный пакет **`apps/bot`**. Backend задаёт контракт данных; бот ходит по HTTP. Переменные: `BACKEND_URL`, `TELEGRAM_BOT_TOKEN` и др. — см. `apps/bot` и **[../../docs/OPERATIONS.md](../../docs/OPERATIONS.md)**.
+
+## Воркеры (`workers/`)
+
+Из каталога `apps/api` (то же venv, что и у API):
+
+```bash
+python -m workers.integrations_worker    # queue.integrations.v1 + polling Telegram-лидов
+python -m workers.notifications_worker   # queue.notifications.v1 — отправка по notification_id
+python -m workers.domain_events_worker   # при DOMAIN_EVENTS_HUB_ASYNC=true
+python -m workers.retention_worker       # retention уведомлений
+```
+
+Без соответствующего воркера задачи в stream накапливаются; API для доставок только **XADD**.
 
 ## Документация
 

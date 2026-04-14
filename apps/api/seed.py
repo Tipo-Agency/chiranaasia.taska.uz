@@ -3,12 +3,13 @@
 import asyncio
 import os
 import sys
+from decimal import Decimal
 
 # Add parent to path
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from sqlalchemy import select
-from app.database import AsyncSessionLocal
+from app.db import AsyncSessionLocal
 from app.models.user import User
 
 ADMIN_ROLE_ID = "00000000-0000-4000-8000-000000000001"
@@ -19,7 +20,6 @@ from app.models.notification import NotificationPreferences as NPrefModel, Autom
 from app.models.client import Client, Deal, EmployeeInfo, AccountsReceivable
 from app.models.content import Doc, Folder, Meeting, ContentPost
 from app.models.finance import Department, FinanceCategory, Fund, FinancePlan
-from app.models.bpm import OrgPosition, BusinessProcess
 from app.models.funnel import SalesFunnel
 
 
@@ -49,7 +49,14 @@ async def seed():
         # Tables
         tables = [
             TableCollection(id="t1", name="Задачи", type="tasks", icon="CheckSquare", color="text-blue-500"),
-            TableCollection(id="t2", name="Контент-план", type="content-plan", icon="Instagram", color="text-pink-500"),
+            TableCollection(
+                id="t2",
+                name="Контент-план",
+                type="content-plan",
+                icon="Instagram",
+                color="text-pink-500",
+                is_public=True,
+            ),
             TableCollection(id="t3", name="Беклог", type="backlog", icon="Archive", color="text-amber-500"),
             TableCollection(id="t4", name="Функционал", type="functionality", icon="Layers", color="text-green-600"),
         ]
@@ -96,11 +103,12 @@ async def seed():
             "action": {"type": "telegram_message", "targetUser": "admin"},
         }))
 
-        # Departments
+        # Departments (дерево: корень d0)
         depts = [
-            Department(id="d1", name="Отдел продаж"),
-            Department(id="d2", name="Маркетинг"),
-            Department(id="d3", name="Разработка"),
+            Department(id="d0", name="Компания"),
+            Department(id="d1", name="Отдел продаж", parent_id="d0"),
+            Department(id="d2", name="Маркетинг", parent_id="d0"),
+            Department(id="d3", name="Разработка", parent_id="d0"),
         ]
         for d in depts:
             db.add(d)
@@ -143,13 +151,20 @@ async def seed():
             ("ООО Агро Сервис", "Сергей"), ("ИП Фотостудия", "Карина"), ("ООО СтройМаш", "Олег"),
         ]
         for i, (name, contact) in enumerate(client_data):
-            db.add(Client(id=f"c{i+1}", name=name, contact_person=contact))
+            db.add(
+                Client(
+                    id=f"c{i+1}",
+                    name=name,
+                    notes=f"Контактное лицо (архив): {contact}" if contact else None,
+                    tags=[],
+                )
+            )
 
         # Deals (simplified)
         db.add(Deal(
             id="fdeal_1",
             title="Разработка корпоративного сайта",
-            amount="1500000",
+            amount=Decimal("1500000"),
             currency="UZS",
             stage="new",
             funnel_id="f1",

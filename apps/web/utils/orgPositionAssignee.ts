@@ -6,9 +6,11 @@ export function getMemberUserIdsForPosition(
   employees: EmployeeInfo[]
 ): string[] {
   if (!position) return [];
+  const onPos = (e: EmployeeInfo) =>
+    e.orgPositionId === position.id || e.positionId === position.id;
   const fromCards = employees
-    .filter((e) => !e.isArchived && e.orgPositionId === position.id && e.userId)
-    .map((e) => e.userId);
+    .filter((e) => !e.isArchived && onPos(e) && e.userId)
+    .map((e) => e.userId as string);
   const uniq = [...new Set(fromCards)].sort();
   if (uniq.length > 0) return uniq;
   if (position.holderUserId) return [position.holderUserId];

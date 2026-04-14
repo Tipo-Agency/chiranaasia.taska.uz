@@ -495,11 +495,16 @@ async def _finance_decide(query, context, api, crm, idx: int, new_status: str) -
     if not row:
         await query.message.reply_text("Заявка не найдена.")
         return
-    merged = dict(row)
-    merged["status"] = new_status
-    merged["decisionDate"] = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    patch: dict = {"status": new_status}
+    if new_status == "rejected":
+        prev_text = (str(row.get("comment") or row.get("description") or "")).strip()
+        reason = "Отклонено через Telegram."
+        patch["comment"] = f"{prev_text}\n\n{reason}" if prev_text else reason
+        did = row.get("departmentId")
+        if did:
+            patch["departmentId"] = str(did)
 
-    ok = await api.put_finance_requests([merged])
+    ok = await api.patch_finance_request(str(rid), patch)
     if ok:
         await query.message.reply_text(
             "✅ Заявка: " + ("согласована" if new_status == "approved" else "отклонена")

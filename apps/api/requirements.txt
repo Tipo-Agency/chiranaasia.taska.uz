@@ -2,14 +2,20 @@ fastapi==0.115.5
 uvicorn[standard]==0.32.1
 sqlalchemy[asyncio]==2.0.36
 asyncpg==0.30.0
-psycopg2-binary==2.9.10
 alembic==1.14.0
 python-jose[cryptography]==3.3.0
+# Пароли: app.core.auth — bcrypt напрямую. passlib[bcrypt] — extra явно тянет bcrypt (не голый passlib).
+bcrypt==4.2.1
 passlib[bcrypt]==1.7.4
 pydantic==2.10.2
 pydantic-settings==2.6.1
 python-multipart==0.0.17
 python-dotenv==1.0.1
 redis==5.2.1
+slowapi==0.1.9
 httpx==0.28.1
 telethon==1.38.1
+boto3==1.35.93
+structlog==24.4.0
+sentry-sdk[fastapi]==2.19.2
+prometheus-client==0.21.1

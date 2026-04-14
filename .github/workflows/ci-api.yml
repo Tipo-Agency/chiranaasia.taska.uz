@@ -1,0 +1,73 @@
+# Вызывается из ci.yml (`workflow_call`). Сервисы Postgres/Redis — для выравнивания с ТЗ; unit-тесты их не поднимают.
+name: API CI
+
+on:
+  workflow_call:
+
+jobs:
+  api:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: testdb
+          POSTGRES_USER: test
+          POSTGRES_PASSWORD: test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U test -d testdb"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+      redis:
+        image: redis:7
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    defaults:
+      run:
+        working-directory: apps/api
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: apps/api/requirements.txt
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt -r requirements-dev.txt
+      - name: Alembic single head
+        run: |
+          set -e
+          out="$(python -m alembic heads)"
+          echo "$out"
+          n="$(echo "$out" | grep -c '(head)' || true)"
+          if [ "$n" != "1" ]; then
+            echo "Expected exactly 1 alembic head line, matched: $n"
+            exit 1
+          fi
+      - name: Alembic upgrade head
+        env:
+          DATABASE_URL: postgresql+asyncpg://test:test@127.0.0.1:5432/testdb
+          SECRET_KEY: test-secret-key-minimum-32-characters-long
+          REDIS_URL: redis://127.0.0.1:6379/0
+        run: python -m alembic upgrade head
+      - name: Ruff check
+        run: ruff check app
+      - name: Scan apps/api for obvious secret-shaped strings
+        working-directory: ${{ github.workspace }}
+        run: bash ops/scripts/check_api_secrets.sh
+      - name: Pytest (unit, без integration)
+        env:
+          DATABASE_URL: postgresql+asyncpg://test:test@127.0.0.1:5432/testdb
+          SECRET_KEY: test-secret-key-minimum-32-characters-long
+          REDIS_URL: redis://127.0.0.1:6379/0
+        run: pytest tests/ -m "not integration" -v --tb=short

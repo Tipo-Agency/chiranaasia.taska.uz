@@ -143,10 +143,47 @@ export const ProfileSettings: React.FC<ProfileSettingsProps> = ({ currentUser, u
   };
   
   const handleResetPassword = async (id: string) => {
-      if(confirm('Сбросить пароль на "123"?')) {
-          onUpdateUsers(users.map(u => u.id === id ? { ...u, password: '123', mustChangePassword: true } : u));
-          alert('Пароль сброшен.');
+    if (!confirm('Сгенерировать временный пароль? Пользователь должен сменить его при входе.')) return;
+    const bytes = new Uint8Array(10);
+    crypto.getRandomValues(bytes);
+    const hex = Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
+    const temp = `Tmp${hex}a1`;
+    try {
+      const payload = users.map((u) => {
+        const row: Record<string, unknown> = {
+          id: u.id,
+          name: u.name,
+          roleId: u.roleId,
+          login: u.login ?? '',
+          email: u.email,
+          phone: u.phone,
+          telegram: u.telegram,
+          telegramUserId: u.telegramUserId,
+          avatar: u.avatar,
+          isArchived: u.isArchived ?? false,
+          mustChangePassword: u.mustChangePassword ?? false,
+        };
+        if (u.id === id) {
+          row.password = temp;
+          row.mustChangePassword = true;
+        }
+        return row;
+      });
+      await api.users.updateAll(payload);
+      onUpdateUsers(
+        users.map((u) => (u.id === id ? { ...u, mustChangePassword: true, password: undefined } : u))
+      );
+      try {
+        await navigator.clipboard.writeText(temp);
+      } catch {
+        /* ignore */
       }
+      alert(
+        `Временный пароль также скопирован в буфер (если браузер разрешил).\nСообщите его пользователю один раз:\n\n${temp}`
+      );
+    } catch {
+      alert('Не удалось сбросить пароль. Проверьте права access.users и сеть.');
+    }
   };
 
   const handleToggleMustChange = (id: string, next: boolean) => {
@@ -247,6 +284,20 @@ export const ProfileSettings: React.FC<ProfileSettingsProps> = ({ currentUser, u
       onUpdateProfile({ ...currentUser, ...me });
     } catch {
       alert('Не удалось обновить ссылку.');
+    } finally {
+      setCalendarBusy(false);
+    }
+  };
+
+  const handleRevokeCalendarLink = async () => {
+    if (!confirm('Отозвать ссылку? Подписка в Google Calendar по этому URL перестанет работать.')) return;
+    setCalendarBusy(true);
+    try {
+      await api.calendar.ensureExportToken({ revoke: true });
+      const me = (await api.users.getMe()) as User;
+      onUpdateProfile({ ...currentUser, ...me });
+    } catch {
+      alert('Не удалось отозвать ссылку.');
     } finally {
       setCalendarBusy(false);
     }
@@ -542,6 +593,15 @@ export const ProfileSettings: React.FC<ProfileSettingsProps> = ({ currentUser, u
                               title="Новый секретный URL"
                             >
                               <RefreshCw size={14} /> Новый URL
+                            </button>
+                            <button
+                              type="button"
+                              disabled={calendarBusy}
+                              onClick={() => void handleRevokeCalendarLink()}
+                              className="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold border border-red-300 dark:border-red-900 text-red-700 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 disabled:opacity-50"
+                              title="Отключить подписку по ссылке"
+                            >
+                              <Trash2 size={14} /> Отозвать
                             </button>
                           </div>
                         </div>

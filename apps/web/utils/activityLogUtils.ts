@@ -295,7 +295,7 @@ export const createMeetingCreatedLog = async (
  * Создает activity log при создании заявки на покупку
  */
 export const createPurchaseRequestCreatedLog = async (
-  request: { id: string; description?: string },
+  request: { id: string; title?: string; description?: string },
   currentUser: User,
   allUsers: User[]
 ): Promise<void> => {
@@ -303,7 +303,7 @@ export const createPurchaseRequestCreatedLog = async (
   await createActivityLogsForAll(
     currentUser,
     'создал заявку на покупку',
-    request.description || 'Без названия',
+    request.title || request.description || 'Без названия',
     allUsers,
     true // Только для администраторов
   );

@@ -2,8 +2,72 @@
 import { useState } from 'react';
 import { Department, FinanceCategory, Fund, FinancePlan, PurchaseRequest, FinancialPlanDocument, FinancialPlanning, Bdr } from '../../../types';
 import { api } from '../../../backend/api';
-import { createSaveHandler, createDeleteHandler } from '../../../utils/crudUtils';
+import { createSaveHandler, createDeleteHandler, saveItem } from '../../../utils/crudUtils';
 import { NOTIFICATION_MESSAGES } from '../../../constants/messages';
+
+function financeRequestPostBody(item: PurchaseRequest): Record<string, unknown> {
+  const title = (item.title && String(item.title).trim()) || 'Заявка';
+  return {
+    id: item.id,
+    title,
+    amount: String(item.amount),
+    currency: item.currency ?? 'UZS',
+    ...(item.category != null && item.category !== '' ? { category: item.category } : {}),
+    ...(item.categoryId != null && item.categoryId !== '' ? { categoryId: item.categoryId } : {}),
+    ...(item.counterparty != null && item.counterparty !== '' ? { counterparty: item.counterparty } : {}),
+    ...(item.requestedBy || item.requesterId
+      ? { requestedBy: item.requestedBy ?? item.requesterId, requesterId: item.requesterId ?? item.requestedBy }
+      : {}),
+    ...(item.departmentId ? { departmentId: item.departmentId } : {}),
+    ...(item.comment != null && item.comment !== '' ? { comment: item.comment } : {}),
+    ...(item.description != null && item.description !== '' ? { description: item.description } : {}),
+    ...(item.paymentDate ? { paymentDate: item.paymentDate } : {}),
+    status: item.status,
+    isArchived: item.isArchived ?? false,
+  };
+}
+
+/** Режим PATCH только статуса (без полного тела — иначе блокировка approved/paid на API). */
+export type PurchaseRequestStatusPatchMode = 'approve' | 'reject' | 'submit' | 'paid';
+
+export type SavePurchaseRequestOptions = {
+  statusPatch?: PurchaseRequestStatusPatchMode;
+  /** Обязателен при statusPatch === 'reject' */
+  rejectComment?: string;
+};
+
+function financeRequestPatchBody(item: PurchaseRequest): Record<string, unknown> {
+  const title = item.title != null ? String(item.title).trim() : '';
+  const b: Record<string, unknown> = {
+    ...(title ? { title } : {}),
+    amount: String(item.amount),
+    ...(item.currency != null ? { currency: item.currency } : {}),
+    ...(item.category !== undefined ? { category: item.category } : {}),
+    ...(item.categoryId !== undefined ? { categoryId: item.categoryId } : {}),
+    ...(item.counterparty !== undefined ? { counterparty: item.counterparty } : {}),
+    ...(item.requestedBy !== undefined || item.requesterId !== undefined
+      ? { requestedBy: item.requestedBy ?? item.requesterId, requesterId: item.requesterId ?? item.requestedBy }
+      : {}),
+    ...(item.departmentId !== undefined ? { departmentId: item.departmentId } : {}),
+    ...(item.comment !== undefined ? { comment: item.comment } : {}),
+    ...(item.description !== undefined ? { description: item.description } : {}),
+    ...(item.paymentDate !== undefined ? { paymentDate: item.paymentDate } : {}),
+    status: item.status,
+    ...(item.isArchived !== undefined ? { isArchived: item.isArchived } : {}),
+    ...(item.version != null && Number.isFinite(item.version) ? { version: item.version } : {}),
+  };
+  return Object.fromEntries(Object.entries(b).filter(([, v]) => v !== undefined));
+}
+
+function withRequestVersion(
+  body: Record<string, unknown>,
+  row: PurchaseRequest | null | undefined
+): Record<string, unknown> {
+  if (row?.version != null && Number.isFinite(row.version)) {
+    return { ...body, version: row.version };
+  }
+  return body;
+}
 
 export const useFinanceLogic = (showNotification: (msg: string) => void) => {
   const [departments, setDepartments] = useState<Department[]>([]);
@@ -68,20 +132,68 @@ export const useFinanceLogic = (showNotification: (msg: string) => void) => {
       // showNotification('План обновлен'); // Too noisy for simple inputs
   };
 
-  // Purchase Requests
-  const savePurchaseRequest = createSaveHandler(
-    setPurchaseRequests,
-    api.finance.updateRequests,
-    showNotification,
-    NOTIFICATION_MESSAGES.PURCHASE_REQUEST_SAVED
-  );
+  // Purchase Requests (POST / PATCH, без PUT списком)
+  const savePurchaseRequest = (item: PurchaseRequest, opts?: SavePurchaseRequestOptions) => {
+    setPurchaseRequests((prevItems) => {
+      const prevRow = prevItems.find((x) => x.id === item.id);
+      const exists = !!prevRow;
+      const optimistic =
+        opts?.statusPatch === 'reject' && opts.rejectComment
+          ? ({ ...item, status: 'rejected' as const, comment: opts.rejectComment.trim() } satisfies PurchaseRequest)
+          : item;
+      const updated = saveItem(prevItems, optimistic);
+      void (async () => {
+        try {
+          if (exists) {
+            if (opts?.statusPatch === 'reject' && opts.rejectComment) {
+              const body: Record<string, unknown> = {
+                status: 'rejected',
+                comment: opts.rejectComment.trim(),
+              };
+              if (item.departmentId) body.departmentId = item.departmentId;
+              await api.finance.patchRequest(item.id, withRequestVersion(body, prevRow));
+            } else if (opts?.statusPatch === 'approve') {
+              await api.finance.patchRequest(item.id, withRequestVersion({ status: 'approved' }, prevRow));
+            } else if (opts?.statusPatch === 'paid') {
+              await api.finance.patchRequest(item.id, withRequestVersion({ status: 'paid' }, prevRow));
+            } else if (opts?.statusPatch === 'submit') {
+              await api.finance.patchRequest(item.id, withRequestVersion({ status: 'pending' }, prevRow));
+            } else if (
+              prevRow &&
+              (prevRow.status === 'approved' || prevRow.status === 'paid') &&
+              prevRow.isArchived !== item.isArchived
+            ) {
+              await api.finance.patchRequest(
+                item.id,
+                withRequestVersion({ isArchived: item.isArchived }, prevRow)
+              );
+            } else {
+              await api.finance.patchRequest(item.id, financeRequestPatchBody(item));
+            }
+          } else {
+            await api.finance.postRequest(financeRequestPostBody(item));
+          }
+        } catch {
+          showNotification('Ошибка сохранения. Проверьте подключение и повторите.');
+        }
+      })();
+      showNotification(NOTIFICATION_MESSAGES.PURCHASE_REQUEST_SAVED);
+      return updated;
+    });
+  };
 
-  const deletePurchaseRequest = createDeleteHandler(
-    setPurchaseRequests,
-    api.finance.updateRequests,
-    showNotification,
-    NOTIFICATION_MESSAGES.PURCHASE_REQUEST_DELETED
-  );
+  const deletePurchaseRequest = (id: string) => {
+    const row = purchaseRequests.find((x) => x.id === id);
+    setPurchaseRequests((prevItems) =>
+      prevItems.map((item) => (item.id === id ? { ...item, isArchived: true } : item))
+    );
+    void api.finance
+      .patchRequest(id, withRequestVersion({ isArchived: true }, row))
+      .catch(() => {
+      showNotification('Ошибка удаления. Проверьте подключение и повторите.');
+    });
+    showNotification(NOTIFICATION_MESSAGES.PURCHASE_REQUEST_DELETED);
+  };
 
   // Financial Plan Documents
   const saveFinancialPlanDocument = createSaveHandler(
@@ -117,16 +229,28 @@ export const useFinanceLogic = (showNotification: (msg: string) => void) => {
     const y = year || String(new Date().getFullYear());
     try {
       const data = await api.finance.getBdr(y);
-      setBdr({ year: data.year, rows: (data.rows || []) as Bdr['rows'] });
+      setBdr({
+        year: data.year,
+        rows: (data.rows || []) as Bdr['rows'],
+        totals: data.totals,
+      });
     } catch {
       setBdr({ year: y, rows: [] });
     }
   };
 
   const saveBdr = async (payload: { year: string; rows: Bdr['rows'] }) => {
-    await api.finance.updateBdr(payload);
-    setBdr({ year: payload.year, rows: payload.rows });
-    showNotification('БДР сохранён');
+    try {
+      const data = await api.finance.updateBdr({ year: payload.year, rows: payload.rows });
+      setBdr({
+        year: data.year,
+        rows: (data.rows || []) as Bdr['rows'],
+        totals: data.totals,
+      });
+      showNotification('БДР сохранён');
+    } catch {
+      showNotification('Ошибка сохранения БДР');
+    }
   };
 
   return {

@@ -167,7 +167,9 @@ export const ArchiveView: React.FC<{
   const [allEmployees, setAllEmployees] = useState<EmployeeInfo[]>(initialEmployees);
 
   const getEmployeeName = (employee: EmployeeInfo) => {
-    const user = allUsers.find(u => u.id === employee.userId);
+    const fn = (employee.fullName || '').trim();
+    if (fn) return fn;
+    const user = employee.userId ? allUsers.find((u) => u.id === employee.userId) : undefined;
     return user ? user.name : `ID: ${employee.id}`;
   };
 
@@ -184,8 +186,8 @@ export const ArchiveView: React.FC<{
     if (archiveTab === 'employees') {
       import('../../backend/api').then(({ api }) => {
         api.employees
-          .getAll()
-          .then(employees => setAllEmployees(employees))
+          .getAll({ includeArchived: true })
+          .then(employees => setAllEmployees(employees as EmployeeInfo[]))
           .catch(err => console.error('Ошибка загрузки сотрудников:', err));
       });
     }

@@ -1,7 +1,14 @@
 """SQLAlchemy models."""
-from app.database import Base
-from app.models.bpm import BusinessProcess, OrgPosition
+from app.db import Base
+from app.models.bpm import (
+    BpInstance,
+    BusinessProcess,
+    BusinessProcessStep,
+    BusinessProcessStepBranch,
+    OrgPosition,
+)
 from app.models.client import AccountsReceivable, Client, Deal, EmployeeInfo
+from app.models.dead_letter_queue import DeadLetterQueue
 from app.models.content import ContentPost, Doc, Folder, Meeting, ShootPlan
 from app.models.finance import (
     BankStatement,
@@ -10,6 +17,7 @@ from app.models.finance import (
     Department,
     FinanceCategory,
     FinancePlan,
+    FinanceRequest,
     FinancialPlanDocument,
     FinancialPlanning,
     Fund,
@@ -29,15 +37,18 @@ from app.models.notification import (
 from app.models.role import Role
 from app.models.settings import ActivityLog, InboxMessage, PriorityOption, StatusOption, TableCollection
 from app.models.site_integration import SiteIntegrationKey
+from app.models.audit_log import AuditLog
 from app.models.system_log import SystemLog
 from app.models.task import Project, Task
 from app.models.telegram_integration import TelegramIntegrationState
-from app.models.telegram_personal import TelegramPersonalSession
+from app.models.mtproto_session import MtprotoSession
+from app.models.refresh_token import RefreshToken
 from app.models.user import User
 from app.models.weekly_plan import Protocol, WeeklyPlan
 
 __all__ = [
     "Base",
+    "DeadLetterQueue",
     "User",
     "Role",
     "Task",
@@ -66,6 +77,7 @@ __all__ = [
     "FinanceCategory",
     "Fund",
     "FinancePlan",
+    "FinanceRequest",
     "PurchaseRequest",
     "FinancialPlanDocument",
     "FinancialPlanning",
@@ -74,7 +86,10 @@ __all__ = [
     "IncomeReport",
     "Bdr",
     "OrgPosition",
+    "BpInstance",
     "BusinessProcess",
+    "BusinessProcessStep",
+    "BusinessProcessStepBranch",
     "Warehouse",
     "InventoryItem",
     "StockMovement",
@@ -82,8 +97,10 @@ __all__ = [
     "SalesFunnel",
     "SiteIntegrationKey",
     "TelegramIntegrationState",
+    "AuditLog",
     "SystemLog",
     "WeeklyPlan",
     "Protocol",
-    "TelegramPersonalSession",
+    "MtprotoSession",
+    "RefreshToken",
 ]

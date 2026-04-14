@@ -440,29 +440,42 @@ function RedisTab({ onAuthError }: { onAuthError: (msg: string | null) => void }
     id: string;
     notification_id: string;
     channel: string;
-    attempts: string;
+    recipient?: string | null;
+    attempts: number;
     last_error?: string;
-    updated_at?: string;
     notification_title?: string;
-    recipient_id?: string;
+    user_id?: string;
   }>>([]);
   const [actionLoading, setActionLoading] = useState<null | 'deliveries' | 'retention' | 'requeue'>(null);
   const [actionResult, setActionResult] = useState<string | null>(null);
   const [failedChannelFilter, setFailedChannelFilter] = useState('');
   const [failedQuery, setFailedQuery] = useState('');
   const [rowRequeueLoadingId, setRowRequeueLoadingId] = useState<string | null>(null);
+  const [dlqRows, setDlqRows] = useState<
+    Array<{
+      id: string;
+      queue_name: string;
+      payload: Record<string, unknown>;
+      error?: string | null;
+      created_at: string;
+      resolved: boolean;
+    }>
+  >([]);
+  const [dlqBusyId, setDlqBusyId] = useState<string | null>(null);
 
   const load = async () => {
     setLoading(true);
     setLoadError(null);
     onAuthError(null);
     try {
-      const [data, failed] = await Promise.all([
+      const [data, failed, dlq] = await Promise.all([
         adminEndpoint.getRedisMonitor(),
         adminEndpoint.getFailedDeliveries(50, failedChannelFilter || undefined, failedQuery || undefined),
+        adminEndpoint.getDlqRows({ limit: 40 }),
       ]);
       setMonitor(data);
       setFailedRows(failed || []);
+      setDlqRows(dlq || []);
     } catch (e) {
       const s = String(e);
       if (s.includes('401') || s.includes('403')) onAuthError(s);
@@ -536,11 +549,11 @@ function RedisTab({ onAuthError }: { onAuthError: (msg: string | null) => void }
             <h3 className="font-medium mb-3">Очередь доставок</h3>
             <div className="grid gap-3 sm:grid-cols-3">
               <div className="rounded-lg border border-gray-200 dark:border-[#333] p-3">
-                <p className="text-xs text-gray-500">В ожидании</p>
+                <p className="text-xs text-gray-500">Очередь (pending / retry / sending)</p>
                 <p className="text-2xl font-semibold">{monitor.deliveries_pending}</p>
               </div>
               <div className="rounded-lg border border-gray-200 dark:border-[#333] p-3">
-                <p className="text-xs text-gray-500">С ошибкой</p>
+                <p className="text-xs text-gray-500">DLQ (dead)</p>
                 <p className={`text-2xl font-semibold ${monitor.deliveries_failed > 0 ? 'text-red-600 dark:text-red-400' : ''}`}>
                   {monitor.deliveries_failed}
                 </p>
@@ -591,7 +604,7 @@ function RedisTab({ onAuthError }: { onAuthError: (msg: string | null) => void }
                   setActionResult(null);
                   try {
                     const res = await adminEndpoint.runNotificationDeliveries(500);
-                    setActionResult(`Доставки: обработано=${res.processed}, отправлено=${res.sent}, ошибок=${res.failed}`);
+                    setActionResult(`Доставки: в очередь уведомлений поставлено задач: ${res.queued}`);
                     await load();
                   } finally {
                     setActionLoading(null);
@@ -645,7 +658,7 @@ function RedisTab({ onAuthError }: { onAuthError: (msg: string | null) => void }
           </div>
 
           <div className="p-4 rounded-xl border border-gray-200 dark:border-[#333] bg-white dark:bg-[#252525]">
-            <h3 className="font-medium mb-3">Последние ошибочные доставки</h3>
+            <h3 className="font-medium mb-3">DLQ доставок (статус dead)</h3>
             <div className="mb-3 flex flex-wrap gap-2">
               <select
                 value={failedChannelFilter}
@@ -655,24 +668,22 @@ function RedisTab({ onAuthError }: { onAuthError: (msg: string | null) => void }
                 <option value="">Все каналы</option>
                 <option value="telegram">telegram</option>
                 <option value="email">email</option>
-                <option value="chat">chat</option>
-                <option value="in_app">in_app</option>
               </select>
               <input
                 value={failedQuery}
                 onChange={(e) => setFailedQuery(e.target.value)}
-                placeholder="Поиск по ошибке/заголовку"
+                placeholder="Поиск по ошибке, получателю, заголовку"
                 className="min-w-[220px] rounded-lg border border-gray-300 dark:border-[#333] bg-white dark:bg-[#202020] px-3 py-1.5 text-sm"
               />
             </div>
             {failedRows.length === 0 ? (
-              <p className="text-sm text-gray-500">Нет failed доставок.</p>
+              <p className="text-sm text-gray-500">Нет доставок в DLQ (статус dead).</p>
             ) : (
               <div className="overflow-x-auto border border-gray-200 dark:border-[#333] rounded-lg">
                 <table className="w-full text-sm">
                   <thead className="bg-gray-50 dark:bg-[#202020] border-b border-gray-200 dark:border-[#333]">
                     <tr>
-                      <th className="text-left px-3 py-2">Время</th>
+                      <th className="text-left px-3 py-2">Получатель</th>
                       <th className="text-left px-3 py-2">Канал</th>
                       <th className="text-left px-3 py-2">Попытки</th>
                       <th className="text-left px-3 py-2">Уведомление</th>
@@ -683,8 +694,8 @@ function RedisTab({ onAuthError }: { onAuthError: (msg: string | null) => void }
                   <tbody>
                     {failedRows.map((row) => (
                       <tr key={row.id} className="border-b border-gray-100 dark:border-[#333]">
-                        <td className="px-3 py-2 whitespace-nowrap text-xs text-gray-500">
-                          {row.updated_at ? new Date(row.updated_at).toLocaleString() : '—'}
+                        <td className="px-3 py-2 max-w-[200px] truncate text-xs text-gray-600 dark:text-gray-400" title={row.recipient || ''}>
+                          {row.recipient || '—'}
                         </td>
                         <td className="px-3 py-2">{row.channel}</td>
                         <td className="px-3 py-2">{row.attempts}</td>
@@ -716,6 +727,82 @@ function RedisTab({ onAuthError }: { onAuthError: (msg: string | null) => void }
                         </td>
                       </tr>
                     ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+
+          <div className="p-4 rounded-xl border border-gray-200 dark:border-[#333] bg-white dark:bg-[#252525]">
+            <h3 className="font-medium mb-3">Таблица dead_letter_queue</h3>
+            {dlqRows.length === 0 ? (
+              <p className="text-sm text-gray-500">Нет нерешённых записей (или список пуст).</p>
+            ) : (
+              <div className="overflow-x-auto border border-gray-200 dark:border-[#333] rounded-lg">
+                <table className="w-full text-sm">
+                  <thead className="bg-gray-50 dark:bg-[#202020] border-b border-gray-200 dark:border-[#333]">
+                    <tr>
+                      <th className="text-left px-3 py-2">Очередь</th>
+                      <th className="text-left px-3 py-2">Тип / id</th>
+                      <th className="text-left px-3 py-2">Ошибка</th>
+                      <th className="text-left px-3 py-2">Действия</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {dlqRows.map((row) => {
+                      const kind = String(row.payload?.kind ?? '');
+                      const nid = String(row.payload?.notification_id ?? row.payload?.delivery_id ?? '');
+                      return (
+                        <tr key={row.id} className="border-b border-gray-100 dark:border-[#333]">
+                          <td className="px-3 py-2 font-mono text-xs break-all">{row.queue_name}</td>
+                          <td className="px-3 py-2 text-xs">
+                            {kind || '—'}
+                            {nid ? ` · ${nid.slice(0, 24)}${nid.length > 24 ? '…' : ''}` : ''}
+                          </td>
+                          <td className="px-3 py-2 max-w-[280px] truncate text-red-600 dark:text-red-400" title={row.error || ''}>
+                            {row.error || '—'}
+                          </td>
+                          <td className="px-3 py-2 flex flex-wrap gap-1">
+                            <button
+                              type="button"
+                              disabled={dlqBusyId !== null}
+                              onClick={async () => {
+                                setDlqBusyId(row.id);
+                                setActionResult(null);
+                                try {
+                                  const res = await adminEndpoint.requeueDlqRow(row.id);
+                                  setActionResult(res.message || (res.ok ? 'requeue ok' : 'requeue failed'));
+                                  await load();
+                                } finally {
+                                  setDlqBusyId(null);
+                                }
+                              }}
+                              className="px-2 py-1 rounded bg-[#3337AD] text-white text-xs disabled:opacity-50"
+                            >
+                              {dlqBusyId === row.id ? '…' : 'В очередь'}
+                            </button>
+                            <button
+                              type="button"
+                              disabled={dlqBusyId !== null}
+                              onClick={async () => {
+                                setDlqBusyId(row.id);
+                                setActionResult(null);
+                                try {
+                                  await adminEndpoint.resolveDlqRow(row.id);
+                                  setActionResult('Запись помечена resolved');
+                                  await load();
+                                } finally {
+                                  setDlqBusyId(null);
+                                }
+                              }}
+                              className="px-2 py-1 rounded bg-gray-600 text-white text-xs disabled:opacity-50"
+                            >
+                              Закрыть
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>

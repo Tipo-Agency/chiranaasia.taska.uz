@@ -4,7 +4,7 @@ import uuid
 from sqlalchemy import Column, String, Text
 from sqlalchemy.dialects.postgresql import JSONB
 
-from app.database import Base
+from app.db import Base
 
 
 def gen_id():

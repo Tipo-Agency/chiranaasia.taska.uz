@@ -1,12 +1,13 @@
 """Helpers to emit canonical domain events from business routers."""
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from typing import Any
 from uuid import uuid4
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import get_settings
 from app.models.notification import NotificationEvent
 from app.services.event_bus import publish_domain_event
 from app.services.notification_hub import process_domain_event
@@ -57,7 +58,7 @@ async def emit_domain_event(
 ) -> str:
     """Persist, publish to Redis stream and process in notification hub."""
     eid = event_id or str(uuid4())
-    ts = occurred_at or datetime.now(UTC)
+    ts = occurred_at or datetime.now(timezone.utc)
 
     # idempotency safeguard
     existing = await db.get(NotificationEvent, eid)
@@ -96,6 +97,11 @@ async def emit_domain_event(
     row.stream_id = stream_id
     await db.flush()
 
+    settings = get_settings()
+    if settings.DOMAIN_EVENTS_HUB_ASYNC and published:
+        return eid
+
     await process_domain_event(db, raw)
+    row.hub_processed_at = datetime.now(timezone.utc)
     await db.flush()
     return eid

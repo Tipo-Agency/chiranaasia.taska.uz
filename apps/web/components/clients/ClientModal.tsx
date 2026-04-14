@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Client, SalesFunnel, Deal, User } from '../../types';
+import { Client, Deal } from '../../types';
 import { X, Edit2, Receipt, FileText } from 'lucide-react';
 import { TaskSelect } from '../TaskSelect';
 import { SystemConfirmDialog } from '../ui';
@@ -7,8 +7,6 @@ import { SystemConfirmDialog } from '../ui';
 interface ClientModalProps {
   isOpen: boolean;
   editingClient: Client | null;
-  users?: User[];
-  salesFunnels?: SalesFunnel[];
   contracts?: Deal[];
   oneTimeDeals?: Deal[];
   onClose: () => void;
@@ -21,8 +19,6 @@ interface ClientModalProps {
 export const ClientModal: React.FC<ClientModalProps> = ({
   isOpen,
   editingClient,
-  users = [],
-  salesFunnels = [],
   contracts = [],
   oneTimeDeals = [],
   onClose,
@@ -33,44 +29,35 @@ export const ClientModal: React.FC<ClientModalProps> = ({
 }) => {
   const [clientModalTab, setClientModalTab] = useState<'company' | 'notes' | 'contracts'>('company');
   const [clientName, setClientName] = useState('');
-  const [contactPerson, setContactPerson] = useState('');
   const [clientPhone, setClientPhone] = useState('');
   const [clientEmail, setClientEmail] = useState('');
   const [clientTelegram, setClientTelegram] = useState('');
   const [clientInstagram, setClientInstagram] = useState('');
   const [companyName, setCompanyName] = useState('');
-  const [companyInfo, setCompanyInfo] = useState('');
   const [clientNotes, setClientNotes] = useState('');
-  const [clientFunnelId, setClientFunnelId] = useState<string>('');
-  const [responsibleUserId, setResponsibleUserId] = useState<string>('');
+  const [clientTags, setClientTags] = useState('');
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
 
   useEffect(() => {
     if (isOpen) {
       if (editingClient) {
         setClientName(editingClient.name);
-        setContactPerson(editingClient.contactPerson || '');
         setClientPhone(editingClient.phone || '');
         setClientEmail(editingClient.email || '');
         setClientTelegram(editingClient.telegram || '');
         setClientInstagram(editingClient.instagram || '');
         setCompanyName(editingClient.companyName || '');
-        setCompanyInfo(editingClient.companyInfo || '');
         setClientNotes(editingClient.notes || '');
-        setClientFunnelId(editingClient.funnelId || '');
-        setResponsibleUserId(editingClient.responsibleUserId || '');
+        setClientTags((editingClient.tags || []).join(', '));
       } else {
         setClientName('');
-        setContactPerson('');
         setClientPhone('');
         setClientEmail('');
         setClientTelegram('');
         setClientInstagram('');
         setCompanyName('');
-        setCompanyInfo('');
         setClientNotes('');
-        setClientFunnelId('');
-        setResponsibleUserId('');
+        setClientTags('');
       }
       setClientModalTab('company');
     }
@@ -78,19 +65,20 @@ export const ClientModal: React.FC<ClientModalProps> = ({
 
   const handleSubmit = (e?: React.FormEvent) => {
     if (e) e.preventDefault();
+    const tags = clientTags
+      .split(',')
+      .map((t) => t.trim())
+      .filter(Boolean);
     onSave({
       id: editingClient ? editingClient.id : `cl-${Date.now()}`,
       name: clientName,
-      contactPerson: contactPerson || undefined,
       phone: clientPhone || undefined,
       email: clientEmail || undefined,
       telegram: clientTelegram || undefined,
       instagram: clientInstagram || undefined,
       companyName: companyName || undefined,
-      companyInfo: companyInfo || undefined,
       notes: clientNotes || undefined,
-      funnelId: clientFunnelId || undefined,
-      responsibleUserId: responsibleUserId || undefined,
+      tags: tags.length ? tags : undefined,
     });
     onClose();
   };
@@ -168,21 +156,22 @@ export const ClientModal: React.FC<ClientModalProps> = ({
             {clientModalTab === 'company' ? (
               <>
                 <div>
-                  <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 mb-1">Название компании</label>
+                  <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 mb-1">Название</label>
                   <input 
                     required 
                     value={clientName} 
                     onChange={e => setClientName(e.target.value)} 
                     className="w-full border border-gray-300 dark:border-gray-600 rounded px-3 py-2 text-sm bg-white dark:bg-[#333] text-gray-900 dark:text-gray-100" 
-                    placeholder="OOO Company"
+                    placeholder="Имя или название"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 mb-1">Контактное лицо</label>
+                  <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 mb-1">Компания (опционально)</label>
                   <input 
-                    value={contactPerson} 
-                    onChange={e => setContactPerson(e.target.value)} 
-                    className="w-full border border-gray-300 dark:border-gray-600 rounded px-3 py-2 text-sm bg-white dark:bg-[#333] text-gray-900 dark:text-gray-100"
+                    value={companyName} 
+                    onChange={e => setCompanyName(e.target.value)} 
+                    className="w-full border border-gray-300 dark:border-gray-600 rounded px-3 py-2 text-sm bg-white dark:bg-[#333] text-gray-900 dark:text-gray-100" 
+                    placeholder="ООО …"
                   />
                 </div>
                 <div className="grid grid-cols-2 gap-4">
@@ -226,38 +215,12 @@ export const ClientModal: React.FC<ClientModalProps> = ({
                   </div>
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 mb-1">О компании</label>
-                  <textarea 
-                    value={companyInfo} 
-                    onChange={e => setCompanyInfo(e.target.value)} 
-                    className="w-full h-32 border border-gray-300 dark:border-gray-600 rounded px-3 py-2 text-sm bg-white dark:bg-[#333] text-gray-900 dark:text-gray-100 resize-none" 
-                    placeholder="Чем занимается компания..."
-                  />
-                </div>
-                {salesFunnels && salesFunnels.length > 0 && (
-                  <div>
-                    <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 mb-1">Воронка продаж</label>
-                    <TaskSelect
-                      value={clientFunnelId}
-                      onChange={setClientFunnelId}
-                      options={[
-                        { value: '', label: 'Не выбрано' },
-                        ...salesFunnels.map(f => ({ value: f.id, label: f.name }))
-                      ]}
-                      className="bg-white dark:bg-[#333] border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100"
-                    />
-                  </div>
-                )}
-                <div>
-                  <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 mb-1">Ответственный сотрудник</label>
-                  <TaskSelect
-                    value={responsibleUserId}
-                    onChange={setResponsibleUserId}
-                    options={[
-                      { value: '', label: 'Не назначен' },
-                      ...users.filter((u) => !u.isArchived).map((u) => ({ value: u.id, label: u.name })),
-                    ]}
-                    className="bg-white dark:bg-[#333] border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100"
+                  <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 mb-1">Теги (через запятую)</label>
+                  <input 
+                    value={clientTags} 
+                    onChange={e => setClientTags(e.target.value)} 
+                    className="w-full border border-gray-300 dark:border-gray-600 rounded px-3 py-2 text-sm bg-white dark:bg-[#333] text-gray-900 dark:text-gray-100" 
+                    placeholder="vip, розница"
                   />
                 </div>
               </>

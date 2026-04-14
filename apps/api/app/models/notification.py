@@ -1,11 +1,11 @@
 """Notification models."""
 import uuid
 
-from sqlalchemy import Boolean, Column, DateTime, String
+from sqlalchemy import Boolean, Column, DateTime, Integer, String, Text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.sql import func
 
-from app.database import Base
+from app.db import Base
 
 
 def gen_id():
@@ -45,6 +45,7 @@ class NotificationEvent(Base):
     payload = Column(JSONB, nullable=False)
     published_to_stream = Column(Boolean, nullable=False, default=False)
     stream_id = Column(String(120), nullable=True)
+    hub_processed_at = Column(DateTime(timezone=True), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
 
@@ -54,35 +55,34 @@ class Notification(Base):
     __tablename__ = "notifications"
 
     id = Column(String(36), primary_key=True, default=gen_id)
-    event_id = Column(String(36), nullable=True, index=True)
-    recipient_id = Column(String(36), nullable=False, index=True)
+    user_id = Column(String(36), nullable=False, index=True)
     type = Column(String(120), nullable=False, index=True)
     title = Column(String(255), nullable=False)
-    body = Column(String(2000), nullable=False)
-    priority = Column(String(20), nullable=False, default="normal", index=True)
+    body = Column(Text, nullable=False)
     entity_type = Column(String(60), nullable=True, index=True)
     entity_id = Column(String(120), nullable=True, index=True)
-    payload = Column(JSONB, nullable=False, default=dict)
     is_read = Column(Boolean, nullable=False, default=False, index=True)
-    read_at = Column(DateTime(timezone=True), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False, index=True)
 
 
 class NotificationDelivery(Base):
-    """Delivery attempts/status per notification and channel."""
+    """Внешняя доставка уведомления (telegram / email).
+
+    State machine: pending → sending → sent | retry → pending → … → dead
+    (ошибка конфигурации / получателя — сразу dead).
+    """
 
     __tablename__ = "notification_deliveries"
 
     id = Column(String(36), primary_key=True, default=gen_id)
     notification_id = Column(String(36), nullable=False, index=True)
-    channel = Column(String(30), nullable=False, index=True)  # in_app, chat, telegram, email
-    status = Column(String(30), nullable=False, default="pending", index=True)  # pending, sent, failed
-    attempts = Column(String(10), nullable=False, default="0")
+    channel = Column(String(30), nullable=False, index=True)  # telegram, email
+    recipient = Column(String(512), nullable=False, default="")  # chat_id или email
+    status = Column(String(30), nullable=False, default="pending", index=True)
+    attempts = Column(Integer, nullable=False, default=0)
     last_error = Column(String(2000), nullable=True)
-    next_attempt_at = Column(DateTime(timezone=True), nullable=True, index=True)
-    delivered_at = Column(DateTime(timezone=True), nullable=True)
-    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
-    updated_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    next_retry_at = Column(DateTime(timezone=True), nullable=True, index=True)
+    sent_at = Column(DateTime(timezone=True), nullable=True)
 
 
 class NotificationArchive(Base):
@@ -91,16 +91,12 @@ class NotificationArchive(Base):
     __tablename__ = "notifications_archive"
 
     id = Column(String(36), primary_key=True)
-    event_id = Column(String(36), nullable=True, index=True)
-    recipient_id = Column(String(36), nullable=False, index=True)
+    user_id = Column(String(36), nullable=False, index=True)
     type = Column(String(120), nullable=False, index=True)
     title = Column(String(255), nullable=False)
-    body = Column(String(2000), nullable=False)
-    priority = Column(String(20), nullable=False, default="normal", index=True)
+    body = Column(Text, nullable=False)
     entity_type = Column(String(60), nullable=True, index=True)
     entity_id = Column(String(120), nullable=True, index=True)
-    payload = Column(JSONB, nullable=False, default=dict)
     is_read = Column(Boolean, nullable=False, default=False, index=True)
-    read_at = Column(DateTime(timezone=True), nullable=True)
     created_at = Column(DateTime(timezone=True), nullable=False, index=True)
     archived_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False, index=True)

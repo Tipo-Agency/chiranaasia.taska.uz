@@ -6,8 +6,10 @@
  * - Не содержит бизнес-логику
  * - Использует переиспользуемые компоненты
  */
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Client, Deal, AccountsReceivable, SalesFunnel } from '../../types';
+import { api } from '../../backend/api';
+import { clientFromApi } from '../../services/apiClient';
 import { PageLayout } from '../ui/PageLayout';
 import { Container } from '../ui/Container';
 import {
@@ -56,6 +58,46 @@ export const ClientsPage: React.FC<ClientsPageProps> = ({
 }) => {
   const [activeTab, setActiveTab] = useState<'clients' | 'contracts' | 'finance' | 'receivables'>('clients');
   const [searchQuery, setSearchQuery] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [serverClientHits, setServerClientHits] = useState<Client[] | null>(null);
+  const [clientSearchLoading, setClientSearchLoading] = useState(false);
+
+  useEffect(() => {
+    const t = window.setTimeout(() => setDebouncedSearch(searchQuery), 300);
+    return () => window.clearTimeout(t);
+  }, [searchQuery]);
+
+  useEffect(() => {
+    const q = debouncedSearch.trim();
+    if (!q) {
+      setServerClientHits(null);
+      setClientSearchLoading(false);
+      return;
+    }
+    let cancelled = false;
+    setClientSearchLoading(true);
+    void (async () => {
+      try {
+        const page = await api.clients.list({
+          search: q,
+          limit: 200,
+          is_archived: false,
+        });
+        if (!cancelled) {
+          setServerClientHits(
+            (page.items ?? []).map((row) => clientFromApi(row as Record<string, unknown>))
+          );
+        }
+      } catch {
+        if (!cancelled) setServerClientHits([]);
+      } finally {
+        if (!cancelled) setClientSearchLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [debouncedSearch]);
   const [contractStatusFilter, setContractStatusFilter] = useState<string>('all');
   const [selectedFunnelId, setSelectedFunnelId] = useState<string>('');
   const [showFilters, setShowFilters] = useState(false);
@@ -81,20 +123,12 @@ export const ClientsPage: React.FC<ClientsPageProps> = ({
     if (!clients || !Array.isArray(clients)) {
       return [];
     }
-    const activeClients = clients.filter(c => c && !c.isArchived);
-    let filtered = activeClients;
-    
-    if (selectedFunnelId) {
-      filtered = filtered.filter(c => c && c.funnelId === selectedFunnelId);
-    }
-    
-    if (searchQuery) {
-      const query = searchQuery.toLowerCase();
-      filtered = filtered.filter(c => c && c.name && c.name.toLowerCase().includes(query));
-    }
-    
-    return filtered;
-  }, [clients, searchQuery, selectedFunnelId]);
+    const activeClients = clients.filter((c) => c && !c.isArchived);
+    const q = debouncedSearch.trim();
+    if (!q) return activeClients;
+    if (clientSearchLoading && serverClientHits === null) return [];
+    return serverClientHits ?? [];
+  }, [clients, debouncedSearch, serverClientHits, clientSearchLoading]);
 
   const filteredContracts = useMemo(() => {
     if (!contracts || !Array.isArray(contracts)) {
@@ -104,15 +138,21 @@ export const ClientsPage: React.FC<ClientsPageProps> = ({
     return activeContracts.filter(c => {
       if (selectedFunnelId && c.funnelId !== selectedFunnelId) return false;
       
-      const matchesSearch = !searchQuery || 
-        (c.number && c.number.includes(searchQuery)) || 
-        clients.some(cl => cl && cl.id === c.clientId && cl.name && cl.name.toLowerCase().includes(searchQuery.toLowerCase()));
+      const matchesSearch = !debouncedSearch.trim() ||
+        (c.number && c.number.includes(debouncedSearch)) ||
+        clients.some(
+          (cl) =>
+            cl &&
+            cl.id === c.clientId &&
+            cl.name &&
+            cl.name.toLowerCase().includes(debouncedSearch.toLowerCase())
+        );
       
       const matchesStatus = contractStatusFilter === 'all' || c.status === contractStatusFilter;
       
       return matchesSearch && matchesStatus;
     });
-  }, [contracts, clients, searchQuery, contractStatusFilter, selectedFunnelId]);
+  }, [contracts, clients, debouncedSearch, contractStatusFilter, selectedFunnelId]);
 
   const handleCreateClient = () => {
     setEditingClient(null);
@@ -251,13 +291,15 @@ export const ClientsPage: React.FC<ClientsPageProps> = ({
         {/* Modals */}
         <ClientModal
           isOpen={isClientModalOpen}
+          editingClient={editingClient}
+          contracts={contracts}
+          oneTimeDeals={oneTimeDeals}
           onClose={() => {
             setIsClientModalOpen(false);
             setEditingClient(null);
           }}
-          client={editingClient}
           onSave={handleSaveClient}
-          salesFunnels={salesFunnels}
+          onDelete={onDeleteClient}
         />
 
         <ContractModal

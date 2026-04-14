@@ -847,19 +847,26 @@ const ContentPlanView: React.FC<ContentPlanViewProps> = ({
   return (
     <ModulePageShell>
       <div className={`${MODULE_PAGE_GUTTER} pt-4 md:pt-6 pb-3 flex-shrink-0`}>
-        <div className="inline-flex max-w-full items-center gap-2 rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-xs text-gray-700 dark:border-[#333] dark:bg-[#1a1a1a] dark:text-gray-300">
-          <span className="font-medium">Публичная ссылка:</span>
-          <span className="truncate">{`${window.location.origin}/content-plan/${tableId}`}</span>
-          <button
-            type="button"
-            onClick={() => {
-              navigator.clipboard.writeText(`${window.location.origin}/content-plan/${tableId}`);
-              alert('Ссылка скопирована!');
-            }}
-            className="font-bold hover:opacity-80 shrink-0"
-          >
-            Копировать
-          </button>
+        <div className="space-y-2">
+          <div className="inline-flex max-w-full flex-wrap items-center gap-2 rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-xs text-gray-700 dark:border-[#333] dark:bg-[#1a1a1a] dark:text-gray-300">
+            <span className="font-medium">Публичная ссылка:</span>
+            <span className="truncate">{`${window.location.origin}/content-plan/${tableId}`}</span>
+            <button
+              type="button"
+              onClick={() => {
+                navigator.clipboard.writeText(`${window.location.origin}/content-plan/${tableId}`);
+                alert('Ссылка скопирована!');
+              }}
+              className="font-bold hover:opacity-80 shrink-0"
+            >
+              Копировать
+            </button>
+          </div>
+          {activeTable?.type === 'content-plan' && activeTable.isPublic === false && (
+            <p className="text-xs text-amber-700 dark:text-amber-400 max-w-xl">
+              Публичный просмотр выключен. Включите «Публичная ссылка» в настройках → Страницы (редактирование этой страницы).
+            </p>
+          )}
         </div>
       </div>
       <div className="flex-1 overflow-y-auto custom-scrollbar min-h-0">

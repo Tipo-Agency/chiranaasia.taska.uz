@@ -1,0 +1,26 @@
+# Вызывается из ci.yml (`workflow_call`). Отдельный job-файл для фронта (сборка/lint/typecheck).
+name: Web CI
+
+on:
+  workflow_call:
+
+jobs:
+  web:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/web
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: apps/web/package-lock.json
+      - run: npm ci
+      - name: npm audit
+        run: npm audit --audit-level=high
+        continue-on-error: true
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm run build
