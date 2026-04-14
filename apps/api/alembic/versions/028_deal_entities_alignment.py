@@ -87,8 +87,9 @@ def upgrade() -> None:
     op.drop_column("deals", "amount")
     op.execute(sa.text("ALTER TABLE deals RENAME COLUMN amount_new TO amount"))
 
-    op.execute(sa.text("UPDATE deals SET assignee_id = NULL WHERE assignee_id = ''"))
+    # Сначала снимаем NOT NULL (если было), затем нормализуем пустые строки в NULL.
     op.alter_column("deals", "assignee_id", existing_type=sa.String(36), nullable=True)
+    op.execute(sa.text("UPDATE deals SET assignee_id = NULL WHERE assignee_id = ''"))
 
     op.execute(
         sa.text(
