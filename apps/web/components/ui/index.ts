@@ -5,8 +5,16 @@ export { ModulePageHeader } from './ModulePageHeader';
 export { ModuleTabsScroller } from './ModuleTabsScroller';
 export { ModuleSegmentedControl } from './ModuleSegmentedControl';
 export type { ModuleSegmentOption } from './ModuleSegmentedControl';
-export { MODULE_PAGE_GUTTER, MODULE_PAGE_TOP_PAD, APP_TOOLBAR_MODULE_CLUSTER } from './moduleAccent';
-export type { ModuleAccentKey } from './moduleAccent';
+export {
+  MODULE_PAGE_GUTTER,
+  MODULE_PAGE_TOP_PAD,
+  APP_TOOLBAR_MODULE_CLUSTER,
+  MODULE_ACCENTS,
+  resolveModuleAccentKey,
+  accentForSpaceType,
+  accentForTableType,
+} from './moduleAccent';
+export type { ModuleAccentKey, ModuleViewContext, SpaceTabKind } from './moduleAccent';
 export { ModuleCreateIconButton } from './ModuleCreateIconButton';
 export type { ModuleCreateIconButtonProps } from './ModuleCreateIconButton';
 export { ModuleFilterIconButton } from './ModuleFilterIconButton';

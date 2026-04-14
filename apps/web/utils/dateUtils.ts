@@ -45,6 +45,20 @@ export function compareDates(date1: string, date2: string): number {
   return 0;
 }
 
+/** Поднять обе границы диапазона YYYY-MM-DD не ниже floor (для запрета «дат в прошлом»). */
+export function clampDateRangeNotBeforeFloor(
+  start: string,
+  end: string,
+  floor: string
+): { start: string; end: string } {
+  let s = (start || '').trim() || floor;
+  let e = (end || '').trim() || floor;
+  if (s < floor) s = floor;
+  if (e < floor) e = floor;
+  if (e < s) e = s;
+  return { start: s, end: e };
+}
+
 /**
  * Проверить, является ли дата сегодняшней (в локальном времени)
  */
@@ -84,6 +98,16 @@ export function normalizeDateForInput(dateStr: string | undefined | null): strin
   const day = String(date.getDate()).padStart(2, '0');
   
   return `${year}-${month}-${day}`;
+}
+
+/** Время для API встреч (HH:mm), как на бэкенде meeting_validation.parse_meeting_wall_clock */
+export function normalizeWallClockTimeForApi(time: string | undefined | null, fallback = '10:00'): string {
+  const raw = (time || fallback).trim();
+  const m = raw.match(/^(\d{1,2}):(\d{2})(?::\d{2})?/);
+  if (!m) return fallback;
+  const h = Math.min(23, Math.max(0, parseInt(m[1], 10)));
+  const mi = Math.min(59, Math.max(0, parseInt(m[2], 10)));
+  return `${String(h).padStart(2, '0')}:${String(mi).padStart(2, '0')}`;
 }
 
 /**

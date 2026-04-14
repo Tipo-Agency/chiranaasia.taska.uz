@@ -103,6 +103,11 @@ def upgrade() -> None:
             "decision_date, is_archived FROM purchase_requests"
         )
     ).mappings().all()
+    existing_user_ids = {
+        str(r[0])
+        for r in bind.execute(sa.text("SELECT id FROM users")).fetchall()
+        if r and r[0] is not None
+    }
 
     for pr in rows:
         desc = (pr.get("description") or "").strip()
@@ -112,7 +117,8 @@ def upgrade() -> None:
         amt = _parse_amount(pr.get("amount"))
         st = _map_status(pr.get("status"))
         rid = str(pr.get("id") or "")
-        req_by = (str(pr.get("requester_id") or "").strip() or None)
+        req_by_raw = str(pr.get("requester_id") or "").strip() or None
+        req_by = req_by_raw if req_by_raw in existing_user_ids else None
         cat = (str(pr.get("category_id") or "").strip() or None)
         dept = (str(pr.get("department_id") or "").strip() or None)
         comment_parts = [desc] if desc else []

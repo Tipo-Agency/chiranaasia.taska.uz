@@ -12,7 +12,7 @@ from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.core.auth import get_current_user, require_permission
+from app.core.auth import get_current_user, require_any_permission, require_permission
 from app.core.config import get_settings
 from app.core.optimistic_version import (
     commit_or_stale_version_conflict,
@@ -20,7 +20,7 @@ from app.core.optimistic_version import (
     merge_expected_version,
     parse_if_match_header,
 )
-from app.core.permissions import PERM_CRM_DEALS_EDIT
+from app.core.permissions import PERM_CRM_DEALS_EDIT, PERM_CRM_SALES_FUNNEL
 from app.db import get_db
 from app.models.client import Client, Deal
 from app.models.funnel import SalesFunnel
@@ -37,6 +37,7 @@ from app.services.deal_stage_validation import (
     assert_deal_stage_transition_allowed,
     user_may_bypass_deal_terminal_stage,
 )
+from app.services.deal_related_archive import archive_entities_linked_to_deal, deal_just_archived
 from app.services.deals_api import apply_deal_patch_to_row, deal_from_create, deal_row_to_read
 from app.services.domain_events import emit_domain_event, log_entity_mutation
 from app.services.list_cursor_page import (
@@ -58,6 +59,12 @@ from app.services.media_storage import (
 router = APIRouter(prefix="/deals", tags=["deals"], dependencies=[Depends(get_current_user)])
 
 require_crm_deals_edit = require_permission(PERM_CRM_DEALS_EDIT, detail="crm_deals_edit_required")
+# Одна сделка (POST/PATCH/DELETE): воронка без отдельного crm.deals.edit; массовый PUT /deals — только с crm.deals.edit.
+require_crm_deals_single_write = require_any_permission(
+    PERM_CRM_DEALS_EDIT,
+    PERM_CRM_SALES_FUNNEL,
+    detail="crm_deals_write_required",
+)
 
 _DEFAULT_LIMIT = 50
 _MAX_LIMIT = 500
@@ -482,6 +489,8 @@ async def update_deals(
         await db.execute(stmt)
         await db.flush()
         deal_row = await db.get(Deal, did)
+        if deal_just_archived(existing=existing, row=deal_row):
+            await archive_entities_linked_to_deal(db, did)
         if existing is not None and deal_row and prev_stage is not None and deal_row.stage != prev_stage:
             await log_entity_mutation(
                 db,
@@ -571,7 +580,7 @@ async def update_deals(
     return OkResponse()
 
 
-@router.post("", response_model=DealRead, status_code=201, dependencies=[Depends(require_crm_deals_edit)])
+@router.post("", response_model=DealRead, status_code=201, dependencies=[Depends(require_crm_deals_single_write)])
 async def create_deal(
     body: DealCreate,
     request: Request,
@@ -645,7 +654,7 @@ async def get_deal(deal_id: str, db: AsyncSession = Depends(get_db)):
     return deal_row_to_read(deal)
 
 
-@router.patch("/{deal_id}", response_model=DealRead, dependencies=[Depends(require_crm_deals_edit)])
+@router.patch("/{deal_id}", response_model=DealRead, dependencies=[Depends(require_crm_deals_single_write)])
 async def patch_deal(
     deal_id: str,
     patch: DealUpdate,
@@ -680,9 +689,12 @@ async def patch_deal(
         next_cid = None if v in (None, "") else (str(v).strip()[:36] or None)
     await assert_deal_client_id_exists(db, next_cid)
     assert_won_requires_client_id(str(to_stage) if to_stage is not None else None, next_cid)
+    was_archived = bool(deal.is_archived)
     apply_deal_patch_to_row(deal, patch)
     deal.updated_at = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3] + "Z"
     await db.flush()
+    if bool(deal.is_archived) and not was_archived:
+        await archive_entities_linked_to_deal(db, deal_id)
     if "stage" in dump and deal.stage != prev_stage:
         await log_entity_mutation(
             db,
@@ -733,7 +745,7 @@ async def patch_deal(
     return deal_row_to_read(row_out)
 
 
-@router.delete("/{deal_id}", response_model=OkResponse, dependencies=[Depends(require_crm_deals_edit)])
+@router.delete("/{deal_id}", response_model=OkResponse, dependencies=[Depends(require_crm_deals_single_write)])
 async def delete_deal(
     deal_id: str,
     request: Request,
@@ -743,6 +755,7 @@ async def delete_deal(
     if deal:
         deal.is_archived = True
         await db.flush()
+        await archive_entities_linked_to_deal(db, deal_id)
         await log_entity_mutation(
             db,
             event_type="deal.archived",

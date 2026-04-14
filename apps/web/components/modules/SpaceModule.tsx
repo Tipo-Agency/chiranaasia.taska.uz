@@ -115,14 +115,14 @@ export const SpaceModule: React.FC<SpaceModuleProps> = ({
                 <div className={`${MODULE_PAGE_GUTTER} pt-4 md:pt-8 flex-shrink-0`}>
                     <div className="mb-4 md:mb-6 space-y-4">
                         <ModulePageHeader
-                            accent="indigo"
+                            accent="sky"
                             icon={<CheckSquare size={24} strokeWidth={2} />}
                             title="Задачи"
                             description="Управление задачами и проектами"
                             hideTitleBlock
                             actions={
                                 <ModuleCreateIconButton
-                                    accent="indigo"
+                                    accent="sky"
                                     label="Новая задача"
                                     onClick={() => actions.openTaskModal(null)}
                                 />
@@ -132,7 +132,7 @@ export const SpaceModule: React.FC<SpaceModuleProps> = ({
                             <ModuleSegmentedControl
                                 size="sm"
                                 variant="accent"
-                                accent="indigo"
+                                accent="sky"
                                 value={viewMode}
                                 onChange={(v) => actions.setViewMode(v as ViewMode)}
                                 options={[

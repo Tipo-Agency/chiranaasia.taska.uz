@@ -44,7 +44,7 @@ export const useAppLogic = () => {
 
   const settingsSlice = useSettingsLogic(showNotification);
   const authSlice = useAuthLogic(showNotification);
-  const crmSlice = useCRMLogic(showNotification);
+  const crmSlice = useCRMLogic(showNotification, () => authSlice.state.currentUser);
   const [salesFunnels, setSalesFunnels] = useState<SalesFunnel[]>([]);
   const [inboxMessages, setInboxMessages] = useState<InboxMessage[]>([]);
   const [outboxMessages, setOutboxMessages] = useState<InboxMessage[]>([]);
@@ -56,23 +56,28 @@ export const useAppLogic = () => {
 
   // Базовая загрузка - только критически важные данные для работы приложения
   // Уровень 0: Загрузка данных для аутентификации (только users)
-  const loadAuthData = async () => {
+  const loadAuthData = async (): Promise<boolean> => {
       try {
           const users = (await api.users.getAll()) as User[];
           if (users.length !== authSlice.state.users.length ||
               users.some(u => !authSlice.state.users.find(au => au.id === u.id))) {
-            authSlice.actions.updateUsers(users);
+            authSlice.actions.updateUsers(users, { persistRemote: false });
           } else {
             authSlice.setters.setUsers(users);
           }
+          return true;
       } catch (error: any) {
+          // Для незалогиненного пользователя 401 на /auth/users — ожидаемый сценарий.
+          if (error?.message === 'Not authenticated') {
+            return false;
+          }
           console.error('[Auth] Error loading users:', error);
           console.error('[Auth] Error details:', {
               code: error?.code,
               message: error?.message,
               stack: error?.stack
           });
-          throw error;
+          return false;
       }
   };
 
@@ -250,8 +255,9 @@ export const useAppLogic = () => {
       
       try {
         // Уровень 0: Загружаем только данные для аутентификации
-        await loadAuthData();
+        const isAuthenticated = await loadAuthData();
         setIsLoading(false);
+        if (!isAuthenticated) return;
         
         // Уровень 1: После загрузки auth данных, загружаем основные данные
         // Загружаем всегда, так как основные данные нужны для работы приложения
@@ -398,6 +404,7 @@ export const useAppLogic = () => {
 
   // Ленивая загрузка данных при открытии разделов (Уровень 2)
   useEffect(() => {
+    if (!authSlice.state.currentUser) return;
     const currentView = settingsSlice.state.currentView;
     
     // Определяем, какие данные нужно загрузить в зависимости от текущего представления
@@ -481,10 +488,11 @@ export const useAppLogic = () => {
     loadData().catch(err => {
       console.error('Ошибка загрузки данных модуля:', err);
     });
-  }, [settingsSlice.state.currentView, settingsSlice.state.activeTableId]);
+  }, [settingsSlice.state.currentView, settingsSlice.state.activeTableId, authSlice.state.currentUser]);
 
   // Обработчик синхронизации контент-плана
   useEffect(() => {
+      if (!authSlice.state.currentUser) return;
       const handleContentPlanSync = async () => {
           const activeTable = settingsSlice.state.tables.find(t => t.id === settingsSlice.state.activeTableId);
           if (activeTable?.type === 'content-plan') {
@@ -507,7 +515,7 @@ export const useAppLogic = () => {
       return () => {
           window.removeEventListener('contentPlanSync', handleContentPlanSync);
       };
-  }, [settingsSlice.state.activeTableId, settingsSlice.state.tables]);
+  }, [settingsSlice.state.activeTableId, settingsSlice.state.tables, authSlice.state.currentUser]);
 
   const saveDocWrapper = (docData: any) => {
       // Для документов не требуется tableId - находим системную таблицу docs или используем пустую строку
@@ -1019,7 +1027,9 @@ export const useAppLogic = () => {
     },
     actions: {
       login: authSlice.actions.login, logout: authSlice.actions.logout, updateUsers: authSlice.actions.updateUsers, updateProfile: authSlice.actions.updateProfile, openProfile: authSlice.actions.openProfile, closeProfile: authSlice.actions.closeProfile,
-      updateProjects: taskSlice.actions.updateProjects, updateStatuses: taskSlice.actions.updateStatuses, updatePriorities: taskSlice.actions.updatePriorities, quickCreateProject: taskSlice.actions.quickCreateProject, saveTask: saveTaskWrapper, deleteTask: taskSlice.actions.deleteTask, restoreTask: taskSlice.actions.restoreTask, permanentDeleteTask: taskSlice.actions.permanentDeleteTask, openTaskModal: taskSlice.actions.openTaskModal, closeTaskModal: taskSlice.actions.closeTaskModal, addTaskComment: taskSlice.actions.addTaskComment, addTaskAttachment: taskSlice.actions.addTaskAttachment, addTaskDocAttachment: taskSlice.actions.addTaskDocAttachment,
+      updateProjects: taskSlice.actions.updateProjects, updateStatuses: taskSlice.actions.updateStatuses, updatePriorities: taskSlice.actions.updatePriorities, quickCreateProject: taskSlice.actions.quickCreateProject, saveTask: saveTaskWrapper, deleteTask: taskSlice.actions.deleteTask, restoreTask: taskSlice.actions.restoreTask, permanentDeleteTask: taskSlice.actions.permanentDeleteTask, openTaskModal: taskSlice.actions.openTaskModal, closeTaskModal: taskSlice.actions.closeTaskModal, addTaskComment: taskSlice.actions.addTaskComment, addTaskAttachment: taskSlice.actions.addTaskAttachment,
+      addTaskDocAttachment: taskSlice.actions.addTaskDocAttachment,
+      removeTaskAttachment: taskSlice.actions.removeTaskAttachment,
       saveClient: (client: Client) => {
         const existing = crmSlice.state.clients.find(c => c.id === client.id);
         crmSlice.actions.saveClient(client);

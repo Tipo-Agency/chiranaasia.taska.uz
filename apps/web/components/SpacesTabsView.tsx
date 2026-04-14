@@ -9,6 +9,8 @@ import {
   MODULE_PAGE_TOP_PAD,
   ModuleCreateIconButton,
   APP_TOOLBAR_MODULE_CLUSTER,
+  MODULE_ACCENTS,
+  accentForSpaceType,
 } from './ui';
 import { useAppToolbar } from '../contexts/AppToolbarContext';
 
@@ -78,8 +80,9 @@ export const SpacesTabsView: React.FC<SpacesTabsViewProps> = ({
   const currentSpaces = tables.filter(t => t.type === activeTab && !t.isArchived);
 
   useLayoutEffect(() => {
-    const indigo = 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300';
     const idle = 'text-gray-600 dark:text-gray-400';
+    const chipFor = (spaceType: SpaceType) => MODULE_ACCENTS[accentForSpaceType(spaceType)].navIconActive;
+    const chipActive = chipFor(activeTab);
     const types: { id: SpaceType; label: string }[] = [
       { id: 'content-plan', label: 'Контент' },
       { id: 'backlog', label: 'Идеи' },
@@ -98,7 +101,7 @@ export const SpacesTabsView: React.FC<SpacesTabsViewProps> = ({
               title={getTypeLabel(t.id)}
               onClick={() => setActiveTab(t.id)}
               className={`px-2 sm:px-2.5 py-1 rounded-lg text-[11px] sm:text-xs font-medium whitespace-nowrap shrink-0 transition-colors ${
-                active ? indigo : `${idle} hover:bg-gray-100 dark:hover:bg-[#252525]`
+                active ? chipFor(t.id) : `${idle} hover:bg-gray-100 dark:hover:bg-[#252525]`
               }`}
             >
               {t.label}
@@ -115,7 +118,7 @@ export const SpacesTabsView: React.FC<SpacesTabsViewProps> = ({
             aria-pressed={viewMode === 'grid'}
             onClick={() => setViewMode('grid')}
             className={`px-2 py-0.5 rounded-md text-[11px] font-medium transition-colors ${
-              viewMode === 'grid' ? indigo : `${idle} hover:bg-gray-100 dark:hover:bg-[#252525]`
+              viewMode === 'grid' ? chipActive : `${idle} hover:bg-gray-100 dark:hover:bg-[#252525]`
             }`}
           >
             Плитка
@@ -125,7 +128,7 @@ export const SpacesTabsView: React.FC<SpacesTabsViewProps> = ({
             aria-pressed={viewMode === 'list'}
             onClick={() => setViewMode('list')}
             className={`px-2 py-0.5 rounded-md text-[11px] font-medium transition-colors ${
-              viewMode === 'list' ? indigo : `${idle} hover:bg-gray-100 dark:hover:bg-[#252525]`
+              viewMode === 'list' ? chipActive : `${idle} hover:bg-gray-100 dark:hover:bg-[#252525]`
             }`}
           >
             Список
@@ -133,7 +136,7 @@ export const SpacesTabsView: React.FC<SpacesTabsViewProps> = ({
         </div>
         {hasPermission(currentUser, 'settings.general') && (
           <ModuleCreateIconButton
-            accent="indigo"
+            accent={accentForSpaceType(activeTab)}
             label="Создать пространство"
             size="sm"
             onClick={() => onCreateTable(activeTab)}
@@ -168,7 +171,7 @@ export const SpacesTabsView: React.FC<SpacesTabsViewProps> = ({
               </p>
               {hasPermission(currentUser, 'settings.general') && (
                 <ModuleCreateIconButton
-                  accent="indigo"
+                  accent={accentForSpaceType(activeTab)}
                   label="Создать пространство"
                   onClick={() => onCreateTable(activeTab)}
                   className="mx-auto"

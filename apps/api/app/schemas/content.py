@@ -25,7 +25,7 @@ class DocItem(BaseModel):
 
 
 class ContentPostItem(BaseModel):
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="forbid", populate_by_name=True)
 
     id: str = Field(..., min_length=1, max_length=100)
     tableId: str | None = Field(default=None, max_length=100)
@@ -35,7 +35,8 @@ class ContentPostItem(BaseModel):
     platform: list[str] = Field(default_factory=list)
     format: str = Field(default="post", max_length=100)
     status: str = Field(default="idea", max_length=100)
-    copy: str | None = None
+    # Не «copy»: затеняет BaseModel — вход JSON по-прежнему { "copy": "..." }
+    post_copy: str | None = Field(default=None, validation_alias="copy", serialization_alias="copy")
     mediaUrl: str | None = None
     isArchived: bool = False
     updatedByUserId: str | None = Field(default=None, max_length=100)
@@ -45,7 +46,7 @@ class ContentPostItem(BaseModel):
 class ContentPostRead(BaseModel):
     """GET /content-posts и публичный контент-план — как row_to_post."""
 
-    model_config = ConfigDict(extra="ignore")
+    model_config = ConfigDict(extra="ignore", populate_by_name=True, serialize_by_alias=True)
 
     id: str
     tableId: str = ""
@@ -55,7 +56,7 @@ class ContentPostRead(BaseModel):
     platform: list[str] = Field(default_factory=list)
     format: str = ""
     status: str = ""
-    copy: str | None = None
+    post_copy: str | None = Field(default=None, validation_alias="copy", serialization_alias="copy")
     mediaUrl: str | None = None
     isArchived: bool = False
 

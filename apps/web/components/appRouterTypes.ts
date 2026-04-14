@@ -41,6 +41,8 @@ import type { AppActions } from '../frontend/hooks/useAppLogic';
 
 export interface AppRouterProps {
   currentView: string;
+  /** Строка поиска в шапке (контекст зависит от экрана). */
+  searchQuery: string;
   viewMode: ViewMode;
   activeTable?: TableCollection;
   /** Текущая выбранная таблица (spaces / table view). */

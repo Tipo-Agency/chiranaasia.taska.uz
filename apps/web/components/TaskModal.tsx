@@ -2,13 +2,13 @@
 import React, { useState, useEffect, useLayoutEffect, useRef, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { computeAnchoredDropdownPosition } from '../utils/floatingDropdownPosition';
-import { Project, Task, User, StatusOption, PriorityOption, TableCollection, TaskAttachment, Doc } from '../types';
-import { X, Calendar as CalendarIcon, Users, Tag, Plus, CheckCircle2, Archive, AlignLeft, Paperclip, Send, File as FileIcon, Image as ImageIcon, MessageSquare, Download, Flag, Link as LinkIcon, Check, ChevronDown, Folder, ExternalLink, FileText, User as UserIcon, ListTree } from 'lucide-react';
+import { Project, Task, User, StatusOption, PriorityOption, TableCollection, TaskAttachment, Doc, Role } from '../types';
+import { X, Calendar as CalendarIcon, Users, Tag, Plus, CheckCircle2, Archive, AlignLeft, Paperclip, Send, File as FileIcon, Image as ImageIcon, MessageSquare, Download, Flag, Link as LinkIcon, Check, ChevronDown, Folder, ExternalLink, FileText, User as UserIcon, ListTree, History } from 'lucide-react';
 import { DynamicIcon } from './AppIcons';
 import { STANDARD_CATEGORIES } from './FunctionalityView';
 import { TaskSelect } from './TaskSelect';
 import { FilePreviewModal } from './FilePreviewModal';
-import { getTodayLocalDate, getDateDaysFromNow, normalizeDateForInput } from '../utils/dateUtils';
+import { getTodayLocalDate, getDateDaysFromNow, normalizeDateForInput, clampDateRangeNotBeforeFloor } from '../utils/dateUtils';
 import { DateRangeInput } from './ui/DateInput';
 import { Button, SystemAlertDialog } from './ui';
 
@@ -27,6 +27,8 @@ interface TaskModalProps {
   onAddComment?: (taskId: string, text: string) => void;
   onAddAttachment?: (taskId: string, file: File) => void;
   onAddDocAttachment?: (taskId: string, docId: string) => void; // Прикрепить документ
+  /** Удалить вложение (и связанный системный комментарий) до или после сохранения задачи */
+  onRemoveAttachment?: (taskId: string, attachmentId: string) => void;
   task?: Partial<Task> | null; // Changed to Partial to accept pre-filled data
   /** Все задачи — для родительской задачи и подзадач */
   allTasks?: Task[];
@@ -35,7 +37,7 @@ interface TaskModalProps {
 const TaskModal: React.FC<TaskModalProps> = ({ 
     users, projects, statuses, priorities, currentUser, tables = [], docs = [],
     onSave, onClose, onCreateProject, onDelete, 
-    onAddComment, onAddAttachment, onAddDocAttachment, task,
+    onAddComment, onAddAttachment, onAddDocAttachment, onRemoveAttachment, task,
     allTasks = [],
 }) => {
   // Определяем тип задачи (идея/функция/задача)
@@ -58,6 +60,12 @@ const TaskModal: React.FC<TaskModalProps> = ({
   const activeProjects = useMemo(() => projects.filter((p) => !p.isArchived), [projects]);
   const activeUsers = useMemo(() => users.filter((u) => !u.isArchived), [users]);
 
+  /** Только администратор может ставить сроки «задним числом». */
+  const canPickPastTaskDates = useMemo(
+    () => Boolean(currentUser?.roleSlug === 'admin' || currentUser?.role === Role.ADMIN),
+    [currentUser]
+  );
+
   const hideChat = taskType === 'idea' || taskType === 'feature';
   // Fields
   const [title, setTitle] = useState('');
@@ -72,7 +80,14 @@ const TaskModal: React.FC<TaskModalProps> = ({
   const [contentPostId, setContentPostId] = useState<string | undefined>(undefined);
   const [category, setCategory] = useState<string>('');
   const [parentTaskId, setParentTaskId] = useState<string>('');
-  
+
+  const isRetrospectiveTaskDates = useMemo(() => {
+    const t = getTodayLocalDate();
+    if (!startDate || !endDate) return false;
+    const lo = startDate <= endDate ? startDate : endDate;
+    return lo < t;
+  }, [startDate, endDate]);
+
   // Comment Input
   const [commentText, setCommentText] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -157,8 +172,14 @@ const TaskModal: React.FC<TaskModalProps> = ({
         const newProjectId = currentTask.projectId || '';
         const newAssigneeId = currentTask.assigneeId || '';
         const newAssigneeIds = currentTask.assigneeIds || (currentTask.assigneeId ? [currentTask.assigneeId] : []);
-        const newStartDate = normalizeDateForInput(currentTask.startDate) || getTodayLocalDate();
-        const newEndDate = normalizeDateForInput(currentTask.endDate) || getTodayLocalDate();
+        let newStartDate = normalizeDateForInput(currentTask.startDate) || getTodayLocalDate();
+        let newEndDate = normalizeDateForInput(currentTask.endDate) || getTodayLocalDate();
+        if (!canPickPastTaskDates) {
+          const floor = getTodayLocalDate();
+          const c = clampDateRangeNotBeforeFloor(newStartDate, newEndDate, floor);
+          newStartDate = c.start;
+          newEndDate = c.end;
+        }
         const newStatus = currentTask.status || activeStatuses[0]?.name || '';
         const newCategory = currentTask.category || '';
         const newParent = currentTask.parentTaskId || '';
@@ -200,8 +221,14 @@ const TaskModal: React.FC<TaskModalProps> = ({
         const newStatus = currentTask.status || activeStatuses[0]?.name || '';
         const newPriority = currentTask.priority || activePriorities[0]?.name || '';
         const newProjectId = currentTask.projectId || '';
-        const newStartDate = normalizeDateForInput(currentTask.startDate) || getTodayLocalDate();
-        const newEndDate = normalizeDateForInput(currentTask.endDate) || getTodayLocalDate();
+        let newStartDate = normalizeDateForInput(currentTask.startDate) || getTodayLocalDate();
+        let newEndDate = normalizeDateForInput(currentTask.endDate) || getTodayLocalDate();
+        if (!canPickPastTaskDates) {
+          const floor = getTodayLocalDate();
+          const c = clampDateRangeNotBeforeFloor(newStartDate, newEndDate, floor);
+          newStartDate = c.start;
+          newEndDate = c.end;
+        }
         const newCategory = currentTask.category || '';
         const newParent = currentTask.parentTaskId || '';
         
@@ -259,7 +286,7 @@ const TaskModal: React.FC<TaskModalProps> = ({
           parentTaskId: '',
         };
     }
-  }, [currentTask, currentUser, prevTaskId, priorities, statuses, activePriorities, activeStatuses]);
+  }, [currentTask, currentUser, prevTaskId, priorities, statuses, activePriorities, activeStatuses, canPickPastTaskDates]);
 
   useEffect(() => {
     if (taskType !== 'idea' && !status && activeStatuses.length > 0) {
@@ -287,9 +314,15 @@ const TaskModal: React.FC<TaskModalProps> = ({
     
     // Для задач (не идей) даты обязательны - если не указаны, используем дату создания
     const createdAtDate = currentTask?.createdAt ? new Date(currentTask.createdAt).toISOString().split('T')[0] : getTodayLocalDate();
-    const finalStartDate = taskType === 'idea' ? undefined : (startDate || createdAtDate);
-    const finalEndDate = taskType === 'idea' ? undefined : (endDate || createdAtDate);
-    
+    let finalStartDate = taskType === 'idea' ? undefined : (startDate || createdAtDate);
+    let finalEndDate = taskType === 'idea' ? undefined : (endDate || createdAtDate);
+    if (taskType !== 'idea' && finalStartDate && finalEndDate && !canPickPastTaskDates) {
+      const floor = getTodayLocalDate();
+      const c = clampDateRangeNotBeforeFloor(finalStartDate, finalEndDate, floor);
+      finalStartDate = c.start;
+      finalEndDate = c.end;
+    }
+
     onSave({
       id: currentTask?.id,
       entityType, // Добавляем entityType
@@ -297,8 +330,10 @@ const TaskModal: React.FC<TaskModalProps> = ({
       title,
       description,
       projectId: projectId || null,
-      assigneeId: assigneeIds[0] || null, 
+      assigneeId: assigneeIds[0] || null,
       assigneeIds,
+      comments: currentTask?.comments ?? [],
+      attachments: currentTask?.attachments ?? [],
       // Для функций тоже сохраняем выбранный статус (не форсим "Не начато")
       status: taskType === 'idea' ? undefined : (status || (activeStatuses[0]?.name || 'Не начато')),
       startDate: finalStartDate,
@@ -339,9 +374,10 @@ const TaskModal: React.FC<TaskModalProps> = ({
   };
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-      if (e.target.files && e.target.files[0] && currentTask?.id && onAddAttachment) {
-          onAddAttachment(currentTask.id, e.target.files[0]);
-      }
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file || !onAddAttachment || !currentTask?.id) return;
+    onAddAttachment(currentTask.id, file);
   };
 
   // Проверка наличия изменений
@@ -940,7 +976,20 @@ const TaskModal: React.FC<TaskModalProps> = ({
                     {/* Dates - скрыты для идей */}
                     {taskType !== 'idea' && (
                         <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-4 col-span-1 md:col-span-2 min-h-8">
-                            <div className="w-full sm:w-28 sm:min-w-[7rem] sm:pr-2 text-[10px] font-semibold text-gray-500 dark:text-gray-400 uppercase flex items-center gap-2 shrink-0"><CalendarIcon size={14} className="shrink-0 text-gray-400" strokeWidth={2} /> Сроки</div>
+                            <div className="w-full sm:w-28 sm:min-w-[7rem] sm:pr-2 text-[10px] font-semibold text-gray-500 dark:text-gray-400 uppercase flex flex-col gap-1.5 shrink-0">
+                              <span className="flex items-center gap-2">
+                                <CalendarIcon size={14} className="shrink-0 text-gray-400" strokeWidth={2} /> Сроки
+                              </span>
+                              {canPickPastTaskDates && isRetrospectiveTaskDates && (
+                                <span
+                                  className="inline-flex items-center gap-1 rounded-md border border-amber-200 dark:border-amber-800/80 bg-amber-50 dark:bg-amber-950/40 px-1.5 py-0.5 text-[9px] font-medium normal-case text-amber-900 dark:text-amber-200 max-w-[11rem]"
+                                  title="Срок начала раньше сегодняшнего дня — задача с датой в прошлом (ретроспектива). Такие даты могут выбрать только администраторы."
+                                >
+                                  <History size={11} className="shrink-0" aria-hidden />
+                                  Дата в прошлом
+                                </span>
+                              )}
+                            </div>
                             <DateRangeInput
                               startDate={startDate}
                               endDate={endDate}
@@ -950,6 +999,7 @@ const TaskModal: React.FC<TaskModalProps> = ({
                               }}
                               className="flex-1 w-full sm:w-auto"
                               size="compact"
+                              minDate={canPickPastTaskDates ? undefined : getTodayLocalDate()}
                             />
                         </div>
                     )}
@@ -1017,29 +1067,44 @@ const TaskModal: React.FC<TaskModalProps> = ({
                         <input type="file" ref={fileInputRef} className="hidden" onChange={handleFileSelect} />
                     </div>
                     
-                    {task?.attachments && task.attachments.length > 0 ? (
+                    {currentTask?.attachments && currentTask.attachments.length > 0 ? (
                         <div className="grid grid-cols-2 gap-3">
-                            {task.attachments.map(att => (
-                                <div 
-                                    key={att.id} 
+                            {currentTask.attachments.map((att) => (
+                                <div
+                                    key={att.id}
                                     className="flex items-center gap-3 p-2 bg-gray-50 dark:bg-[#252525] rounded-lg border border-gray-100 dark:border-gray-700 group cursor-pointer hover:bg-gray-100 dark:hover:bg-[#303030] transition-colors"
                                     onClick={() => setPreviewFile({ url: att.url, name: att.name, type: att.type })}
                                 >
                                     <div className="w-8 h-8 rounded bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center text-blue-600 dark:text-blue-400">
-                                        {att.docId ? <FileText size={16}/> : att.type.includes('image') ? <ImageIcon size={16}/> : <FileIcon size={16}/>}
+                                        {att.docId ? <FileText size={16} /> : att.type.includes('image') ? <ImageIcon size={16} /> : <FileIcon size={16} />}
                                     </div>
                                     <div className="flex-1 min-w-0">
                                         <div className="text-sm font-medium text-gray-800 dark:text-gray-200 truncate">{att.name}</div>
                                         <div className="text-[10px] text-gray-500 dark:text-gray-400">{new Date(att.uploadedAt).toLocaleDateString()}</div>
                                     </div>
-                                    <a 
-                                        href={att.url} 
-                                        download 
+                                    <div className="flex items-center shrink-0 gap-0.5">
+                                      {onRemoveAttachment && currentTask?.id && (
+                                        <button
+                                          type="button"
+                                          title="Убрать вложение"
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            onRemoveAttachment(currentTask.id!, att.id);
+                                          }}
+                                          className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded transition-colors"
+                                        >
+                                          <X size={14} />
+                                        </button>
+                                      )}
+                                      <a
+                                        href={att.url}
+                                        download
                                         onClick={(e) => e.stopPropagation()}
                                         className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-gray-200 dark:hover:bg-gray-700 rounded transition-colors md:opacity-0 md:group-hover:opacity-100"
-                                    >
-                                        <Download size={14}/>
-                                    </a>
+                                      >
+                                        <Download size={14} />
+                                      </a>
+                                    </div>
                                 </div>
                             ))}
                         </div>
@@ -1312,15 +1377,6 @@ const TaskModal: React.FC<TaskModalProps> = ({
                   <button
                     type="button"
                     onClick={() => {
-                      if (!currentTask?.id) {
-                        setSystemAlert({
-                          open: true,
-                          title: 'Сначала сохраните задачу',
-                          message: 'Сначала сохраните задачу, затем прикрепите документ.',
-                        });
-                        setIsAttachmentModalOpen(false);
-                        return;
-                      }
                       if (!docs || docs.length === 0) {
                         setSystemAlert({
                           open: true,
@@ -1369,13 +1425,6 @@ const TaskModal: React.FC<TaskModalProps> = ({
                         onClick={() => {
                           if (currentTask?.id) {
                             onAddDocAttachment(currentTask.id, doc.id);
-                            setShowDocSelector(false);
-                          } else {
-                            setSystemAlert({
-                              open: true,
-                              title: 'Сначала сохраните задачу',
-                              message: 'Сначала сохраните задачу, затем прикрепите документ.',
-                            });
                             setShowDocSelector(false);
                           }
                         }}

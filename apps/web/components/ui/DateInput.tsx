@@ -373,6 +373,8 @@ interface DateRangeInputProps {
   size?: 'default' | 'compact';
   /** Если задано (например 7), диапазон подставляется в 1 клик от выбранной даты */
   autoRangeDays?: number;
+  /** Минимальная дата (YYYY-MM-DD); более ранние дни в календаре не выбираются */
+  minDate?: string;
 }
 
 export const DateRangeInput: React.FC<DateRangeInputProps> = ({
@@ -383,6 +385,7 @@ export const DateRangeInput: React.FC<DateRangeInputProps> = ({
   required = false,
   size = 'default',
   autoRangeDays,
+  minDate,
 }) => {
   const compact = size === 'compact';
   const [open, setOpen] = useState(false);
@@ -438,6 +441,11 @@ export const DateRangeInput: React.FC<DateRangeInputProps> = ({
     return draftStart <= draftEnd ? { s: draftStart, e: draftEnd } : { s: draftEnd, e: draftStart };
   }, [draftStart, draftEnd]);
 
+  const isBeforeMin = useCallback(
+    (iso: string) => Boolean(minDate && /^\d{4}-\d{2}-\d{2}$/.test(iso) && iso < minDate!),
+    [minDate]
+  );
+
   const addDaysISO = (iso: string, days: number) => {
     const date = new Date(`${iso}T12:00:00`);
     date.setDate(date.getDate() + days);
@@ -445,12 +453,19 @@ export const DateRangeInput: React.FC<DateRangeInputProps> = ({
   };
 
   const pick = (iso: string) => {
+    if (isBeforeMin(iso)) return;
     if (!draftStart || (draftStart && draftEnd)) {
       if (autoRangeDays && autoRangeDays > 1) {
-        const autoEnd = addDaysISO(iso, autoRangeDays - 1);
-        setDraftStart(iso);
+        let start = iso;
+        let autoEnd = addDaysISO(iso, autoRangeDays - 1);
+        if (minDate) {
+          if (start < minDate) start = minDate;
+          if (autoEnd < minDate) autoEnd = minDate;
+          if (autoEnd < start) autoEnd = start;
+        }
+        setDraftStart(start);
         setDraftEnd(autoEnd);
-        onChange(iso, autoEnd);
+        onChange(start, autoEnd);
         setOpen(false);
         return;
       }
@@ -460,8 +475,13 @@ export const DateRangeInput: React.FC<DateRangeInputProps> = ({
       return;
     }
     if (draftStart && !draftEnd) {
-      const s = iso < draftStart ? iso : draftStart;
-      const e = iso < draftStart ? draftStart : iso;
+      let s = iso < draftStart ? iso : draftStart;
+      let e = iso < draftStart ? draftStart : iso;
+      if (minDate) {
+        if (s < minDate) s = minDate;
+        if (e < minDate) e = minDate;
+        if (e < s) e = s;
+      }
       setDraftStart(s);
       setDraftEnd(e);
       onChange(s, e);
@@ -536,6 +556,11 @@ export const DateRangeInput: React.FC<DateRangeInputProps> = ({
 
       <div className="mb-2 text-xs text-gray-500 dark:text-gray-400">
         {pickingEnd ? 'Выберите дату окончания' : 'Выберите дату начала'}
+        {minDate ? (
+          <span className="block mt-1 text-[10px] text-gray-400 dark:text-gray-500">
+            Нельзя выбрать дату раньше {formatDisplayRu(minDate)}
+          </span>
+        ) : null}
       </div>
 
       {showMonthPicker ? (
@@ -569,10 +594,12 @@ export const DateRangeInput: React.FC<DateRangeInputProps> = ({
               const isStart = ordered.s === iso;
               const isEnd = ordered.e === iso;
               const inRange = ordered.s && ordered.e && iso > ordered.s && iso < ordered.e;
+              const dis = isBeforeMin(iso);
               return (
                 <button
                   key={idx}
                   type="button"
+                  disabled={dis}
                   onClick={() => pick(iso)}
                   className={`aspect-square max-h-9 rounded-lg text-xs font-medium transition-colors ${
                     !inMonth ? 'text-gray-300 dark:text-gray-600' : 'text-gray-800 dark:text-gray-200'
@@ -580,7 +607,7 @@ export const DateRangeInput: React.FC<DateRangeInputProps> = ({
                     inRange ? 'bg-indigo-100 dark:bg-indigo-950/40' : ''
                   } ${
                     isStart || isEnd ? 'bg-[#3337AD] text-white' : 'hover:bg-indigo-50 dark:hover:bg-indigo-950/30'
-                  }`}
+                  } ${dis ? 'opacity-40 cursor-not-allowed' : ''}`}
                 >
                   {d}
                 </button>

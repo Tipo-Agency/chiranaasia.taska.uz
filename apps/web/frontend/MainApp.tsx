@@ -274,9 +274,17 @@ export function MainApp() {
             currentView={state.currentView}
             currentUser={state.currentUser}
             searchQuery={state.searchQuery}
+            searchPlaceholder={
+              state.currentView === 'sales-funnel'
+                ? 'Поиск по сделкам в воронке'
+                : state.currentView === 'tasks'
+                  ? 'Поиск в задачах'
+                  : 'Поиск по системе…'
+            }
             onToggleDarkMode={actions.toggleDarkMode}
             onSearchChange={actions.setSearchQuery}
             onSearchFocus={() => {
+              if (state.currentView === 'sales-funnel' || state.currentView === 'tasks') return;
               if (state.currentView !== 'search') actions.setCurrentView('search');
             }}
             onOpenSystemChat={() => {
@@ -426,12 +434,11 @@ export function MainApp() {
             <ErrorBoundary>
               <AppRouter
                 currentView={state.currentView}
+                searchQuery={state.searchQuery}
                 viewMode={state.viewMode}
                 activeTableId={state.activeTableId}
                 activeTable={state.activeTable}
-                filteredTasks={state.tasks.filter((t) =>
-                  state.currentView === 'search' ? t.title.toLowerCase().includes(state.searchQuery.toLowerCase()) : true
-                )}
+                filteredTasks={state.tasks}
                 allTasks={state.tasks}
                 users={state.users}
                 currentUser={state.currentUser}
@@ -494,31 +501,9 @@ export function MainApp() {
         </div>
 
         {state.isTaskModalOpen &&
+          state.editingTask &&
           (() => {
-            const task = state.editingTask;
-
-            if (!task) {
-              return (
-                <TaskModal
-                  users={state.users}
-                  projects={state.projects}
-                  statuses={state.statuses}
-                  priorities={state.priorities}
-                  currentUser={state.currentUser}
-                  tables={state.tables}
-                  docs={state.docs}
-                  allTasks={state.tasks}
-                  onSave={actions.saveTask}
-                  onClose={actions.closeTaskModal}
-                  onCreateProject={actions.quickCreateProject}
-                  onDelete={actions.deleteTask}
-                  onAddComment={actions.addTaskComment}
-                  onAddAttachment={actions.addTaskAttachment}
-                  onAddDocAttachment={actions.addTaskDocAttachment}
-                  task={null}
-                />
-              );
-            }
+            const task = state.editingTask!;
 
             const table = state.tables.find((t) => t.id === task.tableId);
             const isIdea = table?.type === 'backlog' || task.entityType === 'idea';
@@ -570,6 +555,7 @@ export function MainApp() {
                 onAddComment={actions.addTaskComment}
                 onAddAttachment={actions.addTaskAttachment}
                 onAddDocAttachment={actions.addTaskDocAttachment}
+                onRemoveAttachment={actions.removeTaskAttachment}
                 task={task}
               />
             );

@@ -11,13 +11,51 @@ from starlette.requests import Request
 from starlette.responses import Response
 
 from app.core.api_errors import error_response
-from app.core.config import get_settings, parse_cors_origins
+from app.core.config import effective_browser_origin_allowlist, get_settings
 from app.core.request_context import reset_request_id_token, set_request_id_token
 
 
 def _trusted_origins() -> list[str]:
     s = get_settings()
-    return [o.strip().rstrip("/") for o in parse_cors_origins(s.CORS_ORIGINS)]
+    return effective_browser_origin_allowlist(s.CORS_ORIGINS, s.PUBLIC_BASE_URL)
+
+
+def _request_browser_origin(request: Request) -> str | None:
+    """Публичный origin за reverse-proxy — совпадает с Origin SPA на том же домене."""
+    xfh = (request.headers.get("x-forwarded-host") or "").strip()
+    host = (xfh.split(",")[0].strip() if xfh else (request.headers.get("host") or "").strip())
+    if not host:
+        return None
+    xfp = (request.headers.get("x-forwarded-proto") or "").strip()
+    proto = (xfp.split(",")[0].strip().lower() if xfp else (request.url.scheme or "https").lower())
+    if proto not in ("http", "https"):
+        proto = "https"
+    return f"{proto}://{host}".rstrip("/")
+
+
+def _origin_matches_request_public(request: Request, origin: str | None) -> bool:
+    if not origin:
+        return False
+    expected = _request_browser_origin(request)
+    if not expected:
+        return False
+    return origin.rstrip("/") == expected.rstrip("/")
+
+
+def _referer_matches_request_public(request: Request, referer: str | None) -> bool:
+    if not referer:
+        return False
+    expected = _request_browser_origin(request)
+    if not expected:
+        return False
+    try:
+        from urllib.parse import urlparse
+
+        p = urlparse(referer)
+        base = f"{p.scheme}://{p.netloc}".rstrip("/")
+        return base == expected.rstrip("/")
+    except Exception:
+        return False
 
 
 def _csp_value() -> str:
@@ -215,7 +253,12 @@ class CSRFMiddleware(BaseHTTPMiddleware):
         auth = request.headers.get("authorization") or ""
         csrf_header = (request.headers.get("X-CSRF-Token") or "").strip()
 
-        origin_ok = _origin_allowed(origin) or _referer_allowed(referer)
+        origin_ok = (
+            _origin_allowed(origin)
+            or _referer_allowed(referer)
+            or _origin_matches_request_public(request, origin)
+            or _referer_matches_request_public(request, referer)
+        )
         # Нет Origin/Referer: браузерные preflight/custom header; Bearer или X-CSRF-Token — признак не «голого» form POST
         if not origin_ok and not origin and not referer:
             if auth.startswith("Bearer ") or csrf_header:

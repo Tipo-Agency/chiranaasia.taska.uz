@@ -1,5 +1,6 @@
 import React, { lazy, Suspense } from 'react';
 import { TasksPage } from '../components/pages/TasksPage';
+import { SystemSearchView } from '../components/pages/SystemSearchView';
 import TableView from '../components/TableView';
 import { SpacesTabsView } from '../components/SpacesTabsView';
 import { RouteFallback } from '../components/ui/RouteFallback';
@@ -21,6 +22,7 @@ export function TaskRoutesView(props: TaskRoutesViewProps) {
     return (
       <TasksPage
         tasks={props.allTasks}
+        headerSearchQuery={props.searchQuery}
         users={props.users}
         projects={props.projects}
         statuses={props.statuses}
@@ -60,19 +62,14 @@ export function TaskRoutesView(props: TaskRoutesViewProps) {
 
   if (view === 'search') {
     return (
-      <TableView
-        tasks={props.filteredTasks}
-        users={props.users}
-        projects={props.projects}
-        statuses={props.statuses}
-        priorities={props.priorities}
-        tables={props.tables}
-        isAggregator={true}
-        currentUser={props.currentUser}
-        businessProcesses={props.businessProcesses}
-        onUpdateTask={(id, updates) => actions.saveTask({ id, ...updates })}
-        onDeleteTask={actions.deleteTask}
-        onOpenTask={actions.openTaskModal}
+      <SystemSearchView
+        query={props.searchQuery}
+        tasks={props.allTasks}
+        deals={props.deals}
+        clients={props.clients}
+        meetings={props.meetings}
+        docs={props.docs}
+        actions={actions}
       />
     );
   }

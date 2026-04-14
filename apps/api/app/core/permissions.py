@@ -11,6 +11,8 @@ FULL_ACCESS = "system.full_access"
 # Канонические ключи для ``Depends(require_permission(...))`` (см. also PERMISSION_GROUPS).
 PERM_TASKS_EDIT = "tasks.edit"
 PERM_CRM_DEALS_EDIT = "crm.deals.edit"
+# Доступ к воронке (карточки, стадии): POST/PATCH/DELETE одной сделки разрешены и с этим правом (см. deals router).
+PERM_CRM_SALES_FUNNEL = "crm.sales_funnel"
 PERM_FINANCE_APPROVE = "finance.approve"
 PERM_ORG_EMPLOYEES_EDIT = "org.employees.edit"
 

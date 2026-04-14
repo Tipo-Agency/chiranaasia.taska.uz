@@ -469,7 +469,7 @@ const BusinessProcessesView: React.FC<BusinessProcessesViewProps> = ({
     setModule(
       <div className={APP_TOOLBAR_MODULE_CLUSTER}>
         <ModuleFilterIconButton
-          accent="indigo"
+          accent="cyan"
           size="sm"
           active={bpmListFilterOpen || !!bpmSearchQuery.trim()}
           activeCount={bpmSearchQuery.trim() ? 1 : 0}
@@ -477,7 +477,7 @@ const BusinessProcessesView: React.FC<BusinessProcessesViewProps> = ({
           onClick={() => setBpmListFilterOpen((o) => !o)}
         />
         <ModuleCreateDropdown
-          accent="indigo"
+          accent="cyan"
           buttonSize="sm"
           items={[
             {
@@ -1467,7 +1467,7 @@ const BusinessProcessesView: React.FC<BusinessProcessesViewProps> = ({
               <p className="text-gray-500 dark:text-gray-400 text-sm mb-2">Нет своих шаблонов</p>
               <p className="text-xs text-gray-400 dark:text-gray-500 mb-4">Создайте первый шаблон процесса</p>
               <ModuleCreateDropdown
-                accent="indigo"
+                accent="cyan"
                 align="left"
                 items={[
                   {

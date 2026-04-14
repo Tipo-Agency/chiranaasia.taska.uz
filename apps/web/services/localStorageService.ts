@@ -70,6 +70,10 @@ export const uploadTaskAttachment = async (file: File, taskId: string): Promise<
   return uploadFile(file, `tasks/${taskId}/attachments/`);
 };
 
+export const uploadDealAttachment = async (file: File, dealId: string): Promise<UploadResult> => {
+  return uploadFile(file, `deals/${dealId}/attachments/`);
+};
+
 export const uploadDocument = async (file: File, docId?: string): Promise<UploadResult> => {
   const path = docId ? `documents/${docId}/` : "documents/";
   return uploadFile(file, path);

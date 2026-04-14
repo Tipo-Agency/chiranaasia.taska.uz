@@ -22,6 +22,8 @@ export interface AppHeaderProps {
   currentView: string;
   currentUser: User;
   searchQuery: string;
+  /** Подсказка в поле поиска (зависит от текущего раздела). */
+  searchPlaceholder?: string;
   onToggleDarkMode: () => void;
   onSearchChange: (query: string) => void;
   onSearchFocus: () => void;
@@ -37,6 +39,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
   currentView,
   currentUser,
   searchQuery,
+  searchPlaceholder = 'Поиск',
   onToggleDarkMode,
   onSearchChange,
   onSearchFocus,
@@ -116,7 +119,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
             />
             <input
               type="text"
-              placeholder="Поиск"
+              placeholder={searchPlaceholder}
               value={searchQuery}
               onChange={(e) => onSearchChange(e.target.value)}
               onKeyDown={(e) => {

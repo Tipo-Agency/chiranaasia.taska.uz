@@ -58,7 +58,7 @@ from app.core.api_errors import (
     first_validation_message,
     http_detail_to_message_and_details,
 )
-from app.core.config import get_settings, parse_cors_origins
+from app.core.config import effective_browser_origin_allowlist, get_settings
 from app.core.logging_handlers import RequestIdLogFilter, SystemLogHandler
 from app.core.observability import setup_observability
 from app.core.rate_limit import limiter
@@ -94,6 +94,10 @@ async def lifespan(app: FastAPI):
     try:
         command.upgrade(alembic_cfg, "head")
     except Exception as e:
+        env = (settings.ENVIRONMENT or "").strip().lower()
+        if env in ("production", "prod", "staging"):
+            print(f"Migration failed (fatal in {env}): {e}", file=sys.stderr)
+            raise
         print(f"Migration warning: {e}", file=sys.stderr)
 
     try:
@@ -214,7 +218,7 @@ app.add_exception_handler(Exception, _unhandled_exception_handler)
 # CORS: только явные origin из CORS_ORIGINS (wildcard * запрещён в Settings — иначе нельзя безопасно с credentials).
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=parse_cors_origins(settings.CORS_ORIGINS),
+    allow_origins=effective_browser_origin_allowlist(settings.CORS_ORIGINS, settings.PUBLIC_BASE_URL),
     allow_credentials=settings.CORS_ALLOW_CREDENTIALS,
     allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allow_headers=[

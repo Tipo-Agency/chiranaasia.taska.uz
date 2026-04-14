@@ -43,6 +43,19 @@ def upgrade() -> None:
         existing_type=sa.String(length=20),
         nullable=True,
     )
+    conn.execute(
+        sa.text(
+            """
+            UPDATE employee_infos e
+            SET user_id = NULL
+            WHERE user_id IS NOT NULL
+              AND (
+                btrim(user_id) = ''
+                OR NOT EXISTS (SELECT 1 FROM users u WHERE u.id = e.user_id)
+              )
+            """
+        )
+    )
     op.create_foreign_key(
         "fk_employee_infos_user_id_users",
         "employee_infos",

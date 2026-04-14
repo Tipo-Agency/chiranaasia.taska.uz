@@ -23,16 +23,7 @@ import {
 import { TableCollection, User } from '../types';
 import { LogoIcon, DynamicIcon } from './AppIcons';
 import { hasPermission } from '../utils/permissions';
-
-/** Подсветка активной иконки в стиле чипов верхнего меню */
-const ICON_ACTIVE: Record<string, string> = {
-  indigo: 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300',
-  violet: 'bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-300',
-  emerald: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300',
-  blue: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300',
-  orange: 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300',
-  slate: 'bg-slate-100 text-slate-700 dark:bg-slate-900/30 dark:text-slate-300',
-};
+import { MODULE_ACCENTS, type ModuleAccentKey } from './ui/moduleAccent';
 
 function NavIcon({
   active,
@@ -40,13 +31,14 @@ function NavIcon({
   children,
 }: {
   active: boolean;
-  accent: keyof typeof ICON_ACTIVE;
+  accent: ModuleAccentKey;
   children: React.ReactNode;
 }) {
+  const chip = MODULE_ACCENTS[accent].navIconActive;
   return (
     <span
       className={`flex shrink-0 items-center justify-center w-8 h-8 rounded-xl transition-colors ${
-        active ? ICON_ACTIVE[accent] : 'text-gray-500 dark:text-gray-400 group-hover:text-gray-700 dark:group-hover:text-gray-200'
+        active ? chip : 'text-gray-500 dark:text-gray-400 group-hover:text-gray-700 dark:group-hover:text-gray-200'
       }`}
     >
       {children}
@@ -184,7 +176,7 @@ const Sidebar: React.FC<SidebarProps> = ({
                 className={`group flex items-center ${isCollapsed ? 'justify-center' : 'gap-2'} ${isCollapsed ? 'px-2' : 'px-3'} py-1.5 rounded-lg cursor-pointer transition-colors ${currentView === 'tasks' ? 'text-gray-900 dark:text-white' : 'text-notion-text/70 dark:text-gray-400 hover:bg-notion-hover dark:hover:bg-[#252525] hover:text-notion-text dark:hover:text-gray-200'}`}
                 title={isCollapsed ? "Задачи" : ""}
             >
-                <NavIcon active={currentView === 'tasks'} accent="indigo"><CheckSquare size={18} /></NavIcon>
+                <NavIcon active={currentView === 'tasks'} accent="sky"><CheckSquare size={18} /></NavIcon>
                 {!isCollapsed && <span className={`text-sm ${currentView === 'tasks' ? 'font-semibold' : ''}`}>Задачи</span>}
             </div>
             )}
@@ -225,7 +217,7 @@ const Sidebar: React.FC<SidebarProps> = ({
                   }`}
                   title={isCollapsed ? 'Бизнес-процессы' : ''}
                 >
-                  <NavIcon active={currentView === 'business-processes'} accent="blue"><Network size={18} /></NavIcon>
+                  <NavIcon active={currentView === 'business-processes'} accent="cyan"><Network size={18} /></NavIcon>
                   {!isCollapsed && (
                     <span className={`text-sm ${currentView === 'business-processes' ? 'font-semibold' : ''}`}>Бизнес-процессы</span>
                   )}
@@ -240,7 +232,7 @@ const Sidebar: React.FC<SidebarProps> = ({
                     }`}
                     title={isCollapsed ? 'Производство' : ''}
                   >
-                    <NavIcon active={currentView === 'production'} accent="emerald"><Factory size={18} className="shrink-0" /></NavIcon>
+                    <NavIcon active={currentView === 'production'} accent="amber"><Factory size={18} className="shrink-0" /></NavIcon>
                     {!isCollapsed && <span className={`text-sm ${currentView === 'production' ? 'font-semibold' : ''}`}>Производство</span>}
                   </div>
                 )}
@@ -253,7 +245,7 @@ const Sidebar: React.FC<SidebarProps> = ({
                   }`}
                   title={isCollapsed ? 'Склад' : ''}
                 >
-                  <NavIcon active={currentView === 'inventory'} accent="emerald"><Package size={18} className="shrink-0" /></NavIcon>
+                  <NavIcon active={currentView === 'inventory'} accent="teal"><Package size={18} className="shrink-0" /></NavIcon>
                   {!isCollapsed && <span className={`text-sm ${currentView === 'inventory' ? 'font-semibold' : ''}`}>Склад</span>}
                 </div>
               </div>
@@ -268,7 +260,7 @@ const Sidebar: React.FC<SidebarProps> = ({
                 }`}
                 title={isCollapsed ? 'Бизнес-процессы' : ''}
               >
-                <NavIcon active={currentView === 'business-processes'} accent="blue"><Network size={18} /></NavIcon>
+                <NavIcon active={currentView === 'business-processes'} accent="cyan"><Network size={18} /></NavIcon>
                 {!isCollapsed && (
                   <span className={`text-sm ${currentView === 'business-processes' ? 'font-semibold' : ''}`}>Бизнес-процессы</span>
                 )}
@@ -284,7 +276,7 @@ const Sidebar: React.FC<SidebarProps> = ({
                 }`}
                 title={isCollapsed ? 'Склад' : ''}
               >
-                <NavIcon active={currentView === 'inventory'} accent="emerald"><Package size={18} /></NavIcon>
+                <NavIcon active={currentView === 'inventory'} accent="teal"><Package size={18} /></NavIcon>
                 {!isCollapsed && <span className={`text-sm ${currentView === 'inventory' ? 'font-semibold' : ''}`}>Склад</span>}
               </div>
             )}
@@ -298,7 +290,7 @@ const Sidebar: React.FC<SidebarProps> = ({
                 }`}
                 title={isCollapsed ? 'Производство' : ''}
               >
-                <NavIcon active={currentView === 'production'} accent="emerald"><Factory size={18} /></NavIcon>
+                <NavIcon active={currentView === 'production'} accent="amber"><Factory size={18} /></NavIcon>
                 {!isCollapsed && <span className={`text-sm ${currentView === 'production' ? 'font-semibold' : ''}`}>Производство</span>}
               </div>
             )}
@@ -328,7 +320,15 @@ const Sidebar: React.FC<SidebarProps> = ({
                   className={`group flex items-center ${isCollapsed ? 'justify-center' : 'gap-2'} ${isCollapsed ? 'px-2' : 'px-3'} py-1.5 rounded-lg cursor-pointer transition-colors ${(currentView === 'spaces' && activeSpaceTab === 'content-plan') || (currentView === 'table' && activeTableId && tables.find(t => t.id === activeTableId)?.type === 'content-plan') ? 'text-gray-900 dark:text-white' : 'text-notion-text/70 dark:text-gray-400 hover:bg-notion-hover dark:hover:bg-[#252525] hover:text-notion-text dark:hover:text-gray-200'}`}
                   title={isCollapsed ? 'Пространство' : ''}
                 >
-                  <NavIcon active={(currentView === 'spaces' && activeSpaceTab === 'content-plan') || (currentView === 'table' && activeTableId && tables.find(t => t.id === activeTableId)?.type === 'content-plan')} accent="indigo"><Layers size={18} /></NavIcon>
+                  <NavIcon
+                    active={
+                      (currentView === 'spaces' && activeSpaceTab === 'content-plan') ||
+                      (currentView === 'table' && activeTableId && tables.find((t) => t.id === activeTableId)?.type === 'content-plan')
+                    }
+                    accent="indigo"
+                  >
+                    <Layers size={18} />
+                  </NavIcon>
                   {!isCollapsed && <span className={`text-sm ${((currentView === 'spaces' && activeSpaceTab === 'content-plan') || (currentView === 'table' && activeTableId && tables.find(t => t.id === activeTableId)?.type === 'content-plan')) ? 'font-semibold' : ''}`}>Пространство</span>}
                 </div>
               </div>

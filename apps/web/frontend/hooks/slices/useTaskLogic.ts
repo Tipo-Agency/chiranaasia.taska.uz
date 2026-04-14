@@ -128,8 +128,8 @@ export const useTaskLogic = (showNotification: (msg: string) => void, currentUse
                 endDate: isTask ? (taskData.endDate || createdAtDate) : taskData.endDate,
                 isArchived: false,
                 description: taskData.description,
-                comments: [],
-                attachments: [],
+                comments: taskData.comments || [],
+                attachments: taskData.attachments || [],
                 contentPostId: taskData.contentPostId,
                 processId: taskData.processId,
                 processInstanceId: taskData.processInstanceId,
@@ -143,10 +143,22 @@ export const useTaskLogic = (showNotification: (msg: string) => void, currentUse
                 linkedFeatureId: taskData.linkedFeatureId,
                 linkedIdeaId: (taskData as any).linkedIdeaId,
             };
+            if (newTask.source && currentUser) {
+              const systemMessage = `Создана задача из контент-плана "${newTask.source}"`;
+              const systemComment: TaskComment = {
+                id: `tc-system-${Date.now()}`,
+                taskId: newTask.id,
+                userId: currentUser.id,
+                text: systemMessage,
+                createdAt: new Date().toISOString(),
+                isSystem: true,
+              };
+              newTask.comments = [systemComment, ...(newTask.comments || [])];
+            }
             updatedTasks = [...tasks, newTask];
-            
+
             if (currentUser) {
-                const assigneeUser = users.find(u => u.id === newTask.assigneeId) || null;
+                const assigneeUser = users.find((u) => u.id === newTask.assigneeId) || null;
                 const context: NotificationContext = {
                     currentUser,
                     allUsers: users,
@@ -177,8 +189,8 @@ export const useTaskLogic = (showNotification: (msg: string) => void, currentUse
             endDate: isTask ? (taskData.endDate || createdAtDate) : taskData.endDate,
             isArchived: false,
             description: taskData.description,
-            comments: [],
-            attachments: [],
+            comments: taskData.comments || [],
+            attachments: taskData.attachments || [],
             contentPostId: taskData.contentPostId,
             processId: taskData.processId,
             processInstanceId: taskData.processInstanceId,
@@ -194,7 +206,7 @@ export const useTaskLogic = (showNotification: (msg: string) => void, currentUse
             linkedIdeaId: (taskData as any).linkedIdeaId,
         };
         
-        // Если задача создана из контент-плана, добавляем системное сообщение
+        // Если задача создана из контент-плана — системное сообщение в начало (не затирая комментарии к вложениям)
         if (newTask.source && currentUser) {
             const systemMessage = `Создана задача из контент-плана "${newTask.source}"`;
             const systemComment: TaskComment = {
@@ -205,7 +217,7 @@ export const useTaskLogic = (showNotification: (msg: string) => void, currentUse
                 createdAt: new Date().toISOString(),
                 isSystem: true
             };
-            newTask.comments = [systemComment];
+            newTask.comments = [systemComment, ...(newTask.comments || [])];
         }
         
         updatedTasks = [...tasks, newTask];
@@ -271,7 +283,7 @@ export const useTaskLogic = (showNotification: (msg: string) => void, currentUse
 
           if (onSaveDoc) {
               try {
-                  const task = tasks.find(t => t.id === taskId);
+                  const task = tasks.find((t) => t.id === taskId) || editingTask;
                   const docTitle = `${file.name} (из задачи: ${task?.title || 'Без названия'})`;
                   const newDoc = onSaveDoc({
                       title: docTitle,
@@ -297,24 +309,28 @@ export const useTaskLogic = (showNotification: (msg: string) => void, currentUse
               attachmentId: attachmentId
           };
 
-          const tasksFinal = tasks.map(t => {
+          const taskExists = tasks.some((t) => t.id === taskId);
+          if (taskExists) {
+            const tasksFinal = tasks.map((t) => {
               if (t.id !== taskId) return t;
               return {
-                  ...t,
-                  attachments: [...(t.attachments || []), attachment],
-                  comments: [...(t.comments || []), comment],
+                ...t,
+                attachments: [...(t.attachments || []), attachment],
+                comments: [...(t.comments || []), comment],
               };
-          });
-          setTasks(tasksFinal);
-          api.tasks.updateAll(tasksFinal).catch(() => showNotification('Ошибка сохранения задачи'));
-
-          if (editingTask && editingTask.id === taskId) {
-              setEditingTask({
-                  ...editingTask,
-                  attachments: [...(editingTask.attachments || []), attachment],
-                  comments: [...(editingTask.comments || []), comment],
-              });
+            });
+            setTasks(tasksFinal);
+            api.tasks.updateAll(tasksFinal).catch(() => showNotification('Ошибка сохранения задачи'));
           }
+
+          setEditingTask((prev) => {
+            if (!prev || prev.id !== taskId) return prev;
+            return {
+              ...prev,
+              attachments: [...(prev.attachments || []), attachment],
+              comments: [...(prev.comments || []), comment],
+            };
+          });
 
           showNotification('Файл загружен и добавлен в документы');
       } catch (error) {
@@ -348,24 +364,50 @@ export const useTaskLogic = (showNotification: (msg: string) => void, currentUse
           attachmentId: attachment.id
       };
 
-      const tasksFinal = tasks.map(t => {
+      const taskExists = tasks.some((t) => t.id === taskId);
+      if (taskExists) {
+        const tasksFinal = tasks.map((t) => {
           if (t.id !== taskId) return t;
           return {
-              ...t,
-              attachments: [...(t.attachments || []), attachment],
-              comments: [...(t.comments || []), comment],
+            ...t,
+            attachments: [...(t.attachments || []), attachment],
+            comments: [...(t.comments || []), comment],
           };
+        });
+        setTasks(tasksFinal);
+        api.tasks.updateAll(tasksFinal).catch(() => showNotification('Ошибка сохранения задачи'));
+      }
+
+      setEditingTask((prev) => {
+        if (!prev || prev.id !== taskId) return prev;
+        return {
+          ...prev,
+          attachments: [...(prev.attachments || []), attachment],
+          comments: [...(prev.comments || []), comment],
+        };
+      });
+  };
+
+  const removeTaskAttachment = (taskId: string, attachmentId: string) => {
+    const strip = (att: TaskAttachment[] | undefined, com: TaskComment[] | undefined) => ({
+      attachments: (att || []).filter((a) => a.id !== attachmentId),
+      comments: (com || []).filter((c) => c.attachmentId !== attachmentId),
+    });
+    const taskExists = tasks.some((t) => t.id === taskId);
+    if (taskExists) {
+      const tasksFinal = tasks.map((t) => {
+        if (t.id !== taskId) return t;
+        const { attachments, comments } = strip(t.attachments, t.comments);
+        return { ...t, attachments, comments };
       });
       setTasks(tasksFinal);
       api.tasks.updateAll(tasksFinal).catch(() => showNotification('Ошибка сохранения задачи'));
-
-      if (editingTask && editingTask.id === taskId) {
-          setEditingTask({
-              ...editingTask,
-              attachments: [...(editingTask.attachments || []), attachment],
-              comments: [...(editingTask.comments || []), comment],
-          });
-      }
+    }
+    setEditingTask((prev) => {
+      if (!prev || prev.id !== taskId) return prev;
+      const { attachments, comments } = strip(prev.attachments, prev.comments);
+      return { ...prev, attachments, comments };
+    });
   };
 
   const deleteTask = (taskId: string) => {
@@ -402,8 +444,17 @@ export const useTaskLogic = (showNotification: (msg: string) => void, currentUse
     actions: {
         updateProjects, updateStatuses, updatePriorities, quickCreateProject,
         saveTask, deleteTask, restoreTask, permanentDeleteTask,
-        addTaskComment, addTaskAttachment, addTaskDocAttachment,
-        openTaskModal: (task: Partial<Task> | null) => { setEditingTask(task); setIsTaskModalOpen(true); },
+        addTaskComment, addTaskAttachment, addTaskDocAttachment, removeTaskAttachment,
+        openTaskModal: (task: Partial<Task> | null) => {
+          if (task === null) {
+            setEditingTask({ id: `task-${Date.now()}`, entityType: 'task' });
+          } else if (!task.id) {
+            setEditingTask({ ...task, id: `task-${Date.now()}` });
+          } else {
+            setEditingTask(task);
+          }
+          setIsTaskModalOpen(true);
+        },
         closeTaskModal: () => setIsTaskModalOpen(false)
     }
   };

@@ -46,7 +46,7 @@ def _public_row_to_post(row: ContentPost) -> PublicContentPostRead:
         platform=platforms,
         format=row.format or "",
         status=row.status or "",
-        post_copy=row.copy,
+        post_copy=getattr(row, "copy", None),
         mediaUrl=row.media_url,
     )
 

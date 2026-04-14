@@ -1,11 +1,15 @@
 
 import { useState } from 'react';
-import { Client, Deal, Contract, OneTimeDeal, EmployeeInfo, AccountsReceivable } from '../../../types';
+import { Client, Deal, Contract, OneTimeDeal, EmployeeInfo, AccountsReceivable, User } from '../../../types';
 import { api } from '../../../backend/api';
+import { dealFromApi, dealToApiCreate, dealToApiPatch } from '../../../services/apiClient';
 import { createSaveHandler, createDeleteHandler, saveItem } from '../../../utils/crudUtils';
 import { NOTIFICATION_MESSAGES } from '../../../constants/messages';
 
-export const useCRMLogic = (showNotification: (msg: string) => void) => {
+export const useCRMLogic = (
+  showNotification: (msg: string) => void,
+  getCurrentUser: () => User | null | undefined,
+) => {
   const [clients, setClients] = useState<Client[]>([]);
   const [deals, setDeals] = useState<Deal[]>([]); // CRM воронка
   const [contracts, setContracts] = useState<Contract[]>([]);
@@ -71,19 +75,55 @@ export const useCRMLogic = (showNotification: (msg: string) => void) => {
     });
   };
 
-  // CRM deals
-  const saveDeal = createSaveHandler(
-    setDeals,
-    api.deals.updateAll,
-    showNotification,
-    'Сделка сохранена'
-  );
-  const deleteDeal = createDeleteHandler(
-    setDeals,
-    api.deals.updateAll,
-    showNotification,
-    'Сделка удалена'
-  );
+  // CRM deals — POST/PATCH (не массовый PUT): совпадает с правами воронки на бэкенде.
+  const saveDeal = (item: Deal) => {
+    setDeals((prevItems) => {
+      const existedBefore = prevItems.some((x) => x.id === item.id);
+      const now = new Date().toISOString();
+      const snapshot = [...prevItems];
+      const itemWithTimestamp: Deal = {
+        ...item,
+        updatedAt: now,
+        createdAt: item.createdAt || (existedBefore ? item.createdAt : now),
+      } as Deal;
+      const optimistic = saveItem(prevItems, itemWithTimestamp);
+      const uid = getCurrentUser()?.id;
+      void (async () => {
+        try {
+          const raw = existedBefore
+            ? await api.deals.update(item.id, dealToApiPatch(itemWithTimestamp, uid))
+            : await api.deals.create(dealToApiCreate(itemWithTimestamp, uid));
+          const saved = dealFromApi(raw as Record<string, unknown>);
+          setDeals((p) => saveItem(p, { ...saved, updatedAt: saved.updatedAt || now }));
+          showNotification('Сделка сохранена');
+        } catch {
+          setDeals(snapshot);
+          showNotification('Ошибка сохранения. Проверьте подключение и повторите.');
+        }
+      })();
+      return optimistic;
+    });
+  };
+
+  const deleteDeal = (id: string) => {
+    setDeals((prevItems) => {
+      const snapshot = [...prevItems];
+      const now = new Date().toISOString();
+      const updated = prevItems.map((item) =>
+        item.id === id ? { ...item, isArchived: true, updatedAt: now } : item
+      );
+      void (async () => {
+        try {
+          await api.deals.delete(id);
+          showNotification('Сделка удалена');
+        } catch {
+          setDeals(snapshot);
+          showNotification('Ошибка удаления. Проверьте подключение и повторите.');
+        }
+      })();
+      return updated;
+    });
+  };
   
   // Contracts / one-time sales
   const saveContractBase = createSaveHandler(

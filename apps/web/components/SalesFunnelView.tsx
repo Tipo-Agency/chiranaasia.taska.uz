@@ -1,7 +1,51 @@
 
 import React, { useState, useEffect, useLayoutEffect, useMemo, useRef } from 'react';
-import { Deal, Client, User, Comment, Task, Project, SalesFunnel, Meeting, NotificationPreferences } from '../types';
-import { Plus, KanbanSquare, X, Send, MessageSquare, MessageCircle, Instagram, Globe, UserPlus, Bot, Edit2, TrendingUp, CheckSquare, CheckCircle2, XCircle, Trash2, Calendar, Clock, Users, Tag, GitBranch, Filter, User as UserIcon, Building2, Briefcase, FileText, AlertCircle, Check } from 'lucide-react';
+import {
+  Deal,
+  DealAttachment,
+  Client,
+  User,
+  Comment,
+  Task,
+  Project,
+  SalesFunnel,
+  Meeting,
+  NotificationPreferences,
+} from '../types';
+import {
+  Plus,
+  KanbanSquare,
+  X,
+  Send,
+  MessageSquare,
+  MessageCircle,
+  Instagram,
+  Globe,
+  UserPlus,
+  Bot,
+  Edit2,
+  TrendingUp,
+  CheckSquare,
+  CheckCircle2,
+  XCircle,
+  Trash2,
+  Calendar,
+  Clock,
+  Users,
+  Tag,
+  GitBranch,
+  Filter,
+  User as UserIcon,
+  Building2,
+  Briefcase,
+  FileText,
+  AlertCircle,
+  Check,
+  Paperclip,
+  File as FileIcon,
+  Download,
+  Image as ImageIcon,
+} from 'lucide-react';
 // Клиентский Telegram/Instagram — при необходимости подключать через api/telegramService.
 import { DynamicIcon } from './AppIcons';
 import {
@@ -20,6 +64,7 @@ import { DateInput } from './ui/DateInput';
 import { TaskSelect } from './TaskSelect';
 import { api } from '../backend/api';
 import { isFunnelDeal } from '../utils/dealModel';
+import { normalizeHeaderSearchQuery, rowMatchesHeaderSearch } from '../utils/headerSearchMatch';
 import {
   canSendExternalTelegram,
   dealChatInputPlaceholder,
@@ -27,6 +72,7 @@ import {
   shouldSyncTelegramDealMessages,
 } from '../utils/dealChatIntegration';
 import { getFunnelKanbanCardAccent } from '../utils/funnelVisual';
+import { uploadDealAttachment } from '../services/localStorageService';
 import { devWarn } from '../utils/devLog';
 import { formatDate } from '../utils/dateUtils';
 import { useAppToolbar } from '../contexts/AppToolbarContext';
@@ -42,6 +88,8 @@ interface SalesFunnelViewProps {
   tasks?: Task[];
   meetings?: Meeting[];
   salesFunnels?: SalesFunnel[];
+  /** Фильтр карточек по строке поиска в шапке (только сделки воронки). */
+  headerSearchQuery?: string;
   onSaveDeal: (deal: Deal) => void;
   onDeleteDeal: (id: string) => void;
   onCreateTask?: (task: Partial<Task>) => void;
@@ -62,12 +110,45 @@ const STAGES = [
     { id: 'negotiation', label: 'Переговоры', color: 'bg-orange-200 dark:bg-orange-900' },
 ];
 
-const SalesFunnelView: React.FC<SalesFunnelViewProps> = ({ deals, clients, users, projects = [], tasks = [], meetings = [], salesFunnels = [], currentUser, onSaveDeal, onDeleteDeal, onCreateTask, onCreateClient, onOpenTask, onSaveMeeting, onDeleteMeeting, onUpdateMeetingSummary, autoOpenCreateModal = false, forcedViewMode }) => {
+/** Поле «Контакт» в карточке сделки — только цифры номера (хранится в deal.contactName). */
+const DEAL_PHONE_MIN_DIGITS = 9;
+const DEAL_PHONE_MAX_DIGITS = 15;
+
+function dealContactDigits(raw: string): string {
+  return raw.replace(/\D/g, '').slice(0, DEAL_PHONE_MAX_DIGITS);
+}
+
+function isDealContactPhoneValid(raw: string): boolean {
+  const n = dealContactDigits(raw).length;
+  return n >= DEAL_PHONE_MIN_DIGITS && n <= DEAL_PHONE_MAX_DIGITS;
+}
+
+/** Подпись для названия задачи и т.п.: компания или ФИО, не телефон из contactName. */
+function clientCompanyOrNameLabel(
+  deal: Deal,
+  clientsList: Client[],
+  dealClientNameField: string
+): string {
+  if (deal.clientId) {
+    const c = clientsList.find((x) => x.id === deal.clientId);
+    if (c) {
+      const label = (c.companyName?.trim() || c.name?.trim() || '').trim();
+      if (label) return label;
+    }
+  }
+  const fromForm = dealClientNameField.trim();
+  if (fromForm) return fromForm;
+  return (deal.title || '').trim() || 'Клиент';
+}
+
+const SalesFunnelView: React.FC<SalesFunnelViewProps> = ({ deals, clients, users, projects = [], tasks = [], meetings = [], salesFunnels = [], currentUser, headerSearchQuery = '', onSaveDeal, onDeleteDeal, onCreateTask, onCreateClient, onOpenTask, onSaveMeeting, onDeleteMeeting, onUpdateMeetingSummary, autoOpenCreateModal = false, forcedViewMode }) => {
   const { setModule } = useAppToolbar();
   const [funnelMenuOpen, setFunnelMenuOpen] = useState(false);
   const [viewMode, setViewMode] = useState<'kanban' | 'list' | 'rejected'>(forcedViewMode || 'kanban');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingDeal, setEditingDeal] = useState<Deal | null>(null);
+  const [dealAttachments, setDealAttachments] = useState<DealAttachment[]>([]);
+  const dealFileInputRef = useRef<HTMLInputElement>(null);
   const [modalTab, setModalTab] = useState<'chat' | 'tasks' | 'meetings'>('chat');
 
   const [title, setTitle] = useState('');
@@ -151,16 +232,19 @@ const SalesFunnelView: React.FC<SalesFunnelViewProps> = ({ deals, clients, users
     return STAGES.map((s) => ({ id: s.id, label: s.label, color: s.color }));
   }, [activeFunnels, salesFunnels, selectedFunnelIds]);
 
-  // Подсказка: к какой воронке принадлежит stage.id (используем для открытия/дропа в канбане)
+  // К какой воронке относится stage.id — только среди выбранных воронок (иначе при одинаковых id
+  // стадий в разных воронках map перезаписывался и onDrop блокировал перенос).
   const stageToFunnelId = useMemo(() => {
     const map = new Map<string, string>();
-    activeFunnels.forEach((f) => {
-      (f.stages || []).forEach((s) => {
-        map.set(s.id, f.id);
+    activeFunnels
+      .filter((f) => selectedFunnelIds.includes(f.id))
+      .forEach((f) => {
+        (f.stages || []).forEach((s) => {
+          map.set(s.id, f.id);
+        });
       });
-    });
     return map;
-  }, [activeFunnels]);
+  }, [activeFunnels, selectedFunnelIds]);
 
   // Получаем основную воронку из настроек
   useEffect(() => {
@@ -200,22 +284,42 @@ const SalesFunnelView: React.FC<SalesFunnelViewProps> = ({ deals, clients, users
     return () => window.removeEventListener('openCreateDealModal', handleOpenModal);
   }, []);
 
-  const funnelDeals = useMemo(() => deals.filter((d) => !d.isArchived && isFunnelDeal(d)), [deals]);
+  const allFunnelDeals = useMemo(() => deals.filter((d) => !d.isArchived && isFunnelDeal(d)), [deals]);
 
-  // Открытие сделки из контекста чата
+  const headerSearchNorm = useMemo(() => normalizeHeaderSearchQuery(headerSearchQuery), [headerSearchQuery]);
+
+  const funnelDeals = useMemo(() => {
+    if (!headerSearchNorm) return allFunnelDeals;
+    return allFunnelDeals.filter((d) => {
+      const c = d.clientId ? clients.find((cl) => cl.id === d.clientId) : undefined;
+      return rowMatchesHeaderSearch(headerSearchNorm, [
+        d.title,
+        d.contactName,
+        d.notes,
+        d.number,
+        d.telegramUsername,
+        c?.name,
+        c?.companyName,
+        c?.phone,
+        c?.email,
+      ]);
+    });
+  }, [allFunnelDeals, headerSearchNorm, clients]);
+
+  // Открытие сделки из контекста чата (полный список воронки, не только отфильтрованный поиском)
   useEffect(() => {
     const handleOpenDealById = (event: Event) => {
       const custom = event as CustomEvent<{ dealId?: string }>;
       const dealId = custom.detail?.dealId;
       if (!dealId) return;
-      const target = funnelDeals.find((d) => d.id === dealId);
+      const target = allFunnelDeals.find((d) => d.id === dealId);
       if (!target) return;
       if (target.funnelId && selectedFunnelId !== 'all') setSelectedFunnelId(String(target.funnelId));
       handleOpenEdit(target);
     };
     window.addEventListener('openDealFromChat', handleOpenDealById as EventListener);
     return () => window.removeEventListener('openDealFromChat', handleOpenDealById as EventListener);
-  }, [funnelDeals, selectedFunnelId]);
+  }, [allFunnelDeals, selectedFunnelId]);
 
   useEffect(() => {
     void api.integrationsTelegramPersonal
@@ -258,9 +362,10 @@ const SalesFunnelView: React.FC<SalesFunnelViewProps> = ({ deals, clients, users
     setDealProjectId('');
     setAssigneeId(users[0]?.id || ''); 
     setNotes('');
-    setComments([]); 
+    setComments([]);
+    setDealAttachments([]);
     setModalTab('chat');
-    setIsModalOpen(true); 
+    setIsModalOpen(true);
   };
 
   const handleOpenCreateRef = useRef(handleOpenCreate);
@@ -274,7 +379,7 @@ const SalesFunnelView: React.FC<SalesFunnelViewProps> = ({ deals, clients, users
     if (forcedViewMode && viewMode !== forcedViewMode) {
       setViewMode(forcedViewMode);
     }
-    const violet = 'bg-[#3337AD] text-white shadow-sm';
+    const segmentActive = MODULE_ACCENTS.violet.segmentActive;
     const idle = 'text-gray-500 dark:text-gray-400';
     setModule(
       <div className={APP_TOOLBAR_MODULE_CLUSTER}>
@@ -379,7 +484,7 @@ const SalesFunnelView: React.FC<SalesFunnelViewProps> = ({ deals, clients, users
                 aria-selected={viewMode === t.id}
                 onClick={() => setViewMode(t.id)}
                 className={`px-2 py-1 rounded-lg text-[11px] sm:text-xs font-medium whitespace-nowrap shrink-0 transition-colors ${
-                  viewMode === t.id ? violet : `${idle} hover:bg-gray-100 dark:hover:bg-[#252525]`
+                  viewMode === t.id ? segmentActive : `${idle} hover:bg-gray-100 dark:hover:bg-[#252525]`
                 }`}
               >
                 {t.label}
@@ -395,10 +500,9 @@ const SalesFunnelView: React.FC<SalesFunnelViewProps> = ({ deals, clients, users
   const handleOpenEdit = (d: Deal) => { 
     setEditingDeal(d); 
     setTitle(d.title); 
-    // Если есть clientId, получаем название клиента, иначе используем contactName или title
     const client = d.clientId ? clients.find(c => c.id === d.clientId) : null;
-    setClientName(client ? client.name : (d.contactName || d.title || '')); 
-    setContactName(d.contactName || ''); 
+    setClientName(client ? client.name : (d.title || '').trim());
+    setContactName(dealContactDigits(d.contactName || '')); 
     setAmount(d.amount.toString()); 
     setStage(d.stage); 
     setFunnelId(d.funnelId || ''); 
@@ -406,9 +510,10 @@ const SalesFunnelView: React.FC<SalesFunnelViewProps> = ({ deals, clients, users
     setAssigneeId(d.assigneeId); 
     setSource(d.source || 'manual'); 
     setNotes(d.notes || '');
-    setComments(d.comments || []); 
+    setComments(d.comments || []);
+    setDealAttachments(d.attachments ?? []);
     setModalTab('chat');
-    setIsModalOpen(true); 
+    setIsModalOpen(true);
   };
 
   /** Смена воронки в модалке: подставляем первый этап, если текущий этап не из этой воронки */
@@ -434,7 +539,17 @@ const SalesFunnelView: React.FC<SalesFunnelViewProps> = ({ deals, clients, users
               setAlertState({ open: true, title: 'Проверьте данные', message: 'Пожалуйста, введите название сделки.' });
               return;
           }
-          
+
+          const phoneDigits = dealContactDigits(contactName);
+          if (!isDealContactPhoneValid(contactName)) {
+              setAlertState({
+                  open: true,
+                  title: 'Проверьте данные',
+                  message: `Укажите номер телефона в поле «Контакт»: только цифры, от ${DEAL_PHONE_MIN_DIGITS} до ${DEAL_PHONE_MAX_DIGITS} знаков.`,
+              });
+              return;
+          }
+
           // Если воронка не указана, используем выбранные воронки (первую) или настройки
           let finalFunnelId = funnelId || primaryFunnelId;
           if (!finalFunnelId) {
@@ -473,7 +588,7 @@ const SalesFunnelView: React.FC<SalesFunnelViewProps> = ({ deals, clients, users
               id: prev?.id ?? `deal-${Date.now()}`,
               title: trimmedTitle,
               clientId: prev?.clientId,
-              contactName: contactName.trim() || undefined,
+              contactName: phoneDigits,
               amount: parseFloat(amount) || 0,
               currency: prev?.currency || 'UZS',
               stage: finalStage,
@@ -487,6 +602,8 @@ const SalesFunnelView: React.FC<SalesFunnelViewProps> = ({ deals, clients, users
               createdAt: prev?.createdAt ?? new Date().toISOString(),
               comments: comments || [],
               updatedAt: new Date().toISOString(),
+              customFields: prev?.customFields,
+              attachments: dealAttachments,
           };
           
           onSaveDeal(dealData);
@@ -495,6 +612,66 @@ const SalesFunnelView: React.FC<SalesFunnelViewProps> = ({ deals, clients, users
           devWarn('[DEAL] Error saving deal:', error);
           setAlertState({ open: true, title: 'Ошибка сохранения', message: 'Произошла ошибка при сохранении сделки. Попробуйте еще раз.' });
       }
+  };
+
+  const canAttachDealFiles = Boolean(editingDeal && deals.some((x) => x.id === editingDeal.id));
+
+  const handleDealFileInputChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file || !editingDeal) return;
+    if (!deals.some((x) => x.id === editingDeal.id)) {
+      setAlertState({
+        open: true,
+        title: 'Сохраните сделку',
+        message:
+          'Сначала нажмите «Сохранить» внизу формы, чтобы сделка попала в воронку. После этого можно прикреплять файлы.',
+      });
+      return;
+    }
+    try {
+      const res = await uploadDealAttachment(file, editingDeal.id);
+      const id = `datt-${Date.now()}`;
+      const next: DealAttachment = {
+        id,
+        dealId: editingDeal.id,
+        name: file.name,
+        url: res.url,
+        type: (file.type && file.type.split('/')[0]) || 'file',
+        uploadedAt: new Date().toISOString(),
+        attachmentType: 'file',
+        storagePath: res.path,
+      };
+      const merged = [...dealAttachments, next];
+      setDealAttachments(merged);
+      const updated: Deal = {
+        ...editingDeal,
+        attachments: merged,
+        updatedAt: new Date().toISOString(),
+      };
+      setEditingDeal(updated);
+      onSaveDeal(updated);
+    } catch (err) {
+      devWarn('[DEAL] attachment upload failed', err);
+      setAlertState({
+        open: true,
+        title: 'Не удалось загрузить файл',
+        message: err instanceof Error ? err.message : 'Проверьте размер файла и свободное место в браузере.',
+      });
+    }
+  };
+
+  const removeDealAttachment = (attId: string) => {
+    if (!editingDeal) return;
+    const merged = dealAttachments.filter((a) => a.id !== attId);
+    setDealAttachments(merged);
+    const updated: Deal = {
+      ...editingDeal,
+      attachments: merged,
+      updatedAt: new Date().toISOString(),
+    };
+    setEditingDeal(updated);
+    onSaveDeal(updated);
   };
 
   const handleSendChat = async () => {
@@ -508,8 +685,14 @@ const SalesFunnelView: React.FC<SalesFunnelViewProps> = ({ deals, clients, users
       const applyUpdatedDeal = (updated: Deal) => {
         const next = updated.comments || [];
         setComments(next);
-        setEditingDeal((prev) => (prev && prev.id === updated.id ? { ...prev, ...updated, comments: next } : prev));
-        onSaveDeal({ ...deal, ...updated, comments: next });
+        const mergedAtt = updated.attachments ?? deal.attachments ?? [];
+        setEditingDeal((prev) =>
+          prev && prev.id === updated.id
+            ? { ...prev, ...updated, comments: next, attachments: mergedAtt }
+            : prev
+        );
+        setDealAttachments(mergedAtt);
+        onSaveDeal({ ...deal, ...updated, comments: next, attachments: mergedAtt });
         setChatMessage('');
       };
 
@@ -578,7 +761,7 @@ const SalesFunnelView: React.FC<SalesFunnelViewProps> = ({ deals, clients, users
     e.preventDefault(); 
     if(!draggedDealId) return;
 
-    const d = funnelDeals.find((x) => x.id === draggedDealId);
+    const d = allFunnelDeals.find((x) => x.id === draggedDealId);
     if(!d) {
       setDraggedDealId(null);
       return;
@@ -592,13 +775,15 @@ const SalesFunnelView: React.FC<SalesFunnelViewProps> = ({ deals, clients, users
     const stageFunnelId = stageToFunnelId.get(String(stage));
     const isWonLost = stage === 'won' || stage === 'lost';
 
-    // Если это stage из конкретной воронки — сделка может попасть туда только если stage существует в её воронке
-    if(!isWonLost) {
-      if(d.funnelId) {
-        if(stageFunnelId && stageFunnelId !== d.funnelId) {
-          setDraggedDealId(null);
-          return;
-        }
+    // Запрет только если целевой этап не входит в воронку этой сделки (не сравниваем с глобальным
+    // stageToFunnelId при дублирующихся id стадий у разных воронок).
+    if (!isWonLost && d.funnelId) {
+      const dealFunnel =
+        activeFunnels.find((f) => f.id === d.funnelId) || salesFunnels.find((f) => f.id === d.funnelId);
+      const stageIdsInDealFunnel = (dealFunnel?.stages || []).map((st) => String(st.id));
+      if (stageIdsInDealFunnel.length > 0 && !stageIdsInDealFunnel.includes(String(stage))) {
+        setDraggedDealId(null);
+        return;
       }
     }
 
@@ -610,17 +795,16 @@ const SalesFunnelView: React.FC<SalesFunnelViewProps> = ({ deals, clients, users
     if (stage === 'won' && onCreateClient) {
       const existingClient = d.clientId ? clients.find((c) => c.id === d.clientId) : null;
       if (!existingClient) {
-        // Используем название клиента из сделки (если было введено) или название сделки
-        const clientName = d.contactName || d.title;
+        const phoneDigits = dealContactDigits(d.contactName || '');
+        const displayName = (d.title || '').trim() || 'Клиент';
         const client: Client = {
           id: `cl-${Date.now()}`,
-          name: clientName,
-          phone: undefined,
+          name: displayName,
+          phone: phoneDigits || undefined,
           email: undefined,
           telegram: d.telegramUsername,
           instagram: d.source === 'instagram' ? d.telegramUsername : undefined,
-          companyName:
-            d.contactName && d.title && d.title !== clientName ? d.title : undefined,
+          companyName: undefined,
           notes: [d.notes, `Создано из сделки: ${d.title}. Сумма: ${d.amount} ${d.currency}`]
             .filter(Boolean)
             .join('\n\n'),
@@ -638,13 +822,12 @@ const SalesFunnelView: React.FC<SalesFunnelViewProps> = ({ deals, clients, users
   
   const handleCreateTask = (taskTitle: string) => {
     if (!onCreateTask || !editingDeal) return;
-    
-    // Получаем название компании из сделки (contactName или title)
-    const companyName = editingDeal.contactName || editingDeal.title;
-    
+
+    const clientLabel = clientCompanyOrNameLabel(editingDeal, clients, clientName);
+
     const task: Partial<Task> = {
       entityType: 'task',
-      title: `${taskTitle.trim()} - ${companyName}`,
+      title: `${taskTitle.trim()} - ${clientLabel}`,
       description: `Задача по сделке: ${editingDeal.title}`,
       status: 'Не начато',
       priority: 'Средний',
@@ -687,17 +870,26 @@ const SalesFunnelView: React.FC<SalesFunnelViewProps> = ({ deals, clients, users
 
   const handleMarkAsWon = () => {
     if (!editingDeal) return;
-    
+
+    const phoneDigits = dealContactDigits(contactName);
+    if (!isDealContactPhoneValid(contactName)) {
+      setAlertState({
+        open: true,
+        title: 'Проверьте данные',
+        message: `Укажите номер в «Контакте»: только цифры, от ${DEAL_PHONE_MIN_DIGITS} до ${DEAL_PHONE_MAX_DIGITS} знаков.`,
+      });
+      return;
+    }
+
     // Создаем клиента при успешной сделке (если еще не создан)
     let newClientId = editingDeal.clientId;
     if (!editingDeal.clientId && onCreateClient) {
-      const dealTitle = title || editingDeal.title;
-      const dealContact = contactName || editingDeal.contactName;
-      const displayName = dealContact || dealTitle || editingDeal.title;
+      const dealTitle = (title || editingDeal.title || '').trim();
+      const displayName = clientName.trim() || dealTitle || editingDeal.title || 'Клиент';
       const client: Client = {
         id: `cl-${Date.now()}`,
         name: displayName,
-        phone: undefined,
+        phone: phoneDigits,
         email: undefined,
         telegram: editingDeal.telegramUsername,
         instagram: source === 'instagram' ? editingDeal.telegramUsername : undefined,
@@ -716,10 +908,13 @@ const SalesFunnelView: React.FC<SalesFunnelViewProps> = ({ deals, clients, users
       newClientId = client.id;
     }
     
-    const updatedDeal = { 
-      ...editingDeal, 
+    const updatedDeal: Deal = {
+      ...editingDeal,
+      title: (title || editingDeal.title || '').trim(),
+      contactName: phoneDigits,
       stage: 'won' as const,
-      clientId: newClientId || editingDeal.clientId
+      clientId: newClientId || editingDeal.clientId,
+      updatedAt: new Date().toISOString(),
     };
     onSaveDeal(updatedDeal);
     setIsModalOpen(false);
@@ -742,6 +937,30 @@ const SalesFunnelView: React.FC<SalesFunnelViewProps> = ({ deals, clients, users
   const activeDeals = filteredDeals.filter(d => d.stage !== 'won' && d.stage !== 'lost');
   const wonDeals = filteredDeals.filter(d => d.stage === 'won');
   const lostDeals = filteredDeals.filter(d => d.stage === 'lost');
+
+  /** Этапы воронки сделки (для возврата из «Отказов» в активную воронку). */
+  const getActiveStagesForLostDeal = (deal: Deal): { id: string; label: string }[] => {
+    const fid = deal.funnelId || primaryFunnelId || salesFunnels[0]?.id || '';
+    const fu = fid ? salesFunnels.find((f) => f.id === fid) : undefined;
+    if (fu?.stages?.length) return fu.stages.map((s) => ({ id: String(s.id), label: s.label }));
+    return STAGES.map((s) => ({ id: s.id, label: s.label }));
+  };
+
+  const restoreLostDealToStage = (deal: Deal, stageId: string) => {
+    const opts = getActiveStagesForLostDeal(deal);
+    if (!opts.some((s) => String(s.id) === String(stageId))) return;
+    const nextFunnelId =
+      deal.funnelId ||
+      stageToFunnelId.get(String(stageId)) ||
+      primaryFunnelId ||
+      salesFunnels[0]?.id;
+    onSaveDeal({
+      ...deal,
+      stage: stageId,
+      funnelId: nextFunnelId || undefined,
+      updatedAt: new Date().toISOString(),
+    });
+  };
 
   const getSourceIcon = (s: string) => {
       switch(s) {
@@ -949,6 +1168,9 @@ const SalesFunnelView: React.FC<SalesFunnelViewProps> = ({ deals, clients, users
               </div>
           ) : viewMode === 'rejected' ? (
               <div className="bg-white dark:bg-[#1e1e1e] border border-gray-200 dark:border-[#333] rounded-xl overflow-hidden shadow-sm h-full flex flex-col">
+                  <p className="px-4 py-2 text-xs text-gray-500 dark:text-gray-400 border-b border-gray-100 dark:border-[#333] shrink-0">
+                    Верните сделку в воронку: выберите этап в колонке ниже или откройте карточку и смените «Стадию» в форме.
+                  </p>
                   <div className="overflow-y-auto flex-1 custom-scrollbar">
                     <table className="w-full text-left text-sm">
                         <thead className="bg-gray-50 dark:bg-[#252525] border-b border-gray-200 dark:border-[#333] sticky top-0 z-10">
@@ -959,6 +1181,7 @@ const SalesFunnelView: React.FC<SalesFunnelViewProps> = ({ deals, clients, users
                                 <th className="px-4 py-3 font-semibold text-gray-600 dark:text-gray-400">Источник</th>
                                 <th className="px-4 py-3 font-semibold text-gray-600 dark:text-gray-400">Ответственный</th>
                                 <th className="px-4 py-3 font-semibold text-gray-600 dark:text-gray-400">Дата</th>
+                                <th className="px-4 py-3 font-semibold text-gray-600 dark:text-gray-400 min-w-[11rem]">В воронку</th>
                                 <th className="px-4 py-3 w-10"></th>
                             </tr>
                         </thead>
@@ -966,6 +1189,7 @@ const SalesFunnelView: React.FC<SalesFunnelViewProps> = ({ deals, clients, users
                             {lostDeals.map(deal => {
                                 const assignee = users.find(u => u.id === deal.assigneeId);
                                 const dealProject = projects.find(p => p.id === deal.projectId);
+                                const stageOpts = getActiveStagesForLostDeal(deal);
                                 return (
                                     <tr key={deal.id} onClick={() => handleOpenEdit(deal)} className="hover:bg-gray-50 dark:hover:bg-[#2a2a2a] cursor-pointer group transition-colors">
                                         <td className="px-4 py-3 font-medium text-gray-800 dark:text-gray-200">{deal.title}</td>
@@ -983,7 +1207,28 @@ const SalesFunnelView: React.FC<SalesFunnelViewProps> = ({ deals, clients, users
                                         <td className="px-4 py-3 flex items-center gap-2">{getSourceIcon(deal.source || 'manual')} <span className="text-xs text-gray-500 capitalize">{deal.source}</span></td>
                                         <td className="px-4 py-3 text-xs text-gray-600 dark:text-gray-400">{assignee?.name}</td>
                                         <td className="px-4 py-3 text-xs text-gray-500 dark:text-gray-400">{new Date(deal.createdAt).toLocaleDateString()}</td>
-                                        <td className="px-4 py-3 text-right"><button onClick={(e) => { e.stopPropagation(); handleOpenEdit(deal); }} className="text-gray-400 hover:text-blue-500 opacity-0 group-hover:opacity-100"><Edit2 size={14}/></button></td>
+                                        <td className="px-4 py-2 align-middle" onClick={(e) => e.stopPropagation()}>
+                                          <select
+                                            key={`${deal.id}-${deal.updatedAt || ''}`}
+                                            aria-label="Вернуть сделку на этап"
+                                            defaultValue=""
+                                            className="w-full max-w-[13rem] text-xs rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-[#252525] text-gray-900 dark:text-gray-100 py-1.5 px-2 outline-none focus:ring-2 focus:ring-violet-500/30"
+                                            onChange={(e) => {
+                                              const v = e.target.value;
+                                              if (v) restoreLostDealToStage(deal, v);
+                                            }}
+                                          >
+                                            <option value="" disabled>
+                                              На этап…
+                                            </option>
+                                            {stageOpts.map((s) => (
+                                              <option key={s.id} value={s.id}>
+                                                {s.label}
+                                              </option>
+                                            ))}
+                                          </select>
+                                        </td>
+                                        <td className="px-4 py-3 text-right"><button type="button" onClick={(e) => { e.stopPropagation(); handleOpenEdit(deal); }} className="text-gray-400 hover:text-blue-500 opacity-0 group-hover:opacity-100"><Edit2 size={14}/></button></td>
                                     </tr>
                                 );
                             })}
@@ -1146,12 +1391,21 @@ const SalesFunnelView: React.FC<SalesFunnelViewProps> = ({ deals, clients, users
                                   />
                               </div>
                               <div>
-                                  <label className="block text-[10px] font-bold text-gray-500 dark:text-gray-400 mb-1 uppercase">Контакт</label>
+                                  <label className="block text-[10px] font-bold text-gray-500 dark:text-gray-400 mb-1 uppercase">
+                                    Контакт <span className="text-red-500">*</span>
+                                    <span className="font-normal normal-case text-gray-400"> (телефон, только цифры)</span>
+                                  </label>
                                   <input
+                                      type="text"
+                                      inputMode="numeric"
+                                      autoComplete="tel"
+                                      required
+                                      aria-required
                                       value={contactName}
-                                      onChange={e => setContactName(e.target.value)}
+                                      onChange={(e) => setContactName(dealContactDigits(e.target.value))}
+                                      maxLength={DEAL_PHONE_MAX_DIGITS}
                                       className="w-full border border-gray-300 dark:border-gray-600 rounded-md px-2.5 py-1.5 min-h-[32px] text-sm bg-white dark:bg-[#333] text-gray-900 dark:text-gray-100"
-                                      placeholder="ФИО, телефон"
+                                      placeholder={`От ${DEAL_PHONE_MIN_DIGITS} до ${DEAL_PHONE_MAX_DIGITS} цифр`}
                                   />
                               </div>
                               {editingDeal && (
@@ -1170,6 +1424,7 @@ const SalesFunnelView: React.FC<SalesFunnelViewProps> = ({ deals, clients, users
                                       );
                                       if (c) {
                                         setClientName(c.name);
+                                        if (c.phone) setContactName(dealContactDigits(c.phone));
                                       }
                                     }}
                                     placeholder="Не привязан"
@@ -1246,6 +1501,88 @@ const SalesFunnelView: React.FC<SalesFunnelViewProps> = ({ deals, clients, users
                                       placeholder="0"
                                   />
                               </div>
+                          </div>
+
+                          <div className="rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50/80 dark:bg-[#252525]/80 p-3 space-y-2">
+                            <div className="flex items-center justify-between gap-2">
+                              <label className="text-[10px] font-bold text-gray-500 dark:text-gray-400 uppercase flex items-center gap-2">
+                                <Paperclip size={14} className="text-gray-400 shrink-0" />
+                                Файлы сделки
+                              </label>
+                              <div className="flex items-center gap-1 shrink-0">
+                                <input
+                                  ref={dealFileInputRef}
+                                  type="file"
+                                  className="hidden"
+                                  onChange={handleDealFileInputChange}
+                                />
+                                <button
+                                  type="button"
+                                  disabled={!canAttachDealFiles}
+                                  onClick={() => dealFileInputRef.current?.click()}
+                                  className="text-xs text-violet-600 dark:text-violet-400 font-medium flex items-center gap-1 px-2 py-1 rounded-md hover:bg-violet-500/10 disabled:opacity-40 disabled:cursor-not-allowed"
+                                >
+                                  <Plus size={14} />
+                                  Прикрепить
+                                </button>
+                              </div>
+                            </div>
+                            {!canAttachDealFiles && (
+                              <p className="text-[10px] text-gray-500 dark:text-gray-400 leading-snug">
+                                После первого сохранения сделки здесь можно прикрепить PDF и другие файлы (хранятся в браузере, как вложения задач).
+                              </p>
+                            )}
+                            {canAttachDealFiles && dealAttachments.length === 0 && (
+                              <p className="text-xs text-gray-400 italic">Нет вложений</p>
+                            )}
+                            {canAttachDealFiles && dealAttachments.length > 0 && (
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                {dealAttachments.map((att) => {
+                                  const isImage =
+                                    att.type === 'image' ||
+                                    (att.url && /\.(jpg|jpeg|png|gif|webp|svg)$/i.test(att.name));
+                                  return (
+                                    <div
+                                      key={att.id}
+                                      className="flex items-center gap-2 p-2 bg-white dark:bg-[#2a2a2a] rounded-lg border border-gray-100 dark:border-gray-700 group"
+                                    >
+                                      <div className="w-8 h-8 rounded-lg bg-violet-100 dark:bg-violet-900/30 flex items-center justify-center text-violet-600 dark:text-violet-400 shrink-0">
+                                        {isImage ? <ImageIcon size={16} /> : <FileIcon size={16} />}
+                                      </div>
+                                      <button
+                                        type="button"
+                                        className="flex-1 min-w-0 text-left"
+                                        onClick={() => window.open(att.url, '_blank', 'noopener,noreferrer')}
+                                      >
+                                        <div className="text-sm font-medium text-gray-800 dark:text-gray-200 truncate">
+                                          {att.name}
+                                        </div>
+                                        <div className="text-[10px] text-gray-500 dark:text-gray-400">
+                                          {new Date(att.uploadedAt).toLocaleDateString('ru-RU')}
+                                        </div>
+                                      </button>
+                                      <a
+                                        href={att.url}
+                                        download={att.name}
+                                        className="p-1.5 text-gray-400 hover:text-violet-600 rounded shrink-0"
+                                        title="Скачать"
+                                        onClick={(e) => e.stopPropagation()}
+                                      >
+                                        <Download size={14} />
+                                      </a>
+                                      <button
+                                        type="button"
+                                        onClick={() => removeDealAttachment(att.id)}
+                                        className="p-1.5 text-gray-400 hover:text-red-500 rounded shrink-0 opacity-0 group-hover:opacity-100 sm:opacity-100"
+                                        title="Удалить"
+                                      >
+                                        <Trash2 size={14} />
+                                      </button>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            )}
                           </div>
 
                           <div>
@@ -1325,7 +1662,7 @@ const SalesFunnelView: React.FC<SalesFunnelViewProps> = ({ deals, clients, users
                                             c.type === 'instagram_out';
                                           return (
                                             <div key={c.id} className={`max-w-[88%] ${mine ? 'ml-auto' : ''}`}>
-                                              <div className={`rounded-xl px-3 py-2 text-sm ${mine ? 'bg-[#3337AD] text-white' : 'bg-white dark:bg-[#333] text-gray-800 dark:text-gray-200 border border-gray-200 dark:border-[#444]'}`}>
+                                              <div className={`rounded-xl px-3 py-2 text-sm ${mine ? 'bg-violet-600 text-white' : 'bg-white dark:bg-[#333] text-gray-800 dark:text-gray-200 border border-gray-200 dark:border-[#444]'}`}>
                                                 <div className={`mb-1 text-[11px] ${mine ? 'text-white/80' : 'text-gray-500 dark:text-gray-400'}`}>
                                                   {getCommentAuthorName(c)}{formatCommentTime(c.createdAt) ? ` • ${formatCommentTime(c.createdAt)}` : ''}
                                                 </div>
@@ -1466,7 +1803,7 @@ const SalesFunnelView: React.FC<SalesFunnelViewProps> = ({ deals, clients, users
                                                       setShowCustomTaskInput(false);
                                                       setCustomTaskTitle('');
                                                   }}
-                                                  className="px-3 py-1.5 rounded-md bg-[#3337AD] text-white text-sm hover:bg-[#2d3199]"
+                                                  className="px-3 py-1.5 rounded-md bg-violet-600 text-white text-sm hover:bg-violet-700"
                                               >
                                                   Добавить
                                               </button>
@@ -1617,7 +1954,7 @@ const SalesFunnelView: React.FC<SalesFunnelViewProps> = ({ deals, clients, users
                                                   setShowCreateMeetingForm(false);
                                                   setAlertState({ open: true, title: 'Встреча создана', message: 'Новая встреча по сделке успешно добавлена.' });
                                                 }}
-                                                className="px-3 py-1.5 rounded-md text-xs text-white bg-[#3337AD] hover:bg-[#2d3199]"
+                                                className="px-3 py-1.5 rounded-md text-xs text-white bg-violet-600 hover:bg-violet-700"
                                               >
                                                 Создать встречу
                                               </button>
