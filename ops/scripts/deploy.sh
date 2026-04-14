@@ -172,10 +172,20 @@ for i in 1 2 3 4 5 6 7 8 9 10; do
   curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:8003/health 2>/dev/null | grep -q 200 && break
   sleep 2
 done
-if $DOCKER_CMD ps 2>/dev/null | grep -q backend; then
-  echo "✅ Backend container running"
+if $DOCKER_CMD ps --services --filter "status=running" 2>/dev/null | grep -qx "backend"; then
+  if curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:8003/health 2>/dev/null | grep -q 200; then
+    echo "✅ Backend container running and /health is 200"
+  else
+    echo "❌ Backend container запущен, но /health != 200"
+    echo "📋 Backend logs (last 120 lines):"
+    $DOCKER_CMD logs --tail=120 backend || true
+    exit 1
+  fi
 else
-  echo "⚠️ Backend container не в списке — проверьте: $DOCKER_CMD ps"
+  echo "❌ Backend container is not running"
+  echo "📋 Backend logs (last 120 lines):"
+  $DOCKER_CMD logs --tail=120 backend || true
+  exit 1
 fi
 cd "$SERVER_PATH" || exit 1
 
