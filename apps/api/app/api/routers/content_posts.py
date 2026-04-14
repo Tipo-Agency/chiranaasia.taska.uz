@@ -37,7 +37,7 @@ def row_to_post(row) -> ContentPostRead:
         platform=_platform_to_list(getattr(row, "platform", None)),
         format=str(row.format or ""),
         status=str(row.status or ""),
-        copy=row.copy,
+        post_copy=getattr(row, "copy", None),
         mediaUrl=row.media_url,
         isArchived=bool(row.is_archived or False),
     )
@@ -64,23 +64,25 @@ async def update_content_posts(posts: list[ContentPostItem], db: AsyncSession = 
             existing.platform = p.platform if p.platform is not None else (existing.platform or [])
             existing.format = p.format or existing.format
             existing.status = p.status or existing.status
-            existing.copy = p.copy
+            existing.copy = p.post_copy
             existing.media_url = p.mediaUrl
             existing.is_archived = p.isArchived
         else:
-            db.add(ContentPost(
-                id=pid,
-                table_id=p.tableId,
-                topic=p.topic,
-                description=p.description,
-                date=p.date,
-                platform=p.platform,
-                format=p.format,
-                status=p.status,
-                copy=p.copy,
-                media_url=p.mediaUrl,
-                is_archived=p.isArchived,
-            ))
+            db.add(
+                ContentPost(
+                    id=pid,
+                    table_id=p.tableId,
+                    topic=p.topic,
+                    description=p.description,
+                    date=p.date,
+                    platform=p.platform,
+                    format=p.format,
+                    status=p.status,
+                    copy=p.post_copy,
+                    media_url=p.mediaUrl,
+                    is_archived=p.isArchived,
+                )
+            )
         await db.flush()
         row = await db.get(ContentPost, pid)
         await log_entity_mutation(
