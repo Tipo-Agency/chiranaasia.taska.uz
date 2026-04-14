@@ -12,6 +12,7 @@ META_TIPA="${META_TIPA:-}"
 META_UCHETGRAM="${META_UCHETGRAM:-}"
 TELEGRAM_API_ID="${TELEGRAM_API_ID:-}"
 TELEGRAM_API_HASH="${TELEGRAM_API_HASH:-}"
+SECRET_KEY="${SECRET_KEY:-}"
 BACKEND_URL="${BACKEND_URL:-http://127.0.0.1:8003}"
 
 echo "🚀 Starting deployment..."
@@ -59,6 +60,15 @@ else
   echo "   ⚠️ TELEGRAM_BOT_TOKEN empty, backend will not have token (set GitHub secret)"
 fi
 
+# SECRET_KEY обязателен для backend/воркеров в docker-compose.
+if [ -n "$SECRET_KEY" ]; then
+  if grep -q "^SECRET_KEY=" .env 2>/dev/null; then
+    grep -v "^SECRET_KEY=" .env > .env.tmp && mv .env.tmp .env
+  fi
+  printf '%s=%s\n' "SECRET_KEY" "$SECRET_KEY" >> .env
+  echo "   SECRET_KEY written to .env"
+fi
+
 # Meta / Instagram (webhook verify + page tokens для Graph API)
 for _meta_key in META_MARKER META_TASKA META_TIPA META_UCHETGRAM; do
   _meta_val="${!_meta_key}"
@@ -72,6 +82,17 @@ for _meta_key in META_MARKER META_TASKA META_TIPA META_UCHETGRAM; do
 done
 if [ -z "$META_MARKER" ]; then
   echo "   ⚠️ META_MARKER пуст — GET /webhook/meta вернёт 503 (задайте тот же секрет, что «Подтверждение маркера» в Meta)"
+fi
+
+_secret_from_env="$(grep '^SECRET_KEY=' .env 2>/dev/null | tail -n1 | cut -d'=' -f2-)"
+if [ -z "$_secret_from_env" ]; then
+  echo "❌ SECRET_KEY не задан. Добавьте SECRET_KEY (или API_SECRET_KEY) в GitHub Actions Secrets."
+  echo "   Либо вручную пропишите SECRET_KEY в $SERVER_PATH/.env (см. .env.example, минимум 32 символа)."
+  exit 1
+fi
+if [ "${#_secret_from_env}" -lt 32 ]; then
+  echo "❌ SECRET_KEY слишком короткий (${#_secret_from_env} символов). Нужно минимум 32."
+  exit 1
 fi
 
 # MTProto (личный Telegram): TELEGRAM_API_ID + TELEGRAM_API_HASH из GitHub Secrets
