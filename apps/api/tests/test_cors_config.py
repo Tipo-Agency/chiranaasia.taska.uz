@@ -4,7 +4,7 @@ from __future__ import annotations
 import pytest
 from pydantic import ValidationError
 
-from app.core.config import Settings, parse_cors_origins
+from app.core.config import Settings, effective_browser_origin_allowlist, parse_cors_origins
 
 
 def _settings(**kwargs: object) -> Settings:
@@ -19,6 +19,23 @@ def _settings(**kwargs: object) -> Settings:
 
 def test_parse_cors_origins_trims_and_splits():
     assert parse_cors_origins(" http://a , https://b ") == ["http://a", "https://b"]
+
+
+def test_effective_browser_origin_allowlist_adds_public_base():
+    out = effective_browser_origin_allowlist(
+        "http://localhost:3000",
+        "https://tipa.taska.uz/api",
+    )
+    assert "http://localhost:3000" in out
+    assert "https://tipa.taska.uz" in out
+
+
+def test_effective_browser_origin_allowlist_dedupes_public_base():
+    out = effective_browser_origin_allowlist(
+        "https://tipa.taska.uz,http://localhost:3000",
+        "https://tipa.taska.uz",
+    )
+    assert out.count("https://tipa.taska.uz") == 1
 
 
 def test_cors_rejects_wildcard_only():

@@ -12,6 +12,24 @@ def parse_cors_origins(raw: str) -> list[str]:
     return [o.strip() for o in raw.split(",") if o.strip()]
 
 
+def effective_browser_origin_allowlist(cors_origins: str, public_base_url: str = "") -> list[str]:
+    """Origin для CORS и CSRF: CORS_ORIGINS + при необходимости origin из PUBLIC_BASE_URL (без дублей)."""
+    from urllib.parse import urlparse
+
+    origins = [o.strip().rstrip("/") for o in parse_cors_origins(cors_origins)]
+    seen = set(origins)
+    raw = (public_base_url or "").strip()
+    if raw:
+        if "://" not in raw:
+            raw = f"https://{raw}"
+        p = urlparse(raw)
+        if p.scheme in ("http", "https") and p.netloc:
+            base = f"{p.scheme}://{p.netloc}".rstrip("/")
+            if base not in seen:
+                origins.append(base)
+    return origins
+
+
 class Settings(BaseSettings):
     """Настройки только из окружения / .env. Секреты без дефолтов."""
 
