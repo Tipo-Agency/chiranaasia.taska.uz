@@ -23,6 +23,8 @@ export type CrmHubTab = 'funnel' | 'chats' | 'clients' | 'rejected';
 interface CRMHubModuleProps {
   tab: CrmHubTab;
   onTabChange: (tab: CrmHubTab) => void;
+  /** Строка поиска в шапке — фильтр сделок на вкладках воронки / отказы */
+  headerSearchQuery?: string;
   currentUser: User;
   deals: Deal[];
   clients: Client[];
@@ -40,6 +42,7 @@ interface CRMHubModuleProps {
 export const CRMHubModule: React.FC<CRMHubModuleProps> = ({
   tab,
   onTabChange,
+  headerSearchQuery = '',
   currentUser,
   deals,
   clients,
@@ -135,6 +138,7 @@ export const CRMHubModule: React.FC<CRMHubModuleProps> = ({
     meetings,
     currentUser,
     actions,
+    headerSearchQuery,
   };
 
   if (!options.length) {

@@ -14,7 +14,12 @@ import {
   Trash2,
 } from 'lucide-react';
 import { TaskSelect } from './TaskSelect';
-import { normalizeDateForInput, compareDates, getTodayLocalDate } from '../utils/dateUtils';
+import {
+  normalizeDateForInput,
+  compareDates,
+  getTodayLocalDate,
+  normalizeWallClockTimeForApi,
+} from '../utils/dateUtils';
 import { ModulePageShell, MODULE_PAGE_GUTTER, SystemConfirmDialog, APP_TOOLBAR_MODULE_CLUSTER } from './ui';
 import { ModuleCreateDropdown } from './ui/ModuleCreateDropdown';
 import { ModuleSelectDropdown } from './ui/ModuleSelectDropdown';
@@ -348,14 +353,18 @@ const MeetingsView: React.FC<MeetingsViewProps> = ({
       const selectedDeal = deals.find(d => d.id === selectedDealId);
       const clientIdFromDeal = selectedDeal?.clientId;
       
+      const dateNorm = normalizeDateForInput(date) || date || getTodayLocalDate();
+      const dateFinal = /^\d{4}-\d{2}-\d{2}$/.test(dateNorm) ? dateNorm : getTodayLocalDate();
+      const timeFinal = normalizeWallClockTimeForApi(time);
+
       if (editingMeeting) {
           // Редактирование существующей встречи
           onSaveMeeting({
               ...editingMeeting,
               type: meetingType,
               title,
-              date,
-              time,
+              date: dateFinal,
+              time: timeFinal,
               recurrence: meetingType === 'work' ? recurrence : 'none', // Повторение только для рабочих встреч
               dealId: meetingType === 'client' ? selectedDealId : undefined,
               clientId: meetingType === 'client' ? clientIdFromDeal : undefined,
@@ -369,8 +378,8 @@ const MeetingsView: React.FC<MeetingsViewProps> = ({
               tableId,
               type: meetingType,
               title,
-              date,
-              time,
+              date: dateFinal,
+              time: timeFinal,
               recurrence: meetingType === 'work' ? recurrence : 'none',
               dealId: meetingType === 'client' ? selectedDealId : undefined,
               clientId: meetingType === 'client' ? clientIdFromDeal : undefined,
@@ -406,7 +415,9 @@ const MeetingsView: React.FC<MeetingsViewProps> = ({
       if (draggedMeetingId) {
           const meeting = meetings.find(m => m.id === draggedMeetingId);
           if (meeting && meeting.date !== targetDate) {
-              onSaveMeeting({ ...meeting, date: targetDate });
+              const dNorm = normalizeDateForInput(targetDate) || targetDate || getTodayLocalDate();
+              const dFinal = /^\d{4}-\d{2}-\d{2}$/.test(dNorm) ? dNorm : getTodayLocalDate();
+              onSaveMeeting({ ...meeting, date: dFinal });
           }
           setDraggedMeetingId(null);
       }
@@ -752,15 +763,28 @@ const MeetingsView: React.FC<MeetingsViewProps> = ({
                                 <TaskSelect
                                     value={selectedDealId}
                                     onChange={setSelectedDealId}
+                                    searchable
+                                    searchPlaceholder="Сделка, клиент, компания…"
                                     options={[
                                         { value: '', label: 'Выберите сделку' },
-                                        ...(deals || []).filter(d => !d.isArchived).map(d => {
-                                            const client = clients.find(c => c.id === d.clientId);
+                                        ...(deals || []).filter((d) => !d.isArchived).map((d) => {
+                                            const client = clients.find((c) => c.id === d.clientId);
+                                            const searchText = [
+                                                d.title,
+                                                d.contactName,
+                                                d.number,
+                                                d.telegramUsername,
+                                                client?.name,
+                                                client?.companyName,
+                                            ]
+                                                .filter(Boolean)
+                                                .join(' ');
                                             return {
                                                 value: d.id,
-                                                label: `${d.title}${client ? ` (${client.name})` : ''}`
+                                                label: `${d.title || 'Без названия'}${client ? ` (${client.name})` : ''}`,
+                                                searchText,
                                             };
-                                        })
+                                        }),
                                     ]}
                                     className="w-full"
                                 />
@@ -773,11 +797,14 @@ const MeetingsView: React.FC<MeetingsViewProps> = ({
                                 <TaskSelect
                                     value={selectedProjectId}
                                     onChange={setSelectedProjectId}
+                                    searchable
+                                    searchPlaceholder="Название проекта…"
                                     options={[
                                         { value: '', label: 'Выберите проект' },
                                         ...(projects || []).filter((p) => !p.isArchived).map((p) => ({
                                             value: p.id,
                                             label: p.name,
+                                            searchText: p.name,
                                         })),
                                     ]}
                                     className="w-full"

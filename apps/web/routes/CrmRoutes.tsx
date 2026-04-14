@@ -13,6 +13,7 @@ export function CrmRoutesView(props: AppRouterProps) {
       <CRMHubModuleLazy
         tab={props.crmHubTab ?? 'funnel'}
         onTabChange={actions.setCrmHubTab}
+        headerSearchQuery={props.searchQuery}
         currentUser={props.currentUser}
         deals={props.deals}
         clients={props.clients}

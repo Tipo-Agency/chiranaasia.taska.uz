@@ -2,6 +2,19 @@ import type { Client } from './clients';
 
 export type DealKind = 'funnel' | 'contract';
 
+/** Вложения сделки (PDF и др.) — хранятся в API в custom_fields._deal_attachments */
+export interface DealAttachment {
+  id: string;
+  dealId: string;
+  name: string;
+  url: string;
+  type: string;
+  uploadedAt: string;
+  attachmentType?: 'file' | 'doc';
+  storagePath?: string;
+  docId?: string;
+}
+
 export interface Deal {
   id: string;
   dealKind?: DealKind;
@@ -36,6 +49,12 @@ export interface Deal {
   startDate?: string;
   endDate?: string;
   paymentDay?: number;
+  /** Произвольные поля с сервера (без служебного ключа _deal_attachments — он в attachments) */
+  customFields?: Record<string, unknown>;
+  tags?: string[];
+  lostReason?: string;
+  /** Файлы сделки (см. custom_fields._deal_attachments на бэкенде) */
+  attachments?: DealAttachment[];
 }
 
 export type Contract = Deal;

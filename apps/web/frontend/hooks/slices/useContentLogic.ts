@@ -2,13 +2,17 @@
 import { useState } from 'react';
 import { Doc, Folder, Meeting, ContentPost, ShootPlan } from '../../../types';
 import { api } from '../../../backend/api';
+import { getTodayLocalDate, normalizeDateForInput, normalizeWallClockTimeForApi } from '../../../utils/dateUtils';
 
 function meetingToApiBody(m: Meeting): Record<string, unknown> {
+  const dateNorm = normalizeDateForInput(m.date) || (m.date || '').trim();
+  const date =
+    dateNorm && /^\d{4}-\d{2}-\d{2}$/.test(dateNorm) ? dateNorm : getTodayLocalDate();
   const body: Record<string, unknown> = {
-    tableId: m.tableId,
+    tableId: m.tableId?.trim() ? m.tableId.trim() : null,
     title: m.title,
-    date: m.date,
-    time: m.time,
+    date,
+    time: normalizeWallClockTimeForApi(m.time),
     participantIds: m.participantIds ?? [],
     summary: m.summary ?? '',
     type: m.type,
@@ -21,6 +25,34 @@ function meetingToApiBody(m: Meeting): Record<string, unknown> {
   if (m.shootPlanId) body.shootPlanId = m.shootPlanId;
   if (m.participants?.length) body.participants = m.participants;
   return body;
+}
+
+/** Слить ответ POST/PATCH встречи с черновиком UI (обязательные поля Meeting). */
+function mergeSavedMeeting(draft: Meeting, saved: Meeting): Meeting {
+  const date =
+    normalizeDateForInput(saved.date) || saved.date || normalizeDateForInput(draft.date) || draft.date;
+  const time = normalizeWallClockTimeForApi(saved.time || draft.time);
+  return {
+    ...draft,
+    ...saved,
+    id: saved.id || draft.id,
+    tableId: (saved.tableId || draft.tableId) as string,
+    title: (saved.title ?? draft.title) as string,
+    date: /^\d{4}-\d{2}-\d{2}$/.test(String(date)) ? String(date) : getTodayLocalDate(),
+    time,
+    participantIds: saved.participantIds?.length ? saved.participantIds : draft.participantIds,
+    summary: saved.summary ?? draft.summary ?? '',
+    type: (saved.type || draft.type) as Meeting['type'],
+    recurrence: (saved.recurrence ?? draft.recurrence ?? 'none') as Meeting['recurrence'],
+    dealId: saved.dealId ?? draft.dealId,
+    clientId: saved.clientId ?? draft.clientId,
+    projectId: saved.projectId ?? draft.projectId,
+    shootPlanId: saved.shootPlanId ?? draft.shootPlanId,
+    isArchived: saved.isArchived ?? draft.isArchived,
+    participants: saved.participants ?? draft.participants,
+    createdAt: draft.createdAt,
+    updatedAt: new Date().toISOString(),
+  };
 }
 
 export const useContentLogic = (showNotification: (msg: string) => void, activeTableId: string) => {
@@ -39,17 +71,36 @@ export const useContentLogic = (showNotification: (msg: string) => void, activeT
   const saveMeeting = (m: Meeting) => {
     const now = new Date().toISOString();
     const existing = meetings.find((meeting) => meeting.id === m.id);
+    const prevSnapshot = meetings;
+    const optimisticDraft: Meeting = {
+      ...m,
+      createdAt: m.createdAt || now,
+      updatedAt: now,
+    };
     const u = existing
-      ? meetings.map((meeting) => (meeting.id === m.id ? { ...m, updatedAt: now } : meeting))
-      : [...meetings, { ...m, createdAt: m.createdAt || now, updatedAt: now }];
+      ? meetings.map((meeting) => (meeting.id === m.id ? optimisticDraft : meeting))
+      : [...meetings, optimisticDraft];
     setMeetings(u);
     const body = meetingToApiBody(m);
     const req = existing ? api.meetings.patch(m.id, body) : api.meetings.create({ ...body, id: m.id });
     req
-      .then(() => api.meetings.getAll())
-      .then((raw) => setMeetings(raw as Meeting[]))
-      .catch(() => showNotification('Ошибка сохранения встречи'));
-    showNotification(existing ? 'Встреча обновлена' : 'Встреча добавлена');
+      .then((savedRaw) => {
+        const saved = savedRaw as Meeting;
+        const merged = mergeSavedMeeting(optimisticDraft, saved);
+        setMeetings((curr) => {
+          const has = curr.some((x) => x.id === merged.id);
+          if (has) return curr.map((x) => (x.id === merged.id ? merged : x));
+          return [...curr, merged];
+        });
+        showNotification(existing ? 'Встреча обновлена' : 'Встреча добавлена');
+        void api.meetings.getAll().then((raw) => {
+          if (Array.isArray(raw)) setMeetings(raw as Meeting[]);
+        });
+      })
+      .catch(() => {
+        setMeetings(prevSnapshot);
+        showNotification('Ошибка сохранения встречи');
+      });
   };
   const deleteMeeting = (id: string) => {
     const prev = meetings;
@@ -60,8 +111,11 @@ export const useContentLogic = (showNotification: (msg: string) => void, activeT
     setMeetings(u);
     api.meetings
       .remove(id)
-      .then(() => api.meetings.getAll())
-      .then((raw) => setMeetings(raw as Meeting[]))
+      .then(() => {
+        void api.meetings.getAll().then((raw) => {
+          if (Array.isArray(raw)) setMeetings(raw as Meeting[]);
+        });
+      })
       .catch(() => {
         setMeetings(prev);
         showNotification('Ошибка удаления встречи');
@@ -69,14 +123,27 @@ export const useContentLogic = (showNotification: (msg: string) => void, activeT
     showNotification('Встреча удалена');
   };
   const updateMeetingSummary = (id: string, summary: string) => {
+    const prevSnapshot = meetings;
     const now = new Date().toISOString();
     const u = meetings.map((m) => (m.id === id ? { ...m, summary, updatedAt: now } : m));
     setMeetings(u);
     api.meetings
       .patch(id, { summary })
-      .then(() => api.meetings.getAll())
-      .then((raw) => setMeetings(raw as Meeting[]))
-      .catch(() => showNotification('Ошибка сохранения встречи'));
+      .then((savedRaw) => {
+        const saved = savedRaw as Meeting;
+        const base = prevSnapshot.find((x) => x.id === id);
+        if (base) {
+          const merged = mergeSavedMeeting({ ...base, summary }, saved);
+          setMeetings((curr) => curr.map((x) => (x.id === id ? merged : x)));
+        }
+        void api.meetings.getAll().then((raw) => {
+          if (Array.isArray(raw)) setMeetings(raw as Meeting[]);
+        });
+      })
+      .catch(() => {
+        setMeetings(prevSnapshot);
+        showNotification('Ошибка сохранения встречи');
+      });
   };
 
   // Content Plan

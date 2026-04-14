@@ -538,7 +538,7 @@ export const WorkdeskView: React.FC<WorkdeskViewProps> = ({
                     <button
                       type="button"
                       onClick={onNavigateToTasks}
-                      className="text-xs text-[#3337AD] hover:underline shrink-0"
+                      className="text-xs font-semibold text-sky-600 dark:text-sky-400 hover:text-sky-700 dark:hover:text-sky-300 hover:underline underline-offset-2 shrink-0 transition-colors"
                     >
                       Все задачи
                     </button>
@@ -585,7 +585,7 @@ export const WorkdeskView: React.FC<WorkdeskViewProps> = ({
                     <button
                       type="button"
                       onClick={onNavigateToMeetings}
-                      className="text-xs text-[#3337AD] hover:underline shrink-0"
+                      className="text-xs font-semibold text-sky-600 dark:text-sky-400 hover:text-sky-700 dark:hover:text-sky-300 hover:underline underline-offset-2 shrink-0 transition-colors"
                     >
                       Календарь
                     </button>

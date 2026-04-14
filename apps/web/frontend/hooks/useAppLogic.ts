@@ -44,7 +44,7 @@ export const useAppLogic = () => {
 
   const settingsSlice = useSettingsLogic(showNotification);
   const authSlice = useAuthLogic(showNotification);
-  const crmSlice = useCRMLogic(showNotification);
+  const crmSlice = useCRMLogic(showNotification, () => authSlice.state.currentUser);
   const [salesFunnels, setSalesFunnels] = useState<SalesFunnel[]>([]);
   const [inboxMessages, setInboxMessages] = useState<InboxMessage[]>([]);
   const [outboxMessages, setOutboxMessages] = useState<InboxMessage[]>([]);
@@ -1027,7 +1027,9 @@ export const useAppLogic = () => {
     },
     actions: {
       login: authSlice.actions.login, logout: authSlice.actions.logout, updateUsers: authSlice.actions.updateUsers, updateProfile: authSlice.actions.updateProfile, openProfile: authSlice.actions.openProfile, closeProfile: authSlice.actions.closeProfile,
-      updateProjects: taskSlice.actions.updateProjects, updateStatuses: taskSlice.actions.updateStatuses, updatePriorities: taskSlice.actions.updatePriorities, quickCreateProject: taskSlice.actions.quickCreateProject, saveTask: saveTaskWrapper, deleteTask: taskSlice.actions.deleteTask, restoreTask: taskSlice.actions.restoreTask, permanentDeleteTask: taskSlice.actions.permanentDeleteTask, openTaskModal: taskSlice.actions.openTaskModal, closeTaskModal: taskSlice.actions.closeTaskModal, addTaskComment: taskSlice.actions.addTaskComment, addTaskAttachment: taskSlice.actions.addTaskAttachment, addTaskDocAttachment: taskSlice.actions.addTaskDocAttachment,
+      updateProjects: taskSlice.actions.updateProjects, updateStatuses: taskSlice.actions.updateStatuses, updatePriorities: taskSlice.actions.updatePriorities, quickCreateProject: taskSlice.actions.quickCreateProject, saveTask: saveTaskWrapper, deleteTask: taskSlice.actions.deleteTask, restoreTask: taskSlice.actions.restoreTask, permanentDeleteTask: taskSlice.actions.permanentDeleteTask, openTaskModal: taskSlice.actions.openTaskModal, closeTaskModal: taskSlice.actions.closeTaskModal, addTaskComment: taskSlice.actions.addTaskComment, addTaskAttachment: taskSlice.actions.addTaskAttachment,
+      addTaskDocAttachment: taskSlice.actions.addTaskDocAttachment,
+      removeTaskAttachment: taskSlice.actions.removeTaskAttachment,
       saveClient: (client: Client) => {
         const existing = crmSlice.state.clients.find(c => c.id === client.id);
         crmSlice.actions.saveClient(client);

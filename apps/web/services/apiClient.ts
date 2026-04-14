@@ -6,6 +6,7 @@ import type {
   Bdr,
   Client,
   Deal,
+  DealAttachment,
   EntityType,
   IntegrationsRoadmapResponse,
   PurchaseRequest,
@@ -843,11 +844,158 @@ function clientToApiWrite(c: Client): Record<string, unknown> {
 
 const DEAL_PAGE_LIMIT = 500;
 
+const DEAL_ATTACHMENTS_KEY = '_deal_attachments';
+
+function parseDealAttachment(raw: unknown, dealId: string): DealAttachment | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const o = raw as Record<string, unknown>;
+  const id = String(o.id ?? '');
+  if (!id) return null;
+  return {
+    id,
+    dealId: String(o.dealId ?? o.deal_id ?? dealId),
+    name: String(o.name ?? 'file'),
+    url: String(o.url ?? ''),
+    type: String(o.type ?? 'file'),
+    uploadedAt: String(o.uploadedAt ?? o.uploaded_at ?? new Date().toISOString()),
+    attachmentType: (o.attachmentType ?? o.attachment_type) as DealAttachment['attachmentType'],
+    storagePath: (o.storagePath ?? o.storage_path) as string | undefined,
+    docId: (o.docId ?? o.doc_id) as string | undefined,
+  };
+}
+
+/**
+ * Тело элемента для PUT /deals (DealBulkItem): без вложенного `client` и лишних полей,
+ * вложения сделки — в customFields._deal_attachments.
+ */
+export function dealToBulkPutItem(d: Deal): Record<string, unknown> {
+  const dealId = String(d.id ?? '');
+  const rawCf = d.customFields && typeof d.customFields === 'object' ? { ...d.customFields } : {};
+  delete rawCf[DEAL_ATTACHMENTS_KEY];
+  const cf: Record<string, unknown> = { ...rawCf };
+  cf[DEAL_ATTACHMENTS_KEY] = Array.isArray(d.attachments) ? d.attachments : [];
+
+  return {
+    id: dealId,
+    title: d.title ?? '',
+    clientId: d.clientId ?? null,
+    contactName: d.contactName ?? null,
+    amount: d.amount ?? 0,
+    currency: d.currency ?? 'UZS',
+    stage: d.stage ?? 'new',
+    funnelId: d.funnelId ?? null,
+    source: d.source ?? null,
+    sourceChatId: d.telegramChatId ?? null,
+    telegramChatId: d.telegramChatId ?? null,
+    tags: d.tags ?? null,
+    customFields: cf,
+    telegramUsername: d.telegramUsername ?? null,
+    lostReason: d.lostReason ?? null,
+    assigneeId: d.assigneeId ?? null,
+    notes: d.notes ?? null,
+    projectId: d.projectId ?? null,
+    comments: d.comments ?? [],
+    isArchived: d.isArchived ?? false,
+    recurring: d.recurring ?? false,
+    number: d.number ?? null,
+    status: d.status ?? null,
+    description: d.description ?? null,
+    date: d.date ?? null,
+    dueDate: d.dueDate ?? null,
+    paidAmount: d.paidAmount ?? null,
+    paidDate: d.paidDate ?? null,
+    startDate: d.startDate ?? null,
+    endDate: d.endDate ?? null,
+    paymentDay: d.paymentDay ?? null,
+    createdAt: d.createdAt ?? null,
+    updatedAt: d.updatedAt ?? null,
+  };
+}
+
+/** Тело POST /deals (DealCreate, camelCase нормализуется на бэкенде). */
+export function dealToApiCreate(d: Deal, createdByUserId?: string | null): Record<string, unknown> {
+  const b = dealToBulkPutItem(d);
+  const out: Record<string, unknown> = {
+    id: b.id || undefined,
+    title: (b.title as string) || 'Новая сделка',
+    clientId: b.clientId,
+    contactName: b.contactName,
+    amount: b.amount,
+    currency: b.currency,
+    stage: b.stage,
+    funnelId: b.funnelId,
+    source: b.source,
+    sourceChatId: b.sourceChatId,
+    tags: b.tags,
+    customFields: b.customFields,
+    lostReason: b.lostReason,
+    assigneeId: b.assigneeId,
+    notes: b.notes,
+    projectId: b.projectId,
+    comments: b.comments,
+    createdAt: b.createdAt,
+    telegramUsername: b.telegramUsername,
+  };
+  if (createdByUserId) out.createdByUserId = createdByUserId;
+  return out;
+}
+
+/** Тело PATCH /deals/{id} (DealUpdate). */
+export function dealToApiPatch(d: Deal, updatedByUserId?: string | null): Record<string, unknown> {
+  const b = dealToBulkPutItem(d);
+  const out: Record<string, unknown> = {
+    title: b.title,
+    clientId: b.clientId,
+    contactName: b.contactName,
+    amount: b.amount,
+    currency: b.currency,
+    stage: b.stage,
+    funnelId: b.funnelId,
+    source: b.source,
+    sourceChatId: b.sourceChatId,
+    tags: b.tags,
+    customFields: b.customFields,
+    lostReason: b.lostReason,
+    assigneeId: b.assigneeId,
+    notes: b.notes,
+    projectId: b.projectId,
+    comments: b.comments,
+    isArchived: b.isArchived,
+    recurring: b.recurring,
+    number: b.number,
+    status: b.status,
+    description: b.description,
+    date: b.date,
+    dueDate: b.dueDate,
+    paidAmount: b.paidAmount,
+    paidDate: b.paidDate,
+    startDate: b.startDate,
+    endDate: b.endDate,
+    paymentDay: b.paymentDay,
+    telegramUsername: b.telegramUsername,
+  };
+  if (d.version != null && Number.isFinite(Number(d.version))) {
+    out.version = Number(d.version);
+  }
+  if (updatedByUserId) out.updatedByUserId = updatedByUserId;
+  return out;
+}
+
 /** Ответ GET /deals (snake_case) → тип Deal (camelCase) для UI. */
 export function dealFromApi(r: Record<string, unknown>): Deal {
   const amt = r.amount;
+  const dealId = String(r.id ?? '');
+  const cfRaw = r.custom_fields;
+  const cfFull =
+    cfRaw && typeof cfRaw === 'object' && !Array.isArray(cfRaw) ? { ...(cfRaw as Record<string, unknown>) } : {};
+  const rawAtt = cfFull[DEAL_ATTACHMENTS_KEY];
+  const attachments: DealAttachment[] = Array.isArray(rawAtt)
+    ? (rawAtt.map((x) => parseDealAttachment(x, dealId)).filter(Boolean) as DealAttachment[])
+    : [];
+  delete cfFull[DEAL_ATTACHMENTS_KEY];
+  const tagsRaw = r.tags;
   return {
-    id: String(r.id ?? ''),
+    id: dealId,
     title: (r.title as string | undefined) ?? '',
     stage: r.stage as string | undefined,
     assigneeId: (r.assignee_id as string | null | undefined) ?? undefined,
@@ -897,6 +1045,10 @@ export function dealFromApi(r: Record<string, unknown>): Deal {
         : r.version != null && r.version !== ''
           ? Number(r.version) || undefined
           : undefined,
+    tags: Array.isArray(tagsRaw) ? (tagsRaw as unknown[]).map((x) => String(x)) : undefined,
+    lostReason: (r.lost_reason as string | undefined) ?? undefined,
+    customFields: Object.keys(cfFull).length > 0 ? cfFull : undefined,
+    attachments: attachments.length > 0 ? attachments : undefined,
   };
 }
 
@@ -940,7 +1092,9 @@ export const dealsEndpoint = {
   updateAll: async (deals: unknown[]) => {
     const all = await fetchAllDealsPages();
     const preserved = all.filter((d) => isContractLikeDeal(d));
-    return put<{ ok: boolean }>('/deals', mergeById(preserved, deals));
+    const payload = (deals as Deal[]).map((d) => dealToBulkPutItem(d));
+    const preservedPayload = preserved.map((d) => dealToBulkPutItem(d));
+    return put<{ ok: boolean }>('/deals', mergeById(preservedPayload, payload));
   },
   create: (deal: unknown) => post<unknown>('/deals', deal),
   update: (id: string, updates: unknown) => patch<unknown>(`/deals/${id}`, updates),

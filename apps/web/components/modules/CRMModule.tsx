@@ -23,9 +23,11 @@ interface CRMModuleProps {
   currentUser?: User | null;
   actions: AppActions;
   autoOpenCreateModal?: boolean;
+  /** Фильтр карточек воронки по строке поиска в шапке приложения */
+  headerSearchQuery?: string;
 }
 
-export const CRMModule: React.FC<CRMModuleProps> = ({ view, embedInCrmHub = false, forcedFunnelViewMode, deals, clients, contracts, oneTimeDeals = [], accountsReceivable = [], users, salesFunnels = [], projects, tasks, meetings = [], currentUser, actions, autoOpenCreateModal = false }) => {
+export const CRMModule: React.FC<CRMModuleProps> = ({ view, embedInCrmHub = false, forcedFunnelViewMode, deals, clients, contracts, oneTimeDeals = [], accountsReceivable = [], users, salesFunnels = [], projects, tasks, meetings = [], currentUser, actions, autoOpenCreateModal = false, headerSearchQuery = '' }) => {
   if (view === 'sales-funnel') {
       return (
         <div className="h-full min-h-0 flex flex-col">
@@ -38,6 +40,7 @@ export const CRMModule: React.FC<CRMModuleProps> = ({ view, embedInCrmHub = fals
             meetings={meetings}
             salesFunnels={salesFunnels}
             currentUser={currentUser}
+            headerSearchQuery={headerSearchQuery}
             onSaveDeal={actions.saveDeal} 
             onDeleteDeal={actions.deleteDeal}
             onCreateTask={actions.openTaskModal ? (task) => actions.openTaskModal(task) : undefined}

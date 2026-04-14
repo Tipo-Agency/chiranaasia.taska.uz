@@ -27,12 +27,15 @@ import {
 } from '../ui';
 import { TasksFilters } from '../features/tasks';
 import { useAppToolbar } from '../../contexts/AppToolbarContext';
+import { normalizeHeaderSearchQuery, rowMatchesHeaderSearch } from '../../utils/headerSearchMatch';
 import TableView from '../TableView';
 import KanbanBoard from '../KanbanBoard';
 import GanttView from '../GanttView';
 
 interface TasksPageProps {
   tasks: Task[];
+  /** Строка поиска в шапке — фильтр списка/канбана на странице «Задачи». */
+  headerSearchQuery?: string;
   users: User[];
   projects: Project[];
   statuses: StatusOption[];
@@ -51,6 +54,7 @@ const EXCLUDED_SOURCES = ['Задача', 'Идеи', 'Беклог', 'Функ�
 
 export const TasksPage: React.FC<TasksPageProps> = ({
   tasks,
+  headerSearchQuery = '',
   users,
   projects,
   statuses,
@@ -91,6 +95,8 @@ export const TasksPage: React.FC<TasksPageProps> = ({
   const activePriorities = useMemo(() => priorities.filter((p) => !p.isArchived), [priorities]);
   const activeProjects = useMemo(() => projects.filter((p) => !p.isArchived), [projects]);
 
+  const headerQNorm = useMemo(() => normalizeHeaderSearchQuery(headerSearchQuery), [headerSearchQuery]);
+
   // Логика фильтрации источника
   const matchesSource = useCallback((task: Task, source: string): boolean => {
     if (!source) return true;
@@ -117,6 +123,7 @@ export const TasksPage: React.FC<TasksPageProps> = ({
     return tasks.filter(task => {
       if (task.entityType === 'idea' || task.entityType === 'feature') return false;
       if (task.isArchived) return false;
+      if (headerQNorm && !rowMatchesHeaderSearch(headerQNorm, [task.title, task.description])) return false;
       if (hideCompleted === 'hide' && COMPLETED_STATUSES.includes(task.status)) return false;
       if (filterStatus && task.status !== filterStatus) return false;
       if (filterPriority && task.priority !== filterPriority) return false;
@@ -125,7 +132,7 @@ export const TasksPage: React.FC<TasksPageProps> = ({
       if (filterSource && !matchesSource(task, filterSource)) return false;
       return true;
     });
-  }, [tasks, hideCompleted, filterStatus, filterPriority, filterAssignee, filterProject, filterSource, matchesSource]);
+  }, [tasks, headerQNorm, hideCompleted, filterStatus, filterPriority, filterAssignee, filterProject, filterSource, matchesSource]);
 
   // Конфигурация фильтров
   const taskFilters = useMemo(() => [
