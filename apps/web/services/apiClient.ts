@@ -172,7 +172,9 @@ async function fetchJson<T>(url: string, options?: FetchJsonOpts): Promise<T> {
       typeof window !== 'undefined' &&
       unauthorizedHandler &&
       !url.startsWith('/auth/login') &&
-      !url.startsWith('/auth/refresh')
+      !url.startsWith('/auth/refresh') &&
+      !url.startsWith('/auth/csrf') &&
+      !url.startsWith('/auth/logout')
     ) {
       try {
         unauthorizedHandler();
