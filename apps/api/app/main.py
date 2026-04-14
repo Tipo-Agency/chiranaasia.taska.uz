@@ -94,6 +94,10 @@ async def lifespan(app: FastAPI):
     try:
         command.upgrade(alembic_cfg, "head")
     except Exception as e:
+        env = (settings.ENVIRONMENT or "").strip().lower()
+        if env in ("production", "prod", "staging"):
+            print(f"Migration failed (fatal in {env}): {e}", file=sys.stderr)
+            raise
         print(f"Migration warning: {e}", file=sys.stderr)
 
     try:
