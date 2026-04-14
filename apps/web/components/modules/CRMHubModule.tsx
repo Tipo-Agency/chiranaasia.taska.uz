@@ -16,6 +16,7 @@ import { hasPermission } from '../../utils/permissions';
 import { CRMModule } from './CRMModule';
 import { ClientChatsPage } from '../pages/ClientChatsPage';
 import { useAppToolbar } from '../../contexts/AppToolbarContext';
+import { MODULE_ACCENTS } from '../ui/moduleAccent';
 
 export type CrmHubTab = 'funnel' | 'chats' | 'clients' | 'rejected';
 
@@ -95,7 +96,7 @@ export const CRMHubModule: React.FC<CRMHubModuleProps> = ({
       setLeading(null);
       return () => setLeading(null);
     }
-    const activeBox = 'bg-[#3337AD] text-white shadow-sm';
+    const activeBox = MODULE_ACCENTS.violet.segmentActive;
     const idleBox = 'text-gray-600 dark:text-gray-400';
     setLeading(
       <div className="flex items-center gap-0.5 sm:gap-1 shrink-0 flex-wrap sm:flex-nowrap" role="tablist" aria-label="CRM">

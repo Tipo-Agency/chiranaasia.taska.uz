@@ -274,7 +274,7 @@ const SalesFunnelView: React.FC<SalesFunnelViewProps> = ({ deals, clients, users
     if (forcedViewMode && viewMode !== forcedViewMode) {
       setViewMode(forcedViewMode);
     }
-    const violet = 'bg-[#3337AD] text-white shadow-sm';
+    const segmentActive = MODULE_ACCENTS.violet.segmentActive;
     const idle = 'text-gray-500 dark:text-gray-400';
     setModule(
       <div className={APP_TOOLBAR_MODULE_CLUSTER}>
@@ -379,7 +379,7 @@ const SalesFunnelView: React.FC<SalesFunnelViewProps> = ({ deals, clients, users
                 aria-selected={viewMode === t.id}
                 onClick={() => setViewMode(t.id)}
                 className={`px-2 py-1 rounded-lg text-[11px] sm:text-xs font-medium whitespace-nowrap shrink-0 transition-colors ${
-                  viewMode === t.id ? violet : `${idle} hover:bg-gray-100 dark:hover:bg-[#252525]`
+                  viewMode === t.id ? segmentActive : `${idle} hover:bg-gray-100 dark:hover:bg-[#252525]`
                 }`}
               >
                 {t.label}
@@ -1325,7 +1325,7 @@ const SalesFunnelView: React.FC<SalesFunnelViewProps> = ({ deals, clients, users
                                             c.type === 'instagram_out';
                                           return (
                                             <div key={c.id} className={`max-w-[88%] ${mine ? 'ml-auto' : ''}`}>
-                                              <div className={`rounded-xl px-3 py-2 text-sm ${mine ? 'bg-[#3337AD] text-white' : 'bg-white dark:bg-[#333] text-gray-800 dark:text-gray-200 border border-gray-200 dark:border-[#444]'}`}>
+                                              <div className={`rounded-xl px-3 py-2 text-sm ${mine ? 'bg-violet-600 text-white' : 'bg-white dark:bg-[#333] text-gray-800 dark:text-gray-200 border border-gray-200 dark:border-[#444]'}`}>
                                                 <div className={`mb-1 text-[11px] ${mine ? 'text-white/80' : 'text-gray-500 dark:text-gray-400'}`}>
                                                   {getCommentAuthorName(c)}{formatCommentTime(c.createdAt) ? ` • ${formatCommentTime(c.createdAt)}` : ''}
                                                 </div>
@@ -1466,7 +1466,7 @@ const SalesFunnelView: React.FC<SalesFunnelViewProps> = ({ deals, clients, users
                                                       setShowCustomTaskInput(false);
                                                       setCustomTaskTitle('');
                                                   }}
-                                                  className="px-3 py-1.5 rounded-md bg-[#3337AD] text-white text-sm hover:bg-[#2d3199]"
+                                                  className="px-3 py-1.5 rounded-md bg-violet-600 text-white text-sm hover:bg-violet-700"
                                               >
                                                   Добавить
                                               </button>
@@ -1617,7 +1617,7 @@ const SalesFunnelView: React.FC<SalesFunnelViewProps> = ({ deals, clients, users
                                                   setShowCreateMeetingForm(false);
                                                   setAlertState({ open: true, title: 'Встреча создана', message: 'Новая встреча по сделке успешно добавлена.' });
                                                 }}
-                                                className="px-3 py-1.5 rounded-md text-xs text-white bg-[#3337AD] hover:bg-[#2d3199]"
+                                                className="px-3 py-1.5 rounded-md text-xs text-white bg-violet-600 hover:bg-violet-700"
                                               >
                                                 Создать встречу
                                               </button>

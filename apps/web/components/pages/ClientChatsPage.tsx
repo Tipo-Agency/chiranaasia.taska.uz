@@ -142,7 +142,7 @@ function SourceChannelAvatar({
   return (
     <div
       className={`${base} ${
-        selected ? 'bg-white/20 text-white' : 'bg-[#3337AD]/12 text-[#3337AD] dark:text-[#8b8ee0]'
+        selected ? 'bg-white/20 text-white' : 'bg-violet-500/12 text-violet-700 dark:text-violet-300'
       } text-xs font-semibold`}
     >
       {letter.match(/[A-ZА-ЯЁ0-9]/i) ? letter : <UserRound size={18} strokeWidth={2} />}
@@ -419,7 +419,7 @@ export const ClientChatsPage: React.FC<ClientChatsPageProps> = ({
                   onClick={() => setChannelFilter(t.id)}
                   className={`rounded-md px-2 py-1 text-[10px] font-semibold transition-colors ${
                     channelFilter === t.id
-                      ? 'bg-[#3337AD] text-white shadow-sm'
+                      ? 'bg-violet-600 text-white shadow-sm'
                       : 'text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-[#333]'
                   }`}
                 >
@@ -446,7 +446,7 @@ export const ClientChatsPage: React.FC<ClientChatsPageProps> = ({
                       onClick={() => setActiveId(d.id)}
                       className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm transition-colors ${
                         selected
-                          ? 'bg-[#3337AD] text-white shadow-md'
+                          ? 'bg-violet-600 text-white shadow-md'
                           : 'text-gray-700 hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-[#2a2a2a]'
                       }`}
                     >
@@ -518,7 +518,7 @@ export const ClientChatsPage: React.FC<ClientChatsPageProps> = ({
                           className={`rounded-2xl px-3 py-2 text-sm ${
                             mine
                               ? outgoing
-                                ? 'bg-[#3337AD] text-white'
+                                ? 'bg-violet-600 text-white'
                                 : 'bg-slate-600 text-white dark:bg-slate-700'
                               : 'border border-gray-200 bg-white text-gray-800 dark:border-[#404040] dark:bg-[#2a2a2a] dark:text-gray-200'
                           }`}
@@ -577,13 +577,13 @@ export const ClientChatsPage: React.FC<ClientChatsPageProps> = ({
                     placeholder={inputHint(active)}
                     disabled={sending}
                     rows={1}
-                    className="min-h-[44px] max-h-[120px] min-w-0 flex-1 resize-none rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm leading-relaxed text-gray-900 shadow-inner outline-none focus:border-[#3337AD]/50 focus:ring-2 focus:ring-[#3337AD]/30 dark:border-[#444] dark:bg-[#191919] dark:text-gray-100"
+                    className="min-h-[44px] max-h-[120px] min-w-0 flex-1 resize-none rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm leading-relaxed text-gray-900 shadow-inner outline-none focus:border-violet-500/50 focus:ring-2 focus:ring-violet-500/30 dark:border-[#444] dark:bg-[#191919] dark:text-gray-100"
                   />
                   <button
                     type="button"
                     onClick={() => void handleSend()}
                     disabled={sending || !input.trim()}
-                    className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#3337AD] text-white shadow-md transition-colors hover:bg-[#292b8a] disabled:cursor-not-allowed disabled:opacity-40"
+                    className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-violet-600 text-white shadow-md transition-colors hover:bg-violet-700 disabled:cursor-not-allowed disabled:opacity-40"
                     aria-label="Отправить"
                   >
                     <Send size={18} />
