@@ -9,7 +9,15 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import get_settings
-from app.core.password_hashing import hash_password_bcrypt
+from app.core.password_hashing import (
+    hash_password_bcrypt,
+)
+from app.core.password_hashing import (
+    looks_like_bcrypt_hash as _looks_like_bcrypt_hash,
+)
+from app.core.password_hashing import (
+    verify_password as _verify_password_bcrypt,
+)
 from app.db import get_db
 from app.models.user import User
 
@@ -38,6 +46,16 @@ def get_password_hash(password: str) -> str:
     """Новый bcrypt-хеш с уникальной солью и стоимостью из ``BCRYPT_ROUNDS``."""
     settings = get_settings()
     return hash_password_bcrypt(password, rounds=int(settings.BCRYPT_ROUNDS))
+
+
+def verify_password(plain: str, hashed: str) -> bool:
+    """Совместимый экспорт для роутеров/тестов: проверка plaintext vs bcrypt-хеш."""
+    return _verify_password_bcrypt(plain, hashed)
+
+
+def looks_like_bcrypt_hash(value: str) -> bool:
+    """Совместимый экспорт для bulk-импорта пользователей."""
+    return _looks_like_bcrypt_hash(value)
 
 
 def create_access_token(data: dict, expires_delta: timedelta | None = None) -> str:
