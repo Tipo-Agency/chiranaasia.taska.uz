@@ -42,7 +42,8 @@ _DEFAULT_LIMIT = 50
 _MAX_LIMIT = 500
 
 
-_CLIENT_SORT_KEYS = frozenset({"name", "company_name", "id", "created_at"})
+# «created_at» у clients в модели нет — сортировка только по реальным колонкам (см. Client).
+_CLIENT_SORT_KEYS = frozenset({"name", "company_name", "id"})
 
 
 def _client_sort_key(sort: str | None) -> str:
@@ -63,7 +64,6 @@ def _client_sort_column(name: str):
         "name": Client.name,
         "company_name": Client.company_name,
         "id": Client.id,
-        "created_at": Client.created_at,
     }
     return m[key]
 
@@ -115,8 +115,29 @@ def _clients_list_fingerprint(*, search: str | None, is_archived: bool | None) -
     return filter_fingerprint({"search": (search or "").strip(), "is_archived": arch})
 
 
+def _normalize_client_tags(raw) -> list[str]:
+    """ARRAY(Text) / легаси: безопасно приводим к list[str]."""
+    if raw is None:
+        return []
+    if isinstance(raw, list | tuple):
+        return [str(x) for x in raw if x is not None]
+    return []
+
+
 def _row_to_read(row: Client) -> ClientRead:
-    return ClientRead.model_validate(row)
+    return ClientRead(
+        id=str(row.id),
+        version=int(getattr(row, "version", 1) or 1),
+        name=str(row.name or ""),
+        phone=row.phone,
+        email=row.email,
+        telegram=row.telegram,
+        instagram=row.instagram,
+        company_name=row.company_name,
+        notes=row.notes,
+        tags=_normalize_client_tags(getattr(row, "tags", None)),
+        is_archived=bool(row.is_archived or False),
+    )
 
 
 @router.get("", response_model=ClientListResponse)
