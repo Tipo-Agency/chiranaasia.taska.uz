@@ -64,14 +64,14 @@ export default function ProductionView({ users, departments, currentUser }: Prod
     setModule(
       <div className={APP_TOOLBAR_MODULE_CLUSTER}>
         <ModuleFilterIconButton
-          accent="emerald"
+          accent="amber"
           size="sm"
           active={prodFiltersOpen}
           label="Фильтры производства"
           onClick={() => setProdFiltersOpen((o) => !o)}
         />
         <ModuleCreateDropdown
-          accent="emerald"
+          accent="amber"
           buttonSize="sm"
           label="Создать"
           items={[

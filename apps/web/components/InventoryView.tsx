@@ -428,7 +428,7 @@ const InventoryView: React.FC<InventoryViewProps> = ({
     setModule(
       <div className={APP_TOOLBAR_MODULE_CLUSTER}>
         <ModuleFilterIconButton
-          accent="emerald"
+          accent="teal"
           size="sm"
           active={showFilters || hasActiveFilters}
           activeCount={
@@ -441,7 +441,7 @@ const InventoryView: React.FC<InventoryViewProps> = ({
           onClick={() => setShowFilters((prev) => !prev)}
         />
         <ModuleCreateDropdown
-          accent="emerald"
+          accent="teal"
           align="left"
           buttonSize="sm"
           items={[

@@ -26,7 +26,7 @@ export const TasksHeader: React.FC<TasksHeaderProps> = ({
 }) => {
   return (
     <ModulePageHeader
-      accent="indigo"
+      accent="sky"
       icon={<CheckSquare size={24} strokeWidth={2} />}
       title="Задачи"
       description="Управление всеми задачами системы"
@@ -34,12 +34,12 @@ export const TasksHeader: React.FC<TasksHeaderProps> = ({
       controls={
         <>
           <ModuleFilterIconButton
-            accent="indigo"
+            accent="sky"
             active={showFilters || hasActiveFilters}
             activeCount={activeFiltersCount}
             onClick={onToggleFilters}
           />
-          <ModuleCreateIconButton accent="indigo" label="Новая задача" onClick={onCreateTask} />
+          <ModuleCreateIconButton accent="sky" label="Новая задача" onClick={onCreateTask} />
         </>
       }
     />

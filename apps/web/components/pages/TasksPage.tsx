@@ -243,13 +243,13 @@ export const TasksPage: React.FC<TasksPageProps> = ({
     setModule(
       <div className={APP_TOOLBAR_MODULE_CLUSTER}>
         <ModuleFilterIconButton
-          accent="indigo"
+          accent="sky"
           size="sm"
           active={showFilters || hasActiveFilters}
           activeCount={activeFiltersCount}
           onClick={() => setShowFilters((v) => !v)}
         />
-        <ModuleCreateIconButton accent="indigo" label="Новая задача" size="sm" onClick={onCreateTask} />
+        <ModuleCreateIconButton accent="sky" label="Новая задача" size="sm" onClick={onCreateTask} />
       </div>
     );
     return () => {

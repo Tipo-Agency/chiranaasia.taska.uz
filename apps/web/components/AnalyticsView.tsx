@@ -727,7 +727,7 @@ const AnalyticsView: React.FC<AnalyticsViewProps> = ({
       <div className={`${MODULE_PAGE_GUTTER} pt-6 md:pt-8 flex-shrink-0`}>
         <div className="mb-6 space-y-5">
           <ModulePageHeader
-            accent="sky"
+            accent="yellow"
             icon={<BarChart3 size={24} strokeWidth={2} />}
             title="Аналитика и отчёты"
             description="Аналитика и отчётность"
@@ -748,7 +748,7 @@ const AnalyticsView: React.FC<AnalyticsViewProps> = ({
               <ModuleSegmentedControl
                 size="sm"
                 variant="accent"
-                accent="sky"
+                accent="yellow"
                 value={period}
                 onChange={(v) => setPeriod(v as 'month' | 'quarter' | 'year')}
                 options={[
