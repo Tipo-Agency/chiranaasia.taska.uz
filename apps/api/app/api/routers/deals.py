@@ -33,11 +33,11 @@ from app.services.deal_client_rules import (
     assert_won_requires_client_id,
     normalize_deal_client_id,
 )
+from app.services.deal_related_archive import archive_entities_linked_to_deal, deal_just_archived
 from app.services.deal_stage_validation import (
     assert_deal_stage_transition_allowed,
     user_may_bypass_deal_terminal_stage,
 )
-from app.services.deal_related_archive import archive_entities_linked_to_deal, deal_just_archived
 from app.services.deals_api import apply_deal_patch_to_row, deal_from_create, deal_row_to_read
 from app.services.domain_events import emit_domain_event, log_entity_mutation
 from app.services.list_cursor_page import (
