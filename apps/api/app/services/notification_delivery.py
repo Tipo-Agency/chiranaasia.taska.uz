@@ -10,7 +10,7 @@ from __future__ import annotations
 import html
 import smtplib
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from email.message import EmailMessage
 from typing import Any
 
@@ -135,7 +135,7 @@ def _should_ack_stream_for_deliveries(rows: list[NotificationDelivery]) -> bool:
     und = [d for d in rows if d.status not in ("sent", "dead")]
     if not und:
         return True
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     if any(d.status == "sending" for d in und):
         return False
     if any(d.status == "pending" for d in und):
@@ -152,7 +152,7 @@ async def process_deliveries_for_notification(db: AsyncSession, notification_id:
     Обработать все «готовые» telegram/email доставки для одного уведомления.
     Не делает commit — вызывающий коммитит после успеха.
     """
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     settings = get_settings()
 
     await db.execute(
@@ -317,7 +317,7 @@ async def enqueue_due_notification_delivery_jobs(
     from app.services.notifications_stream import ensure_notifications_stream, xadd_notification_job
 
     await ensure_notifications_stream(redis)
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     ids = (
         (
             await db.execute(

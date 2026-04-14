@@ -8,13 +8,6 @@ from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request
 from sqlalchemy import asc, desc, func, nullslast, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.db import get_db
-from app.models.client import Client
-from app.schemas.clients import ClientBulkItem, ClientCreate, ClientListResponse, ClientRead, ClientUpdate
-from app.schemas.common_responses import OkResponse
-from app.services.audit_log import log_mutation
-from app.services.client_contact import normalize_client_tags, normalize_email, normalize_phone
-from app.services.domain_events import log_entity_mutation
 from app.core.auth import get_current_user
 from app.core.optimistic_version import (
     commit_or_stale_version_conflict,
@@ -22,6 +15,13 @@ from app.core.optimistic_version import (
     merge_expected_version,
     parse_if_match_header,
 )
+from app.db import get_db
+from app.models.client import Client
+from app.schemas.clients import ClientBulkItem, ClientCreate, ClientListResponse, ClientRead, ClientUpdate
+from app.schemas.common_responses import OkResponse
+from app.services.audit_log import log_mutation
+from app.services.client_contact import normalize_client_tags, normalize_email, normalize_phone
+from app.services.domain_events import log_entity_mutation
 from app.services.list_cursor_page import (
     ListCursorError,
     assert_cursor_matches,

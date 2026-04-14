@@ -9,6 +9,14 @@ from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request
 from sqlalchemy import asc, desc, func, nullslast, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.auth import get_current_user, require_permission
+from app.core.optimistic_version import (
+    commit_or_stale_version_conflict,
+    enforce_expected_version_row,
+    merge_expected_version,
+    parse_if_match_header,
+)
+from app.core.permissions import PERM_TASKS_EDIT
 from app.db import get_db
 from app.models.task import Task
 from app.schemas.tasks import (
@@ -21,6 +29,15 @@ from app.schemas.tasks import (
     TaskUpdate,
 )
 from app.services.audit_log import log_mutation
+from app.services.list_cursor_page import (
+    ListCursorError,
+    assert_cursor_matches,
+    build_seek_after,
+    decode_list_cursor,
+    encode_list_cursor,
+    filter_fingerprint,
+    row_seek_values,
+)
 from app.services.tasks_api import (
     apply_batch_item_to_row,
     apply_task_create_payload,
@@ -32,23 +49,6 @@ from app.services.tasks_api import (
     task_row_to_read,
 )
 from app.services.tasks_api import load_users_by_ids as load_users_map
-from app.core.auth import get_current_user, require_permission
-from app.core.optimistic_version import (
-    commit_or_stale_version_conflict,
-    enforce_expected_version_row,
-    merge_expected_version,
-    parse_if_match_header,
-)
-from app.core.permissions import PERM_TASKS_EDIT
-from app.services.list_cursor_page import (
-    ListCursorError,
-    assert_cursor_matches,
-    build_seek_after,
-    decode_list_cursor,
-    encode_list_cursor,
-    filter_fingerprint,
-    row_seek_values,
-)
 
 router = APIRouter(prefix="/tasks", tags=["tasks"], dependencies=[Depends(get_current_user)])
 

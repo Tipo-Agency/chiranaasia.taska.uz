@@ -1,8 +1,6 @@
 """Отправка сообщений в Instagram (Graph API) из CRM."""
 from __future__ import annotations
 
-from typing import Union
-
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -20,7 +18,7 @@ router = APIRouter(prefix="/integrations/meta", tags=["integrations-meta"])
 
 @router.post(
     "/instagram/send",
-    response_model=Union[DealCamelRead, IntegrationMessagingOk],
+    response_model=DealCamelRead | IntegrationMessagingOk,
 )
 async def instagram_send(
     body: IntegrationDealSendBody,

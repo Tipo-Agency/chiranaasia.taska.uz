@@ -6,7 +6,7 @@ import secrets
 import uuid
 from datetime import datetime
 from decimal import Decimal
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from fastapi import APIRouter, Body, Depends, Header, HTTPException, Request
 from fastapi.responses import JSONResponse
@@ -57,10 +57,10 @@ async def _find_duplicate_site_lead(
     funnel_id: str,
     phone_norm: str,
     email_norm: str,
-) -> Optional[Deal]:
+) -> Deal | None:
     if not phone_norm and not email_norm:
         return None
-    parts: List[Any] = []
+    parts: list[Any] = []
     if phone_norm:
         parts.append(Deal.custom_fields.contains({"_site": {"phone": phone_norm}}))
     if email_norm:
@@ -106,7 +106,7 @@ def _stage_label(funnel: SalesFunnel, stage_id: str) -> str:
     return str(stage_id)
 
 
-def _pick_default_assignee_id(funnel: SalesFunnel) -> Optional[str]:
+def _pick_default_assignee_id(funnel: SalesFunnel) -> str | None:
     sources = funnel.sources or {}
     site = sources.get("site") if isinstance(sources, dict) else None
     if isinstance(site, dict):
@@ -210,7 +210,7 @@ async def create_lead_from_site(
     request: Request,
     lead: SiteLeadPayload = Body(),
     db: AsyncSession = Depends(get_db),
-    x_api_key: Optional[str] = Header(default=None, alias="X-Api-Key"),
+    x_api_key: str | None = Header(default=None, alias="X-Api-Key"),
 ):
     """
     Public intake endpoint. Creates Deal in a configured funnel.
@@ -266,7 +266,7 @@ async def create_lead_from_site(
         )
         return JSONResponse(status_code=200, content=dup_resp.model_dump(mode="json"))
 
-    lines: List[str] = []
+    lines: list[str] = []
     if message:
         lines.append(message)
     if phone:
@@ -290,12 +290,12 @@ async def create_lead_from_site(
     deal_id = str(uuid.uuid4())
     assignee_id = _pick_default_assignee_id(funnel)
     stage_id = _pick_default_stage_id(funnel)
-    site_cf: Dict[str, str] = {}
+    site_cf: dict[str, str] = {}
     if phone_norm:
         site_cf["phone"] = phone_norm
     if email_norm:
         site_cf["email"] = email_norm
-    custom_fields: Dict[str, Any] = {"_site": site_cf} if site_cf else {}
+    custom_fields: dict[str, Any] = {"_site": site_cf} if site_cf else {}
 
     deal = Deal(
         id=deal_id,

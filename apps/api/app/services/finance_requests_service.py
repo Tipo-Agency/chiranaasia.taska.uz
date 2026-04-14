@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import uuid
-from datetime import date, datetime, time, timezone
+from datetime import UTC, date, datetime, time
 from decimal import Decimal
 
 from fastapi import HTTPException
@@ -120,9 +120,9 @@ async def list_finance_requests(
     if category is not None and str(category).strip():
         conds.append(FinanceRequest.category == str(category).strip())
     if date_from is not None:
-        conds.append(FinanceRequest.created_at >= datetime.combine(date_from, time.min, tzinfo=timezone.utc))
+        conds.append(FinanceRequest.created_at >= datetime.combine(date_from, time.min, tzinfo=UTC))
     if date_to is not None:
-        conds.append(FinanceRequest.created_at <= datetime.combine(date_to, time.max, tzinfo=timezone.utc))
+        conds.append(FinanceRequest.created_at <= datetime.combine(date_to, time.max, tzinfo=UTC))
 
     cnt_q = select(func.count()).select_from(FinanceRequest)
     if conds:

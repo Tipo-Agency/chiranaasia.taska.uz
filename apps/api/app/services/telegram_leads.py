@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import logging
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from decimal import Decimal
 from typing import Any
 
@@ -27,8 +27,8 @@ from app.models.funnel import SalesFunnel
 from app.models.telegram_integration import TelegramIntegrationState
 from app.models.user import User
 from app.services.domain_events import emit_domain_event
-from app.services.http_client import async_http_client
 from app.services.funnel_sources_crypto import telegram_config_for_runtime
+from app.services.http_client import async_http_client
 
 log = logging.getLogger("uvicorn.error")
 
@@ -40,7 +40,7 @@ def telegram_poll_offset_redis_key(funnel_id: str) -> str:
 
 
 def _now_iso() -> str:
-    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3] + "Z"
+    return datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3] + "Z"
 
 
 def _first_stage_id(funnel: SalesFunnel) -> str:

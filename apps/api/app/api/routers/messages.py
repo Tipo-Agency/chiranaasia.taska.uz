@@ -8,13 +8,13 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import and_, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.auth import get_current_user
+from app.core.mappers import row_to_inbox_message
 from app.db import get_db
 from app.models.settings import InboxMessage
-from app.services.domain_events import log_entity_mutation
-from app.core.auth import get_current_user
 from app.schemas.common_responses import MessageCreateResponse, OkResponse
 from app.schemas.messages import MessageCreateBody, MessageListResponse, MessageReadPatchBody
-from app.core.mappers import row_to_inbox_message
+from app.services.domain_events import log_entity_mutation
 from app.services.inbox_messages_service import add_inbox_message, normalize_external_msg_id
 from app.services.list_cursor_page import (
     ListCursorError,

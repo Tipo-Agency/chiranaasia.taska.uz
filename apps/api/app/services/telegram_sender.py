@@ -13,8 +13,8 @@ import httpx
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import get_settings
-from app.services.http_client import async_http_client
 from app.models.funnel import SalesFunnel
+from app.services.http_client import async_http_client
 from app.services.notifications import load_user_and_notification_pref_row
 from app.services.telegram_leads import telegram_source_config
 

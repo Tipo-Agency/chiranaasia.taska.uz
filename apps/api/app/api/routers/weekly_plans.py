@@ -1,12 +1,11 @@
 """Weekly plans and protocols router."""
 from __future__ import annotations
 
-from typing import Optional
-
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.auth import get_current_user
 from app.db import get_db
 from app.models.weekly_plan import Protocol, WeeklyPlan
 from app.schemas.common_responses import OkResponse
@@ -18,7 +17,6 @@ from app.schemas.weekly_plans import (
     WeeklyPlanRead,
 )
 from app.services.domain_events import log_entity_mutation
-from app.core.auth import get_current_user
 
 router = APIRouter(prefix="/weekly-plans", tags=["weekly-plans"], dependencies=[Depends(get_current_user)])
 
@@ -104,7 +102,7 @@ async def update_weekly_plans(payload: list[WeeklyPlanItem], db: AsyncSession = 
     return {"ok": True}
 
 
-@router.get("/mine/latest", response_model=Optional[WeeklyPlanRead])
+@router.get("/mine/latest", response_model=WeeklyPlanRead | None)
 async def get_my_latest_plan(
     user_id: str = Query(..., description="ID текущего пользователя"),
     db: AsyncSession = Depends(get_db),

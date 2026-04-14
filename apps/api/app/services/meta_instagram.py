@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 import time
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from decimal import Decimal
 from typing import Any
 
@@ -360,10 +360,10 @@ async def process_instagram_webhook(db: AsyncSession, body: dict[str, Any]) -> i
 
             ts = m.get("timestamp")
             try:
-                ts_ms = int(ts) if ts is not None else int(datetime.now(timezone.utc).timestamp() * 1000)
+                ts_ms = int(ts) if ts is not None else int(datetime.now(UTC).timestamp() * 1000)
             except (TypeError, ValueError):
-                ts_ms = int(datetime.now(timezone.utc).timestamp() * 1000)
-            created_at = datetime.fromtimestamp(ts_ms / 1000.0, tz=timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3] + "Z"
+                ts_ms = int(datetime.now(UTC).timestamp() * 1000)
+            created_at = datetime.fromtimestamp(ts_ms / 1000.0, tz=UTC).strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3] + "Z"
 
             tk = thread_key(page_id, customer_psid)
             result = await db.execute(
@@ -408,7 +408,7 @@ async def process_instagram_webhook(db: AsyncSession, body: dict[str, Any]) -> i
                     row["attachments"] = attachments_save
                 comments.append(row)
                 deal.comments = comments
-                deal.updated_at = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3] + "Z"
+                deal.updated_at = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3] + "Z"
                 await db.flush()
                 n += 1
                 continue
@@ -432,7 +432,7 @@ async def process_instagram_webhook(db: AsyncSession, body: dict[str, Any]) -> i
             did = str(uuid.uuid4())
             attachments_save = await mirror_meta_attachments_to_storage(did, list(attachments_raw))
             title = f"Instagram · {customer_psid[-8:]}"
-            now = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3] + "Z"
+            now = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3] + "Z"
             first_comment: dict[str, Any] = {
                 "id": f"ig-{mid or uuid.uuid4().hex[:12]}",
                 "text": text,

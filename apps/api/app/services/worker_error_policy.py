@@ -21,7 +21,7 @@ class WorkerErrorKind(str, Enum):
 def classify_worker_exception(exc: BaseException) -> WorkerErrorKind:
     if isinstance(exc, asyncio.TimeoutError):
         return WorkerErrorKind.RETRY
-    if isinstance(exc, (httpx.TimeoutException, httpx.ConnectError, httpx.NetworkError)):
+    if isinstance(exc, httpx.TimeoutException | httpx.ConnectError | httpx.NetworkError):
         return WorkerErrorKind.RETRY
     if isinstance(exc, httpx.HTTPStatusError):
         code = exc.response.status_code if exc.response is not None else 0
@@ -29,7 +29,7 @@ def classify_worker_exception(exc: BaseException) -> WorkerErrorKind:
             return WorkerErrorKind.RETRY
         if 400 <= code <= 499:
             return WorkerErrorKind.DLQ
-    if isinstance(exc, (ValueError, TypeError, KeyError)):
+    if isinstance(exc, ValueError | TypeError | KeyError):
         return WorkerErrorKind.DLQ
     return WorkerErrorKind.RETRY
 

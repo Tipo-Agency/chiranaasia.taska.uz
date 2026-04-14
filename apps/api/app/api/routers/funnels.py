@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Any, Optional
+from typing import Any
 
 from fastapi import APIRouter, Depends, Request
 from sqlalchemy import select
@@ -263,7 +263,7 @@ async def create_funnel(funnel: FunnelCreateBody, db: AsyncSession = Depends(get
     return row_to_funnel(result)
 
 
-@router.get("/{funnel_id}", response_model=Optional[FunnelRead])
+@router.get("/{funnel_id}", response_model=FunnelRead | None)
 async def get_funnel(funnel_id: str, db: AsyncSession = Depends(get_db)):
     f = await db.get(SalesFunnel, funnel_id)
     if not f:
@@ -271,7 +271,7 @@ async def get_funnel(funnel_id: str, db: AsyncSession = Depends(get_db)):
     return row_to_funnel(f)
 
 
-@router.patch("/{funnel_id}", response_model=Optional[FunnelRead])
+@router.patch("/{funnel_id}", response_model=FunnelRead | None)
 async def update_funnel(funnel_id: str, updates: FunnelPatchBody, db: AsyncSession = Depends(get_db)):
     f = await db.get(SalesFunnel, funnel_id)
     if not f:

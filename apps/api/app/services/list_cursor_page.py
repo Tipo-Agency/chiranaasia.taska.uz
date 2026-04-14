@@ -54,7 +54,7 @@ def _serialize_cell(val: Any) -> Any:
         return None
     if isinstance(val, Decimal):
         return format(val, "f")
-    if isinstance(val, (datetime, date)):
+    if isinstance(val, datetime | date):
         return val.isoformat()
     return val
 

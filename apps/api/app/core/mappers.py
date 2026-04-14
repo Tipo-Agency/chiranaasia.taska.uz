@@ -1,7 +1,10 @@
 """Utility functions."""
 from __future__ import annotations
 
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from app.schemas.integrations import DealCamelRead
 
 
 def to_camel_case(snake_str: str) -> str:
@@ -272,7 +275,7 @@ def row_to_deal(row) -> dict:
     }
 
 
-def deal_row_to_camel_read(row) -> "DealCamelRead":
+def deal_row_to_camel_read(row) -> DealCamelRead:
     """Сделка для интеграций: тот же shape, что ``row_to_deal``, как Pydantic-модель."""
     from app.schemas.integrations import DealCamelRead
 

@@ -1,7 +1,6 @@
 """Auth router - login, users, roles (RBAC)."""
 import re
 import uuid
-from typing import Dict, List, Optional, Set
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Request, Response
 from pydantic import BaseModel, Field
@@ -19,19 +18,23 @@ from app.core.auth import (
 )
 from app.core.auth_cookies import clear_auth_cookies, set_auth_cookies
 from app.core.config import get_settings
+from app.core.json_http_cache import json_304_or_response
 from app.core.mappers import row_to_user
 from app.core.password_policy import assert_new_password_policy
 from app.core.permissions import (
     PERMISSION_GROUPS,
     all_permission_keys,
     effective_permissions_for_role_response,
-    normalize_permissions,
 )
-from app.core.json_http_cache import json_304_or_response
 from app.core.rate_limit import limiter
 from app.db import get_db
 from app.models.role import Role
 from app.models.user import User
+from app.schemas.auth_api import PermissionsCatalogResponse, RoleApiRow
+from app.schemas.auth_bodies import LoginRequest, LogoutRequest, RefreshRequest
+from app.schemas.auth_session import AuthSessionResponse
+from app.schemas.auth_users import AuthUserOut, UserBulkItem
+from app.schemas.common_responses import IdOkResponse, OkResponse
 from app.services.audit_log import log_mutation
 from app.services.auth_refresh import (
     issue_refresh_token,
@@ -42,40 +45,35 @@ from app.services.auth_refresh import (
 from app.services.domain_events import log_entity_mutation
 from app.services.login_throttle import is_login_locked, record_login_failure, reset_login_throttle
 from app.services.rbac import count_users_with_role, user_has_permission
-from app.schemas.auth_api import PermissionsCatalogResponse, RoleApiRow
-from app.schemas.auth_bodies import LoginRequest, LogoutRequest, RefreshRequest
-from app.schemas.auth_session import AuthSessionResponse
-from app.schemas.auth_users import AuthUserOut, UserBulkItem
-from app.schemas.common_responses import IdOkResponse, OkResponse
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
 
-def _request_id(request: Request) -> Optional[str]:
+def _request_id(request: Request) -> str | None:
     return getattr(request.state, "request_id", None)
 
 class RoleCreateBody(BaseModel):
     name: str = Field(..., min_length=1, max_length=120)
-    slug: Optional[str] = Field(None, max_length=60)
-    description: Optional[str] = None
-    permissions: List[str] = Field(default_factory=list)
+    slug: str | None = Field(None, max_length=60)
+    description: str | None = None
+    permissions: list[str] = Field(default_factory=list)
 
 
 class RolePatchBody(BaseModel):
-    name: Optional[str] = Field(None, min_length=1, max_length=120)
-    description: Optional[str] = None
-    permissions: Optional[List[str]] = None
-    sort_order: Optional[int] = None
+    name: str | None = Field(None, min_length=1, max_length=120)
+    description: str | None = None
+    permissions: list[str] | None = None
+    sort_order: int | None = None
 
 
-async def _load_roles_map(db: AsyncSession, role_ids: Set[str]) -> Dict[str, Role]:
+async def _load_roles_map(db: AsyncSession, role_ids: set[str]) -> dict[str, Role]:
     if not role_ids:
         return {}
     result = await db.execute(select(Role).where(Role.id.in_(role_ids)))
     return {r.id: r for r in result.scalars().all()}
 
 
-async def _resolve_role_id(db: AsyncSession, u: UserBulkItem) -> Optional[str]:
+async def _resolve_role_id(db: AsyncSession, u: UserBulkItem) -> str | None:
     rid = u.roleId
     if rid:
         return rid
@@ -216,7 +214,7 @@ async def permissions_catalog(
     return {"groups": PERMISSION_GROUPS, "allKeys": all_permission_keys()}
 
 
-@router.get("/roles", response_model=List[RoleApiRow])
+@router.get("/roles", response_model=list[RoleApiRow])
 async def list_roles(
     db: AsyncSession = Depends(get_db),
     _user: User = Depends(require_any_permission("access.roles", "access.users")),
@@ -306,7 +304,7 @@ async def delete_role(
     return {"ok": True}
 
 
-@router.get("/users", response_model=List[AuthUserOut])
+@router.get("/users", response_model=list[AuthUserOut])
 async def get_users(
     request: Request,
     db: AsyncSession = Depends(get_db),
@@ -327,7 +325,7 @@ async def get_users(
 
 @router.put("/users", response_model=OkResponse)
 async def update_users(
-    users: List[UserBulkItem],
+    users: list[UserBulkItem],
     request: Request,
     db: AsyncSession = Depends(get_db),
     _user: User = Depends(require_permission("access.users")),

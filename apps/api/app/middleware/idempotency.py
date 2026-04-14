@@ -14,7 +14,8 @@ from starlette.responses import Response
 
 from app.core.api_errors import ensure_request_id, error_response
 from app.core.config import get_settings
-from app.core.redis import get_redis_client, idempotency_key as idempotency_redis_key
+from app.core.redis import get_redis_client
+from app.core.redis import idempotency_key as idempotency_redis_key
 
 logger = logging.getLogger(__name__)
 

@@ -6,7 +6,6 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.config import get_settings
 from app.models.dead_letter_queue import DeadLetterQueue
 from app.models.notification import NotificationDelivery
 from app.services.notifications_stream import ensure_notifications_stream, xadd_notification_job

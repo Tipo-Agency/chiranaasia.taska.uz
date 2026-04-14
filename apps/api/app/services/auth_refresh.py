@@ -4,7 +4,7 @@ from __future__ import annotations
 import hashlib
 import secrets
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -22,7 +22,7 @@ async def issue_refresh_token(db: AsyncSession, user: User, family_id: str | Non
     settings = get_settings()
     raw = secrets.token_urlsafe(48)
     fid = family_id or str(uuid.uuid4())
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     expires = now + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS)
     row = RefreshToken(
         id=str(uuid.uuid4()),
@@ -47,10 +47,10 @@ async def rotate_refresh_token(
     old = result.scalar_one_or_none()
     if not old or old.revoked_at is not None:
         return None
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     exp = old.expires_at
     if exp.tzinfo is None:
-        exp = exp.replace(tzinfo=timezone.utc)
+        exp = exp.replace(tzinfo=UTC)
     if exp <= now:
         return None
 
@@ -78,7 +78,7 @@ async def revoke_refresh_token(db: AsyncSession, raw: str) -> bool:
     row = result.scalar_one_or_none()
     if not row or row.revoked_at is not None:
         return False
-    row.revoked_at = datetime.now(timezone.utc)
+    row.revoked_at = datetime.now(UTC)
     await db.flush()
     return True
 

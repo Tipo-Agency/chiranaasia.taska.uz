@@ -1,7 +1,7 @@
 """ORM ↔ схемы сделок, явное применение PATCH (без динамического setattr по ключам клиента)."""
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from decimal import Decimal, InvalidOperation
 from typing import Any
 
@@ -118,7 +118,7 @@ def deal_row_to_read(row: Deal) -> DealRead:
 
 
 def deal_from_create(body: DealCreate, deal_id: str, *, assignee_id: str | None) -> Deal:
-    now = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3] + "Z"
+    now = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3] + "Z"
     cf = dict(body.custom_fields) if isinstance(body.custom_fields, dict) else {}
     cf = _merge_telegram_username(cf, body.telegram_username)
     return Deal(

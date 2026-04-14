@@ -1,7 +1,6 @@
 """Публичная iCal-подписка для Google Calendar и др. (по секретному токену пользователя)."""
 
 from datetime import datetime
-from typing import Optional
 from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Response
@@ -110,7 +109,7 @@ class ExportTokenBody(BaseModel):
 
 class ExportTokenResponse(BaseModel):
     ok: bool = True
-    token: Optional[str] = Field(default=None, description="Секрет для URL; null после отзыва")
+    token: str | None = Field(default=None, description="Секрет для URL; null после отзыва")
 
 
 @router.post("/export-token", response_model=ExportTokenResponse)

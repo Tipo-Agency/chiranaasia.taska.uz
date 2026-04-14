@@ -1,7 +1,7 @@
 """Ответы роутера /notifications (не путать с notification_events)."""
 from __future__ import annotations
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict
 
 
 class NotificationRowRead(BaseModel):

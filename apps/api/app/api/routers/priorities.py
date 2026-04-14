@@ -3,14 +3,14 @@ from fastapi import APIRouter, Depends, Request
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.auth import get_current_user
 from app.core.json_http_cache import json_304_or_response
+from app.core.mappers import row_to_priority
 from app.db import get_db
 from app.models.settings import PriorityOption
 from app.schemas.common_responses import OkResponse
 from app.schemas.settings import PriorityOptionItem
 from app.services.domain_events import log_entity_mutation
-from app.core.mappers import row_to_priority
-from app.core.auth import get_current_user
 
 router = APIRouter(prefix="/priorities", tags=["priorities"], dependencies=[Depends(get_current_user)])
 

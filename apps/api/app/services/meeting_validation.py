@@ -5,9 +5,9 @@ from __future__ import annotations
 import re
 from datetime import datetime, timedelta
 from typing import Any
+from zoneinfo import ZoneInfo
 
 from fastapi import HTTPException
-from zoneinfo import ZoneInfo
 
 from app.core.config import get_settings
 

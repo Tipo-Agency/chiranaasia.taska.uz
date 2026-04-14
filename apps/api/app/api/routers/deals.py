@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from decimal import Decimal, InvalidOperation
 from typing import Annotated
 
@@ -13,13 +13,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.core.auth import get_current_user, require_permission
+from app.core.config import get_settings
 from app.core.optimistic_version import (
     commit_or_stale_version_conflict,
     enforce_expected_version_row,
     merge_expected_version,
     parse_if_match_header,
 )
-from app.core.config import get_settings
 from app.core.permissions import PERM_CRM_DEALS_EDIT
 from app.db import get_db
 from app.models.client import Client, Deal
@@ -681,7 +681,7 @@ async def patch_deal(
     await assert_deal_client_id_exists(db, next_cid)
     assert_won_requires_client_id(str(to_stage) if to_stage is not None else None, next_cid)
     apply_deal_patch_to_row(deal, patch)
-    deal.updated_at = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3] + "Z"
+    deal.updated_at = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3] + "Z"
     await db.flush()
     if "stage" in dump and deal.stage != prev_stage:
         await log_entity_mutation(

@@ -3,13 +3,13 @@ from fastapi import APIRouter, Depends
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.auth import get_current_user
+from app.core.mappers import row_to_project
 from app.db import get_db
 from app.models.task import Project
 from app.schemas.common_responses import OkResponse
 from app.schemas.settings import ProjectItem, ProjectRead
 from app.services.domain_events import log_entity_mutation
-from app.core.mappers import row_to_project
-from app.core.auth import get_current_user
 
 router = APIRouter(prefix="/projects", tags=["projects"], dependencies=[Depends(get_current_user)])
 

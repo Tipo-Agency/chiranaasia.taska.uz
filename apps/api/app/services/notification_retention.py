@@ -1,7 +1,7 @@
 """Retention jobs for notification-related data."""
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import delete, exists, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -21,7 +21,7 @@ async def run_notification_retention(db: AsyncSession, days: int = 90, batch_siz
     - Доставки, привязанные к старым уведомлениям или «сироты», удаляются.
     - User notifications переносятся в `notifications_archive`, затем удаляются из hot-таблицы.
     """
-    cutoff = datetime.now(timezone.utc) - timedelta(days=days)
+    cutoff = datetime.now(UTC) - timedelta(days=days)
 
     deleted_deliveries = (
         await db.execute(

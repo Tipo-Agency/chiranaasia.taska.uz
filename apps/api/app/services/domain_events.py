@@ -1,7 +1,7 @@
 """Helpers to emit canonical domain events from business routers."""
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 from uuid import uuid4
 
@@ -58,7 +58,7 @@ async def emit_domain_event(
 ) -> str:
     """Persist, publish to Redis stream and process in notification hub."""
     eid = event_id or str(uuid4())
-    ts = occurred_at or datetime.now(timezone.utc)
+    ts = occurred_at or datetime.now(UTC)
 
     # idempotency safeguard
     existing = await db.get(NotificationEvent, eid)
@@ -102,6 +102,6 @@ async def emit_domain_event(
         return eid
 
     await process_domain_event(db, raw)
-    row.hub_processed_at = datetime.now(timezone.utc)
+    row.hub_processed_at = datetime.now(UTC)
     await db.flush()
     return eid

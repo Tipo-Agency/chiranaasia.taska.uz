@@ -1,7 +1,7 @@
 """Маппинг ORM ↔ схемы задач, события (без list[dict] и динамического setattr)."""
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from pydantic import ValidationError
 from sqlalchemy import select
@@ -127,7 +127,7 @@ async def build_reads(db: AsyncSession, tasks: list[Task]) -> list[TaskRead]:
 
 
 def apply_task_create_payload(body: TaskCreate, task_id: str) -> Task:
-    now = datetime.now(timezone.utc).isoformat()
+    now = datetime.now(UTC).isoformat()
     return Task(
         id=task_id,
         version=1,
@@ -253,7 +253,7 @@ def ensure_task_required_defaults(task: Task) -> None:
 
 
 def new_task_shell(task_id: str) -> Task:
-    now = datetime.now(timezone.utc).isoformat()
+    now = datetime.now(UTC).isoformat()
     return Task(
         id=task_id,
         version=1,

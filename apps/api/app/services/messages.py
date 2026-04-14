@@ -6,16 +6,16 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 import httpx
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import Settings, get_settings
-from app.services.http_client import async_http_client
 from app.models.client import Deal
 from app.models.funnel import SalesFunnel
+from app.services.http_client import async_http_client
 from app.services.meta_instagram import parse_thread_key, send_instagram_text
 from app.services.meta_sender import MetaGraphSendResult
 from app.services.telegram_leads import telegram_source_config
@@ -30,7 +30,7 @@ class SendMessageResult:
 
 
 def _now_iso() -> str:
-    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3] + "Z"
+    return datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3] + "Z"
 
 
 def _meta_send_http_status(res: MetaGraphSendResult) -> int:
@@ -57,7 +57,7 @@ def append_deal_outbound_comment(
     comments = list(deal.comments or [])
     comments.append(
         {
-            "id": f"{id_prefix}-{int(datetime.now(timezone.utc).timestamp() * 1000)}",
+            "id": f"{id_prefix}-{int(datetime.now(UTC).timestamp() * 1000)}",
             "text": text,
             "authorId": author_user_id,
             "createdAt": now,

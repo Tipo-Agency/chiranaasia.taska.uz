@@ -3,6 +3,7 @@ from fastapi import APIRouter, Depends
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.auth import get_current_user
 from app.db import get_db
 from app.models.inventory import InventoryItem, InventoryRevision, StockMovement, Warehouse
 from app.schemas.common_responses import OkResponse
@@ -17,7 +18,6 @@ from app.schemas.inventory import (
     WarehouseRead,
 )
 from app.services.domain_events import log_entity_mutation
-from app.core.auth import get_current_user
 
 router = APIRouter(prefix="/inventory", tags=["inventory"], dependencies=[Depends(get_current_user)])
 

@@ -6,7 +6,6 @@ from fastapi import HTTPException
 
 from app.domain.finance_requests import (
     ALL_FINANCE_REQUEST_STATUSES,
-    INITIAL_STATUSES,
     FinanceRequestStatusError,
     check_finance_request_status_transition,
     normalize_finance_request_status,

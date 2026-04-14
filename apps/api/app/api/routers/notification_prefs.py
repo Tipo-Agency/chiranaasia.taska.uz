@@ -3,12 +3,12 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.auth import get_current_user
 from app.db import get_db
 from app.models.notification import NotificationPreferences as NPrefModel
 from app.schemas.common_responses import OkResponse
 from app.schemas.notification_prefs import NotificationPrefsGetResponse, NotificationPrefsPut
 from app.services.domain_events import log_entity_mutation
-from app.core.auth import get_current_user
 
 router = APIRouter(prefix="/notification-prefs", tags=["notification-prefs"], dependencies=[Depends(get_current_user)])
 

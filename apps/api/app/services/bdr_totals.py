@@ -11,7 +11,7 @@ def _to_float(v: Any) -> float:
         return 0.0
     if isinstance(v, bool):
         return float(v)
-    if isinstance(v, (int, float)):
+    if isinstance(v, int | float):
         return float(v)
     s = str(v).strip().replace(" ", "").replace(",", ".")
     try:

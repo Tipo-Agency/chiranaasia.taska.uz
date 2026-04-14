@@ -3,12 +3,12 @@ from fastapi import APIRouter, Depends
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.auth import get_current_user
 from app.db import get_db
 from app.models.content import Doc
 from app.schemas.common_responses import OkResponse
 from app.schemas.content import DocItem, DocRead
 from app.services.domain_events import emit_domain_event, log_entity_mutation
-from app.core.auth import get_current_user
 
 router = APIRouter(prefix="/docs", tags=["docs"], dependencies=[Depends(get_current_user)])
 

@@ -9,7 +9,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import get_settings
-from app.core.password_hashing import hash_password_bcrypt, looks_like_bcrypt_hash, verify_password
+from app.core.password_hashing import hash_password_bcrypt
 from app.db import get_db
 from app.models.user import User
 

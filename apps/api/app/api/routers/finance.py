@@ -1,10 +1,8 @@
 """Finance router - categories, funds, plan, requests, bank statements, income reports."""
 from __future__ import annotations
 
-from datetime import date, datetime, timezone
-from typing import Annotated, Optional
-
-from app.services.bdr_totals import bdr_get_response, sanitize_bdr_rows
+from datetime import UTC, date, datetime
+from typing import Annotated
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request
 from sqlalchemy import delete, select
@@ -59,6 +57,10 @@ from app.schemas.finance_requests import (
     FinanceRequestPatch,
     FinanceRequestRead,
 )
+from app.services.audit_log import log_mutation
+from app.services.bdr_totals import bdr_get_response, sanitize_bdr_rows
+from app.services.domain_events import log_entity_mutation
+from app.services.finance_request_workflow import normalize_status
 from app.services.finance_requests_service import (
     apply_finance_request_patch,
     assert_finance_request_patch_respects_lock,
@@ -68,9 +70,6 @@ from app.services.finance_requests_service import (
     new_finance_request_id,
     reject_comment_provided,
 )
-from app.services.finance_request_workflow import normalize_status
-from app.services.audit_log import log_mutation
-from app.services.domain_events import log_entity_mutation
 from app.services.list_cursor_page import (
     ListCursorError,
     assert_cursor_matches,
@@ -295,7 +294,7 @@ async def update_funds(funds: list[FundItem], db: AsyncSession = Depends(get_db)
     return {"ok": True}
 
 
-@router.get("/plan", response_model=Optional[FinancePlanRowRead])
+@router.get("/plan", response_model=FinancePlanRowRead | None)
 async def get_plan(db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(FinancePlan).limit(1))
     row = result.scalar_one_or_none()
@@ -423,7 +422,7 @@ async def create_finance_request_endpoint(
     request: Request,
     db: AsyncSession = Depends(get_db),
 ):
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     new_id = new_finance_request_id(body)
     existing = await db.get(FinanceRequest, new_id)
     if existing:
@@ -488,7 +487,7 @@ async def patch_finance_request_endpoint(
         if prev_n == "approved" and new_n == "paid":
             await require_finance_approve_mark_paid(current_user=current_user, db=db)
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     apply_finance_request_patch(row, body, now=now, actor_user_id=current_user.id)
     await db.flush()
     await log_entity_mutation(
@@ -894,7 +893,7 @@ async def update_bdr(payload: BdrPutBody, db: AsyncSession = Depends(get_db)):
     rows_clean = sanitize_bdr_rows(rows_in, year=y)
     result = await db.execute(select(Bdr).where(Bdr.year == y))
     existing = result.scalar_one_or_none()
-    now = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+    now = datetime.now(UTC).isoformat().replace("+00:00", "Z")
     is_new = existing is None
     if existing:
         existing.rows = rows_clean

@@ -5,9 +5,9 @@ import sys
 from contextlib import asynccontextmanager
 
 from fastapi import Depends, FastAPI, HTTPException, Request
-from fastapi.responses import JSONResponse
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -72,6 +72,7 @@ from app.middleware.http_security import (
 )
 from app.middleware.idempotency import IdempotencyMiddleware
 from app.schemas.common_responses import PublicHealthResponse
+
 settings = get_settings()
 
 # Send ERROR/CRITICAL to system_logs and Telegram (if configured)

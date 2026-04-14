@@ -3,13 +3,13 @@ from fastapi import APIRouter, Depends
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.auth import get_current_user
+from app.core.mappers import row_to_activity
 from app.db import get_db
 from app.models.settings import ActivityLog
 from app.schemas.common_responses import OkResponse
 from app.schemas.content import ActivityLogCreate, ActivityLogItem, ActivityLogRead
 from app.services.domain_events import log_entity_mutation
-from app.core.mappers import row_to_activity
-from app.core.auth import get_current_user
 
 router = APIRouter(prefix="/activity", tags=["activity"], dependencies=[Depends(get_current_user)])
 

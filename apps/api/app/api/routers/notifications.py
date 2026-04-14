@@ -4,16 +4,11 @@ from fastapi import APIRouter, Depends, HTTPException, Query, WebSocket, WebSock
 from sqlalchemy import desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.auth import get_current_user
 from app.core.config import get_settings
 from app.core.redis import get_redis_client
 from app.db import get_db
 from app.models.notification import Notification
-from app.services.domain_events import log_entity_mutation
-from app.services.notification_delivery import enqueue_due_notification_delivery_jobs
-from app.services.notification_retention import run_notification_retention
-from app.services.notifications_stream import ensure_notifications_stream
-from app.services.notifications_realtime import realtime_hub
-from app.core.auth import get_current_user
 from app.schemas.notification_events import NotificationReadStateBody
 from app.schemas.notifications_api import (
     NotificationDeliveriesRunResponse,
@@ -22,6 +17,11 @@ from app.schemas.notifications_api import (
     NotificationRowRead,
     NotificationUnreadCountResponse,
 )
+from app.services.domain_events import log_entity_mutation
+from app.services.notification_delivery import enqueue_due_notification_delivery_jobs
+from app.services.notification_retention import run_notification_retention
+from app.services.notifications_realtime import realtime_hub
+from app.services.notifications_stream import ensure_notifications_stream
 
 router = APIRouter(prefix="/notifications", tags=["notifications"], dependencies=[Depends(get_current_user)])
 

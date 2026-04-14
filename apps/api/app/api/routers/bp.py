@@ -2,7 +2,8 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
+
 from fastapi import APIRouter, Body, Depends, HTTPException
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import select
@@ -121,7 +122,7 @@ async def start_process(
         raise HTTPException(status_code=409, detail="Экземпляр с таким id уже существует")
 
     ver = int(proc.version) if proc.version and str(proc.version).isdigit() else 1
-    now = datetime.now(timezone.utc).isoformat()
+    now = datetime.now(UTC).isoformat()
     ctx: dict = {
         "processVersion": ver,
         "startedAt": now,
@@ -284,7 +285,7 @@ async def advance_instance(
 
     if target is None:
         ctx["completedStepIds"] = completed
-        ctx["completedAt"] = datetime.now(timezone.utc).isoformat()
+        ctx["completedAt"] = datetime.now(UTC).isoformat()
         inst.status = "completed"
         inst.current_step_id = None
         inst.context = ctx

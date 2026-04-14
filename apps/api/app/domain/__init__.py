@@ -2,9 +2,9 @@
 
 from app.domain.deals import DealStageTransitionError, check_deal_stage_transition
 from app.domain.finance_requests import (
-    FinanceRequestStatusError,
     ALL_FINANCE_REQUEST_STATUSES,
     INITIAL_STATUSES,
+    FinanceRequestStatusError,
     check_finance_request_status_transition,
     normalize_finance_request_status,
 )

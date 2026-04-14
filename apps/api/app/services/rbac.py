@@ -6,13 +6,13 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.role import Role
-from app.models.user import User
 from app.core.permissions import (
     effective_permissions_for_role_response,
     normalize_permissions,
     role_has_permission,
 )
+from app.models.role import Role
+from app.models.user import User
 
 
 async def user_has_permission(db: AsyncSession, user: User, permission: str) -> bool:

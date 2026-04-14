@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 import logging
 import secrets
-from typing import Any, Union
+from typing import Any
 
 import httpx
 from fastapi import APIRouter, Depends, Header, HTTPException, Request
@@ -60,7 +60,7 @@ async def _call_telegram(token: str, method: str, data: dict[str, Any]) -> dict[
         return {"ok": False, "description": r.text[:500]}
 
 
-@router.post("/send", response_model=Union[DealCamelRead, IntegrationMessagingOk])
+@router.post("/send", response_model=DealCamelRead | IntegrationMessagingOk)
 async def send_telegram_to_lead(
     body: IntegrationDealSendBody,
     db: AsyncSession = Depends(get_db),

@@ -6,7 +6,7 @@ import logging
 import mimetypes
 import re
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from cryptography.fernet import InvalidToken
@@ -36,7 +36,7 @@ _TG_STATIC_MEDIA_KINDS = frozenset({"location", "venue", "contact", "poll"})
 
 
 def _now_iso() -> str:
-    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3] + "Z"
+    return datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3] + "Z"
 
 
 def _telethon_session_string_from_storage(blob: str | None) -> str:
@@ -587,7 +587,7 @@ async def send_deal_message(
         peer = await _resolve_peer(client, deal, linked_client)
         sent = await client.send_message(peer, text[:4000])
         mid = getattr(sent, "id", None)
-        cid = f"tg-out-{mid}" if mid else f"tg-out-{int(datetime.now(timezone.utc).timestamp() * 1000)}"
+        cid = f"tg-out-{mid}" if mid else f"tg-out-{int(datetime.now(UTC).timestamp() * 1000)}"
         comments = list(deal.comments or [])
         comments.append(
             {
