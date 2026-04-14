@@ -14,7 +14,7 @@ from alembic import op
 from sqlalchemy import text
 from sqlalchemy.dialects import postgresql
 
-revision: str = "039_business_process_steps_tables"
+revision: str = "039_bp_steps_tables"
 down_revision: Union[str, None] = "038_departments_parent_id"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None

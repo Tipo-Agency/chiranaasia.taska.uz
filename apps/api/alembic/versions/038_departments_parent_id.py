@@ -9,7 +9,7 @@ import sqlalchemy as sa
 from alembic import op
 
 revision: str = "038_departments_parent_id"
-down_revision: Union[str, None] = "037_employee_full_name_status_optional_user"
+down_revision: Union[str, None] = "037_employee_fullname_status"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 

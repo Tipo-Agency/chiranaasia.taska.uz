@@ -14,7 +14,7 @@ from sqlalchemy import text
 from sqlalchemy.dialects import postgresql
 
 revision: str = "040_bp_instances_table"
-down_revision: Union[str, None] = "039_business_process_steps_tables"
+down_revision: Union[str, None] = "039_bp_steps_tables"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 

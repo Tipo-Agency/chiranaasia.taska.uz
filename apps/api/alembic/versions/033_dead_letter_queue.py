@@ -9,7 +9,7 @@ from alembic import op
 from sqlalchemy.dialects.postgresql import JSONB
 
 revision: str = "033_dead_letter_queue"
-down_revision: Union[str, None] = "032_notification_deliveries_alignment"
+down_revision: Union[str, None] = "032_notif_deliveries_align"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 

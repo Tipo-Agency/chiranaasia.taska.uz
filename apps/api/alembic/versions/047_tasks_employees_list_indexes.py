@@ -12,7 +12,7 @@ import sqlalchemy as sa
 from alembic import op
 
 revision: str = "047_tasks_employees_list_indexes"
-down_revision: Union[str, None] = "046_finance_requests_created_id_idx"
+down_revision: Union[str, None] = "046_finreq_created_id_idx"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 

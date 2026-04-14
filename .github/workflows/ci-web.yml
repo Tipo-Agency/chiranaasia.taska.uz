@@ -7,20 +7,17 @@ on:
 jobs:
   web:
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: apps/web
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v6
         with:
           node-version: "22"
           cache: npm
-          cache-dependency-path: apps/web/package-lock.json
+          cache-dependency-path: package-lock.json
       - run: npm ci
       - name: npm audit
-        run: npm audit --audit-level=high
+        run: npm audit --workspace apps/web --audit-level=high
         continue-on-error: true
-      - run: npm run lint
-      - run: npm run typecheck
-      - run: npm run build
+      - run: npm --workspace apps/web run lint
+      - run: npm --workspace apps/web run typecheck
+      - run: npm --workspace apps/web run build
