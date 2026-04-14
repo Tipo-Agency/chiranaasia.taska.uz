@@ -61,7 +61,7 @@ export const useAppLogic = () => {
           const users = (await api.users.getAll()) as User[];
           if (users.length !== authSlice.state.users.length ||
               users.some(u => !authSlice.state.users.find(au => au.id === u.id))) {
-            authSlice.actions.updateUsers(users);
+            authSlice.actions.updateUsers(users, { persistRemote: false });
           } else {
             authSlice.setters.setUsers(users);
           }

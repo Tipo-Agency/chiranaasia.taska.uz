@@ -86,7 +86,7 @@ export const useAuthLogic = (showNotification: (msg: string) => void) => {
     storageService.clearActiveUserId();
   };
 
-  const updateUsers = (newUsers: User[]) => {
+  const updateUsers = (newUsers: User[], opts?: { persistRemote?: boolean }) => {
     const now = new Date().toISOString();
     // Устанавливаем updatedAt для всех пользователей при обновлении
     // ВАЖНО: При удалении пользователя используется мягкое удаление (isArchived: true)
@@ -105,8 +105,13 @@ export const useAuthLogic = (showNotification: (msg: string) => void) => {
         return base;
       })
     );
-    // Сохраняем через API в локальное хранилище (всех, включая архивных)
-    api.users.updateAll(usersWithTimestamp);
+    // Сохраняем в API только при явном пользовательском обновлении (не во время bootstrap).
+    if (opts?.persistRemote !== false) {
+      void api.users.updateAll(usersWithTimestamp).catch((error) => {
+        console.error('[Auth] Error updating users:', error);
+        showNotification('Ошибка сохранения пользователей');
+      });
+    }
     // Refresh current user if data changed
     if (currentUser) {
         const u = usersWithTimestamp.find(curr => curr.id === currentUser.id);
@@ -123,7 +128,10 @@ export const useAuthLogic = (showNotification: (msg: string) => void) => {
   const updateProfile = (updatedUser: User) => {
     const updatedUsers = users.map(u => u.id === updatedUser.id ? updatedUser : u);
     setUsers(updatedUsers.map(withAvatarFallback));
-    api.users.updateAll(updatedUsers);
+    void api.users.updateAll(updatedUsers).catch((error) => {
+      console.error('[Auth] Error updating profile:', error);
+      showNotification('Ошибка сохранения профиля');
+    });
     setCurrentUser(withAvatarFallback(updatedUser));
     setIsProfileOpen(false);
     showNotification('Профиль обновлен');
