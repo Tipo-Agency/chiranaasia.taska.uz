@@ -39,6 +39,8 @@ jobs:
             export META_TASKA="${{ secrets.META_TASKA }}"
             export META_TIPA="${{ secrets.META_TIPA }}"
             export META_UCHETGRAM="${{ secrets.META_UCHETGRAM }}"
+            export SECRET_KEY="${{ secrets.SECRET_KEY }}"
+            if [ -z "$SECRET_KEY" ]; then export SECRET_KEY="${{ secrets.API_SECRET_KEY }}"; fi
             export BACKEND_URL="${{ secrets.BACKEND_URL }}"
             export NGINX_SITE_NAME="${{ secrets.NGINX_SITE_NAME }}"
             # MTProto (личный Telegram в CRM): my.telegram.org → api_id / api_hash
