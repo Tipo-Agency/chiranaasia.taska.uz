@@ -16,6 +16,8 @@ import {
   ModuleSegmentedControl,
   SystemAlertDialog,
   APP_TOOLBAR_MODULE_CLUSTER,
+  MODULE_ACCENTS,
+  MODULE_TOOLBAR_TAB_IDLE,
 } from './ui';
 import { useAppToolbar } from '../contexts/AppToolbarContext';
 import { BankStatementsView, type BankStatementsViewHandle } from './finance/BankStatementsView';
@@ -1907,8 +1909,8 @@ const FinanceView: React.FC<FinanceViewProps> = ({
       setModule(null);
       return;
     }
-    const emerald = 'bg-[#3337AD] text-white shadow-sm';
-    const idle = 'text-gray-600 dark:text-gray-400';
+    const tabActive = MODULE_ACCENTS.emerald.navIconActive;
+    const idle = MODULE_TOOLBAR_TAB_IDLE;
     setLeading(
       <div className="flex items-center gap-0.5 shrink-0 flex-wrap sm:flex-nowrap" role="tablist" aria-label="Финансы">
         {financeTabOptions.map((opt) => (
@@ -1919,7 +1921,7 @@ const FinanceView: React.FC<FinanceViewProps> = ({
             aria-selected={activeTab === opt.value}
             onClick={() => handleFinanceTabChange(opt.value)}
             className={`px-2 sm:px-2.5 py-1 rounded-lg text-[11px] sm:text-xs font-medium whitespace-nowrap transition-colors ${
-              activeTab === opt.value ? emerald : `${idle} hover:bg-gray-100 dark:hover:bg-[#252525]`
+              activeTab === opt.value ? tabActive : idle
             }`}
           >
             {opt.label}

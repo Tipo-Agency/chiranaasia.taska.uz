@@ -10,6 +10,8 @@ export {
   MODULE_PAGE_TOP_PAD,
   APP_TOOLBAR_MODULE_CLUSTER,
   MODULE_ACCENTS,
+  MODULE_TOOLBAR_TAB_IDLE,
+  moduleToolbarTabActive,
   resolveModuleAccentKey,
   accentForSpaceType,
   accentForTableType,

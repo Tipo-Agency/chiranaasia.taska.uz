@@ -17,6 +17,8 @@ import {
   SystemAlertDialog,
   SystemConfirmDialog,
   APP_TOOLBAR_MODULE_CLUSTER,
+  MODULE_ACCENTS,
+  MODULE_TOOLBAR_TAB_IDLE,
 } from './ui';
 import { StandardModal } from './ui/StandardModal';
 import { useAppToolbar } from '../contexts/AppToolbarContext';
@@ -396,8 +398,8 @@ const InventoryView: React.FC<InventoryViewProps> = ({
   };
 
   useLayoutEffect(() => {
-    const em = 'bg-[#3337AD] text-white shadow-sm';
-    const idle = 'text-gray-500 dark:text-gray-400';
+    const tabActive = MODULE_ACCENTS.teal.navIconActive;
+    const idle = MODULE_TOOLBAR_TAB_IDLE;
     const tabs: { id: typeof activeTab; label: string }[] = [
       { id: 'balances', label: 'Остатки' },
       { id: 'items', label: 'Номенклатура' },
@@ -416,7 +418,7 @@ const InventoryView: React.FC<InventoryViewProps> = ({
               aria-selected={on}
               onClick={() => setActiveTab(t.id)}
               className={`px-2 sm:px-2.5 py-1 rounded-lg text-[11px] sm:text-xs font-medium whitespace-nowrap shrink-0 transition-colors ${
-                on ? em : `${idle} hover:bg-gray-100 dark:hover:bg-[#252525]`
+                on ? tabActive : idle
               }`}
             >
               {t.label}

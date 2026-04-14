@@ -24,6 +24,8 @@ import {
   ModuleFilterIconButton,
   ModuleCreateIconButton,
   APP_TOOLBAR_MODULE_CLUSTER,
+  MODULE_ACCENTS,
+  MODULE_TOOLBAR_TAB_IDLE,
 } from '../ui';
 import { TasksFilters } from '../features/tasks';
 import { useAppToolbar } from '../../contexts/AppToolbarContext';
@@ -222,8 +224,8 @@ export const TasksPage: React.FC<TasksPageProps> = ({
   }, [onCreateTask]);
 
   useLayoutEffect(() => {
-    const indigo = 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300';
-    const idle = 'text-gray-600 dark:text-gray-400';
+    const tabActive = MODULE_ACCENTS.sky.navIconActive;
+    const idle = MODULE_TOOLBAR_TAB_IDLE;
     const modes: { id: ViewMode; label: string }[] = [
       { id: ViewMode.TABLE, label: 'Таблица' },
       { id: ViewMode.KANBAN, label: 'Канбан' },
@@ -239,7 +241,7 @@ export const TasksPage: React.FC<TasksPageProps> = ({
             aria-selected={viewMode === m.id}
             onClick={() => setViewMode(m.id)}
             className={`px-2 sm:px-2.5 py-1 rounded-lg text-[11px] sm:text-xs font-medium whitespace-nowrap transition-colors ${
-              viewMode === m.id ? indigo : `${idle} hover:bg-gray-100 dark:hover:bg-[#252525]`
+              viewMode === m.id ? tabActive : idle
             }`}
           >
             {m.label}

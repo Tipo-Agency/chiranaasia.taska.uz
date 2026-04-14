@@ -11,7 +11,7 @@ export function ToolbarModuleLabel({
 }) {
   return (
     <span
-      className={`inline-flex items-center min-h-8 px-2.5 py-1 rounded-lg text-xs font-semibold shrink-0 ${MODULE_ACCENTS[accent].segmentActive}`}
+      className={`inline-flex items-center min-h-8 px-2.5 py-1 rounded-lg text-xs font-semibold shrink-0 ${MODULE_ACCENTS[accent].navIconActive}`}
     >
       {children}
     </span>

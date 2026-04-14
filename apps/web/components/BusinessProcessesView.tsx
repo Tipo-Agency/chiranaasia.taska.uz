@@ -16,6 +16,8 @@ import {
   MODULE_PAGE_TOP_PAD,
   SystemAlertDialog,
   APP_TOOLBAR_MODULE_CLUSTER,
+  MODULE_ACCENTS,
+  MODULE_TOOLBAR_TAB_IDLE,
 } from './ui';
 import { useAppToolbar } from '../contexts/AppToolbarContext';
 
@@ -441,8 +443,8 @@ const BusinessProcessesView: React.FC<BusinessProcessesViewProps> = ({
       setModule(null);
       return;
     }
-    const indigo = 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300';
-    const idle = 'text-gray-600 dark:text-gray-400';
+    const tabActive = MODULE_ACCENTS.cyan.navIconActive;
+    const idle = MODULE_TOOLBAR_TAB_IDLE;
     const tabs: { id: 'templates' | 'running' | 'completed'; label: string }[] = [
       { id: 'templates', label: 'Шаблоны' },
       { id: 'running', label: 'В работе' },
@@ -458,7 +460,7 @@ const BusinessProcessesView: React.FC<BusinessProcessesViewProps> = ({
             aria-selected={activeTab === t.id}
             onClick={() => setActiveTab(t.id)}
             className={`px-2 sm:px-2.5 py-1 rounded-lg text-[11px] sm:text-xs font-medium whitespace-nowrap transition-colors ${
-              activeTab === t.id ? indigo : `${idle} hover:bg-gray-100 dark:hover:bg-[#252525]`
+              activeTab === t.id ? tabActive : idle
             }`}
           >
             {t.label}
@@ -510,7 +512,7 @@ const BusinessProcessesView: React.FC<BusinessProcessesViewProps> = ({
               aria-selected={viewMode === t.id}
               onClick={() => setViewMode(t.id)}
               className={`px-2 py-1 rounded-lg text-[11px] sm:text-xs font-medium whitespace-nowrap shrink-0 transition-colors ${
-                viewMode === t.id ? indigo : `${idle} hover:bg-gray-100 dark:hover:bg-[#252525]`
+                viewMode === t.id ? tabActive : idle
               }`}
             >
               {t.label}

@@ -10,6 +10,7 @@ import {
   MODULE_PAGE_GUTTER,
   ModuleCreateIconButton,
   APP_TOOLBAR_MODULE_CLUSTER,
+  MODULE_ACCENTS,
 } from './ui';
 import { useAppToolbar } from '../contexts/AppToolbarContext';
 import { TaskSelect } from './TaskSelect';
@@ -636,7 +637,7 @@ const ContentPlanView: React.FC<ContentPlanViewProps> = ({
                   onClick={() => setFormatFilter(f)}
                   className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors ${
                     formatFilter === f
-                      ? 'bg-[#3337AD] text-white'
+                      ? MODULE_ACCENTS.indigo.navIconActive
                       : 'bg-white dark:bg-[#2a2a2a] text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-[#333] border border-gray-200 dark:border-[#333]'
                   }`}
                 >

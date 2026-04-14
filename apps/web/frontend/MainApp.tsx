@@ -18,7 +18,7 @@ import { ErrorBoundary } from '../components/ErrorBoundary';
 import { useAppLogic } from './hooks/useAppLogic';
 import { useNotificationCenter } from './contexts/NotificationCenterContext';
 import { AppShellProviders } from '../providers/AppShellProviders';
-import { StandardModal, Input, Button } from '../components/ui';
+import { StandardModal, Input, Button, MODULE_ACCENTS } from '../components/ui';
 import {
   createEntityFromChat as createEntityFromChatBridge,
   updateEntityFromChat as updateEntityFromChatBridge,
@@ -323,8 +323,8 @@ export function MainApp() {
                     onClick={() => setChatMainTab('team')}
                     className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
                       chatMainTab === 'team'
-                        ? 'bg-[#3337AD] text-white'
-                        : 'bg-white/70 dark:bg-[#1f1f1f]/60 text-gray-600 dark:text-gray-300 border border-gray-200/70 dark:border-[#3a3a3a] hover:border-[#3337AD]/40'
+                        ? MODULE_ACCENTS.teal.navIconActive
+                        : 'bg-white/70 dark:bg-[#1f1f1f]/60 text-gray-600 dark:text-gray-300 border border-gray-200/70 dark:border-[#3a3a3a] hover:border-teal-500/30'
                     }`}
                   >
                     Сотрудники
@@ -337,8 +337,8 @@ export function MainApp() {
                     }}
                     className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
                       chatMainTab === 'clients'
-                        ? 'bg-[#3337AD] text-white'
-                        : 'bg-white/70 dark:bg-[#1f1f1f]/60 text-gray-600 dark:text-gray-300 border border-gray-200/70 dark:border-[#3a3a3a] hover:border-[#3337AD]/40'
+                        ? MODULE_ACCENTS.teal.navIconActive
+                        : 'bg-white/70 dark:bg-[#1f1f1f]/60 text-gray-600 dark:text-gray-300 border border-gray-200/70 dark:border-[#3a3a3a] hover:border-teal-500/30'
                     }`}
                   >
                     Клиенты

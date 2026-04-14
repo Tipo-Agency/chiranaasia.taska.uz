@@ -54,13 +54,21 @@ export const ModuleSelectDropdown: React.FC<ModuleSelectDropdownProps> = ({
     if (!prefixLabel) return v;
     return (
       <>
-        <span className="hidden sm:inline text-gray-500 dark:text-gray-400 font-medium">{prefixLabel}: </span>
-        <span className="inline font-semibold">{v}</span>
+        <span
+          className={`hidden sm:inline font-medium ${
+            open ? 'text-white/75' : 'text-gray-500 dark:text-gray-400'
+          }`}
+        >
+          {prefixLabel}:{' '}
+        </span>
+        <span className={`inline font-semibold ${open ? 'text-white' : ''}`}>{v}</span>
       </>
     );
-  }, [prefixLabel, valueLabel]);
+  }, [prefixLabel, valueLabel, open]);
 
   if (!items.length) return null;
+
+  const openActive = MODULE_ACCENTS[accent].filterActive;
 
   const buttonSizeClass =
     size === 'xs'
@@ -82,14 +90,14 @@ export const ModuleSelectDropdown: React.FC<ModuleSelectDropdownProps> = ({
           inline-flex items-center
           w-auto
           ${buttonSizeClass}
-          border border-gray-200/90 dark:border-[#444]
-          bg-white dark:bg-[#1f1f1f]
-          text-gray-900 dark:text-white
-          shadow-sm
-          hover:bg-gray-50 dark:hover:bg-[#2a2a2a]
           transition-colors
           focus:outline-none focus:ring-2 focus:ring-offset-0 focus:ring-[#3337AD]/35 dark:focus:ring-[#a5a8f5]/25
           disabled:opacity-50 disabled:cursor-not-allowed
+          ${
+            open
+              ? `${openActive} border-transparent shadow-md`
+              : `border border-gray-200/90 dark:border-[#444] bg-white dark:bg-[#1f1f1f] text-gray-900 dark:text-white shadow-sm hover:bg-gray-50 dark:hover:bg-[#2a2a2a]`
+          }
         `.trim()}
       >
         <span className="truncate text-left">
@@ -97,7 +105,9 @@ export const ModuleSelectDropdown: React.FC<ModuleSelectDropdownProps> = ({
         </span>
         <ChevronDown
           size={chevronSize}
-          className={`absolute ${chevronRight} top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none transition-transform shrink-0 ${open ? 'rotate-180' : ''}`}
+          className={`absolute ${chevronRight} top-1/2 -translate-y-1/2 pointer-events-none transition-transform shrink-0 ${
+            open ? 'rotate-180 text-white/90' : 'text-gray-400'
+          }`}
         />
       </button>
 

@@ -9,7 +9,8 @@ interface ClientsTabsProps {
 export const ClientsTabs: React.FC<ClientsTabsProps> = ({ activeTab, onTabChange }) => {
   return (
     <ModuleSegmentedControl
-      variant="neutral"
+      variant="accent"
+      accent="violet"
       size="sm"
       value={activeTab}
       onChange={(v) => onTabChange(v as 'clients' | 'contracts' | 'finance' | 'receivables')}

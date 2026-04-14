@@ -8,6 +8,8 @@ import {
   MODULE_PAGE_GUTTER,
   MODULE_PAGE_TOP_PAD,
   APP_TOOLBAR_MODULE_CLUSTER,
+  MODULE_ACCENTS,
+  MODULE_TOOLBAR_TAB_IDLE,
 } from './ui';
 import { useAppToolbar } from '../contexts/AppToolbarContext';
 import { TaskSelect } from './TaskSelect';
@@ -649,8 +651,8 @@ const EmployeesView: React.FC<EmployeesViewProps> = ({
   };
 
   useLayoutEffect(() => {
-    const orange = 'bg-[#3337AD] text-white shadow-sm';
-    const idle = 'text-gray-600 dark:text-gray-400';
+    const tabActive = MODULE_ACCENTS.orange.navIconActive;
+    const idle = MODULE_TOOLBAR_TAB_IDLE;
     const tabs: { id: 'cards' | 'orgchart' | 'structure'; label: string }[] = [
       { id: 'cards', label: 'Карточки' },
       { id: 'orgchart', label: 'Оргсхема' },
@@ -666,7 +668,7 @@ const EmployeesView: React.FC<EmployeesViewProps> = ({
             aria-selected={activeTab === t.id}
             onClick={() => setActiveTab(t.id)}
             className={`px-2 sm:px-2.5 py-1 rounded-lg text-[11px] sm:text-xs font-medium whitespace-nowrap transition-colors ${
-              activeTab === t.id ? orange : `${idle} hover:bg-gray-100 dark:hover:bg-[#252525]`
+              activeTab === t.id ? tabActive : idle
             }`}
           >
             {t.label}

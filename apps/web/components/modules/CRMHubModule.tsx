@@ -16,7 +16,7 @@ import { hasPermission } from '../../utils/permissions';
 import { CRMModule } from './CRMModule';
 import { ClientChatsPage } from '../pages/ClientChatsPage';
 import { useAppToolbar } from '../../contexts/AppToolbarContext';
-import { MODULE_ACCENTS } from '../ui/moduleAccent';
+import { MODULE_ACCENTS, MODULE_TOOLBAR_TAB_IDLE } from '../ui/moduleAccent';
 
 export type CrmHubTab = 'funnel' | 'chats' | 'clients' | 'rejected';
 
@@ -99,8 +99,8 @@ export const CRMHubModule: React.FC<CRMHubModuleProps> = ({
       setLeading(null);
       return () => setLeading(null);
     }
-    const activeBox = MODULE_ACCENTS.violet.segmentActive;
-    const idleBox = 'text-gray-600 dark:text-gray-400';
+    const activeBox = MODULE_ACCENTS.violet.navIconActive;
+    const idleBox = MODULE_TOOLBAR_TAB_IDLE;
     setLeading(
       <div className="flex items-center gap-0.5 sm:gap-1 shrink-0 flex-wrap sm:flex-nowrap" role="tablist" aria-label="CRM">
         {options.map((o) => {
@@ -113,7 +113,7 @@ export const CRMHubModule: React.FC<CRMHubModuleProps> = ({
               aria-selected={active}
               onClick={() => onTabChange(o.value)}
               className={`px-2 sm:px-2.5 py-1 rounded-lg text-[11px] sm:text-xs font-medium whitespace-nowrap shrink-0 transition-colors ${
-                active ? activeBox : `${idleBox} hover:bg-gray-100 dark:hover:bg-[#252525]`
+                active ? activeBox : idleBox
               }`}
             >
               {o.label}

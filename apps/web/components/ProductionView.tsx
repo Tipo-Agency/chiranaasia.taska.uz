@@ -2,7 +2,13 @@ import React, { useLayoutEffect, useMemo, useState } from 'react';
 import { BarChart3, ClipboardList, Factory, LayoutDashboard } from 'lucide-react';
 import type { Department, User } from '../types';
 import { ModuleCreateDropdown, ModuleFilterIconButton, ModulePageShell } from './ui';
-import { MODULE_PAGE_GUTTER, MODULE_PAGE_TOP_PAD, APP_TOOLBAR_MODULE_CLUSTER } from './ui/moduleAccent';
+import {
+  MODULE_PAGE_GUTTER,
+  MODULE_PAGE_TOP_PAD,
+  APP_TOOLBAR_MODULE_CLUSTER,
+  MODULE_ACCENTS,
+  MODULE_TOOLBAR_TAB_IDLE,
+} from './ui/moduleAccent';
 import { useAppToolbar } from '../contexts/AppToolbarContext';
 import { useProductionStore } from './production/useProductionStore';
 import { ProductionMonitorPanel } from './production/ProductionMonitorPanel';
@@ -36,8 +42,8 @@ export default function ProductionView({ users, departments, currentUser }: Prod
   );
 
   useLayoutEffect(() => {
-    const emerald = 'bg-[#3337AD] text-white shadow-sm';
-    const idle = 'text-gray-600 dark:text-gray-400';
+    const tabActive = MODULE_ACCENTS.amber.navIconActive;
+    const idle = MODULE_TOOLBAR_TAB_IDLE;
 
     setLeading(
       <div className="flex items-center gap-0.5 shrink-0 flex-wrap sm:flex-nowrap" role="tablist" aria-label="Производство">
@@ -51,7 +57,7 @@ export default function ProductionView({ users, departments, currentUser }: Prod
               aria-selected={active}
               onClick={() => setTab(t.id)}
               className={`px-2 sm:px-2.5 py-1 rounded-lg text-[11px] sm:text-xs font-medium whitespace-nowrap transition-colors ${
-                active ? emerald : `${idle} hover:bg-gray-100 dark:hover:bg-[#252525]`
+                active ? tabActive : idle
               }`}
             >
               {t.label}

@@ -220,6 +220,15 @@ export const MODULE_ACCENTS: Record<
   },
 };
 
+/** Неактивная вкладка в шапке модуля. */
+export const MODULE_TOOLBAR_TAB_IDLE =
+  'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-[#252525]';
+
+/** Активная вкладка в шапке — как чип иконки в левом меню (полупрозрачный фон). */
+export function moduleToolbarTabActive(accent: ModuleAccentKey): string {
+  return MODULE_ACCENTS[accent].navIconActive;
+}
+
 /**
  * Общий контейнер модуля: тянем контент на всю ширину,
  * но сохраняем одинаковые боковые отступы.

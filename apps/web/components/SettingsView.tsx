@@ -11,6 +11,8 @@ import {
   MODULE_PAGE_GUTTER,
   MODULE_PAGE_TOP_PAD,
   APP_TOOLBAR_MODULE_CLUSTER,
+  MODULE_ACCENTS,
+  MODULE_TOOLBAR_TAB_IDLE,
 } from './ui';
 import { ProfileSettings } from './settings/ProfileSettings';
 import { AccessSettings } from './settings/AccessSettings';
@@ -178,8 +180,8 @@ const SettingsView: React.FC<SettingsViewProps> = ({
   }, []);
 
   useLayoutEffect(() => {
-    const activeBox = 'bg-[#3337AD] text-white shadow-sm';
-    const idleBox = 'text-gray-600 dark:text-gray-400';
+    const activeBox = MODULE_ACCENTS.slate.navIconActive;
+    const idleBox = MODULE_TOOLBAR_TAB_IDLE;
     const leadingTabs = showArchiveScreen
       ? ARCHIVE_TAB_OPTIONS.map((t) => ({ id: t.id as string, label: t.label }))
       : settingsTabs.map((t) => ({ id: t.id, label: t.label }));
@@ -200,7 +202,7 @@ const SettingsView: React.FC<SettingsViewProps> = ({
                 else setActiveTab(t.id);
               }}
               className={`px-2 sm:px-2.5 py-1 rounded-lg text-[11px] sm:text-xs font-medium whitespace-nowrap shrink-0 transition-colors ${
-                active ? activeBox : `${idleBox} hover:bg-gray-100 dark:hover:bg-[#252525]`
+                active ? activeBox : idleBox
               }`}
             >
               {t.label}

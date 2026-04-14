@@ -379,7 +379,7 @@ const SalesFunnelView: React.FC<SalesFunnelViewProps> = ({ deals, clients, users
     if (forcedViewMode && viewMode !== forcedViewMode) {
       setViewMode(forcedViewMode);
     }
-    const segmentActive = MODULE_ACCENTS.violet.segmentActive;
+    const tabActive = MODULE_ACCENTS.violet.navIconActive;
     const idle = 'text-gray-500 dark:text-gray-400';
     setModule(
       <div className={APP_TOOLBAR_MODULE_CLUSTER}>
@@ -484,7 +484,7 @@ const SalesFunnelView: React.FC<SalesFunnelViewProps> = ({ deals, clients, users
                 aria-selected={viewMode === t.id}
                 onClick={() => setViewMode(t.id)}
                 className={`px-2 py-1 rounded-lg text-[11px] sm:text-xs font-medium whitespace-nowrap shrink-0 transition-colors ${
-                  viewMode === t.id ? segmentActive : `${idle} hover:bg-gray-100 dark:hover:bg-[#252525]`
+                  viewMode === t.id ? tabActive : `${idle} hover:bg-gray-100 dark:hover:bg-[#252525]`
                 }`}
               >
                 {t.label}

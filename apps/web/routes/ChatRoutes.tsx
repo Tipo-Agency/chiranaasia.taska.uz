@@ -5,6 +5,7 @@ import { PageLayout } from '../components/ui/PageLayout';
 import { Container } from '../components/ui/Container';
 import type { AppRouterProps } from '../components/appRouterTypes';
 import { getChatDefaultTab, type ChatMainTab } from '../utils/chatPreference';
+import { MODULE_ACCENTS } from '../components/ui';
 
 export type ChatRoutesExtra = {
   createEntityFromChat: (type: 'task' | 'deal' | 'meeting' | 'doc', title: string) => void;
@@ -29,8 +30,8 @@ export function ChatRoutesView(props: AppRouterProps & ChatRoutesExtra) {
               onClick={() => setChatMainTab('team')}
               className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
                 chatMainTab === 'team'
-                  ? 'bg-[#3337AD] text-white'
-                  : 'bg-white/70 dark:bg-[#1f1f1f]/60 text-gray-600 dark:text-gray-300 border border-gray-200/70 dark:border-[#3a3a3a] hover:border-[#3337AD]/40'
+                  ? MODULE_ACCENTS.teal.navIconActive
+                  : 'bg-white/70 dark:bg-[#1f1f1f]/60 text-gray-600 dark:text-gray-300 border border-gray-200/70 dark:border-[#3a3a3a] hover:border-teal-500/30'
               }`}
             >
               Сотрудники
@@ -40,8 +41,8 @@ export function ChatRoutesView(props: AppRouterProps & ChatRoutesExtra) {
               onClick={() => setChatMainTab('clients')}
               className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
                 chatMainTab === 'clients'
-                  ? 'bg-[#3337AD] text-white'
-                  : 'bg-white/70 dark:bg-[#1f1f1f]/60 text-gray-600 dark:text-gray-300 border border-gray-200/70 dark:border-[#3a3a3a] hover:border-[#3337AD]/40'
+                  ? MODULE_ACCENTS.teal.navIconActive
+                  : 'bg-white/70 dark:bg-[#1f1f1f]/60 text-gray-600 dark:text-gray-300 border border-gray-200/70 dark:border-[#3a3a3a] hover:border-teal-500/30'
               }`}
             >
               Клиенты

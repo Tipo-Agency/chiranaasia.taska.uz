@@ -18,7 +18,14 @@ import {
 import { Deal, FinancePlan, Meeting, Task, User, Doc, type BusinessProcess, SalesFunnel } from '../../types';
 import { getDealDisplayTitle, isFunnelDeal } from '../../utils/dealModel';
 import { ModuleCreateDropdown } from '../ui/ModuleCreateDropdown';
-import { ModulePageShell, MODULE_PAGE_GUTTER, MODULE_PAGE_TOP_PAD, APP_TOOLBAR_MODULE_CLUSTER } from '../ui';
+import {
+  ModulePageShell,
+  MODULE_PAGE_GUTTER,
+  MODULE_PAGE_TOP_PAD,
+  APP_TOOLBAR_MODULE_CLUSTER,
+  MODULE_ACCENTS,
+  MODULE_TOOLBAR_TAB_IDLE,
+} from '../ui';
 import { useAppToolbar } from '../../contexts/AppToolbarContext';
 import { DateInput } from '../ui/DateInput';
 import { getTodayLocalDate, normalizeDateForInput, parseLocalDate } from '../../utils/dateUtils';
@@ -316,8 +323,8 @@ export const WorkdeskView: React.FC<WorkdeskViewProps> = ({
   }, [salesFunnels]);
 
   useLayoutEffect(() => {
-    const activeBox = 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300';
-    const idleBox = 'text-gray-600 dark:text-gray-400';
+    const activeBox = MODULE_ACCENTS.indigo.navIconActive;
+    const idleBox = MODULE_TOOLBAR_TAB_IDLE;
     const tabs: { id: WorkdeskTab; label: string }[] = [
       { id: 'dashboard', label: 'Дашборд' },
       { id: 'meetings', label: 'Календарь' },
@@ -335,7 +342,7 @@ export const WorkdeskView: React.FC<WorkdeskViewProps> = ({
               aria-selected={active}
               onClick={() => setActiveTab(t.id)}
               className={`px-2 sm:px-2.5 py-1 rounded-lg text-[11px] sm:text-xs font-medium whitespace-nowrap transition-colors shrink-0 ${
-                active ? activeBox : `${idleBox} hover:bg-gray-100 dark:hover:bg-[#252525]`
+                active ? activeBox : idleBox
               }`}
             >
               {t.label}

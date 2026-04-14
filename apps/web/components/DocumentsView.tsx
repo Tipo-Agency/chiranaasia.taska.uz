@@ -8,6 +8,8 @@ import {
   ModulePageShell,
   MODULE_PAGE_GUTTER,
   APP_TOOLBAR_MODULE_CLUSTER,
+  MODULE_ACCENTS,
+  MODULE_TOOLBAR_TAB_IDLE,
 } from './ui';
 import { useAppToolbar } from '../contexts/AppToolbarContext';
 import { FilePreviewModal } from './FilePreviewModal';
@@ -320,8 +322,8 @@ const DocumentsView: React.FC<DocumentsViewProps> = ({
 
   useLayoutEffect(() => {
     if (docSection === 'docs') {
-      const indigo = 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300';
-      const idle = 'text-gray-600 dark:text-gray-400';
+      const tabActive = MODULE_ACCENTS.slate.navIconActive;
+      const idle = MODULE_TOOLBAR_TAB_IDLE;
       setLeading(
         <div className="flex items-center gap-0.5 shrink-0 flex-wrap sm:flex-nowrap" role="tablist" aria-label="Вид документов">
           {(
@@ -337,7 +339,7 @@ const DocumentsView: React.FC<DocumentsViewProps> = ({
               aria-selected={viewMode === t.id}
               onClick={() => setViewMode(t.id)}
               className={`px-2 sm:px-2.5 py-1 rounded-lg text-[11px] sm:text-xs font-medium whitespace-nowrap transition-colors ${
-                viewMode === t.id ? indigo : `${idle} hover:bg-gray-100 dark:hover:bg-[#252525]`
+                viewMode === t.id ? tabActive : idle
               }`}
             >
               {t.label}
