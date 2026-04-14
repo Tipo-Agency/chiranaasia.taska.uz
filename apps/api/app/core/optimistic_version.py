@@ -2,8 +2,8 @@
 from __future__ import annotations
 
 from fastapi import HTTPException
-from sqlalchemy.exc import StaleDataError
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm.exc import StaleDataError
 
 
 def parse_if_match_header(raw: str | None) -> int | None:
