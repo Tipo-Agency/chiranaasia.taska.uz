@@ -94,6 +94,11 @@ if [ "${#_secret_from_env}" -lt 32 ]; then
   echo "❌ SECRET_KEY слишком короткий (${#_secret_from_env} символов). Нужно минимум 32."
   exit 1
 fi
+# Если GitHub Action передал пустой SECRET_KEY, убираем его из env:
+# docker compose иначе берёт пустую переменную окружения и игнорирует .env.
+if [ -z "$SECRET_KEY" ]; then
+  unset SECRET_KEY
+fi
 
 # MTProto (личный Telegram): TELEGRAM_API_ID + TELEGRAM_API_HASH из GitHub Secrets
 for _k in TELEGRAM_API_ID TELEGRAM_API_HASH; do
