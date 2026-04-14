@@ -1193,7 +1193,9 @@ export const contractsEndpoint = {
   updateAll: async (contracts: unknown[]) => {
     const all = await fetchAllDealsPages();
     const preserved = all.filter((d) => !isRecurringContract(d));
-    return put<{ ok: boolean }>('/deals', mergeById(preserved, contracts));
+    const payload = (contracts as Deal[]).map((d) => dealToBulkPutItem(d));
+    const preservedPayload = preserved.map((d) => dealToBulkPutItem(d));
+    return put<{ ok: boolean }>('/deals', mergeById(preservedPayload, payload));
   },
 };
 
@@ -1205,7 +1207,9 @@ export const oneTimeDealsEndpoint = {
   updateAll: async (sales: unknown[]) => {
     const all = await fetchAllDealsPages();
     const preserved = all.filter((d) => !isOneTimeSale(d));
-    return put<{ ok: boolean }>('/deals', mergeById(preserved, sales));
+    const payload = (sales as Deal[]).map((d) => dealToBulkPutItem(d));
+    const preservedPayload = preserved.map((d) => dealToBulkPutItem(d));
+    return put<{ ok: boolean }>('/deals', mergeById(preservedPayload, payload));
   },
 };
 
