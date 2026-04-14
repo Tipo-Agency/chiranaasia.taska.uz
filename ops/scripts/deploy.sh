@@ -86,9 +86,24 @@ fi
 
 _secret_from_env="$(grep '^SECRET_KEY=' .env 2>/dev/null | tail -n1 | cut -d'=' -f2-)"
 if [ -z "$_secret_from_env" ]; then
-  echo "❌ SECRET_KEY не задан. Добавьте SECRET_KEY (или API_SECRET_KEY) в GitHub Actions Secrets."
-  echo "   Либо вручную пропишите SECRET_KEY в $SERVER_PATH/.env (см. .env.example, минимум 32 символа)."
-  exit 1
+  echo "   SECRET_KEY отсутствует в .env — генерируем новый безопасный ключ..."
+  _generated_secret=""
+  if command -v openssl >/dev/null 2>&1; then
+    _generated_secret="$(openssl rand -hex 32 2>/dev/null || true)"
+  fi
+  if [ -z "$_generated_secret" ] && command -v python3 >/dev/null 2>&1; then
+    _generated_secret="$(python3 - <<'PY'
+import secrets
+print(secrets.token_hex(32))
+PY
+)"
+  fi
+  if [ -z "$_generated_secret" ]; then
+    _generated_secret="$(head -c 32 /dev/urandom | od -An -tx1 | tr -d ' \n')"
+  fi
+  printf '%s=%s\n' "SECRET_KEY" "$_generated_secret" >> .env
+  _secret_from_env="$_generated_secret"
+  echo "   SECRET_KEY generated and saved to .env"
 fi
 if [ "${#_secret_from_env}" -lt 32 ]; then
   echo "❌ SECRET_KEY слишком короткий (${#_secret_from_env} символов). Нужно минимум 32."
