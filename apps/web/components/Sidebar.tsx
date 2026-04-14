@@ -11,7 +11,6 @@ import {
   Network,
   Briefcase,
   UserCheck,
-  PiggyBank,
   X,
   CheckSquare,
   ChevronRight,
@@ -53,7 +52,7 @@ export interface SidebarProps {
   tables: TableCollection[];
   activeTableId: string;
   onSelectTable: (id: string) => void;
-  onNavigate: (view: 'home' | 'tasks' | 'inbox' | 'chat' | 'search' | 'clients' | 'employees' | 'payroll' | 'sales-funnel' | 'client-chats' | 'finance' | 'business-processes' | 'production' | 'analytics' | 'settings' | 'inventory' | 'admin') => void;
+  onNavigate: (view: 'home' | 'tasks' | 'inbox' | 'chat' | 'search' | 'clients' | 'employees' | 'sales-funnel' | 'client-chats' | 'finance' | 'business-processes' | 'production' | 'analytics' | 'settings' | 'inventory' | 'admin') => void;
   currentView: string;
   currentUser: User;
   onCreateTable: () => void;
@@ -307,24 +306,6 @@ const Sidebar: React.FC<SidebarProps> = ({
                 >
                     <NavIcon active={currentView === 'employees'} accent="orange"><UserCheck size={18} /></NavIcon>
                     {!isCollapsed && <span className={`text-sm ${currentView === 'employees' ? 'font-semibold' : ''}`}>Сотрудники</span>}
-                </div>
-            )}
-            {can('org.employees') && (
-                <div
-                  onClick={() => handleNav(() => onNavigate('payroll'))}
-                  className={`group flex items-center ${isCollapsed ? 'justify-center' : 'gap-2'} ${isCollapsed ? 'px-2' : 'px-3'} py-1.5 rounded-lg cursor-pointer transition-colors ${
-                    currentView === 'payroll'
-                      ? 'text-gray-900 dark:text-white'
-                      : 'text-notion-text/70 dark:text-gray-400 hover:bg-notion-hover dark:hover:bg-[#252525] hover:text-notion-text dark:hover:text-gray-200'
-                  }`}
-                  title={isCollapsed ? 'Зарплата' : ''}
-                >
-                  <NavIcon active={currentView === 'payroll'} accent="orange">
-                    <PiggyBank size={18} />
-                  </NavIcon>
-                  {!isCollapsed && (
-                    <span className={`text-sm ${currentView === 'payroll' ? 'font-semibold' : ''}`}>Зарплата</span>
-                  )}
                 </div>
             )}
 

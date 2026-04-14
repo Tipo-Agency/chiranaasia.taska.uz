@@ -6,7 +6,7 @@ const HRModuleLazy = lazy(() =>
   import('../components/modules/HRModule').then((m) => ({ default: m.HRModule }))
 );
 
-type HrRoutesViewProps = AppRouterProps & { hrView: 'employees' | 'business-processes' | 'payroll' };
+type HrRoutesViewProps = AppRouterProps & { hrView: 'employees' | 'business-processes' };
 
 export function HrRoutesView(props: HrRoutesViewProps) {
   const { actions, hrView } = props;
@@ -14,6 +14,8 @@ export function HrRoutesView(props: HrRoutesViewProps) {
     <Suspense fallback={<RouteFallback />}>
       <HRModuleLazy
         view={hrView}
+        employeesHubTab={props.employeesHubTab ?? 'team'}
+        onEmployeesHubTabChange={actions.setEmployeesHubTab}
         employees={props.employeeInfos}
         users={props.users}
         currentUser={props.currentUser}

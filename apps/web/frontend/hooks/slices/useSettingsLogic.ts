@@ -3,6 +3,49 @@ import { useState, useEffect } from 'react';
 import { TableCollection, ActivityLog, ViewMode, NotificationPreferences, AutomationRule } from '../../../types';
 import { api } from '../../../backend/api';
 import { DEFAULT_NOTIFICATION_PREFS } from '../../../constants';
+import { parseLocation } from '../../../utils/urlSync';
+
+type WorkdeskTabState =
+  | 'dashboard'
+  | 'weekly'
+  | 'tasks'
+  | 'deals'
+  | 'meetings'
+  | 'documents';
+
+function readWorkdeskTabFromUrl(): WorkdeskTabState {
+  if (typeof window === 'undefined') return 'dashboard';
+  try {
+    const parsed = parseLocation(window.location.pathname, window.location.search);
+    const w = parsed?.workdeskTab;
+    if (
+      w === 'weekly' ||
+      w === 'tasks' ||
+      w === 'deals' ||
+      w === 'meetings' ||
+      w === 'documents' ||
+      w === 'dashboard'
+    ) {
+      return w;
+    }
+  } catch {
+    /* ignore */
+  }
+  return 'dashboard';
+}
+
+type EmployeesHubTabState = 'team' | 'payroll';
+
+function readEmployeesHubTabFromUrl(): EmployeesHubTabState {
+  if (typeof window === 'undefined') return 'team';
+  try {
+    const parsed = parseLocation(window.location.pathname, window.location.search);
+    if (parsed?.employeesHubTab === 'payroll') return 'payroll';
+  } catch {
+    /* ignore */
+  }
+  return 'team';
+}
 
 export const useSettingsLogic = (showNotification: (msg: string) => void) => {
   const [darkMode, setDarkMode] = useState(false);
@@ -21,7 +64,6 @@ export const useSettingsLogic = (showNotification: (msg: string) => void) => {
     | 'doc-editor'
     | 'clients'
     | 'employees'
-    | 'payroll'
     | 'sales-funnel'
     | 'client-chats'
     | 'finance'
@@ -40,13 +82,13 @@ export const useSettingsLogic = (showNotification: (msg: string) => void) => {
   const [viewMode, setViewMode] = useState<ViewMode>(ViewMode.TABLE);
   const [searchQuery, setSearchQuery] = useState('');
   const [activeSpaceTab, setActiveSpaceTab] = useState<'content-plan' | 'backlog' | 'functionality' | undefined>(undefined);
-  /** Вкладка рабочего стола (дашборд, календарь, документы …) */
-  const [workdeskTab, setWorkdeskTab] = useState<
-    'dashboard' | 'weekly' | 'tasks' | 'deals' | 'meetings' | 'documents'
-  >('dashboard');
+  /** Вкладка рабочего стола (дашборд, календарь, документы …); сразу из URL, чтобы не грузить лишние модули до гидрации */
+  const [workdeskTab, setWorkdeskTab] = useState<WorkdeskTabState>(readWorkdeskTabFromUrl);
   /** Подраздел внутри «Воронка продаж»: воронка / диалоги / клиенты */
   const [crmHubTab, setCrmHubTab] = useState<'funnel' | 'chats' | 'clients'>('funnel');
-  
+  /** Вкладка внутри «Сотрудники»: список / зарплата */
+  const [employeesHubTab, setEmployeesHubTab] = useState<EmployeesHubTabState>(readEmployeesHubTabFromUrl);
+
   // Modals
   const [settingsActiveTab, setSettingsActiveTab] = useState<string>('users'); 
 
@@ -158,7 +200,6 @@ export const useSettingsLogic = (showNotification: (msg: string) => void) => {
       | 'search'
       | 'clients'
       | 'employees'
-      | 'payroll'
       | 'sales-funnel'
       | 'client-chats'
       | 'finance'
@@ -207,6 +248,11 @@ export const useSettingsLogic = (showNotification: (msg: string) => void) => {
       setCurrentView('home');
       return;
     }
+    if (view === 'employees') {
+      setEmployeesHubTab('team');
+      setCurrentView('employees');
+      return;
+    }
     if (view === 'sales-funnel') {
       setCrmHubTab('funnel');
       setCurrentView('sales-funnel');
@@ -232,7 +278,7 @@ export const useSettingsLogic = (showNotification: (msg: string) => void) => {
     state: { 
         darkMode, tables, activityLogs, currentView, activeTableId, viewMode, searchQuery,
         settingsActiveTab, isCreateTableModalOpen, createTableType, isEditTableModalOpen, editingTable, notificationPrefs,
-        automationRules, activeSpaceTab, workdeskTab, crmHubTab
+        automationRules, activeSpaceTab, workdeskTab, crmHubTab, employeesHubTab
     },
     setters: {
       setTables,
@@ -247,6 +293,7 @@ export const useSettingsLogic = (showNotification: (msg: string) => void) => {
       setSettingsActiveTab,
       setWorkdeskTab,
       setCrmHubTab,
+      setEmployeesHubTab,
     },
     actions: {
         toggleDarkMode, createTable, updateTable, deleteTable, markAllRead, navigate: handleNavigate,

@@ -15,7 +15,7 @@ export interface PayrollModuleViewProps {
   departments: Department[];
 }
 
-/** Зарплата (табель, условия, расчёт) — рядом с модулем «Сотрудники», данные в localStorage `payroll:*`. */
+/** Зарплата (табель, условия, расчёт) — вкладка в разделе «Сотрудники»; данные в localStorage `payroll:*`. */
 export const PayrollModuleView: React.FC<PayrollModuleViewProps> = ({ users, departments }) => {
   const { setLeading, setModule } = useAppToolbar();
   const payrollRef = useRef<PayrollViewHandle>(null);

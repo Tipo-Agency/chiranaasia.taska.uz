@@ -89,6 +89,7 @@ export interface AppRouterProps {
   activeSpaceTab?: 'content-plan' | 'backlog' | 'functionality';
   workdeskTab?: 'dashboard' | 'weekly' | 'tasks' | 'deals' | 'meetings' | 'documents';
   crmHubTab?: 'funnel' | 'chats' | 'clients';
+  employeesHubTab?: 'team' | 'payroll';
   notificationPrefs?: NotificationPreferences;
   actions: AppActions;
 }

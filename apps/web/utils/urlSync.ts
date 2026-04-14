@@ -17,7 +17,6 @@ export const VIEW_PATHS: Record<string, string> = {
   docs: '/docs',
   chat: '/chat',
   employees: '/employees',
-  payroll: '/payroll',
   analytics: '/analytics',
   spaces: '/spaces',
   settings: '/settings',
@@ -54,6 +53,7 @@ export interface UrlStateSlice {
   settingsTab?: string;
   workdeskTab?: 'dashboard' | 'weekly' | 'tasks' | 'deals' | 'meetings' | 'documents';
   crmHubTab?: 'funnel' | 'chats' | 'clients';
+  employeesHubTab?: 'team' | 'payroll';
 }
 
 /** Построить path + search из состояния навигации */
@@ -64,6 +64,7 @@ export function buildLocation(opts: {
   settingsActiveTab?: string;
   workdeskTab?: 'dashboard' | 'weekly' | 'tasks' | 'deals' | 'meetings' | 'documents';
   crmHubTab?: 'funnel' | 'chats' | 'clients';
+  employeesHubTab?: 'team' | 'payroll';
 }): string {
   const {
     currentView,
@@ -72,6 +73,7 @@ export function buildLocation(opts: {
     settingsActiveTab,
     workdeskTab,
     crmHubTab,
+    employeesHubTab,
   } = opts;
 
   if (currentView === 'table' && activeTableId) {
@@ -111,6 +113,12 @@ export function buildLocation(opts: {
 
   if (currentView === 'business-processes') {
     return VIEW_PATHS['business-processes'];
+  }
+
+  if (currentView === 'employees') {
+    let path = VIEW_PATHS.employees;
+    if (employeesHubTab === 'payroll') path += '?tab=payroll';
+    return path;
   }
 
   const path = VIEW_PATHS[currentView];
@@ -178,6 +186,10 @@ export function parseLocation(pathname: string, search: string): UrlStateSlice |
     out.view = 'settings';
     out.settingsTab = 'admin';
   }
+  if (view === 'payroll') {
+    out.view = 'employees';
+    out.employeesHubTab = 'payroll';
+  }
 
   if (out.view === 'spaces') {
     const space = q.get('space');
@@ -193,6 +205,11 @@ export function parseLocation(pathname: string, search: string): UrlStateSlice |
     } else if (!out.settingsTab) {
       out.settingsTab = 'users';
     }
+  }
+
+  if (out.view === 'employees') {
+    const t = q.get('tab');
+    if (t === 'payroll') out.employeesHubTab = 'payroll';
   }
 
   if (out.view === 'sales-funnel') {

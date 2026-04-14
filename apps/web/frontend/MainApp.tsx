@@ -480,6 +480,7 @@ export function MainApp() {
                 activeSpaceTab={state.activeSpaceTab}
                 workdeskTab={state.workdeskTab}
                 crmHubTab={state.crmHubTab}
+                employeesHubTab={state.employeesHubTab}
                 notificationPrefs={state.notificationPrefs}
                 actions={actions}
               />

@@ -335,6 +335,9 @@ export const useAppLogic = () => {
     if (parsed.crmHubTab) {
       settingsSlice.setters.setCrmHubTab(parsed.crmHubTab);
     }
+    if (parsed.view === 'employees') {
+      settingsSlice.setters.setEmployeesHubTab(parsed.employeesHubTab === 'payroll' ? 'payroll' : 'team');
+    }
   }, [isLoading, authSlice.state.currentUser]);
 
   // Адресная строка следует за состоянием (клик по меню и т.д.)
@@ -355,6 +358,7 @@ export const useAppLogic = () => {
       settingsActiveTab: settingsSlice.state.settingsActiveTab,
       workdeskTab: settingsSlice.state.workdeskTab,
       crmHubTab: settingsSlice.state.crmHubTab,
+      employeesHubTab: settingsSlice.state.employeesHubTab,
     });
     if (next === built) return;
     window.history.pushState(null, '', built);
@@ -367,6 +371,7 @@ export const useAppLogic = () => {
     settingsSlice.state.settingsActiveTab,
     settingsSlice.state.workdeskTab,
     settingsSlice.state.crmHubTab,
+    settingsSlice.state.employeesHubTab,
   ]);
 
   useEffect(() => {
@@ -395,6 +400,9 @@ export const useAppLogic = () => {
       if (parsed.crmHubTab) {
         settingsSlice.setters.setCrmHubTab(parsed.crmHubTab);
       }
+      if (parsed.view === 'employees') {
+        settingsSlice.setters.setEmployeesHubTab(parsed.employeesHubTab === 'payroll' ? 'payroll' : 'team');
+      }
     };
     window.addEventListener('popstate', onPop);
     return () => window.removeEventListener('popstate', onPop);
@@ -410,16 +418,44 @@ export const useAppLogic = () => {
     // Определяем, какие данные нужно загрузить в зависимости от текущего представления
     const loadData = async () => {
       switch (currentView) {
-          case 'home':
-              // Home использует данные из нескольких модулей + сообщения входящие/исходящие
-              await Promise.all([
-                  loadTasksData(),
-                  loadContentData(), // для meetings и contentPosts
-                  loadFinanceData(), // для financePlan и purchaseRequests
-                  loadCRMData(), // для deals и employeeInfos
-              ]);
-              await loadMessages();
+          case 'home': {
+              // Только то, что нужно активной вкладке рабочего стола — иначе четыре тяжёлых модуля + сообщения каждый раз.
+              const tab = settingsSlice.state.workdeskTab;
+              const loads: Promise<void>[] = [];
+              switch (tab) {
+                case 'dashboard':
+                  loads.push(
+                    loadTasksData(),
+                    loadContentData(),
+                    loadFinanceData(),
+                    loadCRMData(),
+                  );
+                  break;
+                case 'weekly':
+                case 'tasks':
+                  loads.push(loadTasksData());
+                  break;
+                case 'deals':
+                  loads.push(loadTasksData(), loadCRMData());
+                  break;
+                case 'meetings':
+                  loads.push(loadContentData(), loadTasksData(), loadCRMData());
+                  break;
+                case 'documents':
+                  loads.push(loadContentData(), loadTasksData());
+                  break;
+                default:
+                  loads.push(
+                    loadTasksData(),
+                    loadContentData(),
+                    loadFinanceData(),
+                    loadCRMData(),
+                  );
+              }
+              await Promise.all(loads);
+              void loadMessages();
               break;
+          }
           case 'tasks':
           case 'search':
           case 'analytics':
@@ -477,7 +513,7 @@ export const useAppLogic = () => {
           case 'inbox':
           case 'chat':
               await loadTasksData();
-              await loadMessages();
+              void loadMessages();
               break;
           case 'admin':
               await loadTasksData();
@@ -488,7 +524,12 @@ export const useAppLogic = () => {
     loadData().catch(err => {
       console.error('Ошибка загрузки данных модуля:', err);
     });
-  }, [settingsSlice.state.currentView, settingsSlice.state.activeTableId, authSlice.state.currentUser]);
+  }, [
+    settingsSlice.state.currentView,
+    settingsSlice.state.activeTableId,
+    settingsSlice.state.workdeskTab,
+    authSlice.state.currentUser,
+  ]);
 
   // Обработчик синхронизации контент-плана
   useEffect(() => {
@@ -964,8 +1005,14 @@ export const useAppLogic = () => {
   type AppNavView = (typeof settingsSlice.state)['currentView'];
 
   /** Редирект устаревших разделов в хабы (клиенты → воронка, календарь → рабочий стол и т.д.) */
-  const setCurrentView = (v: AppNavView) => {
+  const setCurrentView = (v: AppNavView | 'payroll') => {
     const st = settingsSlice.setters;
+    if (v === 'payroll') {
+      st.setEmployeesHubTab('payroll');
+      st.setCurrentView('employees');
+      st.setActiveTableId('');
+      return;
+    }
     if (v === 'clients') {
       st.setCrmHubTab('clients');
       st.setCurrentView('sales-funnel');
@@ -1022,7 +1069,9 @@ export const useAppLogic = () => {
       salesFunnels: salesFunnels,
       inboxMessages, outboxMessages,
       darkMode: settingsSlice.state.darkMode, tables: settingsSlice.state.tables, activityLogs: settingsSlice.state.activityLogs, currentView: settingsSlice.state.currentView, activeTableId: settingsSlice.state.activeTableId, viewMode: settingsSlice.state.viewMode, searchQuery: settingsSlice.state.searchQuery, settingsActiveTab: settingsSlice.state.settingsActiveTab, isCreateTableModalOpen: settingsSlice.state.isCreateTableModalOpen, createTableType: settingsSlice.state.createTableType, isEditTableModalOpen: settingsSlice.state.isEditTableModalOpen, editingTable: settingsSlice.state.editingTable, notificationPrefs: settingsSlice.state.notificationPrefs, automationRules: settingsSlice.state.automationRules, activeSpaceTab: settingsSlice.state.activeSpaceTab,
-      workdeskTab: settingsSlice.state.workdeskTab, crmHubTab: settingsSlice.state.crmHubTab,
+      workdeskTab: settingsSlice.state.workdeskTab,
+      crmHubTab: settingsSlice.state.crmHubTab,
+      employeesHubTab: settingsSlice.state.employeesHubTab,
       activeTable: settingsSlice.state.tables.find(t => t.id === settingsSlice.state.activeTableId), activeDoc: contentSlice.state.docs.find(d => d.id === contentSlice.state.activeDocId)
     },
     actions: {
@@ -1489,7 +1538,9 @@ export const useAppLogic = () => {
       },
       toggleDarkMode: settingsSlice.actions.toggleDarkMode, createTable: createTableWrapper, updateTable: settingsSlice.actions.updateTable, deleteTable: settingsSlice.actions.deleteTable, markAllRead: settingsSlice.actions.markAllRead, navigate: settingsSlice.actions.navigate, openSettings: settingsSlice.actions.openSettings, closeSettings: settingsSlice.actions.closeSettings, openCreateTable: settingsSlice.actions.openCreateTable, closeCreateTable: settingsSlice.actions.closeCreateTable, openEditTable: settingsSlice.actions.openEditTable, closeEditTable: settingsSlice.actions.closeEditTable, updateNotificationPrefs: settingsSlice.actions.updateNotificationPrefs, saveAutomationRule: settingsSlice.actions.saveAutomationRule, deleteAutomationRule: settingsSlice.actions.deleteAutomationRule, setActiveSpaceTab: settingsSlice.actions.setActiveSpaceTab,
       setActiveTableId: settingsSlice.setters.setActiveTableId, setCurrentView, setViewMode: settingsSlice.setters.setViewMode, setSearchQuery: settingsSlice.setters.setSearchQuery, setSettingsActiveTab: settingsSlice.setters.setSettingsActiveTab,
-      setWorkdeskTab: settingsSlice.setters.setWorkdeskTab, setCrmHubTab: settingsSlice.setters.setCrmHubTab,
+      setWorkdeskTab: settingsSlice.setters.setWorkdeskTab,
+      setCrmHubTab: settingsSlice.setters.setCrmHubTab,
+      setEmployeesHubTab: settingsSlice.setters.setEmployeesHubTab,
       /** Открыть контент-план и вкладку «Съёмки» (из календаря) */
       openShootPlanFromCalendar: (tableId: string, shootPlanId?: string) => {
         settingsSlice.setters.setActiveTableId(tableId);
