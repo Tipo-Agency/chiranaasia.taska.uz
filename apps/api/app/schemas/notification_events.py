@@ -5,7 +5,7 @@ from datetime import UTC, datetime
 from typing import Any
 from uuid import uuid4
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 class DomainEventIn(BaseModel):
@@ -34,3 +34,26 @@ class DomainEventOut(BaseModel):
     id: str
     published: bool
     streamId: str | None = None
+
+
+class DomainEventRecentRead(BaseModel):
+    """GET /notification-events/recent — строка из ORM в JSON."""
+
+    model_config = ConfigDict(extra="ignore")
+
+    id: str
+    type: str
+    occurredAt: str | None = None
+    orgId: str
+    entityType: str
+    entityId: str
+    source: str
+    published: bool = False
+    streamId: str | None = None
+    createdAt: str | None = None
+
+
+class NotificationReadStateBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    isRead: bool = True

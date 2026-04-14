@@ -1,10 +1,11 @@
 """Client, Deal, EmployeeInfo, AccountsReceivable models."""
 import uuid
 
-from sqlalchemy import Boolean, Column, String, Text
-from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy import Boolean, Column, ForeignKey, Index, Integer, Numeric, String, Text, text
+from sqlalchemy.dialects.postgresql import ARRAY, JSONB
+from sqlalchemy.orm import relationship
 
-from app.database import Base
+from app.db import Base
 
 
 def gen_id():
@@ -12,47 +13,59 @@ def gen_id():
 
 
 class Client(Base):
+    """Клиент (docs/ENTITIES): без дублей contact_person/company_info/funnel_id — в notes/tags."""
+
     __tablename__ = "clients"
 
     id = Column(String(36), primary_key=True, default=gen_id)
+    version = Column(Integer, nullable=False, server_default=text("1"))
     name = Column(String(255), nullable=False)
-    contact_person = Column(String(255), nullable=True)
     phone = Column(String(50), nullable=True)
     email = Column(String(255), nullable=True)
     telegram = Column(String(100), nullable=True)
     instagram = Column(String(255), nullable=True)
     company_name = Column(String(255), nullable=True)
-    company_info = Column(Text, nullable=True)
     notes = Column(Text, nullable=True)
-    funnel_id = Column(String(36), nullable=True)
+    tags = Column(ARRAY(Text), nullable=False, server_default=text("ARRAY[]::text[]"))
     is_archived = Column(Boolean, default=False)
+
+    deals = relationship("Deal", back_populates="client")
+
+    __mapper_args__ = {"version_id_col": version}
 
 
 class Deal(Base):
-    """CRM Deal - sales funnel deal with title, stage, assignee."""
+    """
+    CRM Deal — целевые поля docs/ENTITIES.md §4.
+    Дополнительные колонки (договор/разовая продажа, комментарии) сохранены для совместимости UI.
+    """
+
     __tablename__ = "deals"
 
     id = Column(String(36), primary_key=True, default=gen_id)
+    version = Column(Integer, nullable=False, server_default=text("1"))
     title = Column(String(500), nullable=False)
-    client_id = Column(String(36), nullable=True)
-    contact_name = Column(String(255), nullable=True)
-    amount = Column(String(50), default="0")  # numeric as string for flexibility
-    currency = Column(String(10), default="UZS")
     stage = Column(String(100), nullable=False)
     funnel_id = Column(String(36), nullable=True)
+    client_id = Column(String(36), ForeignKey("clients.id", ondelete="SET NULL"), nullable=True)
+    assignee_id = Column(String(36), nullable=True)
+    amount = Column(Numeric(18, 2), nullable=False, server_default=text("0"))
+    currency = Column(String(10), nullable=False, server_default=text("'UZS'"))
     source = Column(String(50), nullable=True)
-    telegram_chat_id = Column(String(255), nullable=True)
-    telegram_username = Column(String(100), nullable=True)
-    assignee_id = Column(String(36), nullable=False)
+    source_chat_id = Column(String(255), nullable=True)
+    tags = Column(ARRAY(Text), nullable=False, server_default=text("ARRAY[]::text[]"))
+    custom_fields = Column(JSONB, nullable=False, server_default=text("'{}'::jsonb"))
+    lost_reason = Column(Text, nullable=True)
+    is_archived = Column(Boolean, default=False)
+    # --- legacy / UI (не в краткой таблице ENTITIES §4) ---
+    contact_name = Column(String(255), nullable=True)
     created_at = Column(String(50), nullable=False)
     notes = Column(Text, nullable=True)
     project_id = Column(String(36), nullable=True)
     comments = Column(JSONB, default=list)
-    is_archived = Column(Boolean, default=False)
-    # Contract/recurring deal fields
     recurring = Column(Boolean, default=False)
     number = Column(String(100), nullable=True)
-    status = Column(String(30), nullable=True)  # pending, paid, overdue, active, completed
+    status = Column(String(30), nullable=True)
     description = Column(Text, nullable=True)
     date = Column(String(50), nullable=True)
     due_date = Column(String(50), nullable=True)
@@ -63,16 +76,25 @@ class Deal(Base):
     payment_day = Column(String(10), nullable=True)
     updated_at = Column(String(50), nullable=True)
 
+    client = relationship("Client", back_populates="deals", foreign_keys=[client_id])
+
+    __mapper_args__ = {"version_id_col": version}
+
 
 class EmployeeInfo(Base):
     __tablename__ = "employee_infos"
+    __table_args__ = (
+        Index("idx_employee_infos_dept_archived_fullname_id", "department_id", "is_archived", "full_name", "id"),
+    )
 
     id = Column(String(36), primary_key=True, default=gen_id)
-    user_id = Column(String(36), nullable=False)
+    user_id = Column(String(36), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     department_id = Column(String(36), nullable=True)
     org_position_id = Column(String(36), nullable=True)
-    position = Column(String(255), nullable=False)
-    hire_date = Column(String(50), nullable=False)
+    full_name = Column(String(255), nullable=False, server_default=text("''"))
+    status = Column(String(50), nullable=False, server_default=text("'active'"))
+    position = Column(String(255), nullable=True)
+    hire_date = Column(String(50), nullable=True)
     birth_date = Column(String(50), nullable=True)
     is_archived = Column(Boolean, default=False)
 
@@ -86,7 +108,7 @@ class AccountsReceivable(Base):
     amount = Column(String(50), nullable=False)
     currency = Column(String(10), nullable=False)
     due_date = Column(String(50), nullable=False)
-    status = Column(String(30), nullable=False)  # current, overdue, paid
+    status = Column(String(30), nullable=False)
     description = Column(Text, nullable=True)
     paid_amount = Column(String(50), nullable=True)
     paid_date = Column(String(50), nullable=True)

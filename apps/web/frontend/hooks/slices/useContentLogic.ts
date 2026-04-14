@@ -3,6 +3,26 @@ import { useState } from 'react';
 import { Doc, Folder, Meeting, ContentPost, ShootPlan } from '../../../types';
 import { api } from '../../../backend/api';
 
+function meetingToApiBody(m: Meeting): Record<string, unknown> {
+  const body: Record<string, unknown> = {
+    tableId: m.tableId,
+    title: m.title,
+    date: m.date,
+    time: m.time,
+    participantIds: m.participantIds ?? [],
+    summary: m.summary ?? '',
+    type: m.type,
+    recurrence: m.recurrence ?? 'none',
+    isArchived: m.isArchived ?? false,
+  };
+  if (m.dealId) body.dealId = m.dealId;
+  if (m.clientId) body.clientId = m.clientId;
+  if (m.projectId) body.projectId = m.projectId;
+  if (m.shootPlanId) body.shootPlanId = m.shootPlanId;
+  if (m.participants?.length) body.participants = m.participants;
+  return body;
+}
+
 export const useContentLogic = (showNotification: (msg: string) => void, activeTableId: string) => {
   const [docs, setDocs] = useState<Doc[]>([]);
   const [folders, setFolders] = useState<Folder[]>([]);
@@ -16,34 +36,47 @@ export const useContentLogic = (showNotification: (msg: string) => void, activeT
   const [editingDoc, setEditingDoc] = useState<Doc | null>(null);
 
   // Meetings
-  const saveMeeting = (m: Meeting) => { 
-      const now = new Date().toISOString();
-      const existing = meetings.find(meeting => meeting.id === m.id);
-      const u = existing 
-          ? meetings.map(meeting => meeting.id === m.id ? { ...m, updatedAt: now } : meeting)
-          : [...meetings, { ...m, createdAt: m.createdAt || now, updatedAt: now }]; 
-      setMeetings(u);
-      api.meetings.updateAll(u).catch(() => showNotification('Ошибка сохранения встречи'));
-      showNotification(existing ? 'Встреча обновлена' : 'Встреча добавлена'); 
+  const saveMeeting = (m: Meeting) => {
+    const now = new Date().toISOString();
+    const existing = meetings.find((meeting) => meeting.id === m.id);
+    const u = existing
+      ? meetings.map((meeting) => (meeting.id === m.id ? { ...m, updatedAt: now } : meeting))
+      : [...meetings, { ...m, createdAt: m.createdAt || now, updatedAt: now }];
+    setMeetings(u);
+    const body = meetingToApiBody(m);
+    const req = existing ? api.meetings.patch(m.id, body) : api.meetings.create({ ...body, id: m.id });
+    req
+      .then(() => api.meetings.getAll())
+      .then((raw) => setMeetings(raw as Meeting[]))
+      .catch(() => showNotification('Ошибка сохранения встречи'));
+    showNotification(existing ? 'Встреча обновлена' : 'Встреча добавлена');
   };
   const deleteMeeting = (id: string) => {
-      const now = new Date().toISOString();
-      // Мягкое удаление: помечаем встречу как архивную
-      const u = meetings.map(m => {
-        if (m.id === id) {
-          return { ...m, isArchived: true, updatedAt: now };
-        }
-        return { ...m, updatedAt: m.updatedAt || now };
+    const prev = meetings;
+    const now = new Date().toISOString();
+    const u = meetings.map((m) =>
+      m.id === id ? { ...m, isArchived: true, updatedAt: now } : { ...m, updatedAt: m.updatedAt || now }
+    );
+    setMeetings(u);
+    api.meetings
+      .remove(id)
+      .then(() => api.meetings.getAll())
+      .then((raw) => setMeetings(raw as Meeting[]))
+      .catch(() => {
+        setMeetings(prev);
+        showNotification('Ошибка удаления встречи');
       });
-      setMeetings(u);
-      api.meetings.updateAll(u).catch(() => showNotification('Ошибка удаления встречи'));
-      showNotification('Встреча удалена');
+    showNotification('Встреча удалена');
   };
-  const updateMeetingSummary = (id: string, summary: string) => { 
-      const now = new Date().toISOString();
-      const u = meetings.map(m => m.id === id ? { ...m, summary, updatedAt: now } : m);
-      setMeetings(u);
-      api.meetings.updateAll(u).catch(() => showNotification('Ошибка сохранения встречи')); 
+  const updateMeetingSummary = (id: string, summary: string) => {
+    const now = new Date().toISOString();
+    const u = meetings.map((m) => (m.id === id ? { ...m, summary, updatedAt: now } : m));
+    setMeetings(u);
+    api.meetings
+      .patch(id, { summary })
+      .then(() => api.meetings.getAll())
+      .then((raw) => setMeetings(raw as Meeting[]))
+      .catch(() => showNotification('Ошибка сохранения встречи'));
   };
 
   // Content Plan

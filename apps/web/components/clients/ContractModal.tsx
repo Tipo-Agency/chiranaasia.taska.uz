@@ -51,8 +51,6 @@ export const ContractModal: React.FC<ContractModalProps> = ({
 
   const handleSubmit = (e?: React.FormEvent) => {
     if (e) e.preventDefault();
-    // Автоматически берем воронку от клиента
-    const client = clients.find(c => c.id === targetClientId);
     const now = new Date().toISOString();
     onSave({
       id: editingContract ? editingContract.id : `deal-${Date.now()}`,
@@ -66,7 +64,7 @@ export const ContractModal: React.FC<ContractModalProps> = ({
       startDate: contractStartDate,
       date: contractStartDate, // Для отображения
       paymentDay: parseInt(contractPaymentDay) || 1,
-      funnelId: client?.funnelId || undefined,
+      funnelId: editingContract?.funnelId ?? undefined,
       createdAt: editingContract?.createdAt || now,
       updatedAt: now
     });

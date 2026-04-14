@@ -611,20 +611,21 @@ const SalesFunnelView: React.FC<SalesFunnelViewProps> = ({ deals, clients, users
       const existingClient = d.clientId ? clients.find((c) => c.id === d.clientId) : null;
       if (!existingClient) {
         // Используем название клиента из сделки (если было введено) или название сделки
-        const clientName = d.contactName || d.title; // contactName теперь хранит название клиента
+        const clientName = d.contactName || d.title;
         const client: Client = {
           id: `cl-${Date.now()}`,
           name: clientName,
-          contactPerson: d.contactName,
-          responsibleUserId: d.assigneeId,
-          phone: undefined, // Можно добавить из комментариев
+          phone: undefined,
           email: undefined,
           telegram: d.telegramUsername,
           instagram: d.source === 'instagram' ? d.telegramUsername : undefined,
-          companyName: d.title,
-          companyInfo: d.notes,
-          funnelId: d.funnelId || nextFunnelId || undefined,
-          notes: `Создано из сделки: ${d.title}. Сумма: ${d.amount} ${d.currency}`
+          companyName:
+            d.contactName && d.title && d.title !== clientName ? d.title : undefined,
+          notes: [d.notes, `Создано из сделки: ${d.title}. Сумма: ${d.amount} ${d.currency}`]
+            .filter(Boolean)
+            .join('\n\n'),
+          tags: [],
+          isArchived: false,
         };
         onCreateClient(client);
         // Обновляем сделку с clientId
@@ -690,19 +691,26 @@ const SalesFunnelView: React.FC<SalesFunnelViewProps> = ({ deals, clients, users
     // Создаем клиента при успешной сделке (если еще не создан)
     let newClientId = editingDeal.clientId;
     if (!editingDeal.clientId && onCreateClient) {
+      const dealTitle = title || editingDeal.title;
+      const dealContact = contactName || editingDeal.contactName;
+      const displayName = dealContact || dealTitle || editingDeal.title;
       const client: Client = {
         id: `cl-${Date.now()}`,
-        name: contactName || title || editingDeal.title,
-        contactPerson: contactName || editingDeal.contactName,
-        responsibleUserId: assigneeId || editingDeal.assigneeId,
+        name: displayName,
         phone: undefined,
         email: undefined,
         telegram: editingDeal.telegramUsername,
         instagram: source === 'instagram' ? editingDeal.telegramUsername : undefined,
-        companyName: title || editingDeal.title,
-        companyInfo: notes || editingDeal.notes,
-        funnelId: funnelId || editingDeal.funnelId || primaryFunnelId || undefined,
-        notes: `Создано из сделки: ${editingDeal.title}. Сумма: ${editingDeal.amount} ${editingDeal.currency}`
+        companyName:
+          dealTitle && dealTitle !== displayName ? dealTitle : undefined,
+        notes: [
+          notes || editingDeal.notes,
+          `Создано из сделки: ${editingDeal.title}. Сумма: ${editingDeal.amount} ${editingDeal.currency}`,
+        ]
+          .filter(Boolean)
+          .join('\n\n'),
+        tags: [],
+        isArchived: false,
       };
       onCreateClient(client);
       newClientId = client.id;
@@ -1162,7 +1170,6 @@ const SalesFunnelView: React.FC<SalesFunnelViewProps> = ({ deals, clients, users
                                       );
                                       if (c) {
                                         setClientName(c.name);
-                                        if (c.contactPerson) setContactName(c.contactPerson);
                                       }
                                     }}
                                     placeholder="Не привязан"

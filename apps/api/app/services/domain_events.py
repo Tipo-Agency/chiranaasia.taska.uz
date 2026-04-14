@@ -7,6 +7,7 @@ from uuid import uuid4
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import get_settings
 from app.models.notification import NotificationEvent
 from app.services.event_bus import publish_domain_event
 from app.services.notification_hub import process_domain_event
@@ -96,6 +97,11 @@ async def emit_domain_event(
     row.stream_id = stream_id
     await db.flush()
 
+    settings = get_settings()
+    if settings.DOMAIN_EVENTS_HUB_ASYNC and published:
+        return eid
+
     await process_domain_event(db, raw)
+    row.hub_processed_at = datetime.now(UTC)
     await db.flush()
     return eid

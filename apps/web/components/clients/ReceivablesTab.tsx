@@ -31,17 +31,17 @@ export const ReceivablesTab: React.FC<ReceivablesTabProps> = ({
         <tbody>
           {receivables.map(receivable => {
             const client = clients.find(c => c.id === receivable.clientId);
-            const isOverdue = receivable.status === 'overdue' || 
-              (receivable.dueDate && new Date(receivable.dueDate) < new Date() && receivable.status !== 'paid');
-            const statusColors = {
-              current: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400',
+            const statusColors: Record<string, string> = {
+              pending: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400',
+              partial: 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300',
               overdue: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',
-              paid: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+              paid: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400',
             };
-            const statusLabels = {
-              current: 'Текущая',
-              overdue: 'Просрочена',
-              paid: 'Оплачена'
+            const statusLabels: Record<string, string> = {
+              pending: 'Ожидание',
+              partial: 'Частично',
+              overdue: 'Просрочено',
+              paid: 'Оплачено',
             };
             return (
               <tr
@@ -60,8 +60,8 @@ export const ReceivablesTab: React.FC<ReceivablesTabProps> = ({
                   {receivable.dueDate ? new Date(receivable.dueDate).toLocaleDateString() : '—'}
                 </td>
                 <td className="px-4 py-3">
-                  <span className={`px-2 py-1 rounded-full text-xs font-bold ${statusColors[receivable.status] || statusColors.current}`}>
-                    {statusLabels[receivable.status] || statusLabels.current}
+                  <span className={`px-2 py-1 rounded-full text-xs font-bold ${statusColors[receivable.status] || statusColors.pending}`}>
+                    {statusLabels[receivable.status] || receivable.status}
                   </span>
                 </td>
                 <td className="px-4 py-3 text-gray-600 dark:text-gray-400 text-sm">

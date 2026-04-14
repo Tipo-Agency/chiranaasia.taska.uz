@@ -369,24 +369,30 @@ export const useTaskLogic = (showNotification: (msg: string) => void, currentUse
   };
 
   const deleteTask = (taskId: string) => {
+      const prev = tasks.find((t) => t.id === taskId);
+      const body: Record<string, unknown> = { is_archived: true };
+      if (prev?.version != null && Number.isFinite(prev.version)) body.version = prev.version;
       const updated = tasks.map(t => t.id === taskId ? { ...t, isArchived: true } : t);
       setTasks(updated);
-      api.tasks.updateAll(updated).catch(() => showNotification('Ошибка сохранения задачи'));
+      api.tasks.patch(taskId, body).catch(() => showNotification('Ошибка сохранения задачи'));
       setIsTaskModalOpen(false);
       showNotification('Задача в архиве');
   };
 
   const restoreTask = (taskId: string) => {
+      const prev = tasks.find((t) => t.id === taskId);
+      const body: Record<string, unknown> = { is_archived: false };
+      if (prev?.version != null && Number.isFinite(prev.version)) body.version = prev.version;
       const updated = tasks.map(t => t.id === taskId ? { ...t, isArchived: false } : t);
       setTasks(updated);
-      api.tasks.updateAll(updated).catch(() => showNotification('Ошибка сохранения задачи'));
+      api.tasks.patch(taskId, body).catch(() => showNotification('Ошибка сохранения задачи'));
       showNotification('Задача восстановлена');
   };
 
   const permanentDeleteTask = (taskId: string) => {
       const updated = tasks.filter(t => t.id !== taskId);
       setTasks(updated);
-      api.tasks.updateAll(updated).catch(() => showNotification('Ошибка сохранения задачи'));
+      api.tasks.remove(taskId).catch(() => showNotification('Ошибка сохранения задачи'));
       showNotification('Задача удалена навсегда');
   };
 

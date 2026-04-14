@@ -14,6 +14,11 @@ const SEED_FLAG = 'taska_demo_seeded_v3';
 
 const now = () => new Date().toISOString();
 const today = () => now().slice(0, 10);
+const offsetDay = (delta: number) => {
+  const d = new Date();
+  d.setUTCDate(d.getUTCDate() + delta);
+  return d.toISOString().slice(0, 10);
+};
 
 export function runSeed(): void {
   if (typeof window === 'undefined') return;
@@ -34,7 +39,7 @@ export function runSeed(): void {
   // Tables (страницы)
   localStoreService.setAll('tables', [
     { id: 't1', name: 'Задачи', type: 'tasks', icon: 'CheckSquare', color: 'text-blue-500' },
-    { id: 't2', name: 'Контент-план', type: 'content-plan', icon: 'Instagram', color: 'text-pink-500' },
+    { id: 't2', name: 'Контент-план', type: 'content-plan', icon: 'Instagram', color: 'text-pink-500', isPublic: true },
     { id: 't3', name: 'Идеи', type: 'backlog', icon: 'Archive', color: 'text-amber-500' },
     { id: 't4', name: 'Функционал', type: 'functionality', icon: 'Layers', color: 'text-green-600' },
   ]);
@@ -47,11 +52,12 @@ export function runSeed(): void {
   localStoreService.setAll('notificationPrefs', [{ id: 'default', ...DEFAULT_NOTIFICATION_PREFS }]);
   localStoreService.setAll('automationRules', DEFAULT_AUTOMATION_RULES);
 
-  // Departments
+  // Departments (иерархия: корень d0)
   localStoreService.setAll('departments', [
-    { id: 'd1', name: 'Отдел продаж' },
-    { id: 'd2', name: 'Маркетинг' },
-    { id: 'd3', name: 'Разработка' },
+    { id: 'd0', name: 'Компания' },
+    { id: 'd1', name: 'Отдел продаж', parentId: 'd0' },
+    { id: 'd2', name: 'Маркетинг', parentId: 'd0' },
+    { id: 'd3', name: 'Разработка', parentId: 'd0' },
   ]);
 
   // Projects
@@ -162,12 +168,26 @@ export function runSeed(): void {
     'ООО Ромашка', 'ИП Васильев', 'ЧП Текстиль Плюс', 'ООО Агро Сервис', 'ИП Фотостудия',
     'ООО СтройМаш', 'ИП Кофе Хауз', 'ООО Медиа Групп', 'ЧП Мебель Стандарт', 'ООО Логистик',
   ];
+  const contactNames = [
+    'Мария',
+    'Алексей',
+    'Дилноза',
+    'Сергей',
+    'Карина',
+    'Олег',
+    'Нигора',
+    'Артём',
+    'Юлия',
+    'Дмитрий',
+  ];
   const clients = clientNames.map((name, i) => ({
     id: `c${i + 1}`,
     name,
-    contactPerson: ['Мария', 'Алексей', 'Дилноза', 'Сергей', 'Карина', 'Олег', 'Нигора', 'Артём', 'Юлия', 'Дмитрий'][i],
     email: `contact${i + 1}@example.uz`,
     phone: `+99890${1000000 + i}`,
+    notes: `Контакт: ${contactNames[i]}`,
+    tags: [] as string[],
+    isArchived: false,
   }));
   localStoreService.setAll('clients', clients);
 
@@ -231,21 +251,83 @@ export function runSeed(): void {
 
   // Employee infos (5+ сотрудников, оргструктура)
   localStoreService.setAll('employeeInfos', [
-    { id: 'emp1', userId: demoUserId, departmentId: 'd1', position: 'Руководитель', hireDate: '2023-01-01' },
-    { id: 'emp2', userId: 'u2', departmentId: 'd1', position: 'Менеджер по продажам', hireDate: '2023-06-01' },
-    { id: 'emp3', userId: 'u3', departmentId: 'd1', position: 'Менеджер', hireDate: '2023-09-01' },
-    { id: 'emp4', userId: 'u4', departmentId: 'd2', position: 'Маркетолог', hireDate: '2024-01-15' },
-    { id: 'emp5', userId: 'u5', departmentId: 'd3', position: 'Разработчик', hireDate: '2024-03-01' },
-    { id: 'emp6', userId: 'u6', departmentId: 'd2', position: 'SMM-специалист', hireDate: '2024-06-01' },
+    {
+      id: 'emp1',
+      userId: demoUserId,
+      departmentId: 'd1',
+      orgPositionId: 'pos_ceo',
+      positionId: 'pos_ceo',
+      fullName: 'Генеральный директор (демо)',
+      status: 'active',
+      hireDate: '2023-01-01',
+    },
+    {
+      id: 'emp2',
+      userId: 'u2',
+      departmentId: 'd1',
+      orgPositionId: 'pos1',
+      positionId: 'pos1',
+      fullName: 'Менеджер по продажам',
+      status: 'active',
+      hireDate: '2023-06-01',
+    },
+    {
+      id: 'emp3',
+      userId: 'u3',
+      departmentId: 'd1',
+      orgPositionId: 'pos_sales_junior',
+      positionId: 'pos_sales_junior',
+      fullName: 'Стажёр по продажам',
+      status: 'active',
+      hireDate: '2023-09-01',
+    },
+    {
+      id: 'emp4',
+      userId: 'u4',
+      departmentId: 'd2',
+      orgPositionId: 'pos3',
+      positionId: 'pos3',
+      fullName: 'Маркетолог',
+      status: 'active',
+      hireDate: '2024-01-15',
+    },
+    {
+      id: 'emp5',
+      userId: 'u5',
+      departmentId: 'd3',
+      orgPositionId: 'pos_dev_junior',
+      positionId: 'pos_dev_junior',
+      fullName: 'Junior разработчик',
+      status: 'active',
+      hireDate: '2024-03-01',
+    },
+    {
+      id: 'emp6',
+      userId: 'u6',
+      departmentId: 'd2',
+      orgPositionId: 'pos_smm',
+      positionId: 'pos_smm',
+      fullName: 'SMM-специалист',
+      status: 'active',
+      hireDate: '2024-06-01',
+    },
+    {
+      id: 'emp_ext',
+      departmentId: 'd1',
+      orgPositionId: 'pos2',
+      positionId: 'pos2',
+      fullName: 'Внешний консультант (без учётной записи)',
+      status: 'active',
+    },
   ]);
 
   // Задолженности (моковые — по договорам/сделкам)
   localStoreService.setAll('accountsReceivable', [
-    { id: 'ar1', clientId: 'c1', dealId: 'contract_c1_1', amount: 500000, currency: 'UZS', dueDate: today(), status: 'overdue', description: 'Остаток по договору Д-2025-100', createdAt: now() },
-    { id: 'ar2', clientId: 'c2', dealId: 'contract_c2_1', amount: 600000, currency: 'UZS', dueDate: today(), status: 'current', description: 'Платёж за март', createdAt: now() },
-    { id: 'ar3', clientId: 'c3', dealId: 'contract_c3_1', amount: 700000, currency: 'UZS', dueDate: today(), status: 'overdue', description: 'Просроченный платёж', createdAt: now() },
-    { id: 'ar4', clientId: 'c4', dealId: 'contract_c4_1', amount: 400000, currency: 'UZS', dueDate: today(), status: 'current', description: 'Ожидает оплаты', createdAt: now() },
-    { id: 'ar5', clientId: 'c5', dealId: 'onetime_c5', amount: 800000, currency: 'UZS', dueDate: today(), status: 'overdue', description: 'Задолженность по разовой сделке', createdAt: now() },
+    { id: 'ar1', clientId: 'c1', dealId: 'contract_c1_1', amount: 500000, currency: 'UZS', dueDate: offsetDay(-20), paidAmount: 0, status: 'overdue' as const, description: 'Остаток по договору Д-2025-100', createdAt: now() },
+    { id: 'ar2', clientId: 'c2', dealId: 'contract_c2_1', amount: 600000, currency: 'UZS', dueDate: offsetDay(14), paidAmount: 0, status: 'pending' as const, description: 'Платёж за март', createdAt: now() },
+    { id: 'ar3', clientId: 'c3', dealId: 'contract_c3_1', amount: 700000, currency: 'UZS', dueDate: offsetDay(30), paidAmount: 200000, status: 'partial' as const, description: 'Частичная оплата', createdAt: now() },
+    { id: 'ar4', clientId: 'c4', dealId: 'contract_c4_1', amount: 400000, currency: 'UZS', dueDate: offsetDay(-5), paidAmount: 400000, status: 'paid' as const, description: 'Погашено', createdAt: now() },
+    { id: 'ar5', clientId: 'c5', dealId: 'onetime_c5', amount: 800000, currency: 'UZS', dueDate: offsetDay(-45), paidAmount: 0, status: 'overdue' as const, description: 'Задолженность по разовой сделке', createdAt: now() },
   ]);
 
   // Документы и папки (мок по вкладкам)
@@ -330,16 +412,24 @@ export function runSeed(): void {
     'Аренда переговорки', 'Кофе и чай офис', 'Полиграфия визиток', 'Домен и SSL',
     'Подписка на рассылку', 'Внешний аудит', 'Консультант по налогам', 'Резерв',
   ];
-  const purchaseRequests = requestDescriptions.map((description, i) => ({
-    id: `prq_${i + 1}`,
-    requesterId: [demoUserId, 'u2', 'u4'][i % 3],
-    departmentId: ['d1', 'd2', 'd3'][i % 3],
-    categoryId: ['fc1', 'fc3', 'fc5', 'fc2', 'fc4'][i % 5],
-    amount: 200000 + i * 80000,
-    description,
-    status: (['pending', 'approved', 'rejected', 'deferred'] as const)[i % 4],
-    date: i % 2 === 0 ? week1Str : week2Str,
-  }));
+  const purchaseRequests = requestDescriptions.map((description, i) => {
+    const amt = 200000 + i * 80000;
+    const st = (['pending', 'approved', 'rejected', 'draft'] as const)[i % 4];
+    return {
+      id: `prq_${i + 1}`,
+      title: description.slice(0, 80),
+      requesterId: [demoUserId, 'u2', 'u4'][i % 3],
+      departmentId: ['d1', 'd2', 'd3'][i % 3],
+      categoryId: ['fc1', 'fc3', 'fc5', 'fc2', 'fc4'][i % 5],
+      category: ['fc1', 'fc3', 'fc5', 'fc2', 'fc4'][i % 5],
+      amount: String(amt),
+      currency: 'UZS',
+      comment: description,
+      description,
+      status: st,
+      date: i % 2 === 0 ? week1Str : week2Str,
+    };
+  });
   localStoreService.setAll('purchaseRequests', purchaseRequests);
   const currentPeriod = `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`;
   const financialPlanDocuments = [

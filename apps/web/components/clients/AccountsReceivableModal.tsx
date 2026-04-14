@@ -35,7 +35,6 @@ export const AccountsReceivableModal: React.FC<AccountsReceivableModalProps> = (
 }) => {
   const [receivableClientId, setReceivableClientId] = useState<string>('');
   const [receivableDueDate, setReceivableDueDate] = useState('');
-  const [receivableStatus, setReceivableStatus] = useState<'current' | 'overdue' | 'paid'>('current');
   const [receivableDescription, setReceivableDescription] = useState('');
   const [receivablePaidAmount, setReceivablePaidAmount] = useState('');
   const [receivablePaidDate, setReceivablePaidDate] = useState('');
@@ -51,7 +50,6 @@ export const AccountsReceivableModal: React.FC<AccountsReceivableModalProps> = (
         // Режим редактирования - показываем одну запись
         setReceivableClientId(editingReceivable.clientId);
         setReceivableDueDate(normalizeDateForInput(editingReceivable.dueDate) || '');
-        setReceivableStatus(editingReceivable.status);
         setReceivableDescription(editingReceivable.description);
         setReceivablePaidAmount(editingReceivable.paidAmount?.toString() || '');
         setReceivablePaidDate(normalizeDateForInput(editingReceivable.paidDate) || '');
@@ -64,7 +62,6 @@ export const AccountsReceivableModal: React.FC<AccountsReceivableModalProps> = (
       } else {
         setReceivableClientId(clientId || '');
         setReceivableDueDate('');
-        setReceivableStatus('current');
         setReceivableDescription('');
         setReceivablePaidAmount('');
         setReceivablePaidDate('');
@@ -127,7 +124,7 @@ export const AccountsReceivableModal: React.FC<AccountsReceivableModalProps> = (
         amount: parseFloat(item.amount) || 0,
         currency: 'UZS',
         dueDate: receivableDueDate,
-        status: receivableStatus,
+        status: 'pending',
         description: receivableDescription || (deal?.recurring === false 
           ? `Задолженность по продаже`
           : `Задолженность по договору`),
@@ -268,7 +265,7 @@ export const AccountsReceivableModal: React.FC<AccountsReceivableModalProps> = (
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 mb-1">Срок погашения *</label>
               <DateInput
@@ -280,15 +277,14 @@ export const AccountsReceivableModal: React.FC<AccountsReceivableModalProps> = (
             </div>
             <div>
               <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 mb-1">Статус</label>
-              <TaskSelect
-                value={receivableStatus}
-                onChange={(val) => setReceivableStatus(val as any)}
-                options={[
-                  { value: 'current', label: 'Текущая' },
-                  { value: 'overdue', label: 'Просрочена' },
-                  { value: 'paid', label: 'Оплачена' }
-                ]}
-              />
+              <p className="text-xs text-gray-500 dark:text-gray-400 leading-relaxed">
+                Считается на сервере по сумме, оплате и сроку: ожидание / частично / оплачено / просрочено.
+              </p>
+              {editingReceivable ? (
+                <p className="mt-2 text-sm font-semibold text-gray-800 dark:text-gray-200 capitalize">
+                  Сейчас: {editingReceivable.status}
+                </p>
+              ) : null}
             </div>
           </div>
 

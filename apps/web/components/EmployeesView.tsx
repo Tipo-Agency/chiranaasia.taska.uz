@@ -45,7 +45,9 @@ const EmployeesView: React.FC<EmployeesViewProps> = ({
   // Form (Cards)
   const [userId, setUserId] = useState('');
   const [orgPositionId, setOrgPositionId] = useState('');
-  const [position, setPosition] = useState('');
+  const [departmentId, setDepartmentId] = useState('');
+  const [fullName, setFullName] = useState('');
+  const [empStatus, setEmpStatus] = useState('active');
   const [hireDate, setHireDate] = useState('');
   const [birthDate, setBirthDate] = useState('');
   const [expandedNodes, setExpandedNodes] = useState<Record<string, boolean>>({});
@@ -64,26 +66,38 @@ const EmployeesView: React.FC<EmployeesViewProps> = ({
       [orgPositions]
   );
 
-  const getEmployeeName = (uid: string) => users.find(u => u.id === uid)?.name || 'Неизвестный';
-  const getEmployeeUser = (uid: string) => users.find(u => u.id === uid);
+  const getEmployeeName = (uid: string) => (uid ? users.find(u => u.id === uid)?.name : undefined) || 'Неизвестный';
+  const getEmployeeUser = (uid: string | undefined) => (uid ? users.find(u => u.id === uid) : undefined);
+  const displayEmployeeTitle = (info: EmployeeInfo) =>
+    (info.fullName && info.fullName.trim()) || (info.userId ? getEmployeeName(info.userId) : '') || 'Сотрудник';
+
+  const employeeOnPosition = (e: EmployeeInfo, posId: string) =>
+    e.orgPositionId === posId || e.positionId === posId;
 
   // --- Handlers Cards ---
   const handleOpenCreate = useCallback(() => {
       setEditingInfo(null);
-      setUserId(users[0]?.id || '');
+      setUserId('');
       setOrgPositionId('');
-      setPosition(''); setHireDate(''); setBirthDate('');
+      setDepartmentId('');
+      setFullName('');
+      setEmpStatus('active');
+      setHireDate('');
+      setBirthDate('');
       setIsModalOpen(true);
-  }, [users]);
+  }, []);
 
   const handleOpenEdit = (info: EmployeeInfo) => {
-      const byLink = info.orgPositionId ? orgPositions.find((p) => p.id === info.orgPositionId) : undefined;
+      const posRef = info.orgPositionId || info.positionId;
+      const byLink = posRef ? orgPositions.find((p) => p.id === posRef) : undefined;
       const legacy = orgPositions.find((p) => p.holderUserId === info.userId);
       const linkedPosition = byLink || legacy;
       setEditingInfo(info);
-      setUserId(info.userId);
-      setOrgPositionId(linkedPosition?.id || info.orgPositionId || '');
-      setPosition(info.position || linkedPosition?.title || '');
+      setUserId(info.userId || '');
+      setOrgPositionId(linkedPosition?.id || info.orgPositionId || info.positionId || '');
+      setDepartmentId(info.departmentId || linkedPosition?.departmentId || '');
+      setFullName((info.fullName && info.fullName.trim()) || linkedPosition?.title || '');
+      setEmpStatus(info.status || 'active');
       setHireDate(normalizeDateForInput(info.hireDate) || '');
       setBirthDate(normalizeDateForInput(info.birthDate) || '');
       setIsModalOpen(true);
@@ -92,13 +106,18 @@ const EmployeesView: React.FC<EmployeesViewProps> = ({
   const handleSubmit = (e?: React.FormEvent) => {
       if (e) e.preventDefault();
       const selectedPos = activeOrgPositions.find((p) => p.id === orgPositionId);
-      const oldPosId = editingInfo?.orgPositionId;
+      const oldPosId = editingInfo?.orgPositionId || editingInfo?.positionId;
+      const name = (fullName || selectedPos?.title || '').trim() || 'Сотрудник';
+      const dept = departmentId || selectedPos?.departmentId;
       onSave({
           id: editingInfo ? editingInfo.id : `emp-${Date.now()}`,
-          userId,
+          userId: userId || undefined,
+          departmentId: dept || undefined,
           orgPositionId: orgPositionId || undefined,
-          position: (selectedPos?.title || position || '').trim(),
-          hireDate,
+          positionId: orgPositionId || undefined,
+          fullName: name,
+          status: empStatus || 'active',
+          hireDate: hireDate || undefined,
           birthDate: birthDate || undefined,
       });
 
@@ -107,9 +126,10 @@ const EmployeesView: React.FC<EmployeesViewProps> = ({
               const pos = orgPositions.find((p) => p.id === pid);
               if (!pos) return;
               const others = employees
-                  .filter((e) => e.id !== editingInfo?.id && !e.isArchived && e.orgPositionId === pid)
-                  .map((e) => e.userId);
-              if (includeCurrentUser && orgPositionId === pid) others.push(userId);
+                  .filter((e) => e.id !== editingInfo?.id && !e.isArchived && employeeOnPosition(e, pid))
+                  .map((e) => e.userId)
+                  .filter(Boolean) as string[];
+              if (includeCurrentUser && orgPositionId === pid && userId) others.push(userId);
               const sorted = [...new Set(others.filter(Boolean))].sort();
               const primary = sorted[0];
               if (pos.holderUserId !== primary) {
@@ -121,9 +141,10 @@ const EmployeesView: React.FC<EmployeesViewProps> = ({
               const pos = orgPositions.find((p) => p.id === oldPosId);
               if (pos) {
                   const remaining = employees
-                      .filter((e) => e.id !== editingInfo?.id && !e.isArchived && e.orgPositionId === oldPosId)
+                      .filter((e) => e.id !== editingInfo?.id && !e.isArchived && employeeOnPosition(e, oldPosId))
                       .map((e) => e.userId)
-                      .sort();
+                      .filter(Boolean) as string[];
+                  remaining.sort();
                   const primary = remaining[0];
                   if (pos.holderUserId !== primary) {
                       onSavePosition({ ...pos, holderUserId: primary });
@@ -138,7 +159,7 @@ const EmployeesView: React.FC<EmployeesViewProps> = ({
   };
 
   const handleDelete = () => {
-      if(editingInfo && confirm('Удалить сотрудника?')) {
+      if(editingInfo && confirm('Переместить карточку сотрудника в архив?')) {
           onDelete(editingInfo.id);
           setIsModalOpen(false);
       }
@@ -181,7 +202,13 @@ const EmployeesView: React.FC<EmployeesViewProps> = ({
       if (posHolder) {
           const holderInfo = employees.find((emp) => emp.userId === posHolder && !emp.isArchived);
           if (holderInfo) {
-              onSave({ ...holderInfo, orgPositionId: newId, position: posTitle });
+              onSave({
+                ...holderInfo,
+                orgPositionId: newId,
+                positionId: newId,
+                fullName: holderInfo.fullName || posTitle,
+                status: holderInfo.status || 'active',
+              });
           }
       }
       setIsPosModalOpen(false);
@@ -214,9 +241,12 @@ const EmployeesView: React.FC<EmployeesViewProps> = ({
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
            {employees.filter(info => !info.isArchived).map(info => {
                const user = getEmployeeUser(info.userId);
+               const posId = info.orgPositionId || info.positionId;
                const linkedPosition =
-                   (info.orgPositionId !== undefined && orgPositions.find((p) => p.id === info.orgPositionId)) ||
-                   orgPositions.find((p) => p.holderUserId === info.userId);
+                   (posId ? orgPositions.find((p) => p.id === posId) : undefined) ||
+                   (info.userId ? orgPositions.find((p) => p.holderUserId === info.userId) : undefined);
+               const title = displayEmployeeTitle(info);
+               const avatarSrc = user?.avatar || getDefaultAvatarForId(user?.id || info.id);
                return (
                    <div key={info.id} className="bg-white dark:bg-[#252525] border border-gray-200 dark:border-[#333] rounded-xl p-5 shadow-sm hover:shadow-md transition-shadow group relative flex flex-col">
                        <button onClick={() => handleOpenEdit(info)} className="absolute top-4 right-4 text-gray-300 hover:text-slate-700 dark:hover:text-slate-200 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -225,13 +255,13 @@ const EmployeesView: React.FC<EmployeesViewProps> = ({
                        
                        <div className="flex items-center gap-4 mb-4">
                             <img 
-                                src={user?.avatar || getDefaultAvatarForId(user?.id)} 
+                                src={avatarSrc} 
                                 className="w-12 h-12 rounded-full border border-gray-200 dark:border-gray-600 object-cover object-center" 
                                 alt=""
                             />
                             <div className="overflow-hidden">
-                                <h3 className="font-bold text-gray-900 dark:text-gray-200 truncate">{user?.name}</h3>
-                                <div className="text-xs text-slate-700 dark:text-slate-200 font-medium bg-slate-100 dark:bg-slate-900/30 px-2 py-0.5 rounded border border-slate-200 dark:border-slate-700 inline-block mt-1 truncate max-w-full">{linkedPosition?.title || info.position}</div>
+                                <h3 className="font-bold text-gray-900 dark:text-gray-200 truncate">{title}</h3>
+                                <div className="text-xs text-slate-700 dark:text-slate-200 font-medium bg-slate-100 dark:bg-slate-900/30 px-2 py-0.5 rounded border border-slate-200 dark:border-slate-700 inline-block mt-1 truncate max-w-full">{linkedPosition?.title || '—'}</div>
                             </div>
                        </div>
                        
@@ -279,12 +309,33 @@ const EmployeesView: React.FC<EmployeesViewProps> = ({
               .filter(p => p.managerPositionId === node.id)
               .sort((a, b) => (a.order || 0) - (b.order || 0));
           
-          const holdersFromCards = employees
-              .filter((e) => !e.isArchived && e.orgPositionId === node.id)
-              .map((e) => users.find((u) => u.id === e.userId))
-              .filter(Boolean) as User[];
+          const cardHolders = employees.filter(
+              (e) => !e.isArchived && (e.orgPositionId === node.id || e.positionId === node.id)
+          );
+          const displayHolders: Array<{ key: string; name: string; avatar: string }> = cardHolders.map((e) => {
+              const u = e.userId ? users.find((x) => x.id === e.userId) : undefined;
+              if (u) {
+                  return { key: e.id, name: u.name, avatar: u.avatar || getDefaultAvatarForId(u.id) };
+              }
+              return {
+                  key: e.id,
+                  name: displayEmployeeTitle(e),
+                  avatar: getDefaultAvatarForId(e.id),
+              };
+          });
           const legacyHolder = node.holderUserId ? users.find((u) => u.id === node.holderUserId) : undefined;
-          const displayHolders = holdersFromCards.length > 0 ? holdersFromCards : legacyHolder ? [legacyHolder] : [];
+          const chips =
+              displayHolders.length > 0
+                  ? displayHolders
+                  : legacyHolder
+                    ? [
+                          {
+                              key: legacyHolder.id,
+                              name: legacyHolder.name,
+                              avatar: legacyHolder.avatar || getDefaultAvatarForId(legacyHolder.id),
+                          },
+                      ]
+                    : [];
           const dept = departments.find(d => d.id === node.departmentId);
           
           // Проверяем, есть ли родитель
@@ -309,11 +360,11 @@ const EmployeesView: React.FC<EmployeesViewProps> = ({
                           <div className="text-xs font-bold text-blue-600 dark:text-blue-400 uppercase mb-1">{dept?.name || 'Без отдела'}</div>
                           <div className="font-bold text-gray-900 dark:text-gray-100 text-sm mb-2">{node.title}</div>
                           
-                          {displayHolders.length > 0 ? (
+                          {chips.length > 0 ? (
                               <div className="flex flex-wrap gap-1.5 bg-gray-50 dark:bg-[#303030] p-1.5 rounded">
-                                  {displayHolders.map((h) => (
-                                      <div key={h.id} className="flex items-center gap-1.5 min-w-0">
-                                          <img src={h.avatar || getDefaultAvatarForId(h.id)} className="w-6 h-6 rounded-full object-cover object-center shrink-0" alt="" />
+                                  {chips.map((h) => (
+                                      <div key={h.key} className="flex items-center gap-1.5 min-w-0">
+                                          <img src={h.avatar} className="w-6 h-6 rounded-full object-cover object-center shrink-0" alt="" />
                                           <span className="text-xs font-medium text-gray-700 dark:text-gray-300 truncate">{h.name}</span>
                                       </div>
                                   ))}
@@ -395,20 +446,33 @@ const EmployeesView: React.FC<EmployeesViewProps> = ({
       const target = orgPositions.find((p) => p.id === targetPositionId);
       if (!target) return;
       const emp = employees.find((e) => e.userId === incomingUserId && !e.isArchived);
+      const linkedUser = users.find((u) => u.id === incomingUserId);
       if (emp) {
-          onSave({ ...emp, orgPositionId: targetPositionId, position: target.title });
+          onSave({
+              ...emp,
+              orgPositionId: targetPositionId,
+              positionId: targetPositionId,
+              fullName: (emp.fullName && emp.fullName.trim()) || linkedUser?.name || target.title,
+              status: emp.status || 'active',
+              departmentId: emp.departmentId || target.departmentId,
+          });
       } else {
           onSave({
               id: `emp-${Date.now()}`,
               userId: incomingUserId,
               orgPositionId: targetPositionId,
-              position: target.title,
-              hireDate: '',
+              positionId: targetPositionId,
+              fullName: (linkedUser?.name || target.title).trim() || 'Сотрудник',
+              status: 'active',
+              departmentId: target.departmentId,
           });
       }
       if (onSavePosition) {
           const members = new Set(
-              employees.filter((e) => !e.isArchived && e.orgPositionId === targetPositionId).map((e) => e.userId)
+              employees
+                  .filter((e) => !e.isArchived && employeeOnPosition(e, targetPositionId))
+                  .map((e) => e.userId)
+                  .filter(Boolean) as string[]
           );
           members.add(incomingUserId);
           const primary = [...members].sort()[0];
@@ -435,12 +499,25 @@ const EmployeesView: React.FC<EmployeesViewProps> = ({
           const children = childrenMap.get(node.id) || [];
           const hasChildren = children.length > 0;
           const isOpen = expandedNodes[node.id] ?? true;
-          const holdersFromCards = employees
-              .filter((e) => !e.isArchived && e.orgPositionId === node.id)
-              .map((e) => users.find((u) => u.id === e.userId))
-              .filter(Boolean) as User[];
+          const cardEmps = employees.filter(
+              (e) => !e.isArchived && (e.orgPositionId === node.id || e.positionId === node.id)
+          );
           const legacyHolder = node.holderUserId ? users.find((u) => u.id === node.holderUserId) : undefined;
-          const displayHolders = holdersFromCards.length > 0 ? holdersFromCards : legacyHolder ? [legacyHolder] : [];
+          type RowHolder = User | { id: string; displayName: string; avatar: string };
+          const holdersForList: RowHolder[] =
+              cardEmps.length > 0
+                  ? cardEmps.map((e) => {
+                        const u = e.userId ? users.find((x) => x.id === e.userId) : undefined;
+                        if (u) return u;
+                        return {
+                            id: e.id,
+                            displayName: displayEmployeeTitle(e),
+                            avatar: getDefaultAvatarForId(e.id),
+                        };
+                    })
+                  : legacyHolder
+                    ? [legacyHolder]
+                    : [];
           const dept = departments.find((d) => d.id === node.departmentId);
 
           return (
@@ -475,23 +552,31 @@ const EmployeesView: React.FC<EmployeesViewProps> = ({
                           </button>
                       </div>
                       <div className="px-3 pb-2.5">
-                          {displayHolders.length > 0 ? (
+                          {holdersForList.length > 0 ? (
                               <div className="space-y-1">
-                                  {displayHolders.map((holder) => (
+                                  {holdersForList.map((holder) => {
+                                      const isCardOnly = 'displayName' in holder;
+                                      const label = isCardOnly ? holder.displayName : holder.name;
+                                      const av = isCardOnly
+                                          ? holder.avatar
+                                          : holder.avatar || getDefaultAvatarForId(holder.id);
+                                      const dragId = isCardOnly ? '' : holder.id;
+                                      return (
                                       <div
                                           key={holder.id}
-                                          draggable
+                                          draggable={Boolean(dragId)}
                                           onDragStart={(e) => {
-                                              setDraggedUserId(holder.id);
-                                              e.dataTransfer.setData('text/plain', holder.id);
+                                              if (!dragId) return;
+                                              setDraggedUserId(dragId);
+                                              e.dataTransfer.setData('text/plain', dragId);
                                               e.dataTransfer.effectAllowed = 'move';
                                           }}
-                                          className="flex items-center gap-2 rounded-md border border-gray-200 dark:border-[#3a3a3a] bg-gray-50 dark:bg-[#2f2f2f] px-2 py-1.5 cursor-move"
+                                          className={`flex items-center gap-2 rounded-md border border-gray-200 dark:border-[#3a3a3a] bg-gray-50 dark:bg-[#2f2f2f] px-2 py-1.5 ${dragId ? 'cursor-move' : 'cursor-default opacity-90'}`}
                                       >
-                                          <img src={holder.avatar || getDefaultAvatarForId(holder.id)} className="w-6 h-6 rounded-full object-cover object-center" alt="" />
-                                          <span className="text-xs font-medium text-gray-700 dark:text-gray-300 truncate">{holder.name}</span>
+                                          <img src={av} className="w-6 h-6 rounded-full object-cover object-center" alt="" />
+                                          <span className="text-xs font-medium text-gray-700 dark:text-gray-300 truncate">{label}</span>
                                       </div>
-                                  ))}
+                                  );})}
                               </div>
                           ) : (
                               <div className="text-xs text-gray-400 italic rounded-md border border-dashed border-gray-200 dark:border-[#3a3a3a] px-2 py-1.5">
@@ -510,7 +595,12 @@ const EmployeesView: React.FC<EmployeesViewProps> = ({
       };
 
       const assignedIds = new Set<string>();
-      employees.filter((info) => !info.isArchived && info.orgPositionId).forEach((info) => assignedIds.add(info.userId));
+      employees
+          .filter(
+              (info) =>
+                  !info.isArchived && (info.orgPositionId || info.positionId) && info.userId
+          )
+          .forEach((info) => assignedIds.add(info.userId as string));
       activeOrgPositions.forEach((p) => {
           if (p.holderUserId) assignedIds.add(p.holderUserId);
       });
@@ -641,7 +731,7 @@ const EmployeesView: React.FC<EmployeesViewProps> = ({
                                 className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-sm font-medium text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40"
                             >
                                 <Trash2 size={16} />
-                                <span className="hidden sm:inline">Удалить</span>
+                                <span className="hidden sm:inline">В архив</span>
                             </button>
                         )}
                         <button type="button" onClick={() => setIsModalOpen(false)} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 p-1.5 rounded-full hover:bg-gray-100 dark:hover:bg-[#333]"><X size={18} /></button>
@@ -668,7 +758,8 @@ const EmployeesView: React.FC<EmployeesViewProps> = ({
                             onChange={(value) => {
                                 setOrgPositionId(value);
                                 const linked = activeOrgPositions.find((p) => p.id === value);
-                                if (linked?.title) setPosition(linked.title);
+                                if (linked?.title && !fullName.trim()) setFullName(linked.title);
+                                if (linked?.departmentId) setDepartmentId(linked.departmentId);
                             }}
                             options={[
                                 { value: '', label: 'Не выбран' },
@@ -681,8 +772,39 @@ const EmployeesView: React.FC<EmployeesViewProps> = ({
                     </div>
 
                     <div>
-                        <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 mb-1">Должность</label>
-                        <input required value={position} onChange={e => setPosition(e.target.value)} className="w-full border border-gray-300 dark:border-gray-600 rounded px-3 py-2 text-sm bg-white dark:bg-[#333] text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-purple-500" placeholder="Маркетолог"/>
+                        <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 mb-1">Подразделение</label>
+                        <TaskSelect
+                            value={departmentId}
+                            onChange={setDepartmentId}
+                            options={[
+                                { value: '', label: 'Не выбрано' },
+                                ...departments.map((d) => ({ value: d.id, label: d.name })),
+                            ]}
+                        />
+                    </div>
+
+                    <div>
+                        <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 mb-1">ФИО на карточке</label>
+                        <input
+                            required
+                            value={fullName}
+                            onChange={(e) => setFullName(e.target.value)}
+                            className="w-full border border-gray-300 dark:border-gray-600 rounded px-3 py-2 text-sm bg-white dark:bg-[#333] text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-purple-500"
+                            placeholder="Иванов Иван Иванович"
+                        />
+                    </div>
+
+                    <div>
+                        <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 mb-1">Статус</label>
+                        <TaskSelect
+                            value={empStatus}
+                            onChange={setEmpStatus}
+                            options={[
+                                { value: 'active', label: 'Активен' },
+                                { value: 'on_leave', label: 'В отпуске / отсутствует' },
+                                { value: 'terminated', label: 'Уволен' },
+                            ]}
+                        />
                     </div>
                     
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">

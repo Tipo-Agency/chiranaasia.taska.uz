@@ -153,7 +153,8 @@ const AnalyticsView: React.FC<AnalyticsViewProps> = ({
       p.requestIds.forEach((rid) => {
         const req = requestById.get(rid);
         if (!req || req.isArchived || req.status !== 'approved') return;
-        expensesApproved += req.amount ?? 0;
+        const raw = String(req.amount ?? '0').replace(/\s/g, '').replace(/,/g, '.');
+        expensesApproved += Number(raw) || 0;
       });
     });
     return { count: conducted.length, income, expensesApproved, net: income - expensesApproved };

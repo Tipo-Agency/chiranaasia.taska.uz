@@ -3,7 +3,7 @@
 from sqlalchemy import BigInteger, Column, DateTime, String
 from sqlalchemy.sql import func
 
-from app.database import Base
+from app.db import Base
 
 
 class TelegramIntegrationState(Base):

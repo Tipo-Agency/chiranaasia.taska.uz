@@ -6,27 +6,10 @@ import logging
 from datetime import datetime
 from typing import Any
 
-from app.config import get_settings
+from app.core.config import get_settings
+from app.core.redis import get_redis_client
 
 logger = logging.getLogger(__name__)
-
-_redis_client = None
-
-
-async def _get_redis():
-    """Lazy-init Redis client to avoid hard failure on import."""
-    global _redis_client
-    if _redis_client is not None:
-        return _redis_client
-    try:
-        from redis.asyncio import Redis  # type: ignore
-
-        settings = get_settings()
-        _redis_client = Redis.from_url(settings.REDIS_URL, decode_responses=True)
-        return _redis_client
-    except Exception as exc:
-        logger.warning("Redis init failed: %s", exc)
-        return None
 
 
 def _serialize_event(event: dict[str, Any]) -> dict[str, str]:
@@ -44,13 +27,36 @@ def _serialize_event(event: dict[str, Any]) -> dict[str, str]:
     return payload
 
 
+def deserialize_domain_event_fields(fields: dict[str, str]) -> dict[str, Any]:
+    """Обратно к виду, ожидаемому ``process_domain_event`` (после ``_serialize_event`` / XADD)."""
+    out: dict[str, Any] = {}
+    for key, raw in fields.items():
+        if raw == "":
+            out[key] = None
+            continue
+        if raw.startswith("{") or raw.startswith("["):
+            try:
+                out[key] = json.loads(raw)
+                continue
+            except json.JSONDecodeError:
+                pass
+        if key == "occurredAt":
+            try:
+                out[key] = datetime.fromisoformat(raw.replace("Z", "+00:00"))
+            except ValueError:
+                out[key] = raw
+        else:
+            out[key] = raw
+    return out
+
+
 async def ensure_redis_stream_and_group() -> None:
     """
     Создаёт Redis Stream для доменных событий и consumer group (для будущих воркеров / мониторинга).
     Без Redis приложение работает: события пишутся в Postgres и обрабатываются синхронно.
     """
     settings = get_settings()
-    redis = await _get_redis()
+    redis = await get_redis_client()
     if redis is None:
         logger.warning("Redis недоступен: события только в БД, без stream.")
         return
@@ -72,7 +78,7 @@ async def publish_domain_event(event: dict[str, Any]) -> tuple[bool, str | None]
     Returns: (published, stream_id)
     """
     settings = get_settings()
-    redis = await _get_redis()
+    redis = await get_redis_client()
     if redis is None:
         return False, None
     try:

@@ -38,7 +38,7 @@ BACKEND_URL = os.getenv("BACKEND_URL", "").rstrip("/")
 API_BASE = f"{BACKEND_URL}/api" if BACKEND_URL else ""
 
 # Порядок миграции: сначала справочники и настройки, потом пользователи, потом остальное.
-# Каждый элемент: (firestore_collection_name, api_path, put_method: "put_list" | "put_one")
+# Каждый элемент: (firestore_collection_name, api_path, method: "put_list" | "put_one" | "post_each")
 MIGRATION_MAP = [
     ("statuses", "/statuses", "put_list"),
     ("priorities", "/priorities", "put_list"),
@@ -66,7 +66,7 @@ MIGRATION_MAP = [
     ("inventoryItems", "/inventory/items", "put_list"),
     ("stockMovements", "/inventory/movements", "put_list"),
     ("financePlan", "/finance/plan", "put_one"),
-    ("purchaseRequests", "/finance/requests", "put_list"),
+    ("purchaseRequests", "/finance/requests", "post_each"),
     ("financialPlanDocuments", "/finance/financial-plan-documents", "put_list"),
     ("financialPlannings", "/finance/financial-plannings", "put_list"),
     ("funds", "/finance/funds", "put_list"),
@@ -156,6 +156,26 @@ def put_via_api(api_path: str, payload: list | dict, dry_run: bool) -> bool:
         return False
 
 
+def post_one_via_api(api_path: str, payload: dict, dry_run: bool) -> bool:
+    """Одна запись POST (например заявка на оплату)."""
+    if dry_run:
+        return True
+    if not API_BASE:
+        print("  [SKIP] BACKEND_URL не задан.")
+        return False
+    url = f"{API_BASE}{api_path}"
+    try:
+        import requests
+        r = requests.post(url, json=payload, timeout=60)
+        if r.status_code in (200, 201):
+            return True
+        print(f"  [ERROR] {r.status_code} {r.text[:200]}")
+        return False
+    except Exception as e:
+        print(f"  [ERROR] {e}")
+        return False
+
+
 def main():
     parser = argparse.ArgumentParser(description="Миграция Firestore → Postgres (Taska API)")
     parser.add_argument("--dry-run", action="store_true", help="Только прочитать данные, в API не писать")
@@ -210,6 +230,19 @@ def main():
                 continue
             payload = items[0] if isinstance(items[0], dict) else items[0]
             success = put_via_api(api_path, payload, args.dry_run)
+        elif method == "post_each":
+            if not items:
+                success = True
+            else:
+                success = True
+                rows = items if isinstance(items, list) else [items]
+                for row in rows:
+                    if not isinstance(row, dict):
+                        success = False
+                        break
+                    if not post_one_via_api(api_path, row, args.dry_run):
+                        success = False
+                        break
         else:
             payload = items
             success = put_via_api(api_path, payload, args.dry_run) if payload else True

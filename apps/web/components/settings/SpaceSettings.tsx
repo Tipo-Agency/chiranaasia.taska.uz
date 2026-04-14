@@ -45,6 +45,7 @@ export const SpaceSettings: React.FC<SpaceSettingsProps> = ({
   const [newPageIcon, setNewPageIcon] = useState('');
   const [newPageColor, setNewPageColor] = useState('');
   const [newPageType, setNewPageType] = useState('tasks');
+  const [newPageIsPublic, setNewPageIsPublic] = useState(false);
 
   const activeProjects = useMemo(() => projects.filter((p) => !p.isArchived), [projects]);
   const activeStatuses = useMemo(() => statuses.filter((s) => !s.isArchived), [statuses]);
@@ -97,12 +98,24 @@ export const SpaceSettings: React.FC<SpaceSettingsProps> = ({
       if (!editingId) return;
       const table = tables.find(t => t.id === editingId);
       if (table) {
-          onUpdateTable({ ...table, name: newPageName, icon: newPageIcon, color: newPageColor, type: newPageType as any });
+          onUpdateTable({
+              ...table,
+              name: newPageName,
+              icon: newPageIcon,
+              color: newPageColor,
+              type: newPageType as any,
+              isPublic: newPageType === 'content-plan' ? newPageIsPublic : false,
+          });
           setEditingId(null);
       }
   };
   const handleEditPage = (t: TableCollection) => {
-      setEditingId(t.id); setNewPageName(t.name); setNewPageIcon(t.icon); setNewPageColor(t.color || 'text-gray-500'); setNewPageType(t.type);
+      setEditingId(t.id);
+      setNewPageName(t.name);
+      setNewPageIcon(t.icon);
+      setNewPageColor(t.color || 'text-gray-500');
+      setNewPageType(t.type);
+      setNewPageIsPublic(t.type === 'content-plan' ? !!t.isPublic : false);
   };
 
   // --- Render ---
@@ -165,6 +178,23 @@ export const SpaceSettings: React.FC<SpaceSettingsProps> = ({
                               ))}
                           </div>
                       </div>
+
+                      {newPageType === 'content-plan' && (
+                          <label className="flex items-start gap-3 rounded-lg border border-gray-200 dark:border-[#333] bg-white dark:bg-[#252525] p-3 text-sm text-gray-700 dark:text-gray-300 cursor-pointer">
+                              <input
+                                  type="checkbox"
+                                  className="mt-0.5 rounded text-blue-600"
+                                  checked={newPageIsPublic}
+                                  onChange={(e) => setNewPageIsPublic(e.target.checked)}
+                              />
+                              <span>
+                                  <span className="font-medium text-gray-900 dark:text-white">Публичная ссылка</span>
+                                  <span className="block text-xs text-gray-500 dark:text-gray-400 mt-1">
+                                      Разрешить просмотр календаря контента без входа в систему (URL вида /content-plan/…)
+                                  </span>
+                              </span>
+                          </label>
+                      )}
 
                       <div className="flex gap-2 justify-end pt-2">
                           <button type="button" onClick={() => setEditingId(null)} className="px-4 py-2 text-sm text-gray-500 hover:text-gray-700">Отмена</button>

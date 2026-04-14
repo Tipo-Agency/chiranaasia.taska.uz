@@ -10,7 +10,6 @@ export interface SystemNotificationItem {
   id: string;
   title: string;
   body: string;
-  priority?: string;
   isRead?: boolean;
   createdAt?: string;
 }
@@ -24,6 +23,15 @@ interface NotificationCenterValue {
 }
 
 const NotificationCenterContext = createContext<NotificationCenterValue | null>(null);
+
+/** Backoff переподключения: 1s → 2s → 4s → далее не чаще чем раз в 30s */
+function notificationsWsReconnectDelayMs(attemptIndex: number): number {
+  const stepsSec = [1, 2, 4, 30];
+  const sec = stepsSec[Math.min(attemptIndex, stepsSec.length - 1)];
+  return sec * 1000;
+}
+
+const WS_MAX_FAILS_BEFORE_SESSION_DISABLE = 20;
 
 export function NotificationCenterProvider({
   userId,
@@ -66,72 +74,134 @@ export function NotificationCenterProvider({
   useEffect(() => {
     if (!userId) return;
     let mounted = true;
+    let intentionalClose = false;
+    let reconnectTimer: number | null = null;
+    let reconnectAttempt = 0;
+    let activeWs: WebSocket | null = null;
+
     refresh();
 
-    let ws: WebSocket | null = null;
     const wsDisableKey = `notifications_ws_disabled:${userId}`;
-    try {
-      const WS: any = (globalThis as any).WebSocket;
+    const WS: typeof WebSocket | undefined = (globalThis as any).WebSocket;
+
+    const clearReconnectTimer = () => {
+      if (reconnectTimer !== null) {
+        window.clearTimeout(reconnectTimer);
+        reconnectTimer = null;
+      }
+    };
+
+    const detachWs = (socket: WebSocket | null) => {
+      if (!socket) return;
       try {
-        if (sessionStorage.getItem(wsDisableKey) === '1') {
-          ws = null;
-        }
+        socket.onopen = null;
+        socket.onmessage = null;
+        socket.onerror = null;
+        socket.onclose = null;
       } catch {
-        // ignore
+        /* ignore */
       }
-      // In some environments (CSP/sandbox/old embedded webviews) WebSocket constructor may throw.
+    };
+
+    const scheduleReconnect = () => {
+      clearReconnectTimer();
+      if (!mounted || intentionalClose) return;
+      try {
+        if (sessionStorage.getItem(wsDisableKey) === '1') return;
+      } catch {
+        /* ignore */
+      }
+      if (reconnectAttempt >= WS_MAX_FAILS_BEFORE_SESSION_DISABLE) {
+        try {
+          sessionStorage.setItem(wsDisableKey, '1');
+        } catch {
+          /* ignore */
+        }
+        return;
+      }
+      const delay = notificationsWsReconnectDelayMs(reconnectAttempt);
+      reconnectAttempt += 1;
+      reconnectTimer = window.setTimeout(() => {
+        reconnectTimer = null;
+        connectSocket();
+      }, delay);
+    };
+
+    const connectSocket = () => {
+      clearReconnectTimer();
+      if (!mounted || intentionalClose) return;
+      try {
+        if (sessionStorage.getItem(wsDisableKey) === '1') return;
+      } catch {
+        /* ignore */
+      }
+
       if (
-        typeof WS === 'function' &&
-        WS.prototype &&
-        typeof WS.prototype.send === 'function' &&
-        typeof WS.prototype.close === 'function'
+        typeof WS !== 'function' ||
+        !WS.prototype ||
+        typeof WS.prototype.send !== 'function' ||
+        typeof WS.prototype.close !== 'function'
       ) {
-        ws = new WS(api.notifications.wsUrl(userId));
-        ws.onerror = () => {
-          // If WS is not supported by server/proxy (common in prod without upgrade headers),
-          // disable reconnect attempts for this session to avoid console spam.
-          try {
-            sessionStorage.setItem(wsDisableKey, '1');
-          } catch {
-            // ignore
-          }
-          try {
-            // readyState: 1 === OPEN
-            if (ws && (ws as any).readyState === 1) ws.close();
-          } catch {
-            // ignore
-          }
-        };
-        ws.onmessage = (evt) => {
-          try {
-            const data = JSON.parse(evt.data);
-            if (data?.type === 'notification.created' && data.notification && mounted) {
-              setNotifications((prev) => [
-                {
-                  id: data.notification.id,
-                  title: data.notification.title,
-                  body: data.notification.body,
-                  priority: data.notification.priority,
-                  isRead: false,
-                  createdAt: new Date().toISOString(),
-                },
-                ...prev,
-              ]);
-              setUnreadCount((prev) => prev + 1);
-              chatLocalService.addSystemFeedMessage({
-                id: `notif-${data.notification.id}`,
-                targetUserId: userId,
-                text: `${data.notification.title}: ${data.notification.body}`,
-              });
-            }
-          } catch {
-            /* malformed */
-          }
-        };
+        scheduleReconnect();
+        return;
       }
-    } catch {
-      ws = null;
-    }
+
+      let socket: WebSocket;
+      try {
+        socket = new WS(api.notifications.wsUrl(userId));
+      } catch {
+        scheduleReconnect();
+        return;
+      }
+
+      activeWs = socket;
+
+      socket.onopen = () => {
+        if (!mounted) return;
+        reconnectAttempt = 0;
+        void refresh();
+      };
+
+      socket.onmessage = (evt: MessageEvent) => {
+        try {
+          const data = JSON.parse(evt.data);
+          if (data?.type === 'notification.created' && data.notification && mounted) {
+            setNotifications((prev) => [
+              {
+                id: data.notification.id,
+                title: data.notification.title,
+                body: data.notification.body,
+                isRead: false,
+                createdAt:
+                  (typeof data.notification.createdAt === 'string' && data.notification.createdAt) ||
+                  new Date().toISOString(),
+              },
+              ...prev,
+            ]);
+            setUnreadCount((prev) => prev + 1);
+            chatLocalService.addSystemFeedMessage({
+              id: `notif-${data.notification.id}`,
+              targetUserId: userId,
+              text: `${data.notification.title}: ${data.notification.body}`,
+            });
+          }
+        } catch {
+          /* malformed */
+        }
+      };
+
+      socket.onerror = () => {
+        /* onclose выполнит один переподключение с backoff — не дублируем и не отключаем WS с первой ошибки */
+      };
+
+      socket.onclose = () => {
+        activeWs = null;
+        if (!mounted || intentionalClose) return;
+        scheduleReconnect();
+      };
+    };
+
+    connectSocket();
 
     const pollId = window.setInterval(() => {
       api.notifications
@@ -145,12 +215,16 @@ export function NotificationCenterProvider({
 
     return () => {
       mounted = false;
+      intentionalClose = true;
       window.clearInterval(pollId);
+      clearReconnectTimer();
+      const s = activeWs;
+      activeWs = null;
+      detachWs(s);
       try {
-        // In React StrictMode dev cycle cleanup can run while CONNECTING.
-        // Avoid explicit close in CONNECTING state to prevent noisy browser warning.
-        // readyState: 1 === OPEN
-        if (ws && (ws as any).readyState === 1) ws.close();
+        if (s && (s.readyState === WebSocket.OPEN || s.readyState === WebSocket.CONNECTING)) {
+          s.close();
+        }
       } catch {
         /* ignore */
       }

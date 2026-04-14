@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useMemo, useLayoutEffect, lazy, Suspense } from 'react';
 import { Project, Task, User, StatusOption, PriorityOption, NotificationPreferences, AutomationRule, TableCollection, Deal, Department, FinanceCategory, Fund, SalesFunnel, Doc, ContentPost, EmployeeInfo, Client, Contract, BusinessProcess, Meeting, Warehouse, OrgPosition } from '../types';
-import { User as UserIcon, Briefcase, Archive, Users, Building2, Wallet, TrendingUp, PiggyBank, ShieldAlert, Settings, BellRing, Zap, Package, ArrowLeft, ShieldCheck, Receipt } from 'lucide-react';
+import { User as UserIcon, Briefcase, Archive, Users, Building2, Wallet, TrendingUp, PiggyBank, ShieldAlert, Settings, BellRing, Zap, Package, ArrowLeft, ShieldCheck, Receipt, Link2 } from 'lucide-react';
 import {
   Input,
   ModuleCreateDropdown,
@@ -23,6 +23,7 @@ import { DEFAULT_NOTIFICATION_PREFS } from '../constants';
 // Integrations are managed outside Settings now.
 import { ArchiveView, ARCHIVE_TAB_OPTIONS, type ArchiveTabId } from './settings/ArchiveView';
 import { FinanceSetupSettings } from './settings/FinanceSetupSettings';
+import { IntegrationsRoadmapSettings } from './settings/IntegrationsRoadmapSettings';
 import { TasksSetupSettings } from './settings/TasksSetupSettings';
 import { hasPermission } from '../utils/permissions';
 import { RouteFallback } from './ui/RouteFallback';
@@ -141,6 +142,7 @@ const SettingsView: React.FC<SettingsViewProps> = ({
   const settingsTabs = useMemo(() => {
     const t = [...SETTINGS_TABS_BASE];
     if (currentUser && hasPermission(currentUser, 'admin.system')) {
+      t.push({ id: 'integrations-roadmap', label: 'Интеграции (план)', icon: <Link2 size={14} /> });
       t.push({ id: 'admin', label: 'Админ-панель', icon: <ShieldCheck size={14} /> });
     }
     return t;
@@ -150,7 +152,12 @@ const SettingsView: React.FC<SettingsViewProps> = ({
     if (t === 'spaces' || t === 'departments' || t === 'warehouses') return 'structure';
     if (t === 'finance-categories' || t === 'funds') return 'finance-setup';
     if (t === 'integrations' || t === 'system') return 'notifications';
-    if (t === 'admin' && (!currentUser || !hasPermission(currentUser, 'admin.system'))) return 'users';
+    if (
+      (t === 'admin' || t === 'integrations-roadmap') &&
+      (!currentUser || !hasPermission(currentUser, 'admin.system'))
+    ) {
+      return 'users';
+    }
     return t;
   };
   const [activeTab, setActiveTab] = useState<string>(normalizeTab(initialTab));
@@ -473,6 +480,11 @@ const SettingsView: React.FC<SettingsViewProps> = ({
                   onDeleteRule={onDeleteAutomationRule!}
                   onUpdatePrefs={onUpdateNotificationPrefs}
                 />
+              )}
+              {activeTab === 'integrations-roadmap' && currentUser && hasPermission(currentUser, 'admin.system') && (
+                <div className="bg-white dark:bg-[#252525] border border-gray-200 dark:border-[#333] rounded-2xl p-4 md:p-6">
+                  <IntegrationsRoadmapSettings />
+                </div>
               )}
               {activeTab === 'admin' && currentUser && hasPermission(currentUser, 'admin.system') && (
                 <Suspense fallback={<RouteFallback />}>

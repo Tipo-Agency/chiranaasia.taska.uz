@@ -3,7 +3,7 @@
  * Планирование по месяцам, кварталам или за год. Строки с произвольными названиями (доходы/расходы), суммы по периодам.
  */
 import React, { useState, useMemo, useEffect } from 'react';
-import { Bdr, BdrRow } from '../../types';
+import { Bdr, BdrRow, BdrTotalsMonth } from '../../types';
 import { Trash2, Save, TrendingUp, TrendingDown, Check, Pencil } from 'lucide-react';
 import { ModuleCreateIconButton } from '../ui/ModuleCreateIconButton';
 import { TaskSelect } from '../TaskSelect';
@@ -21,6 +21,23 @@ function getQuartersForYear(year: number): { key: string; label: string; months:
     { key: 'Q3', label: 'Q3', months: [`${year}-07`, `${year}-08`, `${year}-09`] },
     { key: 'Q4', label: 'Q4', months: [`${year}-10`, `${year}-11`, `${year}-12`] },
   ];
+}
+
+/** Итоги по колонке из помесячных данных API (совпадает с расчётом на бэкенде). */
+function aggregateFromMonthTotals(
+  period: { months: string[] },
+  byMonth: Record<string, BdrTotalsMonth>
+): { income: number; expense: number; profit: number } {
+  let income = 0;
+  let expense = 0;
+  for (const m of period.months) {
+    const cell = byMonth[m];
+    if (cell) {
+      income += cell.income;
+      expense += cell.expense;
+    }
+  }
+  return { income, expense, profit: income - expense };
 }
 
 interface BdrViewProps {
@@ -134,11 +151,20 @@ export const BdrView: React.FC<BdrViewProps> = ({ bdr, onLoadBdr, onSaveBdr }) =
 
   const incomeRows = rows.filter(r => r.type === 'income');
   const expenseRows = rows.filter(r => r.type === 'expense');
-  const totalIncomeByPeriod = (period: { months: string[] }) =>
-    incomeRows.reduce((s, r) => s + getCellValue(r, period), 0);
-  const totalExpenseByPeriod = (period: { months: string[] }) =>
-    expenseRows.reduce((s, r) => s + getCellValue(r, period), 0);
-  const profitByPeriod = (period: { months: string[] }) => totalIncomeByPeriod(period) - totalExpenseByPeriod(period);
+  const serverByMonth =
+    !dirty && bdr?.year === yearStr && bdr.totals?.byMonth ? bdr.totals.byMonth : null;
+  const totalIncomeByPeriod = (period: { months: string[] }) => {
+    if (serverByMonth) return aggregateFromMonthTotals(period, serverByMonth).income;
+    return incomeRows.reduce((s, r) => s + getCellValue(r, period), 0);
+  };
+  const totalExpenseByPeriod = (period: { months: string[] }) => {
+    if (serverByMonth) return aggregateFromMonthTotals(period, serverByMonth).expense;
+    return expenseRows.reduce((s, r) => s + getCellValue(r, period), 0);
+  };
+  const profitByPeriod = (period: { months: string[] }) => {
+    if (serverByMonth) return aggregateFromMonthTotals(period, serverByMonth).profit;
+    return totalIncomeByPeriod(period) - totalExpenseByPeriod(period);
+  };
 
   return (
     <div className="space-y-4">

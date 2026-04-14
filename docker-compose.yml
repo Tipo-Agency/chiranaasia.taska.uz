@@ -32,10 +32,20 @@ services:
       - "8003:8000"   # хост 8003 (из списка свободных портов проекта)
     environment:
       DATABASE_URL: postgresql+asyncpg://taska:${DB_PASSWORD:-taska}@db:5432/taska
-      SECRET_KEY: ${SECRET_KEY:-change-me-in-production}
+      # Минимум 32 символа, без placeholder-подстрок (см. app.core.config). Задайте в корневом .env.
+      SECRET_KEY: ${SECRET_KEY:?Set SECRET_KEY in .env (see .env.example)}
       CORS_ORIGINS: "http://localhost:3000,http://127.0.0.1:3000"
       REDIS_URL: redis://redis:6379/0
-      REDIS_EVENTS_STREAM: events.domain.v1
+      REDIS_EVENTS_STREAM: ${REDIS_EVENTS_STREAM:-queue.domain.v1}
+      REDIS_INTEGRATIONS_STREAM: ${REDIS_INTEGRATIONS_STREAM:-queue.integrations.v1}
+      REDIS_INTEGRATIONS_GROUP: ${REDIS_INTEGRATIONS_GROUP:-integrations}
+      REDIS_INTEGRATIONS_CLAIM_IDLE_MS: ${REDIS_INTEGRATIONS_CLAIM_IDLE_MS:-120000}
+      REDIS_NOTIFICATIONS_STREAM: ${REDIS_NOTIFICATIONS_STREAM:-queue.notifications.v1}
+      REDIS_NOTIFICATIONS_GROUP: ${REDIS_NOTIFICATIONS_GROUP:-notifications}
+      REDIS_NOTIFICATIONS_CLAIM_IDLE_MS: ${REDIS_NOTIFICATIONS_CLAIM_IDLE_MS:-120000}
+      DOMAIN_EVENTS_HUB_ASYNC: ${DOMAIN_EVENTS_HUB_ASYNC:-true}
+      REDIS_DOMAIN_EVENTS_HUB_GROUP: ${REDIS_DOMAIN_EVENTS_HUB_GROUP:-notification_hub}
+      REDIS_DOMAIN_EVENTS_HUB_CLAIM_IDLE_MS: ${REDIS_DOMAIN_EVENTS_HUB_CLAIM_IDLE_MS:-120000}
       TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
       TELEGRAM_API_ID: ${TELEGRAM_API_ID:-0}
       TELEGRAM_API_HASH: ${TELEGRAM_API_HASH:-}
@@ -44,6 +54,84 @@ services:
       META_TIPA: ${META_TIPA:-}
       META_UCHETGRAM: ${META_UCHETGRAM:-}
       META_WEBHOOK_LOG_BODY: ${META_WEBHOOK_LOG_BODY:-false}
+      META_APP_SECRET: ${META_APP_SECRET:-}
+      META_WEBHOOK_VERIFY_SIGNATURE: ${META_WEBHOOK_VERIFY_SIGNATURE:-true}
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  # Telegram getUpdates для воронок без webhook; offset в Redis (см. workers/integrations_worker.py)
+  integrations-worker:
+    build: ./apps/api
+    command: ["python", "-m", "workers.integrations_worker"]
+    environment:
+      DATABASE_URL: postgresql+asyncpg://taska:${DB_PASSWORD:-taska}@db:5432/taska
+      SECRET_KEY: ${SECRET_KEY:?Set SECRET_KEY in .env (see .env.example)}
+      REDIS_URL: redis://redis:6379/0
+      REDIS_EVENTS_STREAM: ${REDIS_EVENTS_STREAM:-queue.domain.v1}
+      REDIS_INTEGRATIONS_STREAM: ${REDIS_INTEGRATIONS_STREAM:-queue.integrations.v1}
+      REDIS_INTEGRATIONS_GROUP: ${REDIS_INTEGRATIONS_GROUP:-integrations}
+      REDIS_INTEGRATIONS_CLAIM_IDLE_MS: ${REDIS_INTEGRATIONS_CLAIM_IDLE_MS:-120000}
+      DOMAIN_EVENTS_HUB_ASYNC: ${DOMAIN_EVENTS_HUB_ASYNC:-true}
+      TELEGRAM_LEADS_POLL_INTERVAL_SECONDS: ${TELEGRAM_LEADS_POLL_INTERVAL_SECONDS:-5}
+      TELEGRAM_LEADS_POLL_LIMIT: ${TELEGRAM_LEADS_POLL_LIMIT:-50}
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  # Доменные события → уведомления (при DOMAIN_EVENTS_HUB_ASYNC=true)
+  domain-events-worker:
+    build: ./apps/api
+    command: ["python", "-m", "workers.domain_events_worker"]
+    environment:
+      DATABASE_URL: postgresql+asyncpg://taska:${DB_PASSWORD:-taska}@db:5432/taska
+      SECRET_KEY: ${SECRET_KEY:?Set SECRET_KEY in .env (see .env.example)}
+      REDIS_URL: redis://redis:6379/0
+      REDIS_EVENTS_STREAM: ${REDIS_EVENTS_STREAM:-queue.domain.v1}
+      DOMAIN_EVENTS_HUB_ASYNC: "true"
+      REDIS_DOMAIN_EVENTS_HUB_GROUP: ${REDIS_DOMAIN_EVENTS_HUB_GROUP:-notification_hub}
+      REDIS_DOMAIN_EVENTS_HUB_CLAIM_IDLE_MS: ${REDIS_DOMAIN_EVENTS_HUB_CLAIM_IDLE_MS:-120000}
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  # Retention таблицы уведомлений (раньше был цикл в lifespan API)
+  retention-worker:
+    build: ./apps/api
+    command: ["python", "-m", "workers.retention_worker"]
+    environment:
+      DATABASE_URL: postgresql+asyncpg://taska:${DB_PASSWORD:-taska}@db:5432/taska
+      SECRET_KEY: ${SECRET_KEY:?Set SECRET_KEY in .env (see .env.example)}
+      NOTIFICATIONS_RETENTION_DAYS: ${NOTIFICATIONS_RETENTION_DAYS:-90}
+      NOTIFICATIONS_RETENTION_INTERVAL_SECONDS: ${NOTIFICATIONS_RETENTION_INTERVAL_SECONDS:-3600}
+    depends_on:
+      db:
+        condition: service_healthy
+
+  # Очередь queue.notifications.v1: telegram / e-mail доставки по notification_id
+  notifications-worker:
+    build: ./apps/api
+    command: ["python", "-m", "workers.notifications_worker"]
+    environment:
+      DATABASE_URL: postgresql+asyncpg://taska:${DB_PASSWORD:-taska}@db:5432/taska
+      SECRET_KEY: ${SECRET_KEY:?Set SECRET_KEY in .env (see .env.example)}
+      REDIS_URL: redis://redis:6379/0
+      REDIS_NOTIFICATIONS_STREAM: ${REDIS_NOTIFICATIONS_STREAM:-queue.notifications.v1}
+      REDIS_NOTIFICATIONS_GROUP: ${REDIS_NOTIFICATIONS_GROUP:-notifications}
+      REDIS_NOTIFICATIONS_CLAIM_IDLE_MS: ${REDIS_NOTIFICATIONS_CLAIM_IDLE_MS:-120000}
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      SMTP_FROM: ${SMTP_FROM:-noreply@tipa.taska.uz}
+      SMTP_USE_TLS: ${SMTP_USE_TLS:-true}
     depends_on:
       db:
         condition: service_healthy

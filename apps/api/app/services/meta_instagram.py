@@ -2,24 +2,27 @@
 
 from __future__ import annotations
 
-import json
 import logging
 import time
 import uuid
 from datetime import UTC, datetime
+from decimal import Decimal
 from typing import Any
 
 import httpx
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.config import Settings, get_settings
+from app.core.config import Settings, get_settings
 from app.models.client import Client as ClientRow
 from app.models.client import Deal
 from app.models.funnel import SalesFunnel
 from app.models.notification import NotificationPreferences as NPrefModel
 from app.models.user import User
 from app.services.domain_events import emit_domain_event
+from app.services.http_client import async_http_client
+from app.services.media_storage import is_media_storage_configured, upload_deal_media_bytes
+from app.services.meta_sender import DEFAULT_GRAPH_VERSION, MetaGraphSendResult, send_instagram_page_message
 
 log = logging.getLogger("uvicorn.error")
 
@@ -51,13 +54,13 @@ async def refresh_ig_entry_map(settings: Settings) -> dict[str, str]:
     if _ig_entry_to_page and (now - _ig_map_fetched_at) < IG_MAP_TTL_SEC:
         return _ig_entry_to_page
     out: dict[str, str] = {}
-    async with httpx.AsyncClient(timeout=20.0) as client:
+    async with async_http_client(timeout=httpx.Timeout(20.0)) as client:
         for page_id, token in _page_token_pairs(settings):
             if not token:
                 continue
             try:
                 r = await client.get(
-                    f"https://graph.facebook.com/v21.0/{page_id}",
+                    f"https://graph.facebook.com/{DEFAULT_GRAPH_VERSION}/{page_id}",
                     params={"fields": "instagram_business_account", "access_token": token},
                 )
             except httpx.HTTPError as e:
@@ -139,6 +142,53 @@ def _message_text_and_attachments(msg: dict[str, Any]) -> tuple[str, list[dict[s
     return "", []
 
 
+async def mirror_meta_attachments_to_storage(deal_id: str, attachments: list[Any]) -> list[dict[str, Any]]:
+    """Скачать вложения Meta по временным URL, положить в S3; в БД только ``storageKey`` (без ``url``)."""
+    out: list[dict[str, Any]] = []
+    if not attachments:
+        return out
+    for a in attachments:
+        if not isinstance(a, dict):
+            continue
+        url = str(a.get("url") or "").strip()
+        typ = str(a.get("type") or a.get("kind") or "file").strip().lower()
+        title = a.get("title")
+        if not url:
+            item = {k: v for k, v in a.items() if k != "url"}
+            if item:
+                out.append(item)
+            continue
+        if not is_media_storage_configured():
+            log.warning(
+                "meta webhook: S3 not configured — skip external attachment deal_id=%s",
+                deal_id,
+            )
+            continue
+        try:
+            async with async_http_client(timeout=httpx.Timeout(45.0), follow_redirects=True) as client:
+                r = await client.get(url, headers={"User-Agent": "TaskaCRM/1.0"})
+                r.raise_for_status()
+                body = r.content
+            ct = (
+                r.headers.get("content-type", "application/octet-stream").split(";")[0].strip()
+                or "application/octet-stream"
+            )
+            key = await upload_deal_media_bytes(
+                deal_id=deal_id,
+                source="ig",
+                body=body,
+                content_type=ct,
+                filename_hint=str(title)[:200] if title else None,
+            )
+            item: dict[str, Any] = {"kind": typ, "storageKey": key, "mime": ct, "type": typ}
+            if title:
+                item["title"] = str(title)[:300]
+            out.append(item)
+        except Exception as exc:
+            log.warning("meta webhook: attachment mirror failed: %s", exc)
+    return out
+
+
 def _comment_has_mid(comments: list[Any] | None, mid: str | None) -> bool:
     if not mid or not comments:
         return False
@@ -162,10 +212,10 @@ async def _default_funnel_stage(db: AsyncSession) -> tuple[str | None, str]:
     return fid, (sid or "new")
 
 
-async def _first_assignee_id(db: AsyncSession) -> str:
+async def _first_assignee_id(db: AsyncSession) -> str | None:
     result = await db.execute(select(User.id).where(User.is_archived.is_(False)).limit(1))
     uid = result.scalar_one_or_none()
-    return uid or ""
+    return uid if uid else None
 
 
 async def _ensure_instagram_client(
@@ -190,32 +240,30 @@ async def _ensure_instagram_client(
         name=f"Instagram · {short}",
         instagram=marker,
         notes=f"Instagram Direct, PSID {customer_psid}, страница {page_id}",
-        funnel_id=funnel_id,
+        tags=[],
     )
     db.add(cl)
     await db.flush()
     return cid
 
 
-async def send_instagram_text(page_id: str, recipient_psid: str, text: str, settings: Settings) -> dict[str, Any]:
+async def send_instagram_text(
+    page_id: str, recipient_psid: str, text: str, settings: Settings
+) -> MetaGraphSendResult:
+    """Исходящее сообщение Instagram Direct через Graph API (ретраи 5xx — в ``meta_sender``)."""
     token = page_access_token(page_id, settings)
     if not token:
-        raise ValueError("Нет Page Access Token для этой страницы (META_TASKA / META_TIPA / META_UCHETGRAM)")
-    url = f"https://graph.facebook.com/v21.0/{page_id}/messages"
-    body = {
-        "recipient": {"id": recipient_psid},
-        "messaging_type": "RESPONSE",
-        "message": {"text": text[:2000]},
-    }
-    async with httpx.AsyncClient(timeout=30.0) as client:
-        r = await client.post(url, params={"access_token": token}, json=body)
-    try:
-        data = r.json()
-    except json.JSONDecodeError:
-        data = {"raw": r.text}
-    if r.status_code >= 400:
-        raise ValueError(data.get("error", {}).get("message", r.text) if isinstance(data, dict) else r.text)
-    return data if isinstance(data, dict) else {"ok": True}
+        return MetaGraphSendResult(
+            ok=False,
+            http_status=None,
+            error_message="no_page_access_token",
+        )
+    return await send_instagram_page_message(
+        page_id=page_id,
+        recipient_psid=recipient_psid,
+        text=text,
+        access_token=token,
+    )
 
 
 def _normalize_messaging_events(entry: dict[str, Any]) -> list[dict[str, Any]]:
@@ -306,7 +354,7 @@ async def process_instagram_webhook(db: AsyncSession, body: dict[str, Any]) -> i
             if not customer_psid:
                 continue
 
-            text, attachments = _message_text_and_attachments(msg)
+            text, attachments_raw = _message_text_and_attachments(msg)
             if not text:
                 continue
 
@@ -320,7 +368,7 @@ async def process_instagram_webhook(db: AsyncSession, body: dict[str, Any]) -> i
             tk = thread_key(page_id, customer_psid)
             result = await db.execute(
                 select(Deal).where(
-                    Deal.telegram_chat_id == tk,
+                    Deal.source_chat_id == tk,
                     Deal.source == "instagram",
                     Deal.is_archived.is_(False),
                 ).limit(1)
@@ -328,6 +376,7 @@ async def process_instagram_webhook(db: AsyncSession, body: dict[str, Any]) -> i
             deal = result.scalar_one_or_none()
 
             if deal:
+                attachments_save = await mirror_meta_attachments_to_storage(deal.id, list(attachments_raw))
                 if not deal.client_id:
                     cid = await _ensure_instagram_client(
                         db,
@@ -340,6 +389,12 @@ async def process_instagram_webhook(db: AsyncSession, body: dict[str, Any]) -> i
                         deal.contact_name = f"Instagram · {customer_psid[-8:]}"
                 comments = list(deal.comments or [])
                 if _comment_has_mid(comments, mid):
+                    log.info(
+                        "meta webhook: duplicate message skipped mid=%r deal_id=%s page_id=%s",
+                        mid,
+                        deal.id,
+                        page_id,
+                    )
                     continue
                 row: dict[str, Any] = {
                     "id": f"ig-{mid or uuid.uuid4().hex[:12]}",
@@ -349,8 +404,8 @@ async def process_instagram_webhook(db: AsyncSession, body: dict[str, Any]) -> i
                     "type": "instagram_in",
                     "metaMid": mid,
                 }
-                if attachments:
-                    row["attachments"] = attachments
+                if attachments_save:
+                    row["attachments"] = attachments_save
                 comments.append(row)
                 deal.comments = comments
                 deal.updated_at = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3] + "Z"
@@ -375,6 +430,7 @@ async def process_instagram_webhook(db: AsyncSession, body: dict[str, Any]) -> i
                 funnel_id=funnel_id,
             )
             did = str(uuid.uuid4())
+            attachments_save = await mirror_meta_attachments_to_storage(did, list(attachments_raw))
             title = f"Instagram · {customer_psid[-8:]}"
             now = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3] + "Z"
             first_comment: dict[str, Any] = {
@@ -385,20 +441,21 @@ async def process_instagram_webhook(db: AsyncSession, body: dict[str, Any]) -> i
                 "type": "instagram_in",
                 "metaMid": mid,
             }
-            if attachments:
-                first_comment["attachments"] = attachments
+            if attachments_save:
+                first_comment["attachments"] = attachments_save
             deal = Deal(
                 id=did,
                 title=title,
                 client_id=client_id,
                 contact_name=f"Instagram · {customer_psid[-8:]}",
-                amount="0",
+                amount=Decimal("0"),
                 currency="UZS",
                 stage=stage_id,
                 funnel_id=funnel_id,
                 source="instagram",
-                telegram_chat_id=tk,
-                telegram_username=f"ig:{customer_psid}",
+                source_chat_id=tk,
+                tags=[],
+                custom_fields={"_legacy": {"telegram_username": f"ig:{customer_psid}"}},
                 assignee_id=assignee_id,
                 created_at=now,
                 notes=f"Автоматически из Instagram (page {page_id})",

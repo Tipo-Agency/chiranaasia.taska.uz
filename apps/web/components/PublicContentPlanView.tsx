@@ -13,6 +13,7 @@ const PublicContentPlanView: React.FC<PublicContentPlanViewProps> = ({ tableId }
   const [shootPlans, setShootPlans] = useState<ShootPlan[]>([]);
   const [table, setTable] = useState<TableCollection | null>(null);
   const [loading, setLoading] = useState(true);
+  const [accessDenied, setAccessDenied] = useState(false);
   const [viewMode, setViewMode] = useState<'calendar' | 'table' | 'gantt'>('calendar');
   const [formatFilter, setFormatFilter] = useState<'all' | 'post' | 'reel' | 'story' | 'article' | 'video'>('all');
   const [currentMonth, setCurrentMonth] = useState<Date>(() => {
@@ -24,6 +25,7 @@ const PublicContentPlanView: React.FC<PublicContentPlanViewProps> = ({ tableId }
     const loadData = async () => {
       try {
         setLoading(true);
+        setAccessDenied(false);
         const res = await api.publicContentPlan.getByTableId(tableId);
         const t = (res.table || null) as TableCollection | null;
         const p = (res.posts || []) as ContentPost[];
@@ -32,7 +34,15 @@ const PublicContentPlanView: React.FC<PublicContentPlanViewProps> = ({ tableId }
         setPosts(p);
         setShootPlans(sp);
       } catch (err) {
-        console.error('Ошибка загрузки данных:', err);
+        const msg = err instanceof Error ? err.message : '';
+        if (msg.includes('Публичный доступ к этой таблице отключён')) {
+          setAccessDenied(true);
+          setTable(null);
+          setPosts([]);
+          setShootPlans([]);
+        } else {
+          console.error('Ошибка загрузки данных:', err);
+        }
       } finally {
         setLoading(false);
       }
@@ -90,6 +100,17 @@ const PublicContentPlanView: React.FC<PublicContentPlanViewProps> = ({ tableId }
     return (
       <div className="min-h-screen bg-gray-50 dark:bg-[#121212] flex items-center justify-center">
         <div className="text-gray-500 dark:text-gray-400">Загрузка...</div>
+      </div>
+    );
+  }
+
+  if (accessDenied) {
+    return (
+      <div className="min-h-screen bg-gray-50 dark:bg-[#121212] flex items-center justify-center">
+        <div className="text-center max-w-md px-4">
+          <h1 className="text-2xl font-bold text-gray-800 dark:text-white mb-2">Доступ по ссылке закрыт</h1>
+          <p className="text-gray-500 dark:text-gray-400">Владелец отключил публичный просмотр этой таблицы.</p>
+        </div>
       </div>
     );
   }

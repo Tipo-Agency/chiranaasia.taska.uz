@@ -116,7 +116,10 @@ else
   exit 1
 fi
 echo "   Using: $DOCKER_CMD"
-if ! $DOCKER_CMD up -d --build db backend; then
+# Все сервисы приложения из корневого compose (без profile tools): Redis, API, воркеры очередей.
+# См. docs/QUEUES.md и docs/OPERATIONS.md §3.
+OPS_COMPOSE_SERVICES="db redis backend integrations-worker domain-events-worker retention-worker notifications-worker"
+if ! $DOCKER_CMD up -d --build $OPS_COMPOSE_SERVICES; then
   echo "❌ Docker Compose failed. Вывод выше — смотрите причину (права, порты, образы)."
   echo "   На сервере выполните: $DOCKER_CMD logs backend"
   exit 1

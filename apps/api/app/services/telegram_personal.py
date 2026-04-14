@@ -1,8 +1,6 @@
 """Telegram личный аккаунт (MTProto, Telethon): отправка и подтягивание истории в сделку."""
 from __future__ import annotations
 
-import base64
-import hashlib
 import io
 import logging
 import mimetypes
@@ -11,41 +9,55 @@ import uuid
 from datetime import UTC, datetime
 from typing import Any
 
-from cryptography.fernet import Fernet
+from cryptography.fernet import InvalidToken
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from telethon import TelegramClient
 from telethon.errors import PhoneCodeInvalidError, SessionPasswordNeededError
 from telethon.sessions import StringSession
 
-from app.config import get_settings
+from app.core.config import get_settings
+from app.core.mappers import _legacy_telegram_username
 from app.models.client import Client, Deal
-from app.models.telegram_personal import TelegramPersonalSession
+from app.models.mtproto_session import (
+    MtprotoSession,
+    MtprotoSessionStatus,
+    mtproto_can_request_code,
+    mtproto_can_sign_in_code,
+    mtproto_can_sign_in_password,
+    mtproto_is_active,
+)
+from app.services.fernet_secrets import decrypt_secret, encrypt_secret
+from app.services.media_storage import is_media_storage_configured, upload_deal_media_bytes
 
 log = logging.getLogger("uvicorn.error")
+
+_TG_STATIC_MEDIA_KINDS = frozenset({"location", "venue", "contact", "poll"})
 
 
 def _now_iso() -> str:
     return datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3] + "Z"
 
 
-def _fernet() -> Fernet:
-    settings = get_settings()
-    key = base64.urlsafe_b64encode(hashlib.sha256(settings.SECRET_KEY.encode()).digest())
-    return Fernet(key)
-
-
-def _encrypt(plain: str) -> str:
-    return _fernet().encrypt(plain.encode()).decode()
-
-
-def _decrypt(token: str) -> str:
-    return _fernet().decrypt(token.encode()).decode()
+def _telethon_session_string_from_storage(blob: str | None) -> str:
+    """Расшифровка ``session_data`` → строка Telethon StringSession (в БД только ciphertext)."""
+    if not blob or not str(blob).strip():
+        return ""
+    try:
+        return decrypt_secret(str(blob).strip())
+    except (InvalidToken, ValueError, TypeError) as exc:
+        raise ValueError("mtproto_session_data_invalid") from exc
 
 
 def mtproto_configured() -> bool:
     s = get_settings()
     return bool(s.TELEGRAM_API_ID and (s.TELEGRAM_API_HASH or "").strip())
+
+
+async def mtproto_session_ready(db: AsyncSession, user_id: str) -> bool:
+    """Есть активная MTProto-сессия в БД (без Telethon)."""
+    row = await _get_row(db, user_id)
+    return bool(row and mtproto_is_active(row.status, bool(row.session_data)))
 
 
 def _normalize_phone(phone: str) -> str:
@@ -62,19 +74,19 @@ def _mask_phone(phone: str) -> str:
     return f"…{p[-4:]}"
 
 
-async def _get_row(db: AsyncSession, user_id: str) -> TelegramPersonalSession | None:
-    r = await db.execute(select(TelegramPersonalSession).where(TelegramPersonalSession.user_id == user_id))
+async def _get_row(db: AsyncSession, user_id: str) -> MtprotoSession | None:
+    r = await db.execute(select(MtprotoSession).where(MtprotoSession.user_id == user_id))
     return r.scalar_one_or_none()
 
 
-async def _ensure_row(db: AsyncSession, user_id: str) -> TelegramPersonalSession:
+async def _ensure_row(db: AsyncSession, user_id: str) -> MtprotoSession:
     row = await _get_row(db, user_id)
     if row:
         return row
-    row = TelegramPersonalSession(
+    row = MtprotoSession(
         id=str(uuid.uuid4()),
         user_id=user_id,
-        status="inactive",
+        status=MtprotoSessionStatus.INACTIVE,
         created_at=_now_iso(),
         updated_at=_now_iso(),
     )
@@ -95,18 +107,24 @@ async def send_code_request(db: AsyncSession, user_id: str, phone: str) -> dict[
     if len(phone) < 8:
         return {"ok": False, "error": "invalid_phone"}
     row = await _ensure_row(db, user_id)
-    if row.status == "active" and row.encrypted_session:
+    if row.status == MtprotoSessionStatus.ACTIVE and not row.session_data:
+        row.status = MtprotoSessionStatus.INACTIVE
+        row.updated_at = _now_iso()
+        await db.flush()
+    if mtproto_is_active(row.status, bool(row.session_data)):
         return {"ok": False, "error": "already_connected"}
+    if not mtproto_can_request_code(row.status):
+        return {"ok": False, "error": "invalid_mtproto_state", "detail": row.status}
 
     client = _new_client(None)
     await client.connect()
     try:
         sent = await client.send_code_request(phone)
         sess = client.session.save()
-        row.encrypted_session = _encrypt(sess)
+        row.session_data = encrypt_secret(sess)
         row.pending_phone = phone
         row.pending_phone_code_hash = sent.phone_code_hash
-        row.status = "pending_code"
+        row.status = MtprotoSessionStatus.PENDING_CODE
         row.phone_masked = _mask_phone(phone)
         row.updated_at = _now_iso()
         await db.flush()
@@ -126,20 +144,29 @@ async def sign_in_with_code(db: AsyncSession, user_id: str, phone: str, code: st
     if not code:
         return {"ok": False, "error": "code_required"}
     row = await _get_row(db, user_id)
-    if not row or row.status != "pending_code" or not row.encrypted_session or not row.pending_phone_code_hash:
+    if (
+        not row
+        or not mtproto_can_sign_in_code(row.status)
+        or not row.session_data
+        or not row.pending_phone_code_hash
+    ):
         return {"ok": False, "error": "no_pending_auth"}
     if _normalize_phone(row.pending_phone or "") != phone:
         return {"ok": False, "error": "phone_mismatch"}
 
-    client = _new_client(_decrypt(row.encrypted_session))
+    try:
+        plain_sess = _telethon_session_string_from_storage(row.session_data)
+    except ValueError:
+        return {"ok": False, "error": "mtproto_session_corrupt"}
+    client = _new_client(plain_sess)
     await client.connect()
     try:
         try:
             await client.sign_in(phone, code, phone_code_hash=row.pending_phone_code_hash)
         except SessionPasswordNeededError:
             sess = client.session.save()
-            row.encrypted_session = _encrypt(sess)
-            row.status = "pending_password"
+            row.session_data = encrypt_secret(sess)
+            row.status = MtprotoSessionStatus.PENDING_PASSWORD
             row.pending_phone_code_hash = None
             row.updated_at = _now_iso()
             await db.flush()
@@ -147,8 +174,8 @@ async def sign_in_with_code(db: AsyncSession, user_id: str, phone: str, code: st
         except PhoneCodeInvalidError:
             return {"ok": False, "error": "invalid_code"}
         sess = client.session.save()
-        row.encrypted_session = _encrypt(sess)
-        row.status = "active"
+        row.session_data = encrypt_secret(sess)
+        row.status = MtprotoSessionStatus.ACTIVE
         row.pending_phone = None
         row.pending_phone_code_hash = None
         row.updated_at = _now_iso()
@@ -168,16 +195,20 @@ async def sign_in_with_password(db: AsyncSession, user_id: str, password: str) -
     if not password:
         return {"ok": False, "error": "password_required"}
     row = await _get_row(db, user_id)
-    if not row or row.status != "pending_password" or not row.encrypted_session:
+    if not row or not mtproto_can_sign_in_password(row.status) or not row.session_data:
         return {"ok": False, "error": "no_pending_password"}
 
-    client = _new_client(_decrypt(row.encrypted_session))
+    try:
+        plain_sess = _telethon_session_string_from_storage(row.session_data)
+    except ValueError:
+        return {"ok": False, "error": "mtproto_session_corrupt"}
+    client = _new_client(plain_sess)
     await client.connect()
     try:
         await client.sign_in(password=password)
         sess = client.session.save()
-        row.encrypted_session = _encrypt(sess)
-        row.status = "active"
+        row.session_data = encrypt_secret(sess)
+        row.status = MtprotoSessionStatus.ACTIVE
         row.pending_phone = None
         row.updated_at = _now_iso()
         await db.flush()
@@ -193,8 +224,8 @@ async def disconnect_session(db: AsyncSession, user_id: str) -> None:
     row = await _get_row(db, user_id)
     if not row:
         return
-    row.encrypted_session = None
-    row.status = "inactive"
+    row.session_data = None
+    row.status = MtprotoSessionStatus.INACTIVE
     row.pending_phone = None
     row.pending_phone_code_hash = None
     row.phone_masked = None
@@ -209,7 +240,7 @@ def _username_from_client(linked: Client | None) -> str:
 
 
 async def _resolve_peer(tg: TelegramClient, deal: Deal, linked_client: Client | None = None):
-    un = (deal.telegram_username or "").strip().lstrip("@")
+    un = str(_legacy_telegram_username(deal.custom_fields) or "").strip().lstrip("@")
     if not un:
         un = _username_from_client(linked_client)
     if un:
@@ -220,7 +251,7 @@ async def _resolve_peer(tg: TelegramClient, deal: Deal, linked_client: Client | 
             except Exception:
                 pass
         return await tg.get_entity(un)
-    cid = str(deal.telegram_chat_id or "").strip()
+    cid = str(deal.source_chat_id or "").strip()
     if not cid:
         raise ValueError("no_peer")
     try:
@@ -422,6 +453,57 @@ def _msg_to_comment(msg, session_user_id: str) -> dict[str, Any] | None:
     return comment
 
 
+async def _hydrate_telegram_sync_comment_media(client, msg, deal_id: str, cm: dict[str, Any]) -> None:
+    """Бинарные вложения → S3 (ключ в БД); без S3 остаётся скачивание по tgMessageId."""
+    atts = cm.get("attachments")
+    if not atts or not isinstance(atts, list) or not is_media_storage_configured():
+        return
+    needs_blob = False
+    for a in atts:
+        if not isinstance(a, dict):
+            continue
+        k = str(a.get("kind") or "").lower()
+        if k not in _TG_STATIC_MEDIA_KINDS:
+            needs_blob = True
+            break
+    if not needs_blob:
+        return
+    try:
+        bio = io.BytesIO()
+        await client.download_media(msg, file=bio)
+        bio.seek(0)
+        data = bio.getvalue()
+        if not data:
+            return
+        content_type, filename = _telegram_media_response_meta(msg)
+        key = await upload_deal_media_bytes(
+            deal_id=deal_id,
+            source="tg",
+            body=data,
+            content_type=content_type,
+            filename_hint=filename,
+        )
+        new_atts: list[dict[str, Any]] = []
+        for a in atts:
+            if not isinstance(a, dict):
+                continue
+            aa = dict(a)
+            kind = str(aa.get("kind") or "").lower()
+            if kind in _TG_STATIC_MEDIA_KINDS:
+                new_atts.append(aa)
+                continue
+            aa.pop("tgMessageId", None)
+            aa["storageKey"] = key
+            if not aa.get("mime"):
+                aa["mime"] = content_type
+            new_atts.append(aa)
+        cm["attachments"] = new_atts
+        if not any(isinstance(x, dict) and x.get("tgMessageId") is not None for x in new_atts):
+            cm.pop("tgMessageId", None)
+    except Exception as exc:
+        log.warning("telegram_personal: S3 hydrate deal_id=%s: %s", deal_id, exc)
+
+
 def _merge_comments(existing: list, incoming: list[dict]) -> list:
     ids = {c.get("id") for c in existing if isinstance(c, dict) and c.get("id")}
     out = list(existing)
@@ -443,11 +525,16 @@ async def sync_deal_messages(
     if not mtproto_configured():
         return {"ok": False, "error": "telegram_api_not_configured"}
     row = await _get_row(db, user_id)
-    if not row or row.status != "active" or not row.encrypted_session:
+    if not row or not mtproto_is_active(row.status, bool(row.session_data)):
         return {"ok": False, "error": "session_not_active"}
 
+    try:
+        plain_sess = _telethon_session_string_from_storage(row.session_data)
+    except ValueError:
+        return {"ok": False, "error": "mtproto_session_corrupt"}
+
     lim = max(1, min(limit, 100))
-    client = _new_client(_decrypt(row.encrypted_session))
+    client = _new_client(plain_sess)
     await client.connect()
     try:
         peer = await _resolve_peer(client, deal, linked_client)
@@ -460,6 +547,7 @@ async def sync_deal_messages(
                 continue
             cm = _msg_to_comment(m, user_id)
             if cm:
+                await _hydrate_telegram_sync_comment_media(client, m, deal.id, cm)
                 incoming.append(cm)
         before = len(deal.comments or [])
         merged = _merge_comments(list(deal.comments or []), incoming)
@@ -485,10 +573,15 @@ async def send_deal_message(
     if not mtproto_configured():
         return {"ok": False, "error": "telegram_api_not_configured"}
     row = await _get_row(db, user_id)
-    if not row or row.status != "active" or not row.encrypted_session:
+    if not row or not mtproto_is_active(row.status, bool(row.session_data)):
         return {"ok": False, "error": "session_not_active"}
 
-    client = _new_client(_decrypt(row.encrypted_session))
+    try:
+        plain_sess = _telethon_session_string_from_storage(row.session_data)
+    except ValueError:
+        return {"ok": False, "error": "mtproto_session_corrupt"}
+
+    client = _new_client(plain_sess)
     await client.connect()
     try:
         peer = await _resolve_peer(client, deal, linked_client)
@@ -527,10 +620,15 @@ async def download_deal_message_media(
     if not mtproto_configured():
         return {"ok": False, "error": "telegram_api_not_configured"}
     row = await _get_row(db, user_id)
-    if not row or row.status != "active" or not row.encrypted_session:
+    if not row or not mtproto_is_active(row.status, bool(row.session_data)):
         return {"ok": False, "error": "session_not_active"}
 
-    client = _new_client(_decrypt(row.encrypted_session))
+    try:
+        plain_sess = _telethon_session_string_from_storage(row.session_data)
+    except ValueError:
+        return {"ok": False, "error": "mtproto_session_corrupt"}
+
+    client = _new_client(plain_sess)
     await client.connect()
     try:
         peer = await _resolve_peer(client, deal, linked_client)
@@ -555,11 +653,11 @@ async def download_deal_message_media(
         await client.disconnect()
 
 
-def status_dict(row: TelegramPersonalSession | None) -> dict[str, Any]:
+def status_dict(row: MtprotoSession | None) -> dict[str, Any]:
     if not row:
-        return {"connected": False, "status": "inactive"}
+        return {"connected": False, "status": MtprotoSessionStatus.INACTIVE}
     return {
-        "connected": row.status == "active" and bool(row.encrypted_session),
+        "connected": mtproto_is_active(row.status, bool(row.session_data)),
         "status": row.status,
         "phoneMasked": row.phone_masked,
     }

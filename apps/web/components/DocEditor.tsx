@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Doc } from '../types';
 import { ArrowLeft, Save, Download, Bold, Italic, Underline, Heading1, Heading2, List, ListOrdered, Quote } from 'lucide-react';
+import { escapeHtmlText, sanitizeDocHtml, setDocEditorHtml, takeDocEditorHtml } from '../utils/sanitizeDocHtml';
 
 interface DocEditorProps {
   doc: Doc;
@@ -16,12 +17,11 @@ const DocEditor: React.FC<DocEditorProps> = ({ doc, onSave, onBack }) => {
   const initialTitleRef = useRef<string>('');
 
   useEffect(() => {
-    // Initialize content
     if (editorRef.current) {
-        const content = doc.content || '<p>Начните писать здесь...</p>';
-        editorRef.current.innerHTML = content;
-        initialContentRef.current = content;
-        initialTitleRef.current = doc.title;
+      const raw = doc.content || '<p>Начните писать здесь...</p>';
+      setDocEditorHtml(editorRef.current, raw);
+      initialContentRef.current = takeDocEditorHtml(editorRef.current);
+      initialTitleRef.current = doc.title;
     }
   }, [doc.id]);
 
@@ -34,7 +34,7 @@ const DocEditor: React.FC<DocEditorProps> = ({ doc, onSave, onBack }) => {
 
   const hasChanges = (): boolean => {
     if (!editorRef.current) return false;
-    return editorRef.current.innerHTML !== initialContentRef.current || title !== initialTitleRef.current;
+    return takeDocEditorHtml(editorRef.current) !== initialContentRef.current || title !== initialTitleRef.current;
   };
 
   const handleBack = () => {
@@ -52,7 +52,7 @@ const DocEditor: React.FC<DocEditorProps> = ({ doc, onSave, onBack }) => {
 
   const handleSave = () => {
     if (editorRef.current) {
-        const content = editorRef.current.innerHTML;
+        const content = takeDocEditorHtml(editorRef.current);
         onSave(doc.id, content, title);
         setIsSaved(true);
         initialContentRef.current = content;
@@ -66,17 +66,18 @@ const DocEditor: React.FC<DocEditorProps> = ({ doc, onSave, onBack }) => {
 
   const handleDownload = () => {
     if (!editorRef.current) return;
-    
-    // Simple HTML to Text for now, or just download the HTML
-    const content = `
-    <html>
-        <head><title>${title}</title></head>
-        <body>
-            <h1>${title}</h1>
-            ${editorRef.current.innerHTML}
-        </body>
-    </html>`;
-    
+
+    const safeTitle = escapeHtmlText(title);
+    const safeBody = takeDocEditorHtml(editorRef.current);
+    const content =
+      '<!DOCTYPE html><html><head><meta charset="utf-8"><title>' +
+      safeTitle +
+      '</title></head><body><h1>' +
+      safeTitle +
+      '</h1>' +
+      safeBody +
+      '</body></html>';
+
     const element = document.createElement("a");
     const file = new Blob([content], {type: 'text/html'});
     element.href = URL.createObjectURL(file);
@@ -89,6 +90,17 @@ const DocEditor: React.FC<DocEditorProps> = ({ doc, onSave, onBack }) => {
   const execCmd = (command: string, value: string | undefined = undefined) => {
     document.execCommand(command, false, value);
     editorRef.current?.focus();
+  };
+
+  /** Вставка rich HTML только после DOMPurify (как и при загрузке / сохранении). */
+  const handleEditorPaste = (e: React.ClipboardEvent<HTMLDivElement>) => {
+    const html = e.clipboardData.getData('text/html');
+    if (!html?.trim()) {
+      return;
+    }
+    e.preventDefault();
+    const clean = sanitizeDocHtml(html);
+    document.execCommand('insertHTML', false, clean);
   };
 
   return (
@@ -152,6 +164,7 @@ const DocEditor: React.FC<DocEditorProps> = ({ doc, onSave, onBack }) => {
             <div 
                 ref={editorRef}
                 contentEditable
+                onPaste={handleEditorPaste}
                 className="editor-content w-full h-full outline-none text-gray-800 dark:text-gray-200"
                 suppressContentEditableWarning={true}
             />

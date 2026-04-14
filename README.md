@@ -6,13 +6,18 @@
 
 | Раздел | Содержание |
 |--------|------------|
-| **[docs/README.md](docs/README.md)** | Оглавление и навигация по всей документации |
-| **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)** | Системная архитектура: БД, события, уведомления, realtime, ограничения |
-| **[docs/FRONTEND.md](docs/FRONTEND.md)** | Фронтенд: маршруты, модули, состояние, UI-слой, зоны приложения |
-| **[docs/COMPONENTS.md](docs/COMPONENTS.md)** | Карта компонентов и каталогов UI |
-| **[docs/API.md](docs/API.md)** | Обзор HTTP API, WebSocket, вебхуки, интеграции |
-| **[docs/OPERATIONS.md](docs/OPERATIONS.md)** | Локальный запуск, деплой, секреты, troubleshooting |
-| **[docs/CLIENT.md](docs/CLIENT.md)** | Кратко для заказчика (эксплуатация без внутренностей репозитория) |
+| **[docs/README.md](docs/README.md)** | Оглавление, быстрый старт, карта репозитория |
+| **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)** | Архитектура: слои, очереди, WebSocket, NFR |
+| **[docs/DATABASE.md](docs/DATABASE.md)** | Схема БД, индексы, миграции |
+| **[docs/API.md](docs/API.md)** | HTTP API, пагинация, идемпотентность, вебхуки |
+| **[docs/FRONTEND.md](docs/FRONTEND.md)** | SPA: роутинг, стейт, API-клиент |
+| **[docs/ENTITIES.md](docs/ENTITIES.md)** | Доменные сущности и инварианты |
+| **[docs/MODULES.md](docs/MODULES.md)** | Продуктовые модули и критерии приёмки |
+| **[docs/SECURITY.md](docs/SECURITY.md)** | CSP/HSTS (API+nginx), JWT+refresh+`token_version`, CSRF+Origin, rate limit, лимиты body, политика паролей |
+| **[docs/INTEGRATIONS.md](docs/INTEGRATIONS.md)** | Meta, Telegram, MTProto, сайт, хранилище |
+| **[docs/TESTING.md](docs/TESTING.md)** | Стратегия тестов |
+| **[docs/OPERATIONS.md](docs/OPERATIONS.md)** | Docker, деплой, nginx, troubleshooting |
+| **[docs/DECISIONS.md](docs/DECISIONS.md)** | ADR и инженерные правила |
 
 Источник правды по коду: `apps/web/`, `apps/api/app/`, `apps/bot/`, `ops/`.
 
@@ -23,7 +28,7 @@ apps/web/       — Vite + React + TypeScript (клиент)
 apps/api/       — FastAPI, SQLAlchemy, Alembic
 apps/bot/       — Telegram-бот (python-telegram-bot)
 ops/            — nginx, скрипты деплоя
-docs/           — документация (этот каталог)
+docs/           — документация
 scripts/        — миграции данных и разовые утилиты
 ```
 
@@ -42,7 +47,7 @@ npm run dev:web
 
 ## CI / деплой
 
-Пуш в `main` → GitHub Actions (lint, typecheck, build фронта, проверки API) → при успехе деплой на сервер (`ops/scripts/deploy.sh`). Подробности — в **OPERATIONS**.
+Пуш в `main` → GitHub Actions (lint, typecheck, build фронта, проверки API) → при успехе деплой на сервер (`ops/scripts/deploy.sh`). Подробности — в **docs/OPERATIONS.md**.
 
 ## Дополнительно
 

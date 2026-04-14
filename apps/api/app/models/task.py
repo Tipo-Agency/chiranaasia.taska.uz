@@ -1,10 +1,10 @@
 """Task and Project models."""
 import uuid
 
-from sqlalchemy import Boolean, Column, String, Text
+from sqlalchemy import Boolean, Column, Index, Integer, String, Text, text
 from sqlalchemy.dialects.postgresql import JSONB
 
-from app.database import Base
+from app.db import Base
 
 
 def gen_id():
@@ -23,8 +23,12 @@ class Project(Base):
 
 class Task(Base):
     __tablename__ = "tasks"
+    __table_args__ = (
+        Index("idx_tasks_table_archived_created_id", "table_id", "is_archived", "created_at", "id"),
+    )
 
     id = Column(String(36), primary_key=True, default=gen_id)
+    version = Column(Integer, nullable=False, server_default=text("1"))
     table_id = Column(String(36), nullable=True)
     entity_type = Column(String(30), default="task")  # task, idea, feature, purchase_request
     title = Column(String(500), nullable=False)
@@ -54,3 +58,5 @@ class Task(Base):
     amount = Column(String(50), nullable=True)  # stored as string for flexibility
     decision_date = Column(String(50), nullable=True)
     assignee_ids = Column(JSONB, default=list)
+
+    __mapper_args__ = {"version_id_col": version}

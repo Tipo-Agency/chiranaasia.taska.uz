@@ -159,7 +159,7 @@ export const notifyMeetingCreated = async (
 };
 
 export const notifyPurchaseRequestCreated = async (
-  request: { id: string; title?: string; description?: string; amount?: number },
+  request: { id: string; title?: string; description?: string; amount?: string | number },
   departmentName: string,
   options: BaseNotificationOptions
 ): Promise<void> => {

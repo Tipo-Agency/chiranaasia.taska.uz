@@ -23,38 +23,24 @@ import { useTaskLogic } from './slices/useTaskLogic';
 import { useCRMLogic } from './slices/useCRMLogic';
 import { useContentLogic } from './slices/useContentLogic';
 import { useSettingsLogic } from './slices/useSettingsLogic';
-import { useFinanceLogic } from './slices/useFinanceLogic';
+import { useFinanceLogic, type SavePurchaseRequestOptions } from './slices/useFinanceLogic';
 import { useBPMLogic } from './slices/useBPMLogic';
 import { useInventoryLogic } from './slices/useInventoryLogic';
 import { STANDARD_FEATURES } from '../../components/FunctionalityView';
 import { buildLocation, parseLocation } from '../../utils/urlSync';
 import { devWarn } from '../../utils/devLog';
 import { resolveAssigneesForOrgPosition } from '../../utils/orgPositionAssignee';
+import { useAuthScopeStore } from '../stores/authScopeStore';
+import { useUiToastStore } from '../stores/uiToastStore';
 // Функция заполнения тестовыми данными полностью удалена
 
 export const useAppLogic = () => {
   const [isLoading, setIsLoading] = useState(true);
-  const [notification, setNotification] = useState<string | null>(null);
+  const notification = useUiToastStore((s) => s.notification);
+  const showNotification = useUiToastStore((s) => s.showNotification);
+  const clearNotification = useUiToastStore((s) => s.clearNotification);
   /** Защита от повторной загрузки данных модулей (lazy load) — без лишнего state в React */
   const loadedModulesRef = useRef<Set<string>>(new Set());
-
-  const lastToastRef = useRef<{ msg: string; at: number } | null>(null);
-  const notificationTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  /** Централизованные тосты: без дублей подряд, сброс при смене раздела */
-  const showNotification = (msg: string) => {
-    const now = Date.now();
-    if (lastToastRef.current && lastToastRef.current.msg === msg && now - lastToastRef.current.at < 2000) {
-      return;
-    }
-    lastToastRef.current = { msg, at: now };
-    if (notificationTimeoutRef.current) clearTimeout(notificationTimeoutRef.current);
-    setNotification(msg);
-    notificationTimeoutRef.current = setTimeout(() => {
-      setNotification(null);
-      notificationTimeoutRef.current = null;
-    }, 4000);
-  };
 
   const settingsSlice = useSettingsLogic(showNotification);
   const authSlice = useAuthLogic(showNotification);
@@ -187,7 +173,7 @@ export const useAppLogic = () => {
           api.finance.getCategories(),
           api.finance.getFunds(),
           api.finance.getPlan(),
-          api.finance.getRequests(),
+          api.finance.getRequestsAll(),
           api.finance.getFinancialPlanDocuments(),
           api.finance.getFinancialPlannings(),
       ]);
@@ -282,12 +268,6 @@ export const useAppLogic = () => {
   const didHydrateUrlRef = useRef(false);
   const ignoreNextUrlSyncRef = useRef(false);
 
-  useEffect(() => {
-    return () => {
-      if (notificationTimeoutRef.current) clearTimeout(notificationTimeoutRef.current);
-    };
-  }, []);
-
   // Сброс тоста при смене раздела (первый ренер пропускаем — иначе сбросим до показа)
   const toastClearAfterNavRef = useRef(false);
   useEffect(() => {
@@ -295,12 +275,12 @@ export const useAppLogic = () => {
       toastClearAfterNavRef.current = true;
       return;
     }
-    setNotification(null);
-    if (notificationTimeoutRef.current) {
-      clearTimeout(notificationTimeoutRef.current);
-      notificationTimeoutRef.current = null;
-    }
-  }, [settingsSlice.state.currentView]);
+    clearNotification();
+  }, [settingsSlice.state.currentView, clearNotification]);
+
+  useEffect(() => {
+    useAuthScopeStore.getState().setCurrentUserId(authSlice.state.currentUser?.id ?? null);
+  }, [authSlice.state.currentUser?.id]);
 
   useEffect(() => {
     if (!authSlice.state.currentUser) {
@@ -1157,9 +1137,9 @@ export const useAppLogic = () => {
       openDocModal: contentSlice.actions.openDocModal,
       openEditDocModal: contentSlice.actions.openEditDocModal,
       closeDocModal: contentSlice.actions.closeDocModal,
-      saveDepartment: financeSlice.actions.saveDepartment, deleteDepartment: financeSlice.actions.deleteDepartment, saveFinanceCategory: financeSlice.actions.saveFinanceCategory, deleteFinanceCategory: financeSlice.actions.deleteFinanceCategory, saveFund: financeSlice.actions.saveFund, deleteFund: financeSlice.actions.deleteFund, updateFinancePlan: financeSlice.actions.updateFinancePlan, savePurchaseRequest: (request: PurchaseRequest) => {
+      saveDepartment: financeSlice.actions.saveDepartment, deleteDepartment: financeSlice.actions.deleteDepartment, saveFinanceCategory: financeSlice.actions.saveFinanceCategory, deleteFinanceCategory: financeSlice.actions.deleteFinanceCategory, saveFund: financeSlice.actions.saveFund, deleteFund: financeSlice.actions.deleteFund, updateFinancePlan: financeSlice.actions.updateFinancePlan,       savePurchaseRequest: (request: PurchaseRequest, opts?: SavePurchaseRequestOptions) => {
         const existing = financeSlice.state.purchaseRequests.find(r => r.id === request.id);
-        financeSlice.actions.savePurchaseRequest(request);
+        financeSlice.actions.savePurchaseRequest(request, opts);
         if (!existing && authSlice.state.currentUser) {
           const department = financeSlice.state.departments.find(d => d.id === request.departmentId);
           const context: NotificationContext = {
@@ -1168,7 +1148,12 @@ export const useAppLogic = () => {
             notificationPrefs: settingsSlice.state.notificationPrefs
           };
           notifyPurchaseRequestCreated(
-            { id: request.id, title: request.description, description: request.description, amount: request.amount },
+            {
+              id: request.id,
+              title: request.title || request.description,
+              description: request.comment || request.description,
+              amount: request.amount,
+            },
             department?.name || 'Не указан',
             { context }
           ).catch(() => {});
@@ -1179,7 +1164,7 @@ export const useAppLogic = () => {
             chatLocalService.addSystemMessageForEntity({
               actorId: authSlice.state.currentUser.id,
               targetUserId: admin.id,
-              text: `Я создал заявку на ${request.amount?.toLocaleString() || 0} UZS: ${request.description || ''}`,
+              text: `Я создал заявку на ${typeof request.amount === 'string' ? request.amount : String(request.amount ?? 0)} UZS: ${request.title || request.description || request.comment || ''}`,
               entityType: 'request',
               entityId: request.id,
             });
@@ -1275,13 +1260,9 @@ export const useAppLogic = () => {
       },
       restoreEmployee: async (employeeId: string) => {
           try {
-              const allEmployees = (await api.employees.getAll()) as EmployeeInfo[];
-              const employee = allEmployees.find(e => e.id === employeeId);
-              if (!employee) return;
-              const now = new Date().toISOString();
-              const updated = allEmployees.map(e => e.id === employeeId ? { ...e, isArchived: false, updatedAt: now } : e);
-              await api.employees.updateAll(updated);
-              crmSlice.setters.setEmployeeInfos(updated);
+              await api.employees.update(employeeId, { isArchived: false });
+              const employees = (await api.employees.getAll()) as EmployeeInfo[];
+              crmSlice.setters.setEmployeeInfos(employees);
               showNotification('Сотрудник восстановлен');
           } catch (error) {
               console.error('Ошибка восстановления сотрудника:', error);
@@ -1395,13 +1376,14 @@ export const useAppLogic = () => {
       },
       restoreClient: async (clientId: string) => {
           try {
-              const allClients = (await api.clients.getAll()) as Client[];
-              const client = allClients.find(c => c.id === clientId);
-              if (!client) return;
-              const now = new Date().toISOString();
-              const updated = allClients.map(c => c.id === clientId ? { ...c, isArchived: false, updatedAt: now } : c);
-              await api.clients.updateAll(updated);
-              crmSlice.setters.setClients(updated);
+              const fresh = await api.clients.getById(clientId);
+              const updated = await api.clients.patch(clientId, {
+                isArchived: false,
+                ...(fresh.version != null && Number.isFinite(fresh.version) ? { version: fresh.version } : {}),
+              });
+              crmSlice.setters.setClients((prev) =>
+                prev.map((c) => (c.id === clientId ? updated : c))
+              );
               showNotification('Клиент восстановлен');
           } catch (error) {
               console.error('Ошибка восстановления клиента:', error);
@@ -1425,13 +1407,9 @@ export const useAppLogic = () => {
       },
       restoreMeeting: async (meetingId: string) => {
           try {
-              const allMeetings = (await api.meetings.getAll()) as Meeting[];
-              const meeting = allMeetings.find(m => m.id === meetingId);
-              if (!meeting) return;
-              const now = new Date().toISOString();
-              const updated = allMeetings.map(m => m.id === meetingId ? { ...m, isArchived: false, updatedAt: now } : m);
-              await api.meetings.updateAll(updated);
-              contentSlice.setters.setMeetings(updated);
+              await api.meetings.patch(meetingId, { isArchived: false });
+              const fresh = (await api.meetings.getAll()) as Meeting[];
+              contentSlice.setters.setMeetings(fresh);
               showNotification('Встреча восстановлена');
           } catch (error) {
               console.error('Ошибка восстановления встречи:', error);

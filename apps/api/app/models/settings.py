@@ -1,10 +1,10 @@
 """Settings-related models: TableCollection, StatusOption, PriorityOption, ActivityLog."""
 import uuid
 
-from sqlalchemy import Boolean, Column, String, Text
+from sqlalchemy import Boolean, Column, String, Text, UniqueConstraint
 from sqlalchemy.dialects.postgresql import JSONB
 
-from app.database import Base
+from app.db import Base
 
 
 def gen_id():
@@ -21,6 +21,7 @@ class TableCollection(Base):
     color = Column(String(50), nullable=True)
     is_system = Column(Boolean, default=False)
     is_archived = Column(Boolean, default=False)
+    is_public = Column(Boolean, default=False, nullable=False)
 
 
 class StatusOption(Base):
@@ -55,13 +56,27 @@ class ActivityLog(Base):
 
 
 class InboxMessage(Base):
-    """Сообщения входящие/исходящие с возможностью прикреплять сущности."""
+    """Диалог CRM + внутренний чат: секреты только вне этого ряда."""
+
     __tablename__ = "inbox_messages"
+    __table_args__ = (
+        UniqueConstraint(
+            "channel",
+            "external_msg_id",
+            name="uq_inbox_messages_channel_external_msg_id",
+        ),
+    )
 
     id = Column(String(36), primary_key=True, default=gen_id)
-    sender_id = Column(String(36), nullable=False)
-    recipient_id = Column(String(36), nullable=True)  # null = всем / общий канал
-    text = Column(Text, nullable=False)
-    attachments = Column(JSONB, default=list)  # [{"entityType": "task", "entityId": "...", "label": "..."}]
+    deal_id = Column(String(36), nullable=True)
+    funnel_id = Column(String(36), nullable=True)
+    direction = Column(String(16), nullable=False, default="internal")  # in | out | internal
+    channel = Column(String(32), nullable=False, default="internal")  # telegram | instagram | site | internal
+    sender_id = Column(String(255), nullable=False)
+    body = Column(Text, nullable=False, default="")
+    media_url = Column(Text, nullable=True)
+    external_msg_id = Column(String(512), nullable=True)
+    is_read = Column(Boolean, nullable=False, default=False)
+    recipient_id = Column(String(36), nullable=True)  # маршрутизация internal / уведомлений
+    attachments = Column(JSONB, default=list)
     created_at = Column(String(50), nullable=False)
-    read = Column(Boolean, default=False)

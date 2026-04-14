@@ -1,10 +1,9 @@
 import React from 'react';
-import { Client, Contract, OneTimeDeal, User } from '../../types';
+import { Client, Contract } from '../../types';
 import { Edit2, MessageCircle, Phone, Plus } from 'lucide-react';
 
 interface ClientsTabProps {
   clients: Client[];
-  users?: User[];
   contracts: Contract[];
   onEditClient: (client: Client) => void;
   onCreateContract: (clientId: string) => void;
@@ -12,7 +11,6 @@ interface ClientsTabProps {
 
 export const ClientsTab: React.FC<ClientsTabProps> = ({
   clients,
-  users = [],
   contracts,
   onEditClient,
   onCreateContract,
@@ -32,9 +30,9 @@ export const ClientsTab: React.FC<ClientsTabProps> = ({
           <thead className="bg-gray-50 dark:bg-[#202020] border-b border-gray-200 dark:border-[#333]">
             <tr>
               <th className="px-4 py-3 text-gray-600 dark:text-gray-400 font-semibold">Клиент</th>
-              <th className="px-4 py-3 text-gray-600 dark:text-gray-400 font-semibold">Контакт</th>
+              <th className="px-4 py-3 text-gray-600 dark:text-gray-400 font-semibold">Компания</th>
               <th className="px-4 py-3 text-gray-600 dark:text-gray-400 font-semibold">Телефон</th>
-              <th className="px-4 py-3 text-gray-600 dark:text-gray-400 font-semibold">Ответственный</th>
+              <th className="px-4 py-3 text-gray-600 dark:text-gray-400 font-semibold">Telegram</th>
               <th className="px-4 py-3 text-gray-600 dark:text-gray-400 font-semibold">Договоры</th>
               <th className="px-4 py-3 text-right text-gray-600 dark:text-gray-400 font-semibold w-28">Действия</th>
             </tr>
@@ -45,7 +43,6 @@ export const ClientsTab: React.FC<ClientsTabProps> = ({
               const clientContracts = (contracts || []).filter(
                 (c) => c && !c.isArchived && c.clientId === client.id
               );
-              const responsible = users.find((u) => u.id === client.responsibleUserId);
               const contractsTotal = clientContracts.reduce((s, c) => s + (c.amount || 0), 0);
               return (
                 <tr
@@ -57,7 +54,7 @@ export const ClientsTab: React.FC<ClientsTabProps> = ({
                     {client.name}
                   </td>
                   <td className="px-4 py-3 text-gray-600 dark:text-gray-400 align-top max-w-[200px]">
-                    {client.contactPerson || '—'}
+                    {client.companyName || '—'}
                   </td>
                   <td className="px-4 py-3 text-gray-600 dark:text-gray-400 align-top whitespace-nowrap">
                     {client.phone ? (
@@ -78,9 +75,6 @@ export const ClientsTab: React.FC<ClientsTabProps> = ({
                     ) : (
                       <span className="text-gray-400">—</span>
                     )}
-                  </td>
-                  <td className="px-4 py-3 text-gray-600 dark:text-gray-400 align-top">
-                    {responsible?.name || '—'}
                   </td>
                   <td className="px-4 py-3 text-gray-700 dark:text-gray-300 align-top">
                     <div className="text-xs">

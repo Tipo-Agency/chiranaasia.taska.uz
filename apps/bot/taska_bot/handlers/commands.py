@@ -141,7 +141,6 @@ async def login_password(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         await api.link_telegram_to_user(uid, tg)
 
     context.user_data["crm_user"] = user
-    context.user_data["access_token"] = result.get("access_token")
     name = html.escape(str(user.get("name") or user.get("login") or "пользователь"))
     from taska_bot.handlers.menu import send_main_menu_after_auth
 
@@ -225,11 +224,8 @@ async def cmd_run_deliveries(update: Update, context: ContextTypes.DEFAULT_TYPE)
         await update.message.reply_text("Не удалось запустить доставки.")
         return
     await update.message.reply_text(
-        "✅ Прогон delivery-очереди выполнен:\n"
-        f"processed: {res.get('processed')}\n"
-        f"sent: {res.get('sent')}\n"
-        f"failed: {res.get('failed')}\n"
-        f"skipped: {res.get('skipped')}",
+        "✅ Задачи доставки поставлены в Redis stream queue.notifications:\n"
+        f"queued: {res.get('queued')}",
     )
 
 

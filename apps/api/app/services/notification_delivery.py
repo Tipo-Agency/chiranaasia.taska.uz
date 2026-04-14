@@ -1,115 +1,100 @@
-"""Best-effort delivery worker helpers (telegram/email placeholders)."""
+"""
+Доставка уведомлений в telegram / email.
+
+- ``process_deliveries_for_notification`` — **только** из ``workers.notifications_worker`` (после XREADGROUP).
+- HTTP API вызывает лишь ``enqueue_due_notification_delivery_jobs`` (XADD в stream); отправку в каналы из Uvicorn не выполняет.
+- Telegram: ``telegram_sender`` (токен воронки из prefs, затем env), учёт 429 / ``retry_after``.
+"""
 from __future__ import annotations
 
 import html
-import json
 import smtplib
-import urllib.parse
+import uuid
 from datetime import UTC, datetime, timedelta
 from email.message import EmailMessage
+from typing import Any
 
-from sqlalchemy import or_, select
+from sqlalchemy import and_, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.config import get_settings
-from app.models.notification import Notification, NotificationDelivery, NotificationPreferences
-from app.models.user import User
+from app.core.config import get_settings
+from app.models.dead_letter_queue import DeadLetterQueue
+from app.models.notification import Notification, NotificationDelivery
+from app.services.telegram_sender import (
+    resolve_notification_telegram_bot_token,
+    send_telegram_message,
+)
+
+# Сколько раз разрешено получить ошибку отправки; на MAX_ATTEMPTS-й — только dead (без retry).
+MAX_ATTEMPTS = 5
+
+# После ошибки: attempts += 1; next_retry_at = now + пауза (пока attempts < MAX_ATTEMPTS).
+# Индекс = (attempts после инкремента): 1→1 мин, 2→5 мин, 3→15 мин, 4→1 ч; при attempts == 5 → dead.
+_BACKOFF_SECONDS_AFTER_ERROR: tuple[int, ...] = (
+    60,  # 1 мин
+    300,  # 5 мин
+    900,  # 15 мин
+    3600,  # 1 час
+)
 
 
-def _to_int(value: str | None) -> int:
-    try:
-        return int(value or "0")
-    except Exception:
-        return 0
+def _backoff_seconds_for_retry(attempts_after_error: int) -> int:
+    """Пауза перед следующей попыткой; ``attempts_after_error`` — уже увеличенный счётчик (1..MAX_ATTEMPTS-1)."""
+    idx = attempts_after_error - 1
+    if 0 <= idx < len(_BACKOFF_SECONDS_AFTER_ERROR):
+        return _BACKOFF_SECONDS_AFTER_ERROR[idx]
+    return _BACKOFF_SECONDS_AFTER_ERROR[-1]
 
 
-def _next_backoff_seconds(attempt: int) -> int:
-    # 10s, 30s, 120s, 600s, 1800s, 3600s...
-    plan = [10, 30, 120, 600, 1800]
-    if attempt <= len(plan):
-        return plan[attempt - 1]
-    return 3600
+def _mark_delivery_dead(d: NotificationDelivery, last_error: str) -> None:
+    d.status = "dead"
+    d.last_error = last_error
+    d.next_retry_at = None
 
 
-def _telegram_notification_html(n: Notification) -> tuple[str, str] | None:
-    """Шаблон из воронки (telegramHtmlOverride) или стандартное HTML для лида."""
-    p = n.payload if isinstance(n.payload, dict) else {}
-    ov = p.get("telegramHtmlOverride")
-    if isinstance(ov, str) and ov.strip():
-        text_out = ov.strip()
-        if len(text_out) > 4000:
-            text_out = text_out[:3997] + "..."
-        return text_out, "HTML"
-    return _telegram_deal_assigned_html(n)
+async def _dead_letter_notification_delivery(
+    db: AsyncSession,
+    d: NotificationDelivery,
+    *,
+    reason: str,
+    notification_id: str | None = None,
+    extra: dict[str, Any] | None = None,
+) -> None:
+    """Фиксируем переход доставки в dead в DLQ (сообщение не теряется для разбора)."""
+    settings = get_settings()
+    err_text = (d.last_error or reason or "")[:8000]
+    payload: dict[str, Any] = {
+        "kind": "notification_delivery",
+        "reason": reason,
+        "notification_id": notification_id or d.notification_id,
+        "delivery_id": d.id,
+        "channel": d.channel,
+        "attempts": int(d.attempts or 0),
+    }
+    if d.recipient:
+        payload["recipient_hint"] = (d.recipient or "")[:256]
+    if extra:
+        payload.update(extra)
+    db.add(
+        DeadLetterQueue(
+            id=str(uuid.uuid4()),
+            queue_name=settings.REDIS_NOTIFICATIONS_STREAM,
+            payload=payload,
+            error=err_text,
+            resolved=False,
+        )
+    )
 
 
-def _telegram_deal_assigned_html(n: Notification) -> tuple[str, str] | None:
-    """Rich Telegram message with tap-to-call for site leads."""
-    if n.type != "deal.assigned":
-        return None
-    p = n.payload if isinstance(n.payload, dict) else {}
-    if not (p.get("leadSource") == "site" or p.get("phone") or p.get("funnelName")):
-        return None
-
-    parts: list[str] = [f"<b>{html.escape(n.title)}</b>", ""]
-    actor = html.escape(str(p.get("actorName") or "Система"))
-    t = html.escape(str(p.get("title") or ""))
-    parts.append(f"{actor} назначил вам сделку: «{t}»")
-
-    if p.get("funnelName"):
-        parts.append(f"Воронка: {html.escape(str(p.get('funnelName')))}")
-    if p.get("stageLabel"):
-        parts.append(f"Этап: {html.escape(str(p.get('stageLabel')))}")
-    if p.get("contactName"):
-        parts.append(f"Имя: {html.escape(str(p.get('contactName')))}")
-
-    phone = str(p.get("phone") or "").strip()
-    if phone:
-        href = "".join(c for c in phone if c.isdigit() or c == "+")
-        if href and not href.startswith("+"):
-            href = "+" + href.replace("+", "")
-        safe_href = urllib.parse.quote(href, safe="+") if href else ""
-        if safe_href:
-            parts.append(f'Телефон: <a href="tel:{safe_href}">{html.escape(phone)}</a>')
-        else:
-            parts.append(f"Телефон: {html.escape(phone)}")
-
-    if p.get("email"):
-        em = str(p.get("email")).strip()
-        if em:
-            parts.append(f'Email: <a href="mailto:{html.escape(em)}">{html.escape(em)}</a>')
-
-    if p.get("message"):
-        parts.append(f"Сообщение: {html.escape(str(p.get('message')))[:800]}")
-
-    text_out = "\n".join(parts)
+def _telegram_html_from_notification(n: Notification) -> tuple[str, str]:
+    """HTML для Telegram (parse_mode) из сохранённых title + body."""
+    safe_title = html.escape(n.title or "")
+    body = n.body or ""
+    safe_body = html.escape(body).replace("\n", "<br/>")
+    text_out = f"<b>{safe_title}</b><br/><br/>{safe_body}"
     if len(text_out) > 4000:
         text_out = text_out[:3997] + "..."
     return text_out, "HTML"
-
-
-def _send_telegram(token: str, chat_id: str, text: str, parse_mode: str | None = None) -> tuple[bool, str | None]:
-    try:
-        import urllib.request
-
-        data: dict[str, str] = {"chat_id": str(chat_id), "text": text}
-        if parse_mode:
-            data["parse_mode"] = parse_mode
-        payload = urllib.parse.urlencode(data).encode()
-        req = urllib.request.Request(
-            f"https://api.telegram.org/bot{token}/sendMessage",
-            data=payload,
-            method="POST",
-            headers={"Content-Type": "application/x-www-form-urlencoded"},
-        )
-        with urllib.request.urlopen(req, timeout=10) as resp:  # nosec B310
-            raw = resp.read().decode("utf-8")
-            parsed = json.loads(raw) if raw else {"ok": False}
-            if parsed.get("ok"):
-                return True, None
-            return False, str(parsed.get("description") or "telegram_send_failed")
-    except Exception as exc:
-        return False, str(exc)
 
 
 def _send_email(
@@ -142,137 +127,221 @@ def _send_email(
         return False, str(exc)
 
 
-async def run_pending_deliveries(db: AsyncSession, limit: int = 100) -> dict:
+def _should_ack_stream_for_deliveries(rows: list[NotificationDelivery]) -> bool:
+    """
+    XACK, если по уведомлению нечего делать сейчас: всё terminal или только retry в будущем.
+    Иначе сообщение остаётся в PEL → XAUTOCLAIM после idle (в т.ч. ожидание backoff).
+    """
+    und = [d for d in rows if d.status not in ("sent", "dead")]
+    if not und:
+        return True
     now = datetime.now(UTC)
-    rows = (
-        await db.execute(
-            select(NotificationDelivery)
-            .where(NotificationDelivery.status == "pending")
-            .where(
-                or_(
-                    NotificationDelivery.next_attempt_at.is_(None),
-                    NotificationDelivery.next_attempt_at <= now,
-                )
-            )
-            .order_by(NotificationDelivery.created_at.asc())
-            .limit(limit)
-        )
-    ).scalars().all()
+    if any(d.status == "sending" for d in und):
+        return False
+    if any(d.status == "pending" for d in und):
+        return False
+    for d in und:
+        if d.status == "retry":
+            if d.next_retry_at is None or d.next_retry_at <= now:
+                return False
+    return True
 
-    sent = 0
-    failed = 0
-    skipped = 0
+
+async def process_deliveries_for_notification(db: AsyncSession, notification_id: str) -> dict[str, Any]:
+    """
+    Обработать все «готовые» telegram/email доставки для одного уведомления.
+    Не делает commit — вызывающий коммитит после успеха.
+    """
+    now = datetime.now(UTC)
     settings = get_settings()
 
-    for d in rows:
+    await db.execute(
+        update(NotificationDelivery)
+        .where(
+            NotificationDelivery.notification_id == notification_id,
+            NotificationDelivery.status == "sending",
+        )
+        .values(status="pending")
+    )
+    await db.flush()
+
+    all_rows = (
+        (
+            await db.execute(
+                select(NotificationDelivery).where(
+                    NotificationDelivery.notification_id == notification_id,
+                    NotificationDelivery.channel.in_(("telegram", "email")),
+                )
+            )
+        )
+        .scalars()
+        .all()
+    )
+
+    if not all_rows:
+        return {"processed": 0, "sent": 0, "failed": 0, "should_ack_stream": True}
+
+    due = [
+        d
+        for d in all_rows
+        if d.status in ("pending", "retry")
+        and (d.next_retry_at is None or d.next_retry_at <= now)
+    ]
+
+    if not due:
+        return {
+            "processed": 0,
+            "sent": 0,
+            "failed": 0,
+            "should_ack_stream": _should_ack_stream_for_deliveries(list(all_rows)),
+        }
+
+    sent = 0
+    dead = 0
+
+    for d in due:
+        d.status = "sending"
+    await db.flush()
+
+    for d in due:
         n = await db.get(Notification, d.notification_id)
         if not n:
-            d.status = "failed"
-            d.last_error = "notification_not_found"
-            d.attempts = str(int(d.attempts or "0") + 1)
-            d.next_attempt_at = None
-            d.updated_at = now
-            failed += 1
+            _mark_delivery_dead(d, "notification_not_found")
+            await _dead_letter_notification_delivery(db, d, reason="notification_not_found")
+            dead += 1
             continue
 
-        attempts = _to_int(d.attempts) + 1
-        d.attempts = str(attempts)
+        rcpt = (d.recipient or "").strip()
+        if not rcpt:
+            _mark_delivery_dead(d, "recipient_empty")
+            await _dead_letter_notification_delivery(db, d, reason="recipient_empty")
+            dead += 1
+            continue
+
+        ok = False
+        err: str | None = None
 
         if d.channel == "telegram":
-            user = await db.get(User, n.recipient_id)
-            pref_row = (
-                await db.execute(select(NotificationPreferences).where(NotificationPreferences.id == n.recipient_id).limit(1))
-            ).scalar_one_or_none()
-            if not pref_row:
-                pref_row = (
-                    await db.execute(select(NotificationPreferences).where(NotificationPreferences.id == "default").limit(1))
-                ).scalar_one_or_none()
-
-            prefs = pref_row.prefs if pref_row and pref_row.prefs else {}
-            chat_id = (
-                (prefs or {}).get("telegramChatId")
-                or (user.telegram_user_id if user else None)
-                or (pref_row.telegram_group_chat_id if pref_row else None)
-            )
-
-            if not settings.TELEGRAM_BOT_TOKEN:
-                d.status = "failed"
-                d.last_error = "telegram_not_configured"
-                failed += 1
-            elif not chat_id:
-                d.status = "failed"
-                d.last_error = "telegram_chat_id_missing"
-                failed += 1
-            else:
-                tg = _telegram_notification_html(n)
-                if tg:
-                    tg_text, tg_mode = tg
-                    ok, err = _send_telegram(settings.TELEGRAM_BOT_TOKEN, str(chat_id), tg_text, tg_mode)
-                else:
-                    ok, err = _send_telegram(
-                        settings.TELEGRAM_BOT_TOKEN,
-                        str(chat_id),
-                        f"{n.title}\n\n{n.body}",
-                    )
-                if ok:
-                    d.status = "sent"
-                    d.delivered_at = now
-                    d.next_attempt_at = None
-                    d.last_error = None
-                    sent += 1
-                else:
-                    if attempts >= 10:
-                        d.status = "failed"
-                        d.next_attempt_at = None
-                    else:
-                        d.next_attempt_at = now + timedelta(seconds=_next_backoff_seconds(attempts))
-                    d.last_error = err or "telegram_send_failed"
-                    failed += 1
+            bot_token = await resolve_notification_telegram_bot_token(db, n.user_id)
+            if not bot_token:
+                _mark_delivery_dead(d, "telegram_not_configured")
+                await _dead_letter_notification_delivery(db, d, reason="telegram_not_configured")
+                dead += 1
+                continue
+            tg_text, tg_mode = _telegram_html_from_notification(n)
+            tg_out = await send_telegram_message(bot_token, rcpt, tg_text, parse_mode=tg_mode)
+            ok = tg_out.ok
+            err = tg_out.error
+            if tg_out.rate_limited:
+                sec = int(tg_out.retry_after_seconds or 60)
+                d.status = "retry"
+                d.last_error = err or "telegram_429"
+                d.next_retry_at = now + timedelta(seconds=sec)
+                continue
         elif d.channel == "email":
-            user = await db.get(User, n.recipient_id)
             if not settings.SMTP_HOST:
-                d.status = "failed"
-                d.last_error = "smtp_not_configured"
-                failed += 1
-            elif not user or not user.email:
-                d.status = "failed"
-                d.last_error = "recipient_email_missing"
-                failed += 1
-            else:
-                ok, err = _send_email(
-                    host=settings.SMTP_HOST,
-                    port=settings.SMTP_PORT,
-                    user=settings.SMTP_USER,
-                    password=settings.SMTP_PASSWORD,
-                    sender=settings.SMTP_FROM,
-                    to_email=user.email,
-                    subject=n.title,
-                    body=n.body,
-                    use_tls=settings.SMTP_USE_TLS,
-                )
-                if ok:
-                    d.status = "sent"
-                    d.delivered_at = now
-                    d.next_attempt_at = None
-                    d.last_error = None
-                    sent += 1
-                else:
-                    if attempts >= 10:
-                        d.status = "failed"
-                        d.next_attempt_at = None
-                    else:
-                        d.next_attempt_at = now + timedelta(seconds=_next_backoff_seconds(attempts))
-                    d.last_error = err or "email_send_failed"
-                    failed += 1
+                _mark_delivery_dead(d, "smtp_not_configured")
+                await _dead_letter_notification_delivery(db, d, reason="smtp_not_configured")
+                dead += 1
+                continue
+            ok, err = _send_email(
+                host=settings.SMTP_HOST,
+                port=settings.SMTP_PORT,
+                user=settings.SMTP_USER,
+                password=settings.SMTP_PASSWORD,
+                sender=settings.SMTP_FROM,
+                to_email=rcpt,
+                subject=n.title,
+                body=n.body or "",
+                use_tls=settings.SMTP_USE_TLS,
+            )
         else:
-            skipped += 1
+            _mark_delivery_dead(d, "unknown_channel")
+            await _dead_letter_notification_delivery(db, d, reason="unknown_channel")
+            dead += 1
+            continue
 
-        d.updated_at = now
+        if ok:
+            d.status = "sent"
+            d.sent_at = now
+            d.next_retry_at = None
+            d.last_error = None
+            sent += 1
+            continue
+
+        d.attempts = int(d.attempts or 0) + 1
+        d.last_error = err or "send_failed"
+        if d.attempts >= MAX_ATTEMPTS:
+            _mark_delivery_dead(d, d.last_error or "send_failed")
+            await _dead_letter_notification_delivery(
+                db,
+                d,
+                reason="max_attempts_exhausted",
+                extra={"transport_error": (err or "")[:2000]},
+            )
+            dead += 1
+        else:
+            d.status = "retry"
+            d.next_retry_at = now + timedelta(seconds=_backoff_seconds_for_retry(d.attempts))
 
     await db.flush()
+
+    refreshed = (
+        (
+            await db.execute(
+                select(NotificationDelivery).where(
+                    NotificationDelivery.notification_id == notification_id,
+                    NotificationDelivery.channel.in_(("telegram", "email")),
+                )
+            )
+        )
+        .scalars()
+        .all()
+    )
+
     return {
-        "processed": len(rows),
+        "processed": len(due),
         "sent": sent,
-        "failed": failed,
-        "skipped": skipped,
+        "failed": dead,
+        "should_ack_stream": _should_ack_stream_for_deliveries(list(refreshed)),
     }
+
+
+async def enqueue_due_notification_delivery_jobs(
+    db: AsyncSession, redis: Any, *, limit: int = 500
+) -> dict[str, int]:
+    """
+    Для ручного дренажа: XADD по каждому notification_id, у которого есть работа в БД.
+    Сама отправка выполняется только воркером stream.
+    """
+    from app.services.notifications_stream import ensure_notifications_stream, xadd_notification_job
+
+    await ensure_notifications_stream(redis)
+    now = datetime.now(UTC)
+    ids = (
+        (
+            await db.execute(
+                select(NotificationDelivery.notification_id)
+                .distinct()
+                .where(
+                    NotificationDelivery.channel.in_(("telegram", "email")),
+                    or_(
+                        NotificationDelivery.status == "sending",
+                        and_(
+                            NotificationDelivery.status.in_(("pending", "retry")),
+                            or_(
+                                NotificationDelivery.next_retry_at.is_(None),
+                                NotificationDelivery.next_retry_at <= now,
+                            ),
+                        ),
+                    ),
+                )
+                .limit(limit)
+            )
+        )
+        .scalars()
+        .all()
+    )
+    for nid in ids:
+        await xadd_notification_job(redis, str(nid))
+    return {"queued": len(ids)}

@@ -1,9 +1,9 @@
 """User model."""
 import uuid
 
-from sqlalchemy import Boolean, Column, ForeignKey, String
+from sqlalchemy import Boolean, Column, ForeignKey, Integer, String
 
-from app.database import Base
+from app.db import Base
 
 
 def gen_id():
@@ -22,7 +22,9 @@ class User(Base):
     phone = Column(String(50), nullable=True)
     telegram = Column(String(100), nullable=True)
     telegram_user_id = Column(String(50), nullable=True)
+    # Только bcrypt (строка с солью), не plaintext; NULL — вход без пароля (демо / устаревшие записи)
     password_hash = Column(String(255), nullable=True)
     must_change_password = Column(Boolean, default=False)
     is_archived = Column(Boolean, default=False)
-    calendar_export_token = Column(String(36), nullable=True, unique=True)
+    token_version = Column(Integer, nullable=False, default=0)
+    calendar_export_token = Column(String(128), nullable=True, unique=True)
