@@ -13,6 +13,17 @@ from app.schemas.pagination import PaginatedResponse
 FinanceRequestStatusLiteral = Literal["draft", "pending", "approved", "rejected", "paid", "deferred"]
 
 
+class FinanceRequestAttachmentItem(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    id: str = ""
+    name: str = ""
+    url: str = ""
+    type: str = ""
+    uploadedAt: str | None = Field(default=None, alias="uploadedAt")
+    storagePath: str | None = Field(default=None, alias="storagePath")
+
+
 class FinanceRequestRead(BaseModel):
     """Ответ API (camelCase, сумма строкой)."""
 
@@ -40,6 +51,10 @@ class FinanceRequestRead(BaseModel):
     description: str | None = None
     date: str | None = None
     decision_date: str | None = Field(default=None, alias="decisionDate")
+    attachments: list[dict] = Field(default_factory=list)
+    counterparty_inn: str | None = Field(default=None, validation_alias="counterpartyInn", serialization_alias="counterpartyInn")
+    invoice_number: str | None = Field(default=None, validation_alias="invoiceNumber", serialization_alias="invoiceNumber")
+    invoice_date: str | None = Field(default=None, validation_alias="invoiceDate", serialization_alias="invoiceDate")
 
 
 class FinanceRequestListResponse(PaginatedResponse[FinanceRequestRead]):
@@ -79,6 +94,10 @@ class FinanceRequestCreate(BaseModel):
     status: FinanceRequestStatusLiteral | str = Field(default="pending")
     is_archived: bool = Field(default=False, alias="isArchived")
     approved_by: str | None = Field(default=None, alias="approvedBy", max_length=36)
+    attachments: list[FinanceRequestAttachmentItem] = Field(default_factory=list)
+    counterparty_inn: str | None = Field(default=None, alias="counterpartyInn", max_length=32)
+    invoice_number: str | None = Field(default=None, alias="invoiceNumber", max_length=100)
+    invoice_date: date | None = Field(default=None, alias="invoiceDate")
 
     @field_validator("amount", mode="before")
     @classmethod
@@ -109,6 +128,10 @@ class FinanceRequestPatch(BaseModel):
     payment_date: date | None = Field(default=None, alias="paymentDate")
     status: FinanceRequestStatusLiteral | str | None = None
     is_archived: bool | None = Field(default=None, alias="isArchived")
+    attachments: list[FinanceRequestAttachmentItem] | None = None
+    counterparty_inn: str | None = Field(default=None, alias="counterpartyInn", max_length=32)
+    invoice_number: str | None = Field(default=None, alias="invoiceNumber", max_length=100)
+    invoice_date: date | None = Field(default=None, alias="invoiceDate")
 
     @field_validator("amount", mode="before")
     @classmethod

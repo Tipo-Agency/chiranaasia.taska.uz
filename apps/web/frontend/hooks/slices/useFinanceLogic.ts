@@ -1,6 +1,6 @@
 
-import { useState } from 'react';
-import { Department, FinanceCategory, Fund, FinancePlan, PurchaseRequest, FinancialPlanDocument, FinancialPlanning, Bdr } from '../../../types';
+import { useCallback, useState } from 'react';
+import { Department, FinanceCategory, Fund, FinancePlan, PurchaseRequest, FinancialPlanDocument, FinancialPlanning, Bdr, IncomeReport } from '../../../types';
 import { api } from '../../../backend/api';
 import { createSaveHandler, createDeleteHandler, saveItem } from '../../../utils/crudUtils';
 import { NOTIFICATION_MESSAGES } from '../../../constants/messages';
@@ -22,6 +22,10 @@ function financeRequestPostBody(item: PurchaseRequest): Record<string, unknown> 
     ...(item.comment != null && item.comment !== '' ? { comment: item.comment } : {}),
     ...(item.description != null && item.description !== '' ? { description: item.description } : {}),
     ...(item.paymentDate ? { paymentDate: item.paymentDate } : {}),
+    ...(item.attachments?.length ? { attachments: item.attachments } : {}),
+    ...(item.counterpartyInn ? { counterpartyInn: item.counterpartyInn } : {}),
+    ...(item.invoiceNumber ? { invoiceNumber: item.invoiceNumber } : {}),
+    ...(item.invoiceDate ? { invoiceDate: item.invoiceDate } : {}),
     status: item.status,
     isArchived: item.isArchived ?? false,
   };
@@ -34,6 +38,8 @@ export type SavePurchaseRequestOptions = {
   statusPatch?: PurchaseRequestStatusPatchMode;
   /** Обязателен при statusPatch === 'reject' */
   rejectComment?: string;
+  /** Только вложения / ИНН / счёт (для одобренных и оплаченных заявок). */
+  metadataOnly?: boolean;
 };
 
 function financeRequestPatchBody(item: PurchaseRequest): Record<string, unknown> {
@@ -52,6 +58,10 @@ function financeRequestPatchBody(item: PurchaseRequest): Record<string, unknown>
     ...(item.comment !== undefined ? { comment: item.comment } : {}),
     ...(item.description !== undefined ? { description: item.description } : {}),
     ...(item.paymentDate !== undefined ? { paymentDate: item.paymentDate } : {}),
+    ...(item.attachments !== undefined ? { attachments: item.attachments ?? [] } : {}),
+    ...(item.counterpartyInn !== undefined ? { counterpartyInn: item.counterpartyInn } : {}),
+    ...(item.invoiceNumber !== undefined ? { invoiceNumber: item.invoiceNumber } : {}),
+    ...(item.invoiceDate !== undefined ? { invoiceDate: item.invoiceDate } : {}),
     status: item.status,
     ...(item.isArchived !== undefined ? { isArchived: item.isArchived } : {}),
     ...(item.version != null && Number.isFinite(item.version) ? { version: item.version } : {}),
@@ -77,7 +87,17 @@ export const useFinanceLogic = (showNotification: (msg: string) => void) => {
   const [purchaseRequests, setPurchaseRequests] = useState<PurchaseRequest[]>([]);
   const [financialPlanDocuments, setFinancialPlanDocuments] = useState<FinancialPlanDocument[]>([]);
   const [financialPlannings, setFinancialPlannings] = useState<FinancialPlanning[]>([]);
+  const [incomeReports, setIncomeReports] = useState<IncomeReport[]>([]);
   const [bdr, setBdr] = useState<Bdr | null>(null);
+
+  const refreshIncomeReports = useCallback(async () => {
+    try {
+      const rows = await api.finance.getIncomeReports();
+      setIncomeReports((rows || []) as IncomeReport[]);
+    } catch {
+      /* ignore */
+    }
+  }, []);
 
   // Departments
   const saveDepartment = createSaveHandler(
@@ -132,6 +152,15 @@ export const useFinanceLogic = (showNotification: (msg: string) => void) => {
       // showNotification('План обновлен'); // Too noisy for simple inputs
   };
 
+  const refreshPurchaseRequests = async () => {
+    try {
+      const list = await api.finance.getRequestsAll();
+      setPurchaseRequests(list);
+    } catch {
+      /* ignore */
+    }
+  };
+
   // Purchase Requests (POST / PATCH, без PUT списком)
   const savePurchaseRequest = (item: PurchaseRequest, opts?: SavePurchaseRequestOptions) => {
     setPurchaseRequests((prevItems) => {
@@ -145,6 +174,22 @@ export const useFinanceLogic = (showNotification: (msg: string) => void) => {
       void (async () => {
         try {
           if (exists) {
+            if (opts?.metadataOnly) {
+              await api.finance.patchRequest(
+                item.id,
+                withRequestVersion(
+                  {
+                    attachments: item.attachments ?? [],
+                    counterpartyInn: item.counterpartyInn ?? null,
+                    invoiceNumber: item.invoiceNumber ?? null,
+                    invoiceDate: item.invoiceDate ?? null,
+                  },
+                  prevRow
+                )
+              );
+              await refreshPurchaseRequests();
+              return;
+            }
             if (opts?.statusPatch === 'reject' && opts.rejectComment) {
               const body: Record<string, unknown> = {
                 status: 'rejected',
@@ -254,16 +299,17 @@ export const useFinanceLogic = (showNotification: (msg: string) => void) => {
   };
 
   return {
-    state: { departments, financeCategories, funds, financePlan, purchaseRequests, financialPlanDocuments, financialPlannings, bdr },
-    setters: { setDepartments, setFinanceCategories, setFunds, setFinancePlan, setPurchaseRequests, setFinancialPlanDocuments, setFinancialPlannings, setBdr },
+    state: { departments, financeCategories, funds, financePlan, purchaseRequests, financialPlanDocuments, financialPlannings, incomeReports, bdr },
+    setters: { setDepartments, setFinanceCategories, setFunds, setFinancePlan, setPurchaseRequests, setFinancialPlanDocuments, setFinancialPlannings, setIncomeReports, setBdr },
     actions: { 
         saveDepartment, deleteDepartment, 
         saveFinanceCategory, deleteFinanceCategory,
         saveFund, deleteFund,
         updateFinancePlan,
-        savePurchaseRequest, deletePurchaseRequest,
+        savePurchaseRequest, deletePurchaseRequest, refreshPurchaseRequests,
         saveFinancialPlanDocument, deleteFinancialPlanDocument,
         saveFinancialPlanning, deleteFinancialPlanning,
+        refreshIncomeReports,
         loadBdr, saveBdr
     }
   };

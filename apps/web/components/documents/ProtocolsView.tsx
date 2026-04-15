@@ -408,10 +408,10 @@ export const ProtocolsView = forwardRef<ProtocolsViewHandle, ProtocolsViewProps>
                   <h4 className="text-sm font-semibold text-gray-800 dark:text-gray-200">Статистика по выручке</h4>
                   <div className="flex items-center gap-3">
                     <button type="button" onClick={() => void pullPlannedFromFinance()} className="text-xs text-[#3337AD] hover:underline">
-                      Подтянуть план из фин.планирования
+                      Подтянуть план из бюджета
                     </button>
                     <button type="button" onClick={() => void pullActualFromFinance()} className="text-xs text-[#3337AD] hover:underline">
-                      Подтянуть факт из фин.планирования
+                      Подтянуть факт из бюджета
                     </button>
                   </div>
                 </div>

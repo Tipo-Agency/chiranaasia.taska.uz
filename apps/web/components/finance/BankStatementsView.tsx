@@ -1,9 +1,11 @@
 import React, { useEffect, useImperativeHandle, useMemo, useRef, useState, forwardRef } from 'react';
-import { FileText, ChevronDown, ChevronRight, RefreshCw, Loader2, Plus } from 'lucide-react';
+import { ChevronDown, ChevronRight, RefreshCw, Loader2, Plus } from 'lucide-react';
 import { financeEndpoint, type BankStatementApi, type IncomeReportApi } from '../../services/apiClient';
 import { DateInput, ModuleSegmentedControl } from '../ui';
 import { TaskSelect } from '../TaskSelect';
 import { dedupeBankStatementFlatLines, parseBankStatementFile } from '../../utils/bankStatementParser';
+import type { FinancialPlanning, PurchaseRequest } from '../../types';
+import { FpExpenseVerificationTab } from './FpExpenseVerificationTab';
 
 export interface BankStatementsViewHandle {
   triggerUpload: () => void;
@@ -11,8 +13,19 @@ export interface BankStatementsViewHandle {
   toggleFilters: () => void;
 }
 
-export const BankStatementsView = forwardRef<BankStatementsViewHandle>(function BankStatementsView(_, ref) {
-  const [tab, setTab] = useState<'balance' | 'income' | 'expense' | 'commission' | 'reconciliation' | 'income-reports'>('balance');
+export interface BankStatementsViewProps {
+  purchaseRequests?: PurchaseRequest[];
+  financialPlannings?: FinancialPlanning[];
+  onRefreshPurchaseRequests?: () => void | Promise<void>;
+}
+
+export const BankStatementsView = forwardRef<BankStatementsViewHandle, BankStatementsViewProps>(function BankStatementsView(
+  { purchaseRequests = [], financialPlannings = [], onRefreshPurchaseRequests },
+  ref
+) {
+  const [tab, setTab] = useState<
+    'balance' | 'income' | 'expense' | 'commission' | 'reconciliation' | 'verification' | 'income-reports'
+  >('balance');
   const [statements, setStatements] = useState<BankStatementApi[]>([]);
   const [incomeReports, setIncomeReports] = useState<IncomeReportApi[]>([]);
   const [loading, setLoading] = useState(true);
@@ -78,10 +91,21 @@ export const BankStatementsView = forwardRef<BankStatementsViewHandle>(function 
   }, []);
 
   const flatLines = useMemo(() => {
-    const lines: Array<{ statementName: string; statementId: string; lineDate: string; description?: string; amount: number; lineType: 'in' | 'out' }> = [];
+    const lines: Array<{
+      id: string;
+      statementName: string;
+      statementId: string;
+      lineDate: string;
+      description?: string;
+      amount: number;
+      lineType: 'in' | 'out';
+    }> = [];
     statements.forEach((s) => {
-      s.lines?.forEach((line) => {
+      s.lines?.forEach((line, idx) => {
         lines.push({
+          id:
+            line.id ||
+            `${s.id}|${line.lineDate}|${String(line.amount ?? 0)}|${(line.description || '').trim().slice(0, 120)}|${idx}`,
           statementName: s.name || s.period || s.id,
           statementId: s.id,
           lineDate: line.lineDate,
@@ -105,6 +129,18 @@ export const BankStatementsView = forwardRef<BankStatementsViewHandle>(function 
   const incomeLines = useMemo(() => filteredLines.filter((l) => l.lineType === 'in' && !isSaldoLine(l.description)), [filteredLines]);
   const expenseLines = useMemo(() => filteredLines.filter((l) => l.lineType === 'out' && !isSaldoLine(l.description)), [filteredLines]);
   const commissionLines = useMemo(() => expenseLines.filter((l) => isCommissionLine(l.description)), [expenseLines]);
+
+  const fpVerificationExpenseLines = useMemo(() => {
+    return expenseLines
+      .filter((l) => !isCommissionLine(l.description))
+      .map((l) => ({
+        id: l.id,
+        lineDate: l.lineDate,
+        amount: l.amount,
+        description: l.description,
+        statementName: l.statementName,
+      }));
+  }, [expenseLines]);
 
   const totals = useMemo(() => {
     const income = incomeLines.reduce((s, l) => s + l.amount, 0);
@@ -150,6 +186,7 @@ export const BankStatementsView = forwardRef<BankStatementsViewHandle>(function 
     const rest = existing ? statements.filter((s) => s.id !== existing.id) : statements;
     await financeEndpoint.updateBankStatements([...rest, next]);
     await load();
+    await onRefreshPurchaseRequests?.();
   };
 
   const saveIncomeReport = async () => {
@@ -191,6 +228,7 @@ export const BankStatementsView = forwardRef<BankStatementsViewHandle>(function 
             { value: 'expense', label: 'Расходы' },
             { value: 'commission', label: 'Комиссия' },
             { value: 'reconciliation', label: 'Сверка' },
+            { value: 'verification', label: 'Проверка' },
             { value: 'income-reports', label: 'Справки о доходах' },
           ]}
         />
@@ -327,7 +365,7 @@ export const BankStatementsView = forwardRef<BankStatementsViewHandle>(function 
                   </tr>
                 ) : (
                   incomeLines.map((l) => (
-                    <tr key={l.statementId + '-' + l.lineDate + '-' + l.amount + '-' + (l.description || '').slice(0, 16)} className="border-t border-gray-200 dark:border-[#333]">
+                    <tr key={l.id} className="border-t border-gray-200 dark:border-[#333]">
                       <td className="pr-4 py-1">{l.lineDate}</td>
                       <td className="pr-4 py-1 max-w-xs truncate">{l.description || '—'}</td>
                       <td className="py-1 font-mono">{l.amount}</td>
@@ -366,7 +404,7 @@ export const BankStatementsView = forwardRef<BankStatementsViewHandle>(function 
                   </tr>
                 ) : (
                   expenseLines.map((l) => (
-                    <tr key={l.statementId + '-' + l.lineDate + '-' + l.amount + '-' + (l.description || '').slice(0, 16)} className="border-t border-gray-200 dark:border-[#333]">
+                    <tr key={l.id} className="border-t border-gray-200 dark:border-[#333]">
                       <td className="pr-4 py-1">{l.lineDate}</td>
                       <td className="pr-4 py-1 max-w-xs truncate">{l.description || '—'}</td>
                       <td className="py-1 font-mono">{l.amount}</td>
@@ -405,7 +443,7 @@ export const BankStatementsView = forwardRef<BankStatementsViewHandle>(function 
                   </tr>
                 ) : (
                   commissionLines.map((l) => (
-                    <tr key={l.statementId + '-' + l.lineDate + '-' + l.amount + '-' + (l.description || '').slice(0, 16)} className="border-t border-gray-200 dark:border-[#333]">
+                    <tr key={l.id} className="border-t border-gray-200 dark:border-[#333]">
                       <td className="pr-4 py-1">{l.lineDate}</td>
                       <td className="pr-4 py-1 max-w-xs truncate">{l.description || '—'}</td>
                       <td className="py-1 font-mono">{l.amount}</td>
@@ -452,6 +490,15 @@ export const BankStatementsView = forwardRef<BankStatementsViewHandle>(function 
             </tbody>
           </table>
         </div>
+      )}
+
+      {tab === 'verification' && (
+        <FpExpenseVerificationTab
+          expenseLines={fpVerificationExpenseLines}
+          requests={purchaseRequests}
+          plannings={financialPlannings}
+          onRefreshRequests={() => void onRefreshPurchaseRequests?.()}
+        />
       )}
 
       {tab === 'income-reports' && (

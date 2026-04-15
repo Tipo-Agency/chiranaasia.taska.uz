@@ -98,6 +98,7 @@ export function TaskRoutesView(props: TaskRoutesViewProps) {
           businessProcesses={props.businessProcesses}
           clients={props.clients}
           deals={props.deals}
+          inventoryItems={props.inventoryItems}
           notificationPrefs={props.notificationPrefs}
           actions={actions}
         />

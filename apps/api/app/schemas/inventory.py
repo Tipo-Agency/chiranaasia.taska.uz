@@ -6,6 +6,28 @@ from typing import Any
 from pydantic import BaseModel, ConfigDict, Field
 
 
+class NomenclatureAttributeItem(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    id: str = ""
+    label: str = ""
+    unit: str | None = None
+    value: str = ""
+    kind: str = "text"
+    options: list[str] = Field(default_factory=list)
+
+
+class NomenclatureAttachmentItem(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    id: str = ""
+    name: str = ""
+    url: str = ""
+    type: str = ""
+    uploadedAt: str | None = None
+    storagePath: str | None = None
+
+
 class WarehouseItem(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -27,6 +49,11 @@ class InventoryItemSchema(BaseModel):
     unit: str = Field(default="", max_length=50)
     category: str | None = Field(default=None, max_length=200)
     notes: str | None = None
+    attributes: list[NomenclatureAttributeItem] = Field(default_factory=list)
+    attachments: list[NomenclatureAttachmentItem] = Field(default_factory=list)
+    barcode: str | None = Field(default=None, max_length=100)
+    manufacturer: str | None = Field(default=None, max_length=255)
+    consumptionHint: str | None = None
     isArchived: bool = False
     updatedByUserId: str | None = Field(default=None, max_length=100)
 
@@ -96,6 +123,11 @@ class InventoryItemRead(BaseModel):
     unit: str = ""
     category: str | None = None
     notes: str | None = None
+    attributes: list[Any] = Field(default_factory=list)
+    attachments: list[Any] = Field(default_factory=list)
+    barcode: str | None = None
+    manufacturer: str | None = None
+    consumptionHint: str | None = None
     isArchived: bool = False
 
 

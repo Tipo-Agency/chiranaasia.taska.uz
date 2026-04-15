@@ -8,7 +8,7 @@ from app.models.bpm import (
     BusinessProcessStepBranch,
     OrgPosition,
 )
-from app.models.client import AccountsReceivable, Client, Deal, EmployeeInfo
+from app.models.client import AccountsReceivable, Client, CrmContact, Deal, EmployeeInfo
 from app.models.content import ContentPost, Doc, Folder, Meeting, ShootPlan
 from app.models.dead_letter_queue import DeadLetterQueue
 from app.models.finance import (
@@ -18,6 +18,7 @@ from app.models.finance import (
     Department,
     FinanceCategory,
     FinancePlan,
+    FinanceReconciliationGroup,
     FinanceRequest,
     FinancialPlanDocument,
     FinancialPlanning,
@@ -26,6 +27,7 @@ from app.models.finance import (
     PurchaseRequest,
 )
 from app.models.funnel import SalesFunnel
+from app.models.production import ProductionHandoff, ProductionOrder, ProductionPipeline
 from app.models.inventory import InventoryItem, InventoryRevision, StockMovement, Warehouse
 from app.models.mtproto_session import MtprotoSession
 from app.models.notification import (
@@ -65,6 +67,7 @@ __all__ = [
     "NotificationDelivery",
     "NotificationArchive",
     "Client",
+    "CrmContact",
     "Deal",
     "EmployeeInfo",
     "AccountsReceivable",
@@ -83,6 +86,7 @@ __all__ = [
     "FinancialPlanning",
     "BankStatement",
     "BankStatementLine",
+    "FinanceReconciliationGroup",
     "IncomeReport",
     "Bdr",
     "OrgPosition",
@@ -95,6 +99,9 @@ __all__ = [
     "StockMovement",
     "InventoryRevision",
     "SalesFunnel",
+    "ProductionPipeline",
+    "ProductionOrder",
+    "ProductionHandoff",
     "SiteIntegrationKey",
     "TelegramIntegrationState",
     "AuditLog",

@@ -8,6 +8,7 @@ from typing import Any
 from app.core.mappers import _legacy_telegram_username
 from app.models.client import Deal
 from app.schemas.clients import ClientRead as ClientNestedRead
+from app.schemas.crm_contacts import CrmContactRead as CrmContactNestedRead
 from app.schemas.deals import DealCreate, DealRead, DealUpdate
 
 
@@ -78,11 +79,14 @@ def deal_row_to_read(row: Deal) -> DealRead:
     comments = row.comments if isinstance(row.comments, list) else []
     rel = getattr(row, "client", None)
     nested_client = ClientNestedRead.model_validate(rel) if rel is not None else None
+    crel = getattr(row, "contact", None)
+    nested_contact = CrmContactNestedRead.model_validate(crel) if crel is not None else None
     return DealRead(
         id=row.id,
         version=int(row.version) if getattr(row, "version", None) is not None else 1,
         title=row.title or "",
         client_id=row.client_id,
+        contact_id=getattr(row, "contact_id", None),
         contact_name=row.contact_name,
         amount=amount_f,
         currency=row.currency or "UZS",
@@ -114,6 +118,7 @@ def deal_row_to_read(row: Deal) -> DealRead:
         end_date=row.end_date,
         payment_day=_payment_day_read(row),
         client=nested_client,
+        contact=nested_contact,
     )
 
 
@@ -126,6 +131,7 @@ def deal_from_create(body: DealCreate, deal_id: str, *, assignee_id: str | None)
         version=1,
         title=body.title.strip()[:500],
         client_id=(body.client_id.strip()[:36] or None) if body.client_id else None,
+        contact_id=(body.contact_id.strip()[:36] or None) if body.contact_id else None,
         contact_name=body.contact_name[:255] if body.contact_name else None,
         amount=_dec_amount(body.amount),
         currency=(body.currency or "UZS").strip()[:10] or "UZS",
@@ -155,6 +161,12 @@ def apply_deal_patch_to_row(deal: Deal, patch: DealUpdate) -> None:
             deal.client_id = None
         else:
             deal.client_id = str(v).strip()[:36] or None
+    if "contact_id" in data:
+        v = data["contact_id"]
+        if v is None or v == "":
+            deal.contact_id = None
+        else:
+            deal.contact_id = str(v).strip()[:36] or None
     if "contact_name" in data:
         v = data["contact_name"]
         deal.contact_name = v[:255] if v else None

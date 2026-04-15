@@ -4,6 +4,8 @@ import type { AppActions } from '../../frontend/hooks/useAppLogic';
 import MeetingsView from '../MeetingsView';
 
 interface MeetingsModuleProps {
+  /** Рабочий стол: без второго фона и без дублирующих полей — отступы даёт WorkdeskView */
+  embedInWorkdesk?: boolean;
   table: TableCollection;
   meetings: Meeting[];
   users: User[];
@@ -18,6 +20,7 @@ interface MeetingsModuleProps {
 }
 
 export const MeetingsModule: React.FC<MeetingsModuleProps> = ({
+  embedInWorkdesk = false,
   table,
   meetings,
   users,
@@ -31,9 +34,16 @@ export const MeetingsModule: React.FC<MeetingsModuleProps> = ({
   actions,
 }) => {
   return (
-    <div className="h-full flex flex-col min-h-0 bg-white dark:bg-[#191919]">
-      <MeetingsView 
-        meetings={meetings} 
+    <div
+      className={
+        embedInWorkdesk
+          ? 'h-full flex flex-col min-h-0 min-w-0'
+          : 'h-full flex flex-col min-h-0 bg-white dark:bg-[#191919]'
+      }
+    >
+      <MeetingsView
+        embedInWorkdesk={embedInWorkdesk}
+        meetings={meetings}
         users={users}
         projects={projects}
         clients={clients}

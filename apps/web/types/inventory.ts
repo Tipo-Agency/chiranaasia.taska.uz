@@ -7,6 +7,26 @@ export interface Warehouse {
   isArchived?: boolean;
 }
 
+/** Характеристика позиции: название + единица измерения значения + тип поля */
+export interface NomenclatureAttribute {
+  id: string;
+  label: string;
+  unit?: string;
+  value: string;
+  /** text — строка; number — число; select — значение из options */
+  kind?: 'text' | 'number' | 'select';
+  options?: string[];
+}
+
+export interface NomenclatureAttachment {
+  id: string;
+  name: string;
+  url: string;
+  type: string;
+  uploadedAt?: string;
+  storagePath?: string;
+}
+
 export interface InventoryItem {
   id: string;
   sku: string;
@@ -14,6 +34,12 @@ export interface InventoryItem {
   unit: string;
   category?: string;
   notes?: string;
+  attributes?: NomenclatureAttribute[];
+  attachments?: NomenclatureAttachment[];
+  barcode?: string;
+  manufacturer?: string;
+  /** Норма расхода / упаковка (напр. «0,12 л/м²», «20 л канистра») — справочно для производства и снабжения */
+  consumptionHint?: string;
   isArchived?: boolean;
 }
 

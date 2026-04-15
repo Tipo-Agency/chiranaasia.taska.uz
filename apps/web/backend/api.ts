@@ -34,6 +34,7 @@ import {
   bpmEndpoint,
   inventoryEndpoint,
   funnelsEndpoint,
+  productionEndpoint,
   integrationsMetaEndpoint,
   integrationsSiteEndpoint,
   integrationsTelegramEndpoint,
@@ -79,6 +80,7 @@ export const api = {
   bpm: bpmEndpoint,
   inventory: inventoryEndpoint,
   funnels: funnelsEndpoint,
+  production: productionEndpoint,
 
   integrationsMeta: integrationsMetaEndpoint,
   integrationsSite: integrationsSiteEndpoint,

@@ -48,6 +48,10 @@ class FinancialPlanDocumentRead(BaseModel):
     approvedBy: str | None = None
     approvedAt: str | None = None
     isArchived: bool = False
+    periodStart: str | None = None
+    periodEnd: str | None = None
+    planSeriesId: str | None = None
+    periodLabel: str | None = None
 
 
 class FinancialPlanningRead(BaseModel):
@@ -68,6 +72,13 @@ class FinancialPlanningRead(BaseModel):
     approvedAt: str | None = None
     notes: str | None = None
     isArchived: bool = False
+    periodStart: str | None = None
+    periodEnd: str | None = None
+    planDocumentIds: list[str] = Field(default_factory=list)
+    incomeReportId: str | None = None
+    incomeReportIds: list[str] = Field(default_factory=list)
+    fundMovements: list[dict[str, Any]] = Field(default_factory=list)
+    expenseDistribution: dict[str, Any] = Field(default_factory=dict)
 
 
 class BankStatementLineRead(BaseModel):
@@ -98,6 +109,17 @@ class IncomeReportRead(BaseModel):
     period: str = ""
     data: dict[str, Any] = Field(default_factory=dict)
     createdAt: str = ""
+    updatedAt: str | None = None
+    lockedByPlanningId: str | None = None
+
+
+class FinanceReconciliationGroupRead(BaseModel):
+    model_config = ConfigDict(extra="ignore", populate_by_name=True)
+
+    id: str
+    lineIds: list[str] = Field(default_factory=list)
+    requestId: str | None = None
+    manualResolved: bool = False
     updatedAt: str | None = None
 
 

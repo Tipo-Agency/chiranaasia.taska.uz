@@ -31,6 +31,9 @@ export function AdminRoutesView(props: AppRouterProps) {
         contracts={props.contracts}
         meetings={props.meetings}
         salesFunnels={props.salesFunnels}
+        productionPipelines={props.productionPipelines}
+        onSaveProductionPipeline={actions.saveProductionPipeline}
+        onDeleteProductionPipeline={actions.deleteProductionPipeline}
         businessProcesses={props.businessProcesses}
         orgPositions={props.orgPositions}
         onUpdateUsers={actions.updateUsers}

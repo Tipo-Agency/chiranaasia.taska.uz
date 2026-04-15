@@ -88,6 +88,10 @@ class FinanceRequest(Base):
     created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
     updated_at = Column(DateTime(timezone=True), nullable=True)
     is_archived = Column(Boolean, nullable=False, server_default=text("false"))
+    attachments = Column(JSONB, default=list)
+    counterparty_inn = Column(String(32), nullable=True)
+    invoice_number = Column(String(100), nullable=True)
+    invoice_date = Column(Date, nullable=True)
 
     __mapper_args__ = {"version_id_col": version}
 
@@ -101,7 +105,7 @@ class FinancialPlanDocument(Base):
 
     id = Column(String(36), primary_key=True, default=gen_id)
     department_id = Column(String(36), nullable=False)
-    period = Column(String(10), nullable=False)  # YYYY-MM
+    period = Column(String(10), nullable=False)  # YYYY-MM (якорный месяц)
     income = Column(String(50), nullable=False)
     expenses = Column(JSONB, default=dict)
     status = Column(String(30), nullable=False)
@@ -110,6 +114,10 @@ class FinancialPlanDocument(Base):
     approved_by = Column(String(36), nullable=True)
     approved_at = Column(String(50), nullable=True)
     is_archived = Column(Boolean, default=False)
+    period_start = Column(String(20), nullable=True)  # YYYY-MM-DD
+    period_end = Column(String(20), nullable=True)
+    plan_series_id = Column(String(36), nullable=True)  # группа недельных отрезков одного месяца
+    period_label = Column(String(120), nullable=True)
 
 
 class FinancialPlanning(Base):
@@ -130,6 +138,13 @@ class FinancialPlanning(Base):
     approved_at = Column(String(50), nullable=True)
     notes = Column(String(500), nullable=True)
     is_archived = Column(Boolean, default=False)
+    period_start = Column(String(20), nullable=True)
+    period_end = Column(String(20), nullable=True)
+    plan_document_ids = Column(JSONB, default=list)
+    income_report_id = Column(String(36), nullable=True)
+    income_report_ids = Column(JSONB, default=list)
+    fund_movements = Column(JSONB, default=list)
+    expense_distribution = Column(JSONB, default=dict)
 
 
 class BankStatement(Base):
@@ -154,6 +169,18 @@ class BankStatementLine(Base):
     line_type = Column(String(10), nullable=False)  # 'in' | 'out'
 
 
+class FinanceReconciliationGroup(Base):
+    """Ручная группировка строк выписки (несколько расходов → одна заявка ФП)."""
+
+    __tablename__ = "finance_reconciliation_groups"
+
+    id = Column(String(36), primary_key=True, default=gen_id)
+    line_ids = Column(JSONB, default=list)
+    request_id = Column(String(36), nullable=True)
+    manual_resolved = Column(Boolean, nullable=False, server_default=text("false"))
+    updated_at = Column(String(50), nullable=True)
+
+
 class IncomeReport(Base):
     """Отчёт по приходам (сводка по дням для сверки с выписками)."""
     __tablename__ = "income_reports"
@@ -163,6 +190,7 @@ class IncomeReport(Base):
     data = Column(JSONB, default=dict)  # например {"2024-01-15": 1000.5, ...} — дата -> сумма прихода
     created_at = Column(String(50), nullable=False)
     updated_at = Column(String(50), nullable=True)
+    locked_by_planning_id = Column(String(36), nullable=True)
 
 
 class Bdr(Base):

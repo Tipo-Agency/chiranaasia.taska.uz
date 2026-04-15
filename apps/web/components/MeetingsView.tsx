@@ -45,6 +45,8 @@ interface MeetingsViewProps {
   shootPlans?: ShootPlan[];
   contentPosts?: ContentPost[];
   onSaveShootPlan?: (plan: ShootPlan) => void;
+  /** Вкладка рабочего стола — без второго gutter и без вложенного скролла */
+  embedInWorkdesk?: boolean;
 }
 
 const DEFAULT_CAL_COLORS = {
@@ -88,6 +90,7 @@ const MeetingsView: React.FC<MeetingsViewProps> = ({
   shootPlans = [],
   contentPosts = [],
   onSaveShootPlan,
+  embedInWorkdesk = false,
 }) => {
   const { setModule } = useAppToolbar();
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -675,12 +678,14 @@ const MeetingsView: React.FC<MeetingsViewProps> = ({
     contentPlanTables.length,
   ]);
 
+  const scrollAreaClass = embedInWorkdesk
+    ? 'w-full min-w-0 min-h-0'
+    : `${MODULE_PAGE_GUTTER} pt-3 md:pt-5 pb-16 md:pb-20 h-full overflow-y-auto custom-scrollbar`;
+
   return (
-    <ModulePageShell>
-      <div className="flex-1 min-h-0 overflow-hidden">
-        <div className={`${MODULE_PAGE_GUTTER} pt-3 md:pt-5 pb-16 md:pb-20 h-full overflow-y-auto custom-scrollbar`}>
-      {renderCalendar()}
-        </div>
+    <ModulePageShell className={embedInWorkdesk ? '!bg-transparent' : ''}>
+      <div className={embedInWorkdesk ? 'flex-1 min-h-0 min-w-0 flex flex-col' : 'flex-1 min-h-0 overflow-hidden'}>
+        <div className={scrollAreaClass}>{renderCalendar()}</div>
       </div>
 
       {/* Create/Edit Modal — один скролл по центру, шапка и футер фиксированы */}

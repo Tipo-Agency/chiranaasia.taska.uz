@@ -20,6 +20,7 @@ export function FinanceRoutesView(props: AppRouterProps) {
         currentUser={props.currentUser}
         financialPlanDocuments={props.financialPlanDocuments}
         financialPlannings={props.financialPlannings}
+        incomeReports={props.incomeReports}
         bdr={props.bdr}
         actions={actions}
       />

@@ -5,7 +5,7 @@ from datetime import UTC, date, datetime
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request
-from sqlalchemy import delete, select
+from sqlalchemy import delete, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.auth import get_current_user, require_permission
@@ -23,6 +23,7 @@ from app.models.finance import (
     Bdr,
     FinanceCategory,
     FinancePlan,
+    FinanceReconciliationGroup,
     FinanceRequest,
     FinancialPlanDocument,
     FinancialPlanning,
@@ -37,6 +38,7 @@ from app.schemas.finance_api import (
     FinanceCategoryRead,
     FinanceFundRead,
     FinancePlanRowRead,
+    FinanceReconciliationGroupRead,
     FinancialPlanDocumentRead,
     FinancialPlanningRead,
     IncomeReportRead,
@@ -47,6 +49,7 @@ from app.schemas.finance_bulk import (
     FinanceCategoryItem,
     FinancePlanUpsert,
     FinancialPlanDocItem,
+    FinanceReconciliationGroupItem,
     FinancialPlanningItem,
     FundItem,
     IncomeReportItem,
@@ -61,6 +64,8 @@ from app.services.audit_log import log_mutation
 from app.services.bdr_totals import bdr_get_response, sanitize_bdr_rows
 from app.services.domain_events import log_entity_mutation
 from app.services.finance_request_workflow import normalize_status
+from app.services.finance_fp_expense_match import auto_match_fp_expenses_to_paid
+from app.services.finance_planning_funds import assert_budget_fund_allows_approval
 from app.services.finance_requests_service import (
     apply_finance_request_patch,
     assert_finance_request_patch_respects_lock,
@@ -69,6 +74,11 @@ from app.services.finance_requests_service import (
     list_finance_requests,
     new_finance_request_id,
     reject_comment_provided,
+)
+from app.services.past_entity_edit_guard import (
+    assert_may_edit_past_dated_entity,
+    calendar_year_is_strictly_past,
+    guard_finance_yyyy_mm_mutation,
 )
 from app.services.list_cursor_page import (
     ListCursorError,
@@ -185,7 +195,36 @@ def row_to_plan_doc(row):
         "approvedBy": row.approved_by,
         "approvedAt": row.approved_at,
         "isArchived": row.is_archived or False,
+        "periodStart": getattr(row, "period_start", None),
+        "periodEnd": getattr(row, "period_end", None),
+        "planSeriesId": getattr(row, "plan_series_id", None),
+        "periodLabel": getattr(row, "period_label", None),
     }
+
+
+def _planning_merged_document_ids(row: FinancialPlanning) -> list[str]:
+    raw = list(row.plan_document_ids or []) if getattr(row, "plan_document_ids", None) is not None else []
+    pid = (row.plan_document_id or "").strip()
+    if pid and pid not in raw:
+        return [pid, *raw]
+    if not raw and pid:
+        return [pid]
+    return raw
+
+
+def _planning_merged_income_report_ids(row: FinancialPlanning | None) -> list[str]:
+    if row is None:
+        return []
+    raw = list(row.income_report_ids or []) if getattr(row, "income_report_ids", None) is not None else []
+    out: list[str] = []
+    for x in raw:
+        s = str(x).strip()
+        if s and s not in out:
+            out.append(s)
+    single = (getattr(row, "income_report_id", None) or "").strip()
+    if single and single not in out:
+        out.insert(0, single)
+    return out
 
 
 def row_to_planning(row):
@@ -205,7 +244,57 @@ def row_to_planning(row):
         "approvedAt": row.approved_at,
         "notes": row.notes,
         "isArchived": row.is_archived or False,
+        "periodStart": getattr(row, "period_start", None),
+        "periodEnd": getattr(row, "period_end", None),
+        "planDocumentIds": _planning_merged_document_ids(row),
+        "incomeReportId": getattr(row, "income_report_id", None),
+        "incomeReportIds": _planning_merged_income_report_ids(row),
+        "fundMovements": list(getattr(row, "fund_movements", None) or []),
+        "expenseDistribution": getattr(row, "expense_distribution", None) or {},
     }
+
+
+def _planning_status_locks_income_report(st: str | None) -> bool:
+    return (st or "").strip().lower() in ("conducted", "approved")
+
+
+async def _validate_income_reports_for_planning(db: AsyncSession, *, planning_id: str, report_ids: list[str]) -> None:
+    for rid in report_ids:
+        ir = await db.get(IncomeReport, rid)
+        if not ir:
+            raise HTTPException(status_code=400, detail="income_report_not_found")
+        lock = (ir.locked_by_planning_id or "").strip()
+        if lock and lock != planning_id:
+            raise HTTPException(status_code=400, detail="income_report_already_used_in_budget")
+
+
+async def _sync_income_report_locks_for_planning(
+    db: AsyncSession,
+    *,
+    planning_id: str,
+    row: FinancialPlanning,
+) -> None:
+    new_st = (row.status or "").strip().lower()
+    locks = _planning_status_locks_income_report(new_st)
+    new_ids = set(_planning_merged_income_report_ids(row))
+
+    if not locks:
+        await db.execute(
+            update(IncomeReport)
+            .where(IncomeReport.locked_by_planning_id == planning_id)
+            .values(locked_by_planning_id=None)
+        )
+        return
+
+    stray_r = await db.execute(select(IncomeReport).where(IncomeReport.locked_by_planning_id == planning_id))
+    for ir in stray_r.scalars().all():
+        if ir.id not in new_ids:
+            ir.locked_by_planning_id = None
+
+    for rid in sorted(new_ids):
+        ir = await db.get(IncomeReport, rid)
+        if ir:
+            ir.locked_by_planning_id = planning_id
 
 
 @router.get("/categories", response_model=list[FinanceCategoryRead])
@@ -489,6 +578,8 @@ async def patch_finance_request_endpoint(
 
     now = datetime.now(UTC)
     apply_finance_request_patch(row, body, now=now, actor_user_id=current_user.id)
+    if prev_n == "pending" and normalize_status(row.status) == "approved":
+        await assert_budget_fund_allows_approval(db, finance_request_id=finance_request_id, row=row)
     await db.flush()
     await log_entity_mutation(
         db,
@@ -568,6 +659,14 @@ async def update_financial_plan_documents(
     for d, existing in items:
         did = d.id
         is_new = existing is None
+        await guard_finance_yyyy_mm_mutation(
+            db,
+            current_user,
+            is_new=is_new,
+            existing_period=existing.period if existing else None,
+            payload_period=(d.period or "").strip() or None,
+            period_explicit_in_payload="period" in d.model_fields_set,
+        )
         prev_status = existing.status if existing else None
         if existing:
             existing.department_id = d.departmentId or existing.department_id
@@ -580,6 +679,15 @@ async def update_financial_plan_documents(
             existing.approved_by = d.approvedBy
             existing.approved_at = d.approvedAt
             existing.is_archived = d.isArchived
+            dfs = d.model_fields_set
+            if "periodStart" in dfs:
+                existing.period_start = d.periodStart
+            if "periodEnd" in dfs:
+                existing.period_end = d.periodEnd
+            if "planSeriesId" in dfs:
+                existing.plan_series_id = d.planSeriesId
+            if "periodLabel" in dfs:
+                existing.period_label = d.periodLabel
         else:
             db.add(FinancialPlanDocument(
                 id=did,
@@ -593,6 +701,10 @@ async def update_financial_plan_documents(
                 approved_by=d.approvedBy,
                 approved_at=d.approvedAt,
                 is_archived=d.isArchived,
+                period_start=d.periodStart,
+                period_end=d.periodEnd,
+                plan_series_id=d.planSeriesId,
+                period_label=d.periodLabel,
             ))
         await db.flush()
         doc_row = await db.get(FinancialPlanDocument, did)
@@ -642,6 +754,14 @@ async def update_financial_plannings(
     for p, existing in items:
         pid = p.id
         is_new = existing is None
+        await guard_finance_yyyy_mm_mutation(
+            db,
+            current_user,
+            is_new=is_new,
+            existing_period=existing.period if existing else None,
+            payload_period=(p.period or "").strip() or None,
+            period_explicit_in_payload="period" in p.model_fields_set,
+        )
         prev_status = existing.status if existing else None
         fs = p.model_fields_set
         if existing:
@@ -651,6 +771,8 @@ async def update_financial_plannings(
                 existing.period = p.period or existing.period
             if "planDocumentId" in fs:
                 existing.plan_document_id = p.planDocumentId
+            if "planDocumentIds" in fs:
+                existing.plan_document_ids = [str(x).strip() for x in (p.planDocumentIds or []) if str(x).strip()]
             if "income" in fs:
                 existing.income = str(p.income) if p.income is not None else None
             if "fundAllocations" in fs:
@@ -673,12 +795,57 @@ async def update_financial_plannings(
                 existing.notes = p.notes
             if "isArchived" in fs:
                 existing.is_archived = p.isArchived
+            if "periodStart" in fs:
+                existing.period_start = p.periodStart
+            if "periodEnd" in fs:
+                existing.period_end = p.periodEnd
+            if "incomeReportId" in fs:
+                existing.income_report_id = p.incomeReportId
+            if "incomeReportIds" in fs:
+                existing.income_report_ids = [str(x).strip() for x in (p.incomeReportIds or []) if str(x).strip()]
+            if "fundMovements" in fs:
+                existing.fund_movements = p.fundMovements or []
+            if "expenseDistribution" in fs:
+                existing.expense_distribution = p.expenseDistribution or {}
+            if "planDocumentIds" in fs or "planDocumentId" in fs:
+                ids = list(existing.plan_document_ids or [])
+                doc_id = (existing.plan_document_id or "").strip() if existing.plan_document_id else ""
+                if doc_id and doc_id not in ids:
+                    ids = [doc_id, *ids]
+                    existing.plan_document_ids = ids
+                elif not doc_id and ids:
+                    existing.plan_document_id = ids[0]
+                elif doc_id and not ids:
+                    existing.plan_document_ids = [doc_id]
+            if "incomeReportIds" in fs or "incomeReportId" in fs:
+                ids_ir = list(existing.income_report_ids or []) if getattr(existing, "income_report_ids", None) is not None else []
+                single_ir = (existing.income_report_id or "").strip() if existing.income_report_id else ""
+                if single_ir and single_ir not in ids_ir:
+                    ids_ir = [single_ir, *ids_ir]
+                    existing.income_report_ids = ids_ir
+                elif not single_ir and ids_ir:
+                    existing.income_report_id = ids_ir[0]
+                elif single_ir and not ids_ir:
+                    existing.income_report_ids = [single_ir]
         else:
+            doc_ids = [str(x).strip() for x in (p.planDocumentIds or []) if str(x).strip()]
+            primary = (p.planDocumentId or "").strip() if p.planDocumentId else ""
+            if primary and primary not in doc_ids:
+                doc_ids = [primary, *doc_ids]
+            if not primary and doc_ids:
+                primary = doc_ids[0]
+            inc_ids = [str(x).strip() for x in (p.incomeReportIds or []) if str(x).strip()]
+            inc_primary = (p.incomeReportId or "").strip() if p.incomeReportId else ""
+            if inc_primary and inc_primary not in inc_ids:
+                inc_ids = [inc_primary, *inc_ids]
+            if not inc_primary and inc_ids:
+                inc_primary = inc_ids[0]
             db.add(FinancialPlanning(
                 id=pid,
                 department_id=p.departmentId or "",
                 period=p.period or "",
-                plan_document_id=p.planDocumentId,
+                plan_document_id=primary or None,
+                plan_document_ids=doc_ids,
                 income=str(p.income) if p.income is not None else None,
                 fund_allocations=p.fundAllocations or {},
                 request_fund_ids=p.requestFundIds or {},
@@ -690,9 +857,30 @@ async def update_financial_plannings(
                 approved_at=p.approvedAt,
                 notes=p.notes,
                 is_archived=p.isArchived,
+                period_start=p.periodStart,
+                period_end=p.periodEnd,
+                income_report_id=inc_primary or None,
+                income_report_ids=inc_ids,
+                fund_movements=p.fundMovements or [],
+                expense_distribution=p.expenseDistribution or {},
             ))
         await db.flush()
         pl_row = await db.get(FinancialPlanning, pid)
+        if pl_row is None:
+            continue
+        ids_ir = list(pl_row.income_report_ids or []) if getattr(pl_row, "income_report_ids", None) is not None else []
+        single_ir = (pl_row.income_report_id or "").strip() if pl_row.income_report_id else ""
+        if single_ir and single_ir not in ids_ir:
+            ids_ir = [single_ir, *ids_ir]
+            pl_row.income_report_ids = ids_ir
+        elif not single_ir and ids_ir:
+            pl_row.income_report_id = ids_ir[0]
+        elif single_ir and not ids_ir:
+            pl_row.income_report_ids = [single_ir]
+        await db.flush()
+        eff_reports = _planning_merged_income_report_ids(pl_row)
+        await _validate_income_reports_for_planning(db, planning_id=pid, report_ids=eff_reports)
+        await _sync_income_report_locks_for_planning(db, planning_id=pid, row=pl_row)
         st = pl_row.status if pl_row else p.status
         await log_entity_mutation(
             db,
@@ -791,6 +979,56 @@ async def update_bank_statements(payload: list[BankStatementItem], db: AsyncSess
             source="finance-router",
             payload={"name": s.name, "period": s.period, "lineCount": len(lines)},
         )
+    await auto_match_fp_expenses_to_paid(db)
+    await db.commit()
+    return {"ok": True}
+
+
+@router.get("/expense-reconciliation-groups", response_model=list[FinanceReconciliationGroupRead])
+async def get_expense_reconciliation_groups(db: AsyncSession = Depends(get_db)):
+    result = await db.execute(select(FinanceReconciliationGroup))
+    out = []
+    for g in result.scalars().all():
+        lids = g.line_ids if isinstance(g.line_ids, list) else []
+        out.append(
+            FinanceReconciliationGroupRead(
+                id=g.id,
+                lineIds=[str(x) for x in lids],
+                requestId=g.request_id,
+                manualResolved=bool(g.manual_resolved),
+                updatedAt=g.updated_at,
+            )
+        )
+    return out
+
+
+@router.put("/expense-reconciliation-groups", response_model=OkResponse)
+async def put_expense_reconciliation_groups(
+    payload: list[FinanceReconciliationGroupItem],
+    db: AsyncSession = Depends(get_db),
+):
+    await db.execute(delete(FinanceReconciliationGroup))
+    now = datetime.now(UTC).isoformat()
+    for it in payload:
+        db.add(
+            FinanceReconciliationGroup(
+                id=it.id,
+                line_ids=list(it.lineIds or []),
+                request_id=it.requestId,
+                manual_resolved=bool(it.manualResolved),
+                updated_at=now,
+            )
+        )
+    await db.flush()
+    await log_entity_mutation(
+        db,
+        event_type="finance.expense_reconciliation_groups.updated",
+        entity_type="finance_reconciliation",
+        entity_id="all",
+        source="finance-router",
+        payload={"count": len(payload)},
+        actor_id=None,
+    )
     await db.commit()
     return {"ok": True}
 
@@ -823,6 +1061,7 @@ def _row_to_income_report(row):
         "data": row.data or {},
         "createdAt": row.created_at,
         "updatedAt": row.updated_at,
+        "lockedByPlanningId": getattr(row, "locked_by_planning_id", None),
     }
 
 
@@ -833,18 +1072,31 @@ async def get_income_reports(db: AsyncSession = Depends(get_db)):
 
 
 @router.put("/income-reports", response_model=OkResponse)
-async def update_income_reports(payload: list[IncomeReportItem], db: AsyncSession = Depends(get_db)):
+async def update_income_reports(
+    payload: list[IncomeReportItem],
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     for r in payload:
         rid = r.id
         if not rid:
             continue
         existing = await db.get(IncomeReport, rid)
         is_new = existing is None
+        await guard_finance_yyyy_mm_mutation(
+            db,
+            current_user,
+            is_new=is_new,
+            existing_period=existing.period if existing else None,
+            payload_period=(r.period or "").strip() or None,
+            period_explicit_in_payload="period" in r.model_fields_set,
+        )
         if existing:
             existing.period = r.period or existing.period
             existing.data = r.data if r.data is not None else (existing.data or {})
             existing.created_at = r.createdAt or existing.created_at
             existing.updated_at = r.updatedAt
+            # locked_by_planning_id задаётся только через сохранение бюджета (проведение/утверждение)
         else:
             db.add(IncomeReport(
                 id=rid,
@@ -852,6 +1104,7 @@ async def update_income_reports(payload: list[IncomeReportItem], db: AsyncSessio
                 data=r.data or {},
                 created_at=r.createdAt or "",
                 updated_at=r.updatedAt,
+                locked_by_planning_id=None,
             ))
         await db.flush()
         await log_entity_mutation(
@@ -882,11 +1135,17 @@ async def get_bdr(year: str | None = None, db: AsyncSession = Depends(get_db)):
 
 
 @router.put("/bdr", response_model=BdrGetResponse)
-async def update_bdr(payload: BdrPutBody, db: AsyncSession = Depends(get_db)):
+async def update_bdr(
+    payload: BdrPutBody,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     """Сохранить БДР за год. В БД пишутся только ``year`` + ``rows`` (JSONB); итоги возвращаются в ответе."""
     y = str(payload.year).strip()[:4]
     if not y or not y.isdigit():
         raise HTTPException(status_code=400, detail="year required")
+    if calendar_year_is_strictly_past(y):
+        await assert_may_edit_past_dated_entity(db, current_user)
     rows_in = payload.rows
     if not isinstance(rows_in, list):
         rows_in = []

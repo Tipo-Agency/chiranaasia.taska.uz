@@ -1,6 +1,7 @@
-import React, { useLayoutEffect, useMemo, useState } from 'react';
-import { BarChart3, ClipboardList, Factory, LayoutDashboard } from 'lucide-react';
-import type { Department, User } from '../types';
+import React, { useEffect, useLayoutEffect, useMemo, useState } from 'react';
+import { BarChart3, ClipboardList, Factory, GitBranch, LayoutDashboard } from 'lucide-react';
+import type { Department, ProductionRouteOrder, ProductionRoutePipeline, User } from '../types';
+import { hasPermission } from '../utils/permissions';
 import { ModuleCreateDropdown, ModuleFilterIconButton, ModulePageShell } from './ui';
 import {
   MODULE_PAGE_GUTTER,
@@ -15,31 +16,64 @@ import { ProductionMonitorPanel } from './production/ProductionMonitorPanel';
 import { ProductionOrdersPanel } from './production/ProductionOrdersPanel';
 import { ProductionPlanningPanel } from './production/ProductionPlanningPanel';
 import { ProductionReportsPanel } from './production/ProductionReportsPanel';
+import { ProductionRouteBoard } from './production/ProductionRouteBoard';
 
-type ProductionTab = 'monitor' | 'orders' | 'planning' | 'reports';
+type ProductionTab = 'monitor' | 'route' | 'orders' | 'planning' | 'reports';
 
 interface ProductionViewProps {
   users: User[];
   departments: Department[];
   currentUser: User;
+  productionPipelines: ProductionRoutePipeline[];
+  productionBoardOrders: ProductionRouteOrder[];
+  onRefreshProductionRoutes: () => Promise<void>;
+  onCreateProductionRouteOrder: (pipelineId: string, title: string) => Promise<void>;
+  onProductionHandOver: (orderId: string, notes?: string) => Promise<void>;
+  onProductionResolveHandoff: (
+    handoffId: string,
+    payload: { action: 'accept' | 'reject'; hasDefects?: boolean; defectNotes?: string | null }
+  ) => Promise<void>;
+  onProductionCompleteOrder: (orderId: string) => Promise<void>;
 }
 
-export default function ProductionView({ users, departments, currentUser }: ProductionViewProps) {
+export default function ProductionView({
+  users,
+  departments,
+  currentUser,
+  productionPipelines,
+  productionBoardOrders,
+  onRefreshProductionRoutes,
+  onCreateProductionRouteOrder,
+  onProductionHandOver,
+  onProductionResolveHandoff,
+  onProductionCompleteOrder,
+}: ProductionViewProps) {
   const { setLeading, setModule } = useAppToolbar();
   const [tab, setTab] = useState<ProductionTab>('monitor');
   const [prodFiltersOpen, setProdFiltersOpen] = useState(false);
   const { orders, operations, shiftLogs, stats, setStatus, createOrder, updateOrder, createOperation, updateOperation, logShift } =
     useProductionStore();
 
-  const tabs = useMemo(
-    () => [
-      { id: 'monitor' as const, label: 'Монитор производства' },
-      { id: 'orders' as const, label: 'Заказы' },
-      { id: 'planning' as const, label: 'Планирование' },
-      { id: 'reports' as const, label: 'Отчёты' },
-    ],
-    []
-  );
+  const canProductionRoute = hasPermission(currentUser, 'org.production');
+
+  const tabs = useMemo(() => {
+    const row: { id: ProductionTab; label: string }[] = [
+      { id: 'monitor', label: 'Монитор производства' },
+    ];
+    if (canProductionRoute) {
+      row.push({ id: 'route', label: 'Производственный маршрут' });
+    }
+    row.push(
+      { id: 'orders', label: 'Заказы' },
+      { id: 'planning', label: 'Планирование' },
+      { id: 'reports', label: 'Отчёты' }
+    );
+    return row;
+  }, [canProductionRoute]);
+
+  useEffect(() => {
+    if (tab === 'route' && !canProductionRoute) setTab('monitor');
+  }, [tab, canProductionRoute]);
 
   useLayoutEffect(() => {
     const tabActive = MODULE_ACCENTS.amber.navIconActive;
@@ -88,6 +122,17 @@ export default function ProductionView({ users, departments, currentUser }: Prod
               onClick: () => setTab('orders'),
               iconClassName: 'text-emerald-600 dark:text-emerald-400',
             },
+            ...(canProductionRoute
+              ? [
+                  {
+                    id: 'route',
+                    label: 'Производственный маршрут',
+                    icon: GitBranch,
+                    onClick: () => setTab('route'),
+                    iconClassName: 'text-emerald-600 dark:text-emerald-400',
+                  } as const,
+                ]
+              : []),
             {
               id: 'planning',
               label: 'Планирование и смены',
@@ -118,13 +163,26 @@ export default function ProductionView({ users, departments, currentUser }: Prod
       setLeading(null);
       setModule(null);
     };
-  }, [setLeading, setModule, tab, tabs, prodFiltersOpen]);
+  }, [setLeading, setModule, tab, tabs, prodFiltersOpen, canProductionRoute]);
 
   return (
     <ModulePageShell>
       <div className="flex-1 min-h-0 overflow-hidden">
         <div className={`${MODULE_PAGE_GUTTER} ${MODULE_PAGE_TOP_PAD} pb-24 md:pb-32 h-full overflow-y-auto overflow-x-hidden custom-scrollbar`}>
           {tab === 'monitor' && <ProductionMonitorPanel orders={orders} operations={operations} users={users} onSetStatus={setStatus} />}
+          {tab === 'route' && canProductionRoute && (
+            <ProductionRouteBoard
+              pipelines={productionPipelines}
+              orders={productionBoardOrders}
+              users={users}
+              currentUser={currentUser}
+              onRefresh={onRefreshProductionRoutes}
+              onCreateOrder={onCreateProductionRouteOrder}
+              onHandOver={onProductionHandOver}
+              onResolveHandoff={onProductionResolveHandoff}
+              onComplete={onProductionCompleteOrder}
+            />
+          )}
           {tab === 'orders' && (
             <ProductionOrdersPanel
               orders={orders}

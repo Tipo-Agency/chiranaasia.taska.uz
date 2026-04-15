@@ -39,6 +39,10 @@ class FinancialPlanDocItem(BaseModel):
     approvedBy: str | None = Field(default=None, max_length=100)
     approvedAt: str | None = Field(default=None, max_length=100)
     isArchived: bool = False
+    periodStart: str | None = Field(default=None, max_length=20)
+    periodEnd: str | None = Field(default=None, max_length=20)
+    planSeriesId: str | None = Field(default=None, max_length=36)
+    periodLabel: str | None = Field(default=None, max_length=120)
 
 
 class FinancialPlanningItem(BaseModel):
@@ -59,6 +63,13 @@ class FinancialPlanningItem(BaseModel):
     approvedAt: str | None = Field(default=None, max_length=100)
     notes: str | None = None
     isArchived: bool = False
+    periodStart: str | None = Field(default=None, max_length=20)
+    periodEnd: str | None = Field(default=None, max_length=20)
+    planDocumentIds: list[str] = Field(default_factory=list)
+    incomeReportId: str | None = Field(default=None, max_length=36)
+    incomeReportIds: list[str] = Field(default_factory=list)
+    fundMovements: list[dict[str, Any]] = Field(default_factory=list)
+    expenseDistribution: dict[str, Any] = Field(default_factory=dict)
 
 
 class BankStatementLineItem(BaseModel):
@@ -90,6 +101,16 @@ class IncomeReportItem(BaseModel):
     data: dict[str, Any] = Field(default_factory=dict)
     createdAt: str = Field(default="", max_length=100)
     updatedAt: str | None = Field(default=None, max_length=100)
+    lockedByPlanningId: str | None = Field(default=None, max_length=36)
+
+
+class FinanceReconciliationGroupItem(BaseModel):
+    model_config = ConfigDict(extra="forbid", populate_by_name=True)
+
+    id: str = Field(..., min_length=1, max_length=36)
+    lineIds: list[str] = Field(default_factory=list)
+    requestId: str | None = Field(default=None, max_length=36)
+    manualResolved: bool = False
 
 
 class FinancePlanUpsert(BaseModel):

@@ -466,6 +466,7 @@ export function MainApp() {
                 purchaseRequests={state.purchaseRequests}
                 financialPlanDocuments={state.financialPlanDocuments}
                 financialPlannings={state.financialPlannings}
+                incomeReports={state.incomeReports}
                 bdr={state.bdr}
                 warehouses={state.warehouses}
                 inventoryItems={state.inventoryItems}
@@ -475,6 +476,8 @@ export function MainApp() {
                 orgPositions={state.orgPositions}
                 businessProcesses={state.businessProcesses}
                 salesFunnels={state.salesFunnels}
+                productionPipelines={state.productionPipelines}
+                productionBoardOrders={state.productionBoardOrders}
                 automationRules={state.automationRules}
                 settingsActiveTab={state.settingsActiveTab}
                 activeSpaceTab={state.activeSpaceTab}

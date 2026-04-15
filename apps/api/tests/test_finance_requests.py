@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import uuid
+from datetime import date
 
 from http_helpers import browser_csrf_headers
 
@@ -114,6 +115,96 @@ def test_mark_paid_requires_approve_permission(api_client):
     )
     assert paid.status_code == 403, paid.text
     assert paid.json().get("message") == "finance_mark_paid_required"
+
+
+def test_finance_approve_request_fund_insufficient_when_in_budget(api_client):
+    """В бюджете лимит фонда: одобрение заявки с суммой выше остатка — 400."""
+    _login(api_client, "demo")
+    rid = str(uuid.uuid4())
+    pid = str(uuid.uuid4())
+    ym = date.today().strftime("%Y-%m")
+    c = api_client.post(
+        "/api/finance/requests",
+        json={
+            "id": rid,
+            "title": "Заявка больше фонда",
+            "amount": "500",
+            "currency": "UZS",
+            "status": "pending",
+            "requesterId": "demo-user",
+        },
+        headers=browser_csrf_headers(api_client),
+    )
+    assert c.status_code == 201, c.text
+    put = api_client.put(
+        "/api/finance/financial-plannings",
+        json=[
+            {
+                "id": pid,
+                "departmentId": "d0",
+                "period": ym,
+                "status": "conducted",
+                "createdAt": "2020-01-01T00:00:00Z",
+                "requestIds": [rid],
+                "requestFundIds": {rid: "fund-1"},
+                "fundAllocations": {"fund-1": 100},
+            }
+        ],
+        headers=browser_csrf_headers(api_client),
+    )
+    assert put.status_code == 200, put.text
+    r = api_client.patch(
+        f"/api/finance/requests/{rid}",
+        json={"status": "approved"},
+        headers=browser_csrf_headers(api_client),
+    )
+    assert r.status_code == 400, r.text
+    assert r.json().get("message") == "finance_request_fund_insufficient"
+
+
+def test_finance_approve_request_budget_fund_required(api_client):
+    """Заявка в бюджете без назначенного фонда — 400."""
+    _login(api_client, "demo")
+    rid = str(uuid.uuid4())
+    pid = str(uuid.uuid4())
+    ym = date.today().strftime("%Y-%m")
+    c = api_client.post(
+        "/api/finance/requests",
+        json={
+            "id": rid,
+            "title": "Без фонда",
+            "amount": "10",
+            "currency": "UZS",
+            "status": "pending",
+            "requesterId": "demo-user",
+        },
+        headers=browser_csrf_headers(api_client),
+    )
+    assert c.status_code == 201, c.text
+    put = api_client.put(
+        "/api/finance/financial-plannings",
+        json=[
+            {
+                "id": pid,
+                "departmentId": "d0",
+                "period": ym,
+                "status": "conducted",
+                "createdAt": "2020-01-01T00:00:00Z",
+                "requestIds": [rid],
+                "requestFundIds": {},
+                "fundAllocations": {"fund-1": 10000},
+            }
+        ],
+        headers=browser_csrf_headers(api_client),
+    )
+    assert put.status_code == 200, put.text
+    r = api_client.patch(
+        f"/api/finance/requests/{rid}",
+        json={"status": "approved"},
+        headers=browser_csrf_headers(api_client),
+    )
+    assert r.status_code == 400, r.text
+    assert r.json().get("message") == "finance_request_budget_fund_required"
 
 
 def test_create_finance_request_idempotency_replay(api_client):

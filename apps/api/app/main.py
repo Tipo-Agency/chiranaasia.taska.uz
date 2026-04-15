@@ -22,6 +22,7 @@ from app.api.routers import (
     bpm,
     calendar_feed,
     clients,
+    crm_contacts,
     content_posts,
     deals,
     departments,
@@ -43,6 +44,7 @@ from app.api.routers import (
     notification_prefs,
     notifications,
     priorities,
+    production,
     projects,
     shoot_plans,
     statuses,
@@ -272,6 +274,7 @@ app.include_router(notification_events.router, prefix=settings.API_PREFIX, tags=
 app.include_router(notifications.router, prefix=settings.API_PREFIX, tags=["notifications"])
 app.include_router(automation.router, prefix=settings.API_PREFIX, tags=["automation"])
 app.include_router(clients.router, prefix=settings.API_PREFIX, tags=["clients"])
+app.include_router(crm_contacts.router, prefix=settings.API_PREFIX, tags=["contacts"])
 app.include_router(deals.router, prefix=settings.API_PREFIX, tags=["deals"])
 app.include_router(employees.router, prefix=settings.API_PREFIX, tags=["employees"])
 app.include_router(accounts_receivable.router, prefix=settings.API_PREFIX, tags=["accounts-receivable"])
@@ -286,6 +289,7 @@ app.include_router(bp.router, prefix=settings.API_PREFIX, tags=["bp"])
 app.include_router(bpm.router, prefix=settings.API_PREFIX, tags=["bpm"])
 app.include_router(inventory.router, prefix=settings.API_PREFIX, tags=["inventory"])
 app.include_router(funnels.router, prefix=settings.API_PREFIX, tags=["funnels"])
+app.include_router(production.router, prefix=settings.API_PREFIX, tags=["production"])
 app.include_router(weekly_plans.router, prefix=settings.API_PREFIX, tags=["weekly-plans"])
 
 

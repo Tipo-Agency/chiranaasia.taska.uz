@@ -80,6 +80,7 @@ export function DashboardRoutesView(props: AppRouterProps & DashboardRoutesExtra
       meetingsSlot={
         <Suspense fallback={<RouteFallback />}>
           <MeetingsModuleLazy
+            embedInWorkdesk
             table={meetingsTable}
             meetings={props.meetings}
             users={props.users}
@@ -97,11 +98,14 @@ export function DashboardRoutesView(props: AppRouterProps & DashboardRoutesExtra
       documentsSlot={
         <Suspense fallback={<RouteFallback />}>
           <DocumentsModuleLazy
+            embedInWorkdesk
             table={docsTable}
             docs={props.docs}
             folders={props.folders}
             tables={props.tables}
             tasks={props.allTasks}
+            deals={props.deals}
+            inventoryItems={props.inventoryItems}
             users={props.users}
             departments={props.departments}
             employees={props.employeeInfos}

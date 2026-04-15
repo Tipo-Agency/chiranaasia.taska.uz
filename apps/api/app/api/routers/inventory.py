@@ -6,6 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.auth import get_current_user
 from app.db import get_db
 from app.models.inventory import InventoryItem, InventoryRevision, StockMovement, Warehouse
+from app.models.user import User
 from app.schemas.common_responses import OkResponse
 from app.schemas.inventory import (
     InventoryItemRead,
@@ -18,6 +19,11 @@ from app.schemas.inventory import (
     WarehouseRead,
 )
 from app.services.domain_events import log_entity_mutation
+from app.services.past_entity_edit_guard import (
+    guard_inventory_dated_mutation,
+    inventory_revision_effective_date_field,
+    stock_movement_effective_date_field,
+)
 
 router = APIRouter(prefix="/inventory", tags=["inventory"], dependencies=[Depends(get_current_user)])
 
@@ -37,6 +43,12 @@ def row_to_warehouse(row):
     }
 
 
+def _json_list(col):
+    if col is None:
+        return []
+    return col if isinstance(col, list) else []
+
+
 def row_to_item(row):
     return {
         "id": row.id,
@@ -45,6 +57,11 @@ def row_to_item(row):
         "unit": row.unit,
         "category": row.category,
         "notes": row.notes,
+        "attributes": _json_list(getattr(row, "attributes", None)),
+        "attachments": _json_list(getattr(row, "attachments", None)),
+        "barcode": getattr(row, "barcode", None),
+        "manufacturer": getattr(row, "manufacturer", None),
+        "consumptionHint": getattr(row, "consumption_hint", None),
         "isArchived": _bool(row.is_archived),
     }
 
@@ -133,12 +150,19 @@ async def update_items(items: list[InventoryItemSchema], db: AsyncSession = Depe
             continue
         existing = await db.get(InventoryItem, iid)
         is_new = existing is None
+        attr_payload = [a.model_dump(mode="python") for a in i.attributes]
+        att_payload = [a.model_dump(mode="python") for a in i.attachments]
         if existing:
             existing.sku = i.sku or existing.sku
             existing.name = i.name or existing.name
             existing.unit = i.unit or existing.unit
             existing.category = i.category
             existing.notes = i.notes
+            existing.attributes = attr_payload
+            existing.attachments = att_payload
+            existing.barcode = i.barcode
+            existing.manufacturer = i.manufacturer
+            existing.consumption_hint = i.consumptionHint
             existing.is_archived = "true" if i.isArchived else "false"
         else:
             db.add(InventoryItem(
@@ -148,6 +172,11 @@ async def update_items(items: list[InventoryItemSchema], db: AsyncSession = Depe
                 unit=i.unit or "",
                 category=i.category,
                 notes=i.notes,
+                attributes=attr_payload,
+                attachments=att_payload,
+                barcode=i.barcode,
+                manufacturer=i.manufacturer,
+                consumption_hint=i.consumptionHint,
                 is_archived="true" if i.isArchived else "false",
             ))
         await db.flush()
@@ -171,7 +200,11 @@ async def get_movements(db: AsyncSession = Depends(get_db)):
 
 
 @router.put("/movements", response_model=OkResponse)
-async def update_movements(movements: list[StockMovementItem], db: AsyncSession = Depends(get_db)):
+async def update_movements(
+    movements: list[StockMovementItem],
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     for m in movements:
         mid = m.id
         if not mid:
@@ -179,6 +212,13 @@ async def update_movements(movements: list[StockMovementItem], db: AsyncSession 
         payload_items = [ln.model_dump(mode="python") for ln in m.items]
         existing = await db.get(StockMovement, mid)
         is_new = existing is None
+        eff_date = stock_movement_effective_date_field(m, existing)
+        await guard_inventory_dated_mutation(
+            db,
+            current_user,
+            existing_date=existing.date if existing else None,
+            effective_date=eff_date,
+        )
         if existing:
             existing.type = m.type or existing.type
             existing.date = m.date or existing.date
@@ -219,7 +259,11 @@ async def get_revisions(db: AsyncSession = Depends(get_db)):
 
 
 @router.put("/revisions", response_model=OkResponse)
-async def update_revisions(revisions: list[InventoryRevisionItem], db: AsyncSession = Depends(get_db)):
+async def update_revisions(
+    revisions: list[InventoryRevisionItem],
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     for r in revisions:
         rid = r.id
         if not rid:
@@ -227,6 +271,13 @@ async def update_revisions(revisions: list[InventoryRevisionItem], db: AsyncSess
         payload_lines = [ln.model_dump(mode="python") for ln in r.lines]
         existing = await db.get(InventoryRevision, rid)
         is_new = existing is None
+        eff_date = inventory_revision_effective_date_field(r, existing)
+        await guard_inventory_dated_mutation(
+            db,
+            current_user,
+            existing_date=existing.date if existing else None,
+            effective_date=eff_date,
+        )
         if existing:
             existing.number = r.number or existing.number
             existing.warehouse_id = r.warehouseId or existing.warehouse_id

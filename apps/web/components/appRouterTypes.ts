@@ -25,6 +25,8 @@ import type {
   OrgPosition,
   BusinessProcess,
   SalesFunnel,
+  ProductionRoutePipeline,
+  ProductionRouteOrder,
   ViewMode,
   AutomationRule,
   Warehouse,
@@ -35,6 +37,7 @@ import type {
   OneTimeDeal,
   AccountsReceivable,
   Bdr,
+  IncomeReport,
   NotificationPreferences,
 } from '../types';
 import type { AppActions } from '../frontend/hooks/useAppLogic';
@@ -75,6 +78,7 @@ export interface AppRouterProps {
   purchaseRequests: PurchaseRequest[];
   financialPlanDocuments?: FinancialPlanDocument[];
   financialPlannings?: FinancialPlanning[];
+  incomeReports?: IncomeReport[];
   bdr?: Bdr | null;
   warehouses: Warehouse[];
   inventoryItems: InventoryItem[];
@@ -85,6 +89,8 @@ export interface AppRouterProps {
   businessProcesses: BusinessProcess[];
   automationRules?: AutomationRule[];
   salesFunnels?: SalesFunnel[];
+  productionPipelines?: ProductionRoutePipeline[];
+  productionBoardOrders?: ProductionRouteOrder[];
   settingsActiveTab?: string;
   activeSpaceTab?: 'content-plan' | 'backlog' | 'functionality';
   workdeskTab?: 'dashboard' | 'weekly' | 'tasks' | 'deals' | 'meetings' | 'documents';

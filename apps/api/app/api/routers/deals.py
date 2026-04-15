@@ -38,6 +38,7 @@ from app.services.deal_stage_validation import (
     assert_deal_stage_transition_allowed,
     user_may_bypass_deal_terminal_stage,
 )
+from app.services.deal_contact_sync import assert_contact_allowed_for_client, maybe_ensure_contact_for_deal
 from app.services.deals_api import apply_deal_patch_to_row, deal_from_create, deal_row_to_read
 from app.services.domain_events import emit_domain_event, log_entity_mutation
 from app.services.list_cursor_page import (
@@ -118,6 +119,15 @@ def _custom_fields_from_bulk(item: DealBulkItem, existing: Deal | None) -> dict[
             leg["telegram_username"] = tu
             base["_legacy"] = leg
     return base
+
+
+def _contact_id_from_bulk(item: DealBulkItem, existing: Deal | None):
+    if "contactId" not in item.model_fields_set:
+        return existing.contact_id if existing else None
+    raw = item.contactId
+    if raw is None or raw == "":
+        return None
+    return str(raw).strip()[:36] or None
 
 
 def _assignee_from_bulk(item: DealBulkItem, existing: Deal | None):
@@ -332,7 +342,7 @@ async def list_deals(
         except ListCursorError:
             raise HTTPException(status_code=400, detail="invalid_cursor") from None
 
-    stmt = select(Deal).options(selectinload(Deal.client))
+    stmt = select(Deal).options(selectinload(Deal.client), selectinload(Deal.contact))
     if conds:
         stmt = stmt.where(*conds)
     if seek is not None:
@@ -411,6 +421,7 @@ async def update_deals(
             "id": did,
             "title": _lim(d.get("title", ""), 500) or "",
             "client_id": _lim(d.get("clientId"), 36),
+            "contact_id": _contact_id_from_bulk(deal_item, existing),
             "contact_name": _lim(d.get("contactName"), 255),
             "amount": _dec_amount(d.get("amount")),
             "currency": _lim(d.get("currency", "UZS"), 10) or "UZS",
@@ -442,6 +453,7 @@ async def update_deals(
         }
         cid_put = normalize_deal_client_id(payload["client_id"])
         await assert_deal_client_id_exists(db, cid_put)
+        await assert_contact_allowed_for_client(db, contact_id=payload["contact_id"], client_id=cid_put)
         assert_won_requires_client_id(payload["stage"], cid_put)
         await _validate_stage_change_for_put(
             db,
@@ -456,6 +468,7 @@ async def update_deals(
             set_={
                 "title": payload["title"],
                 "client_id": payload["client_id"],
+                "contact_id": payload["contact_id"],
                 "contact_name": payload["contact_name"],
                 "amount": payload["amount"],
                 "currency": payload["currency"],
@@ -489,6 +502,9 @@ async def update_deals(
         await db.execute(stmt)
         await db.flush()
         deal_row = await db.get(Deal, did)
+        if deal_row:
+            await maybe_ensure_contact_for_deal(db, deal_row)
+            await db.flush()
         if deal_just_archived(existing=existing, row=deal_row):
             await archive_entities_linked_to_deal(db, did)
         if existing is not None and deal_row and prev_stage is not None and deal_row.stage != prev_stage:
@@ -606,9 +622,12 @@ async def create_deal(
     )
     cid_create = normalize_deal_client_id(body.client_id)
     await assert_deal_client_id_exists(db, cid_create)
+    await assert_contact_allowed_for_client(db, contact_id=body.contact_id, client_id=cid_create)
     assert_won_requires_client_id(body.stage, cid_create)
     row = deal_from_create(body, did, assignee_id=assignee_id)
     db.add(row)
+    await db.flush()
+    await maybe_ensure_contact_for_deal(db, row)
     await db.flush()
     await log_mutation(
         db,
@@ -637,7 +656,7 @@ async def create_deal(
         )
     await db.commit()
     res = await db.execute(
-        select(Deal).options(selectinload(Deal.client)).where(Deal.id == did)
+        select(Deal).options(selectinload(Deal.client), selectinload(Deal.contact)).where(Deal.id == did)
     )
     row_out = res.scalar_one()
     return deal_row_to_read(row_out)
@@ -646,7 +665,7 @@ async def create_deal(
 @router.get("/{deal_id}", response_model=DealRead)
 async def get_deal(deal_id: str, db: AsyncSession = Depends(get_db)):
     res = await db.execute(
-        select(Deal).options(selectinload(Deal.client)).where(Deal.id == deal_id)
+        select(Deal).options(selectinload(Deal.client), selectinload(Deal.contact)).where(Deal.id == deal_id)
     )
     deal = res.scalar_one_or_none()
     if not deal:
@@ -687,11 +706,18 @@ async def patch_deal(
     if "client_id" in dump:
         v = dump["client_id"]
         next_cid = None if v in (None, "") else (str(v).strip()[:36] or None)
+    next_contact_id = deal.contact_id
+    if "contact_id" in dump:
+        v = dump["contact_id"]
+        next_contact_id = None if v in (None, "") else (str(v).strip()[:36] or None)
     await assert_deal_client_id_exists(db, next_cid)
+    await assert_contact_allowed_for_client(db, contact_id=next_contact_id, client_id=next_cid)
     assert_won_requires_client_id(str(to_stage) if to_stage is not None else None, next_cid)
     was_archived = bool(deal.is_archived)
     apply_deal_patch_to_row(deal, patch)
     deal.updated_at = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3] + "Z"
+    await db.flush()
+    await maybe_ensure_contact_for_deal(db, deal)
     await db.flush()
     if bool(deal.is_archived) and not was_archived:
         await archive_entities_linked_to_deal(db, deal_id)
@@ -739,7 +765,7 @@ async def patch_deal(
     )
     await commit_or_stale_version_conflict(db)
     res = await db.execute(
-        select(Deal).options(selectinload(Deal.client)).where(Deal.id == deal_id)
+        select(Deal).options(selectinload(Deal.client), selectinload(Deal.contact)).where(Deal.id == deal_id)
     )
     row_out = res.scalar_one()
     return deal_row_to_read(row_out)

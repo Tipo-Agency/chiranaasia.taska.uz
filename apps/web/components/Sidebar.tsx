@@ -193,15 +193,15 @@ const Sidebar: React.FC<SidebarProps> = ({
             </div>
             )}
 
-            {/* 4. Финансовое планирование */}
+            {/* 4. Финансы */}
             {can('finance.finance') && (
             <div 
                 onClick={() => handleNav(() => onNavigate('finance'))}
                 className={`group flex items-center ${isCollapsed ? 'justify-center' : 'gap-2'} ${isCollapsed ? 'px-2' : 'px-3'} py-1.5 rounded-lg cursor-pointer transition-colors ${currentView === 'finance' ? 'text-gray-900 dark:text-white' : 'text-notion-text/70 dark:text-gray-400 hover:bg-notion-hover dark:hover:bg-[#252525] hover:text-notion-text dark:hover:text-gray-200'}`}
-                title={isCollapsed ? "Фин. планирование" : ""}
+                title={isCollapsed ? "Финансы" : ""}
             >
                 <NavIcon active={currentView === 'finance'} accent="emerald"><Wallet size={18} /></NavIcon>
-                {!isCollapsed && <span className={`text-sm ${currentView === 'finance' ? 'font-semibold' : ''}`}>Фин. планирование</span>}
+                {!isCollapsed && <span className={`text-sm ${currentView === 'finance' ? 'font-semibold' : ''}`}>Финансы</span>}
             </div>
             )}
 

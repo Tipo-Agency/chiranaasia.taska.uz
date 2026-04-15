@@ -41,6 +41,10 @@ def finance_request_row_to_dict(row: FinanceRequest) -> dict:
     elif row.status in ("approved", "rejected") and row.updated_at:
         decision_date = row.updated_at.isoformat()
 
+    atts = getattr(row, "attachments", None)
+    if not isinstance(atts, list):
+        atts = []
+    inv = getattr(row, "invoice_date", None)
     return {
         "id": row.id,
         "version": int(row.version) if row.version is not None else 1,
@@ -64,6 +68,10 @@ def finance_request_row_to_dict(row: FinanceRequest) -> dict:
         "description": stripped,
         "date": created,
         "decisionDate": decision_date,
+        "attachments": atts,
+        "counterpartyInn": getattr(row, "counterparty_inn", None),
+        "invoiceNumber": getattr(row, "invoice_number", None),
+        "invoiceDate": inv.isoformat() if inv else None,
     }
 
 
@@ -75,14 +83,21 @@ def assert_finance_request_patch_respects_lock(row: FinanceRequest, data: Financ
     """
     В статусах ``approved`` и ``paid`` запрещены правки полей, кроме:
     - ``is_archived``;
-    - для ``approved`` ещё переход ``status`` → ``paid``.
+    - для ``approved`` ещё переход ``status`` → ``paid``;
+    - вложения и реквизиты счёта (ИНН, номер и дата счёта) для сверки с выпиской.
     """
     fs = data.model_fields_set - {"version"}
     ns = normalize_status(row.status)
     if ns not in ("approved", "paid"):
         return
+    meta_fields = {
+        "attachments",
+        "counterparty_inn",
+        "invoice_number",
+        "invoice_date",
+    }
     if ns == "approved":
-        allowed: set[str] = set()
+        allowed: set[str] = set(meta_fields)
         if "is_archived" in fs:
             allowed.add("is_archived")
         if "status" in fs and data.status is not None and normalize_status(str(data.status)) == "paid":
@@ -90,7 +105,7 @@ def assert_finance_request_patch_respects_lock(row: FinanceRequest, data: Financ
         if not fs.issubset(allowed):
             raise HTTPException(status_code=400, detail="finance_request_locked")
         return
-    if not fs.issubset({"is_archived"}):
+    if not fs.issubset({"is_archived", *meta_fields}):
         raise HTTPException(status_code=400, detail="finance_request_locked")
 
 
@@ -181,6 +196,12 @@ def insert_finance_request_row(
             approved_by = str(ab).strip()[:36]
     paid_at = now if new_status == "paid" else None
 
+    atts_payload = [a.model_dump(mode="python", by_alias=True) for a in (data.attachments or [])]
+
+    inn = str(data.counterparty_inn).strip()[:32] if data.counterparty_inn else None
+    inv_num = str(data.invoice_number).strip()[:100] if data.invoice_number else None
+    inv_dt = data.invoice_date
+
     return FinanceRequest(
         id=new_id,
         version=1,
@@ -198,6 +219,10 @@ def insert_finance_request_row(
         is_archived=bool(data.is_archived),
         created_at=now,
         updated_at=now,
+        attachments=atts_payload or [],
+        counterparty_inn=inn,
+        invoice_number=inv_num,
+        invoice_date=inv_dt,
     )
 
 
@@ -283,6 +308,20 @@ def apply_finance_request_patch(
             if new_s == "approved" and actor_user_id:
                 row.approved_by = str(actor_user_id).strip()[:36]
         row.status = new_s
+
+    if "attachments" in fs and data.attachments is not None:
+        row.attachments = [a.model_dump(mode="python", by_alias=True) for a in data.attachments]
+
+    if "counterparty_inn" in fs:
+        v = data.counterparty_inn
+        row.counterparty_inn = None if v is None else (str(v).strip()[:32] or None)
+
+    if "invoice_number" in fs:
+        v = data.invoice_number
+        row.invoice_number = None if v is None else (str(v).strip()[:100] or None)
+
+    if "invoice_date" in fs:
+        row.invoice_date = data.invoice_date
 
     row.updated_at = now
 

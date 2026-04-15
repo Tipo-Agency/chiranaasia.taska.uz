@@ -7,6 +7,7 @@ from typing import Any
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from app.schemas.clients import ClientRead
+from app.schemas.crm_contacts import CrmContactRead
 from app.schemas.pagination import PaginatedResponse
 
 
@@ -15,6 +16,7 @@ def _normalize_camel_deal_keys(data: Any) -> Any:
         return data
     key_map = {
         "clientId": "client_id",
+        "contactId": "contact_id",
         "contactName": "contact_name",
         "funnelId": "funnel_id",
         "assigneeId": "assignee_id",
@@ -50,6 +52,7 @@ class DealCreate(BaseModel):
     id: str | None = Field(default=None, max_length=36)
     title: str = Field(default="Новая сделка", min_length=1, max_length=500)
     client_id: str | None = Field(default=None, max_length=36)
+    contact_id: str | None = Field(default=None, max_length=36)
     contact_name: str | None = Field(default=None, max_length=255)
     amount: Decimal | None = None
     currency: str = Field(default="UZS", max_length=10)
@@ -68,7 +71,7 @@ class DealCreate(BaseModel):
     telegram_username: str | None = Field(default=None, max_length=100)
     created_by_user_id: str | None = Field(default=None, max_length=36)
 
-    @field_validator("assignee_id", mode="before")
+    @field_validator("assignee_id", "contact_id", mode="before")
     @classmethod
     def _empty_assignee_create(cls, v: Any) -> Any:
         if v == "":
@@ -93,6 +96,7 @@ class DealUpdate(BaseModel):
     )
     title: str | None = Field(default=None, min_length=1, max_length=500)
     client_id: str | None = Field(default=None, max_length=36)
+    contact_id: str | None = Field(default=None, max_length=36)
     contact_name: str | None = Field(default=None, max_length=255)
     amount: Decimal | None = None
     currency: str | None = Field(default=None, max_length=10)
@@ -128,7 +132,7 @@ class DealUpdate(BaseModel):
     def _aliases(cls, data: Any) -> Any:
         return _normalize_camel_deal_keys(data)
 
-    @field_validator("assignee_id", mode="before")
+    @field_validator("assignee_id", "contact_id", mode="before")
     @classmethod
     def _empty_assignee(cls, v: Any) -> Any:
         if v == "":
@@ -145,6 +149,7 @@ class DealRead(BaseModel):
     version: int = 1
     title: str
     client_id: str | None = None
+    contact_id: str | None = None
     contact_name: str | None = None
     amount: float = 0.0
     currency: str = "UZS"
@@ -176,6 +181,7 @@ class DealRead(BaseModel):
     end_date: str | None = None
     payment_day: int | str | None = None
     client: ClientRead | None = None
+    contact: CrmContactRead | None = None
 
 
 class DealListResponse(PaginatedResponse[DealRead]):
@@ -192,6 +198,7 @@ class DealBulkItem(BaseModel):
     id: str | None = Field(default=None, max_length=36)
     title: str = Field(default="", max_length=500)
     clientId: str | None = Field(default=None, max_length=36)
+    contactId: str | None = Field(default=None, max_length=36)
     contactName: str | None = Field(default=None, max_length=255)
     amount: Any = None
     currency: str = Field(default="UZS", max_length=10)

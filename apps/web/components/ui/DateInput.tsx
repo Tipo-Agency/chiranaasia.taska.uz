@@ -82,6 +82,7 @@ interface DateInputProps {
   min?: string;
   max?: string;
   size?: 'default' | 'compact';
+  disabled?: boolean;
 }
 
 export const DateInput: React.FC<DateInputProps> = ({
@@ -93,6 +94,7 @@ export const DateInput: React.FC<DateInputProps> = ({
   min,
   max,
   size = 'default',
+  disabled = false,
 }) => {
   const compact = size === 'compact';
   const [open, setOpen] = useState(false);
@@ -121,7 +123,11 @@ export const DateInput: React.FC<DateInputProps> = ({
   }, [value]);
 
   useEffect(() => {
-    if (!open) return;
+    if (disabled) setOpen(false);
+  }, [disabled]);
+
+  useEffect(() => {
+    if (!open || disabled) return;
     const onDoc = (e: MouseEvent) => {
       const t = e.target as Node;
       if (popRef.current?.contains(t)) return;
@@ -146,7 +152,7 @@ export const DateInput: React.FC<DateInputProps> = ({
       window.removeEventListener('resize', recalc);
       window.removeEventListener('scroll', recalc, true);
     };
-  }, [open]);
+  }, [open, disabled]);
 
   const isDisabledDay = useCallback(
     (y: number, m0: number, d: number) => {
@@ -348,12 +354,14 @@ export const DateInput: React.FC<DateInputProps> = ({
       <button
         ref={buttonRef}
         type="button"
+        disabled={disabled}
         onClick={() => {
+          if (disabled) return;
           setOpen((o) => !o);
           setShowMonthPicker(false);
           setShowYearPicker(false);
         }}
-        className={`relative w-full text-left bg-white dark:bg-[#252525] text-gray-900 dark:text-gray-100 border border-gray-300 dark:border-[#555] ${btnPad} focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all flex items-center justify-between gap-2`}
+        className={`relative w-full text-left bg-white dark:bg-[#252525] text-gray-900 dark:text-gray-100 border border-gray-300 dark:border-[#555] ${btnPad} focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all flex items-center justify-between gap-2 ${disabled ? 'opacity-60 cursor-not-allowed' : ''}`}
       >
         <span className={!value ? 'text-gray-400 dark:text-gray-500' : ''}>{display}</span>
         <Calendar size={iconSz} className={`absolute ${iconRight} top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500 shrink-0 pointer-events-none`} />

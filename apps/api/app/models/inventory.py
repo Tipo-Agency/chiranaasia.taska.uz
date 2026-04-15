@@ -31,6 +31,11 @@ class InventoryItem(Base):
     unit = Column(String(50), nullable=False)
     category = Column(String(100), nullable=True)
     notes = Column(Text, nullable=True)
+    attributes = Column(JSONB, default=list)
+    attachments = Column(JSONB, default=list)
+    barcode = Column(String(100), nullable=True)
+    manufacturer = Column(String(255), nullable=True)
+    consumption_hint = Column(Text, nullable=True)
     is_archived = Column(String(10), default="false")
 
 

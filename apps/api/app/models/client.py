@@ -30,6 +30,31 @@ class Client(Base):
     is_archived = Column(Boolean, default=False)
 
     deals = relationship("Deal", back_populates="client")
+    crm_contacts = relationship("CrmContact", back_populates="client")
+
+    __mapper_args__ = {"version_id_col": version}
+
+
+class CrmContact(Base):
+    """Контактное лицо компании (клиента); каналы — телефон, Telegram, Instagram."""
+
+    __tablename__ = "crm_contacts"
+
+    id = Column(String(36), primary_key=True, default=gen_id)
+    version = Column(Integer, nullable=False, server_default=text("1"))
+    client_id = Column(String(36), ForeignKey("clients.id", ondelete="SET NULL"), nullable=True)
+    name = Column(String(255), nullable=False)
+    phone = Column(String(50), nullable=True)
+    email = Column(String(255), nullable=True)
+    telegram = Column(String(100), nullable=True)
+    instagram = Column(String(255), nullable=True)
+    job_title = Column(String(255), nullable=True)
+    notes = Column(Text, nullable=True)
+    tags = Column(ARRAY(Text), nullable=False, server_default=text("ARRAY[]::text[]"))
+    is_archived = Column(Boolean, default=False)
+
+    client = relationship("Client", back_populates="crm_contacts")
+    deals = relationship("Deal", back_populates="contact")
 
     __mapper_args__ = {"version_id_col": version}
 
@@ -48,6 +73,7 @@ class Deal(Base):
     stage = Column(String(100), nullable=False)
     funnel_id = Column(String(36), nullable=True)
     client_id = Column(String(36), ForeignKey("clients.id", ondelete="SET NULL"), nullable=True)
+    contact_id = Column(String(36), ForeignKey("crm_contacts.id", ondelete="SET NULL"), nullable=True)
     assignee_id = Column(String(36), nullable=True)
     amount = Column(Numeric(18, 2), nullable=False, server_default=text("0"))
     currency = Column(String(10), nullable=False, server_default=text("'UZS'"))
@@ -77,6 +103,7 @@ class Deal(Base):
     updated_at = Column(String(50), nullable=True)
 
     client = relationship("Client", back_populates="deals", foreign_keys=[client_id])
+    contact = relationship("CrmContact", back_populates="deals", foreign_keys=[contact_id])
 
     __mapper_args__ = {"version_id_col": version}
 

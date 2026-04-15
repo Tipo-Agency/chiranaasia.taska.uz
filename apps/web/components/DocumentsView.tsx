@@ -1,6 +1,7 @@
 
-import React, { useState, useRef, useLayoutEffect } from 'react';
-import { Doc, Folder, TableCollection, Task, TaskAttachment, User, Department, EmployeeInfo } from '../types';
+import React, { useState, useRef, useLayoutEffect, useMemo } from 'react';
+import type { TaskAttachment } from '../types/tasks';
+import { Doc, Folder, TableCollection, Task, User, Department, EmployeeInfo, Deal, InventoryItem } from '../types';
 import { FileText, Folder as FolderIcon, Trash2, ExternalLink, ChevronRight, FolderPlus, Box, FileText as FileTextIcon, Paperclip, File as FileIcon, Edit2, Calendar, Users } from 'lucide-react';
 import {
   Button,
@@ -39,6 +40,12 @@ interface DocumentsViewProps {
   onOpenTask?: (task: Task) => void;
   onUpdateTask?: (taskId: string, updates: Partial<Task>) => void;
   onDeleteAttachment?: (taskId: string, attachmentId: string) => void;
+  /** Сводная медиатека: сделки, номенклатура */
+  deals?: Deal[];
+  inventoryItems?: InventoryItem[];
+  onSaveDeal?: (deal: Deal) => void;
+  onSaveInventoryItem?: (item: InventoryItem) => void;
+  embedInWorkdesk?: boolean;
 }
 
 const DocumentsView: React.FC<DocumentsViewProps> = ({ 
@@ -60,14 +67,20 @@ const DocumentsView: React.FC<DocumentsViewProps> = ({
     onDeleteDoc,
     onEditDoc,
     onOpenTask,
-    onUpdateTask,
-    onDeleteAttachment
+  onUpdateTask,
+  onDeleteAttachment,
+  deals = [],
+  inventoryItems = [],
+  onSaveDeal,
+  onSaveInventoryItem,
+  embedInWorkdesk = false,
 }) => {
   const { setLeading, setModule } = useAppToolbar();
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('list');
   const [folderPath, setFolderPath] = useState<string[]>([]);
   const [docSection, setDocSection] = useState<'docs' | 'attachments' | 'weekly' | 'protocols'>('docs');
   const [previewFile, setPreviewFile] = useState<{ url: string; name: string; type: string } | null>(null);
+  const [attachmentQuery, setAttachmentQuery] = useState('');
   const weeklyPlansRef = useRef<WeeklyPlansViewHandle>(null);
   const protocolsRef = useRef<ProtocolsViewHandle>(null);
   
@@ -167,46 +180,182 @@ const DocumentsView: React.FC<DocumentsViewProps> = ({
       setRenameFolderName('');
   };
 
-  const renderAttachmentsTab = () => {
-    // Собираем все вложения из всех задач
-    const allAttachments: Array<{ attachment: TaskAttachment; task: Task }> = [];
-    tasks.forEach(task => {
-      if (task.attachments && task.attachments.length > 0) {
-        task.attachments.forEach(att => {
-          allAttachments.push({ attachment: att, task });
+  type AttachmentHubRow = {
+    key: string;
+    name: string;
+    url: string;
+    mime: string;
+    badge: string;
+    subtitle: string;
+    uploadedAt: number;
+    onDelete?: () => void;
+    onOpenSource?: () => void;
+  };
+
+  const attachmentHubRows = useMemo(() => {
+    const rows: AttachmentHubRow[] = [];
+    const q = attachmentQuery.trim().toLowerCase();
+
+    const match = (name: string, subtitle: string, badge: string) => {
+      if (!q) return true;
+      return (
+        name.toLowerCase().includes(q) ||
+        subtitle.toLowerCase().includes(q) ||
+        badge.toLowerCase().includes(q)
+      );
+    };
+
+    tasks.forEach((task) => {
+      (task.attachments || []).forEach((att: TaskAttachment) => {
+        if (!match(att.name, task.title || '', 'задача')) return;
+        rows.push({
+          key: `t-${task.id}-${att.id}`,
+          name: att.name,
+          url: att.url,
+          mime: att.type,
+          badge: 'Задача',
+          subtitle: task.title || 'Без названия',
+          uploadedAt: Date.parse(att.uploadedAt) || 0,
+          onDelete: onDeleteAttachment
+            ? () => {
+                if (confirm(`Удалить «${att.name}»?`)) onDeleteAttachment(task.id, att.id);
+              }
+            : undefined,
+          onOpenSource: onOpenTask ? () => onOpenTask(task) : undefined,
         });
-      }
+      });
     });
 
+    deals.forEach((deal) => {
+      (deal.attachments || []).forEach((att) => {
+        if (!match(att.name, deal.title || '', 'сделка')) return;
+        rows.push({
+          key: `d-${deal.id}-${att.id}`,
+          name: att.name,
+          url: att.url,
+          mime: att.type,
+          badge: 'Сделка',
+          subtitle: deal.title || deal.id,
+          uploadedAt: Date.parse(att.uploadedAt) || 0,
+          onDelete:
+            onSaveDeal && deal.id
+              ? () => {
+                  if (confirm(`Удалить «${att.name}» из сделки?`)) {
+                    onSaveDeal({
+                      ...deal,
+                      attachments: (deal.attachments || []).filter((a) => a.id !== att.id),
+                    });
+                  }
+                }
+              : undefined,
+        });
+      });
+    });
 
+    docs
+      .filter((d) => !d.isArchived && (d.url || '').trim())
+      .forEach((doc) => {
+        const name = doc.title || 'Документ';
+        if (!match(name, doc.title || '', 'документ')) return;
+        rows.push({
+          key: `doc-${doc.id}`,
+          name,
+          url: doc.url!,
+          mime: doc.type === 'link' ? 'text/uri-list' : 'application/octet-stream',
+          badge: 'Документ',
+          subtitle: doc.title || '',
+          uploadedAt: doc.updatedAt ? Date.parse(doc.updatedAt) : 0,
+          onDelete: onDeleteDoc
+            ? () => {
+                if (confirm(`Удалить документ «${name}»?`)) onDeleteDoc(doc.id);
+              }
+            : undefined,
+          onOpenSource: () => onOpenDoc(doc),
+        });
+      });
+
+    inventoryItems.forEach((item) => {
+      (item.attachments || []).forEach((att) => {
+        if (!match(att.name, item.name, 'номенклатура')) return;
+        rows.push({
+          key: `i-${item.id}-${att.id}`,
+          name: att.name,
+          url: att.url,
+          mime: att.type,
+          badge: 'Номенклатура',
+          subtitle: item.name,
+          uploadedAt: att.uploadedAt ? Date.parse(att.uploadedAt) : 0,
+          onDelete:
+            onSaveInventoryItem
+              ? () => {
+                  if (confirm(`Удалить файл из номенклатуры «${item.name}»?`)) {
+                    onSaveInventoryItem({
+                      ...item,
+                      attachments: (item.attachments || []).filter((a) => a.id !== att.id),
+                    });
+                  }
+                }
+              : undefined,
+        });
+      });
+    });
+
+    rows.sort((a, b) => b.uploadedAt - a.uploadedAt);
+    return rows;
+  }, [
+    tasks,
+    deals,
+    docs,
+    inventoryItems,
+    attachmentQuery,
+    onDeleteAttachment,
+    onSaveDeal,
+    onDeleteDoc,
+    onSaveInventoryItem,
+    onOpenTask,
+    onOpenDoc,
+  ]);
+
+  const renderAttachmentsTab = () => {
     return (
       <div className="space-y-4">
-        {allAttachments.length > 0 ? (
+        <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:justify-between">
+          <p className="text-xs text-gray-500 dark:text-gray-400 max-w-xl">
+            Единая лента файлов из задач, CRM, карточек документов со ссылкой/файлом и вложений номенклатуры. Удаление
+            убирает вложение у исходной сущности.
+          </p>
+          <input
+            type="search"
+            value={attachmentQuery}
+            onChange={(e) => setAttachmentQuery(e.target.value)}
+            placeholder="Поиск по названию или источнику…"
+            className="w-full sm:max-w-xs rounded-xl border border-gray-200 dark:border-[#333] px-3 py-2 text-sm bg-white dark:bg-[#252525]"
+          />
+        </div>
+        {attachmentHubRows.length > 0 ? (
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
-            {allAttachments.map(({ attachment, task }) => {
-              const imageUrl = isImageFile(attachment.url, attachment.type) ? attachment.url : null;
+            {attachmentHubRows.map((row) => {
+              const imageUrl = isImageFile(row.url, row.mime) ? row.url : null;
               return (
-                <div 
-                  key={attachment.id} 
+                <div
+                  key={row.key}
                   className="bg-white dark:bg-[#252525] border border-gray-200 dark:border-[#333] rounded-lg overflow-hidden hover:shadow-md transition-all group relative cursor-pointer"
-                  onClick={() => setPreviewFile({ url: attachment.url, name: attachment.name, type: attachment.type })}
+                  onClick={() => setPreviewFile({ url: row.url, name: row.name, type: row.mime })}
                 >
                   {imageUrl ? (
                     <div className="aspect-square relative bg-gray-100 dark:bg-[#1e1e1e]">
-                      <img 
-                        src={imageUrl} 
-                        alt={attachment.name}
-                        className="w-full h-full object-cover"
-                      />
+                      <img src={imageUrl} alt={row.name} className="w-full h-full object-cover" />
                       <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors" />
-                      {onDeleteAttachment && (
-                        <button 
+                      <span className="absolute bottom-1 left-1 px-1.5 py-0.5 rounded text-[9px] font-medium bg-black/60 text-white">
+                        {row.badge}
+                      </span>
+                      {row.onDelete && (
+                        <button
+                          type="button"
                           onClick={(e) => {
                             e.stopPropagation();
-                            if (confirm(`Удалить вложение "${attachment.name}"?`)) {
-                              onDeleteAttachment(task.id, attachment.id);
-                            }
-                          }} 
+                            row.onDelete?.();
+                          }}
                           className="absolute top-2 right-2 text-white hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity p-1.5 rounded bg-black/50 hover:bg-black/70"
                         >
                           <Trash2 size={14} />
@@ -216,14 +365,16 @@ const DocumentsView: React.FC<DocumentsViewProps> = ({
                   ) : (
                     <div className="aspect-square bg-gray-50 dark:bg-[#1e1e1e] flex items-center justify-center relative">
                       <FileIcon size={32} className="text-gray-400" />
-                      {onDeleteAttachment && (
-                        <button 
+                      <span className="absolute bottom-1 left-1 px-1.5 py-0.5 rounded text-[9px] font-medium bg-black/50 text-white">
+                        {row.badge}
+                      </span>
+                      {row.onDelete && (
+                        <button
+                          type="button"
                           onClick={(e) => {
                             e.stopPropagation();
-                            if (confirm(`Удалить вложение "${attachment.name}"?`)) {
-                              onDeleteAttachment(task.id, attachment.id);
-                            }
-                          }} 
+                            row.onDelete?.();
+                          }}
                           className="absolute top-2 right-2 text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity p-1.5 rounded hover:bg-red-50 dark:hover:bg-red-900/30"
                         >
                           <Trash2 size={14} />
@@ -232,10 +383,20 @@ const DocumentsView: React.FC<DocumentsViewProps> = ({
                     </div>
                   )}
                   <div className="p-2">
-                    <h3 className="font-semibold text-gray-800 dark:text-gray-200 text-xs mb-1 line-clamp-2">{attachment.name}</h3>
-                    <div className="text-[10px] text-gray-500 dark:text-gray-400 line-clamp-1">
-                      Из: {task.title}
-                    </div>
+                    <h3 className="font-semibold text-gray-800 dark:text-gray-200 text-xs mb-1 line-clamp-2">{row.name}</h3>
+                    <div className="text-[10px] text-gray-500 dark:text-gray-400 line-clamp-2">{row.subtitle}</div>
+                    {row.onOpenSource && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          row.onOpenSource?.();
+                        }}
+                        className="mt-1 text-[10px] text-indigo-600 dark:text-indigo-400 hover:underline"
+                      >
+                        Открыть источник
+                      </button>
+                    )}
                   </div>
                 </div>
               );
@@ -244,8 +405,10 @@ const DocumentsView: React.FC<DocumentsViewProps> = ({
         ) : (
           <div className="text-center py-12 border-2 border-dashed border-gray-100 dark:border-[#333] rounded-xl bg-gray-50/50 dark:bg-[#202020] flex flex-col items-center">
             <Paperclip size={48} className="text-gray-300 dark:text-gray-600 mb-3" />
-            <p className="text-gray-500 dark:text-gray-400 font-medium">Нет вложений</p>
-            <p className="text-gray-400 dark:text-gray-500 text-sm">Вложения из задач будут отображаться здесь</p>
+            <p className="text-gray-500 dark:text-gray-400 font-medium">Нет файлов по фильтру</p>
+            <p className="text-gray-400 dark:text-gray-500 text-sm">
+              Добавьте вложения к задачам, сделкам, номенклатуре или документы со ссылкой
+            </p>
           </div>
         )}
       </div>
@@ -260,7 +423,7 @@ const DocumentsView: React.FC<DocumentsViewProps> = ({
             Документы
           </button>
           <ChevronRight size={14} className="text-gray-400 shrink-0" />
-          <span className="font-semibold text-gray-800 dark:text-gray-200">Вложения</span>
+          <span className="font-semibold text-gray-800 dark:text-gray-200">Медиатека</span>
         </div>
       );
     }
@@ -293,7 +456,7 @@ const DocumentsView: React.FC<DocumentsViewProps> = ({
           className={`cursor-pointer hover:text-blue-600 dark:hover:text-blue-400 px-1 py-0.5 rounded transition-colors text-left ${!currentFolderId ? 'font-semibold text-gray-800 dark:text-gray-200' : ''}`}
           onClick={handleBackToRoot}
         >
-          {showAll ? 'Все документы' : 'Документы'}
+          Документы
         </button>
         {folderPathArray.map((folder, index) => (
           <React.Fragment key={folder.id}>
@@ -315,7 +478,7 @@ const DocumentsView: React.FC<DocumentsViewProps> = ({
   };
 
   const systemFolderCards: { id: 'attachments' | 'weekly' | 'protocols'; label: string; desc: string; icon: typeof Paperclip }[] = [
-    { id: 'attachments', label: 'Вложения', desc: 'Файлы из задач', icon: Paperclip },
+    { id: 'attachments', label: 'Медиатека', desc: 'Файлы из задач, CRM, документов, номенклатуры', icon: Paperclip },
     { id: 'weekly', label: 'Недельные планы', desc: 'Планы по неделям', icon: Calendar },
     { id: 'protocols', label: 'Протоколы', desc: 'Записи встреч', icon: Users },
   ];
@@ -405,11 +568,15 @@ const DocumentsView: React.FC<DocumentsViewProps> = ({
     };
   }, [docSection, viewMode, currentFolderId, setLeading, setModule, onAddDoc]);
 
+  const scrollAreaClass = embedInWorkdesk
+    ? 'w-full min-w-0 min-h-0'
+    : `${MODULE_PAGE_GUTTER} pt-3 md:pt-5 pb-16 md:pb-20 h-full overflow-y-auto custom-scrollbar`;
+
   return (
     <>
-    <ModulePageShell>
-      <div className="flex-1 min-h-0 overflow-hidden">
-        <div className={`${MODULE_PAGE_GUTTER} pt-3 md:pt-5 pb-16 md:pb-20 h-full overflow-y-auto custom-scrollbar`}>
+    <ModulePageShell className={embedInWorkdesk ? '!bg-transparent' : ''}>
+      <div className={embedInWorkdesk ? 'flex-1 min-h-0 min-w-0 flex flex-col' : 'flex-1 min-h-0 overflow-hidden'}>
+        <div className={scrollAreaClass}>
           {docSection === 'docs' ? (
             <>
               {renderBreadcrumbs()}

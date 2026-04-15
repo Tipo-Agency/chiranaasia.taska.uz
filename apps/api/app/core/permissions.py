@@ -51,6 +51,7 @@ PERMISSION_GROUPS: list[dict[str, Any]] = [
             {"key": "org.employees", "label": "Сотрудники (просмотр)"},
             {"key": PERM_ORG_EMPLOYEES_EDIT, "label": "Редактирование сотрудников"},
             {"key": "org.bpm", "label": "Бизнес-процессы"},
+            {"key": "org.production", "label": "Производство (маршруты и заказы)"},
         ],
     },
     {

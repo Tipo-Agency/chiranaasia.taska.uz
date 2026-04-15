@@ -1,5 +1,5 @@
 
-import React, { useState, useMemo, useLayoutEffect, useCallback } from 'react';
+import React, { useState, useMemo, useLayoutEffect, useCallback, useEffect } from 'react';
 import { EmployeeInfo, User, OrgPosition, Department } from '../types';
 import { Search, Trash2, Edit2, Calendar, FileText, X, Save, User as UserIcon, Phone, Send, Cake, Network, Building2, UserPlus, ChevronDown, ChevronRight, FolderTree } from 'lucide-react';
 import {
@@ -16,6 +16,9 @@ import { TaskSelect } from './TaskSelect';
 import { getDefaultAvatarForId } from '../constants/avatars';
 import { formatDate, normalizeDateForInput } from '../utils/dateUtils';
 import { DateInput } from './ui/DateInput';
+import { PayrollModuleView } from './PayrollModuleView';
+
+type EmployeesMainTab = 'cards' | 'orgchart' | 'structure' | 'payroll';
 
 interface EmployeesViewProps {
   employees: EmployeeInfo[];
@@ -26,15 +29,44 @@ interface EmployeesViewProps {
   onDelete: (id: string) => void;
   onSavePosition?: (pos: OrgPosition) => void;
   onDeletePosition?: (id: string) => void;
+  /** Синхронизация с URL (?tab=payroll) */
+  employeesHubTab?: 'team' | 'payroll';
+  onEmployeesHubTabChange?: (tab: 'team' | 'payroll') => void;
 }
 
-const EmployeesView: React.FC<EmployeesViewProps> = ({ 
-    employees, users, 
-    departments = [], orgPositions = [], 
-    onSave, onDelete, onSavePosition, onDeletePosition 
+const EmployeesView: React.FC<EmployeesViewProps> = ({
+  employees,
+  users,
+  departments = [],
+  orgPositions = [],
+  onSave,
+  onDelete,
+  onSavePosition,
+  onDeletePosition,
+  employeesHubTab = 'team',
+  onEmployeesHubTabChange,
 }) => {
   const { setLeading, setModule } = useAppToolbar();
-  const [activeTab, setActiveTab] = useState<'cards' | 'orgchart' | 'structure'>('cards');
+  const [activeTab, setActiveTab] = useState<EmployeesMainTab>(() =>
+    employeesHubTab === 'payroll' ? 'payroll' : 'cards'
+  );
+
+  useEffect(() => {
+    if (employeesHubTab === 'payroll') {
+      setActiveTab('payroll');
+    } else {
+      setActiveTab((prev) => (prev === 'payroll' ? 'cards' : prev));
+    }
+  }, [employeesHubTab]);
+
+  const selectTab = useCallback(
+    (id: EmployeesMainTab) => {
+      setActiveTab(id);
+      if (id === 'payroll') onEmployeesHubTabChange?.('payroll');
+      else onEmployeesHubTabChange?.('team');
+    },
+    [onEmployeesHubTabChange]
+  );
   
   // Card Modals
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -653,10 +685,11 @@ const EmployeesView: React.FC<EmployeesViewProps> = ({
   useLayoutEffect(() => {
     const tabActive = MODULE_ACCENTS.orange.navIconActive;
     const idle = MODULE_TOOLBAR_TAB_IDLE;
-    const tabs: { id: 'cards' | 'orgchart' | 'structure'; label: string }[] = [
-      { id: 'cards', label: 'Карточки' },
+    const tabs: { id: EmployeesMainTab; label: string }[] = [
+      { id: 'cards', label: 'Сотрудники' },
       { id: 'orgchart', label: 'Оргсхема' },
       { id: 'structure', label: 'Структура' },
+      { id: 'payroll', label: 'Зарплата' },
     ];
     setLeading(
       <div className="flex items-center gap-0.5 shrink-0 flex-wrap sm:flex-nowrap" role="tablist" aria-label="Сотрудники">
@@ -666,7 +699,7 @@ const EmployeesView: React.FC<EmployeesViewProps> = ({
             type="button"
             role="tab"
             aria-selected={activeTab === t.id}
-            onClick={() => setActiveTab(t.id)}
+            onClick={() => selectTab(t.id)}
             className={`px-2 sm:px-2.5 py-1 rounded-lg text-[11px] sm:text-xs font-medium whitespace-nowrap transition-colors ${
               activeTab === t.id ? tabActive : idle
             }`}
@@ -677,42 +710,48 @@ const EmployeesView: React.FC<EmployeesViewProps> = ({
       </div>
     );
     setModule(
-      <div className={APP_TOOLBAR_MODULE_CLUSTER}>
-      <ModuleCreateDropdown
-        accent="orange"
-        align="left"
-        buttonSize="sm"
-        items={[
-          {
-            id: 'employee',
-            label: 'Сотрудник',
-            icon: UserPlus,
-            onClick: handleOpenCreate,
-          },
-          {
-            id: 'position',
-            label: 'Должность в оргсхеме',
-            icon: Building2,
-            onClick: handleOpenPosCreate,
-          },
-        ]}
-      />
-      </div>
+      activeTab === 'payroll' ? null : (
+        <div className={APP_TOOLBAR_MODULE_CLUSTER}>
+          <ModuleCreateDropdown
+            accent="orange"
+            align="left"
+            buttonSize="sm"
+            items={[
+              {
+                id: 'employee',
+                label: 'Сотрудник',
+                icon: UserPlus,
+                onClick: handleOpenCreate,
+              },
+              {
+                id: 'position',
+                label: 'Должность в оргсхеме',
+                icon: Building2,
+                onClick: handleOpenPosCreate,
+              },
+            ]}
+          />
+        </div>
+      )
     );
     return () => {
       setLeading(null);
       setModule(null);
     };
-  }, [activeTab, setLeading, setModule, handleOpenCreate, handleOpenPosCreate]);
+  }, [activeTab, selectTab, setLeading, setModule, handleOpenCreate, handleOpenPosCreate]);
 
   return (
     <ModulePageShell>
-       <div className="flex-1 min-h-0 overflow-hidden">
-         <div className={`${MODULE_PAGE_GUTTER} ${MODULE_PAGE_TOP_PAD} pb-20 h-full overflow-y-auto custom-scrollbar`}>
-       {activeTab === 'cards' && renderCards()}
-       {activeTab === 'orgchart' && renderOrgChart()}
-       {activeTab === 'structure' && renderStructure()}
-         </div>
+       <div className="flex-1 min-h-0 overflow-hidden flex flex-col min-h-0">
+         {activeTab === 'payroll' ? (
+           <PayrollModuleView users={users} departments={departments} embedded />
+         ) : (
+           <div className={`${MODULE_PAGE_GUTTER} ${MODULE_PAGE_TOP_PAD} pb-20 h-full overflow-y-auto custom-scrollbar`}>
+             {activeTab === 'cards' && renderCards()}
+             {activeTab === 'orgchart' && renderOrgChart()}
+             {activeTab === 'structure' && renderStructure()}
+           </div>
+         )}
        </div>
 
        {/* Employee Modal */}

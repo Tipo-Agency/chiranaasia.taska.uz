@@ -167,7 +167,7 @@ export const AutomationSettings: React.FC<AutomationSettingsProps> = ({
                 return [
                     { value: 'purchase_request_created', label: 'Создана заявка на приобретение' },
                     { value: 'purchase_request_status_changed', label: 'Изменен статус заявки' },
-                    { value: 'finance_plan_updated', label: 'Обновлен финансовый план' }
+                    { value: 'finance_plan_updated', label: 'Обновлён план' }
                 ];
             case 'crm':
                 return [
@@ -223,7 +223,7 @@ export const AutomationSettings: React.FC<AutomationSettingsProps> = ({
                 return [
                     { key: 'purchaseRequestCreated', label: 'Создана заявка', description: 'Когда создается заявка на приобретение' },
                     { key: 'purchaseRequestStatusChanged', label: 'Изменен статус заявки', description: 'Когда меняется статус заявки' },
-                    { key: 'financePlanUpdated', label: 'Обновлен план', description: 'Когда обновляется финансовый план' }
+                    { key: 'financePlanUpdated', label: 'Обновлён план', description: 'Когда обновляется план' }
                 ];
             case 'crm':
                 return [

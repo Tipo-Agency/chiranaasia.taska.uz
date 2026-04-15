@@ -1407,6 +1407,8 @@ export interface IncomeReportApi {
   data: Record<string, number>;
   createdAt?: string;
   updatedAt?: string;
+  /** Заполняется сервером: справка привязана к проведённому/утверждённому бюджету. */
+  lockedByPlanningId?: string | null;
 }
 
 /** Ответ GET /finance/requests (пагинация). */
@@ -1467,6 +1469,19 @@ export function purchaseRequestFromApi(r: Record<string, unknown>): PurchaseRequ
     isArchived: Boolean(r.is_archived ?? r.isArchived),
     version:
       typeof v === 'number' ? v : v != null && v !== '' ? Number(v) || undefined : undefined,
+    attachments: Array.isArray(r.attachments)
+      ? (r.attachments as Record<string, unknown>[]).map((a) => ({
+          id: String(a.id ?? ''),
+          name: String(a.name ?? ''),
+          url: String(a.url ?? ''),
+          type: String(a.type ?? ''),
+          uploadedAt: (a.uploadedAt ?? a.uploaded_at) as string | undefined,
+          storagePath: (a.storagePath ?? a.storage_path) as string | undefined,
+        }))
+      : [],
+    counterpartyInn: (r.counterparty_inn ?? r.counterpartyInn) as string | undefined,
+    invoiceNumber: (r.invoice_number ?? r.invoiceNumber) as string | undefined,
+    invoiceDate: (r.invoice_date ?? r.invoiceDate) as string | undefined,
   };
 }
 
@@ -1511,6 +1526,12 @@ export const financeEndpoint = {
   getBankStatements: () => get<BankStatementApi[]>('/finance/bank-statements'),
   updateBankStatements: (statements: BankStatementApi[]) => put<{ ok: boolean }>('/finance/bank-statements', statements),
   deleteBankStatement: (id: string) => del<{ ok: boolean }>(`/finance/bank-statements/${id}`),
+  getExpenseReconciliationGroups: () =>
+    get<Array<{ id: string; lineIds: string[]; requestId?: string | null; manualResolved?: boolean; updatedAt?: string }>>(
+      '/finance/expense-reconciliation-groups'
+    ),
+  updateExpenseReconciliationGroups: (groups: unknown[]) =>
+    put<{ ok: boolean }>('/finance/expense-reconciliation-groups', groups),
   getIncomeReports: () => get<IncomeReportApi[]>('/finance/income-reports'),
   updateIncomeReports: (reports: IncomeReportApi[]) => put<{ ok: boolean }>('/finance/income-reports', reports),
   getBdr: (year?: string) => get<Bdr>(`/finance/bdr${year ? `?year=${encodeURIComponent(year)}` : ''}`),
@@ -1544,6 +1565,28 @@ export const funnelsEndpoint = {
   create: (funnel: unknown) => post<unknown>('/funnels', funnel),
   update: (id: string, updates: unknown) => patch<unknown>(`/funnels/${id}`, updates),
   delete: (id: string) => del<{ ok: boolean }>(`/funnels/${id}`),
+};
+
+/** Производственные маршруты и заказы по этапам */
+export const productionEndpoint = {
+  getPipelines: () => get<unknown[]>('/production/pipelines'),
+  putPipelines: (items: unknown[]) => put<{ ok: boolean }>('/production/pipelines', items),
+  getOrders: (pipelineId?: string) => {
+    const q = pipelineId ? `?pipelineId=${encodeURIComponent(pipelineId)}` : '';
+    return get<unknown[]>(`/production/orders${q}`);
+  },
+  createOrder: (body: { pipelineId: string; title: string; notes?: string | null }) =>
+    post<unknown>('/production/orders', body),
+  patchOrder: (id: string, body: unknown, init?: { headers?: Record<string, string> }) =>
+    patch<unknown>(`/production/orders/${encodeURIComponent(id)}`, body, init),
+  handOver: (orderId: string, body: { notes?: string | null } = {}) =>
+    post<unknown>(`/production/orders/${encodeURIComponent(orderId)}/hand-over`, body),
+  completeOrder: (orderId: string) =>
+    post<unknown>(`/production/orders/${encodeURIComponent(orderId)}/complete`, {}),
+  resolveHandoff: (
+    handoffId: string,
+    body: { action: 'accept' | 'reject'; hasDefects?: boolean; defectNotes?: string | null }
+  ) => post<unknown>(`/production/handoffs/${encodeURIComponent(handoffId)}/resolve`, body),
 };
 
 // Public content plan (no auth required)

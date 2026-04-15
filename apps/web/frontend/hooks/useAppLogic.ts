@@ -12,7 +12,7 @@ import {
   notifyPurchaseRequestCreated,
   NotificationContext 
 } from '../../services/notificationService';
-import { Deal, Task, BusinessProcess, ProcessStep, Client, Contract, PurchaseRequest, Doc, Meeting, SalesFunnel, InboxMessage, MessageAttachment, User, ContentPost, Project, TableCollection, Department, FinanceCategory, EmployeeInfo, OrgPosition, AutomationRule, StatusOption, PriorityOption, ShootPlan } from '../../types';
+import { Deal, Task, BusinessProcess, ProcessStep, Client, Contract, PurchaseRequest, Doc, Meeting, SalesFunnel, InboxMessage, MessageAttachment, User, ContentPost, Project, TableCollection, Department, FinanceCategory, EmployeeInfo, OrgPosition, AutomationRule, StatusOption, PriorityOption, ShootPlan, ProductionRoutePipeline, ProductionRouteOrder } from '../../types';
 import { hasPermission } from '../../utils/permissions';
 import { getStepsForInstance } from '../../utils/bpmDealFunnel';
 import { chatLocalService } from '../../services/chatLocalService';
@@ -32,6 +32,12 @@ import { devWarn } from '../../utils/devLog';
 import { resolveAssigneesForOrgPosition } from '../../utils/orgPositionAssignee';
 import { useAuthScopeStore } from '../stores/authScopeStore';
 import { useUiToastStore } from '../stores/uiToastStore';
+import {
+  normalizeProductionOrder,
+  normalizeProductionPipeline,
+  pipelineToBulk,
+} from '../../utils/productionRoutesNormalize';
+import { normalizeInventoryItem } from '../../utils/inventoryNormalize';
 // Функция заполнения тестовыми данными полностью удалена
 
 export const useAppLogic = () => {
@@ -46,6 +52,8 @@ export const useAppLogic = () => {
   const authSlice = useAuthLogic(showNotification);
   const crmSlice = useCRMLogic(showNotification, () => authSlice.state.currentUser);
   const [salesFunnels, setSalesFunnels] = useState<SalesFunnel[]>([]);
+  const [productionPipelines, setProductionPipelines] = useState<ProductionRoutePipeline[]>([]);
+  const [productionBoardOrders, setProductionBoardOrders] = useState<ProductionRouteOrder[]>([]);
   const [inboxMessages, setInboxMessages] = useState<InboxMessage[]>([]);
   const [outboxMessages, setOutboxMessages] = useState<InboxMessage[]>([]);
   const contentSlice = useContentLogic(showNotification, settingsSlice.state.activeTableId);
@@ -84,7 +92,8 @@ export const useAppLogic = () => {
   // Уровень 1: Загрузка основных данных верхнего уровня (после аутентификации)
   const loadMainData = async () => {
       // Загружаем параллельно для скорости
-      const [tables, activityLogs, notificationPrefs, automationRules, statuses, priorities, funnels] = await Promise.all([
+      const [tables, activityLogs, notificationPrefs, automationRules, statuses, priorities, funnels, prodPipes, prodOrders] =
+          await Promise.all([
           api.tables.getAll(),
           api.activity.getAll(),
           api.notificationPrefs.get(),
@@ -92,6 +101,8 @@ export const useAppLogic = () => {
           api.statuses.getAll(),
           api.priorities.getAll(),
           api.funnels.getAll(),
+          api.production.getPipelines().catch(() => []),
+          api.production.getOrders().catch(() => []),
       ]);
       
       settingsSlice.setters.setTables(tables);
@@ -101,6 +112,14 @@ export const useAppLogic = () => {
       taskSlice.setters.setStatuses(statuses);
       taskSlice.setters.setPriorities(priorities);
       setSalesFunnels(funnels);
+      const pipes = (Array.isArray(prodPipes) ? prodPipes : [])
+          .map(normalizeProductionPipeline)
+          .filter((x): x is ProductionRoutePipeline => x != null && !x.isArchived);
+      setProductionPipelines(pipes);
+      const ords = (Array.isArray(prodOrders) ? prodOrders : [])
+          .map(normalizeProductionOrder)
+          .filter((x): x is ProductionRouteOrder => x != null && !x.isArchived);
+      setProductionBoardOrders(ords);
   };
 
   // Уровень 2: Загрузка данных модуля Tasks (lazy loading)
@@ -173,7 +192,7 @@ export const useAppLogic = () => {
   // Уровень 2: Загрузка данных модуля Finance (lazy loading)
   const loadFinanceData = async () => {
       if (loadedModulesRef.current.has('finance')) return; // Уже загружено
-      const [departments, categories, funds, plan, requests, planDocs, plannings] = await Promise.all([
+      const [departments, categories, funds, plan, requests, planDocs, plannings, incReports] = await Promise.all([
           api.departments.getAll(),
           api.finance.getCategories(),
           api.finance.getFunds(),
@@ -181,6 +200,7 @@ export const useAppLogic = () => {
           api.finance.getRequestsAll(),
           api.finance.getFinancialPlanDocuments(),
           api.finance.getFinancialPlannings(),
+          api.finance.getIncomeReports(),
       ]);
       financeSlice.setters.setDepartments(departments);
       financeSlice.setters.setFinanceCategories(categories);
@@ -189,6 +209,7 @@ export const useAppLogic = () => {
       financeSlice.setters.setPurchaseRequests(requests);
       financeSlice.setters.setFinancialPlanDocuments(planDocs);
       financeSlice.setters.setFinancialPlannings(plannings);
+      financeSlice.setters.setIncomeReports(incReports || []);
       await financeSlice.actions.loadBdr();
       loadedModulesRef.current.add('finance');
   };
@@ -215,7 +236,9 @@ export const useAppLogic = () => {
           api.inventory.getRevisions(),
       ]);
       inventorySlice.setters.setWarehouses(warehouses);
-      inventorySlice.setters.setItems(items);
+      inventorySlice.setters.setItems(
+        Array.isArray(items) ? items.map((row) => normalizeInventoryItem(row)) : []
+      );
       inventorySlice.setters.setMovements(movements);
       inventorySlice.setters.setRevisions(revisions);
       loadedModulesRef.current.add('inventory');
@@ -1063,10 +1086,12 @@ export const useAppLogic = () => {
       tasks: taskSlice.state.tasks, projects: taskSlice.state.projects, statuses: taskSlice.state.statuses, priorities: taskSlice.state.priorities, isTaskModalOpen: taskSlice.state.isTaskModalOpen, editingTask: taskSlice.state.editingTask,
       clients: crmSlice.state.clients, contracts: crmSlice.state.contracts, oneTimeDeals: crmSlice.state.oneTimeDeals, accountsReceivable: crmSlice.state.accountsReceivable, employeeInfos: crmSlice.state.employeeInfos, deals: crmSlice.state.deals,
       docs: contentSlice.state.docs, folders: contentSlice.state.folders, meetings: contentSlice.state.meetings, contentPosts: contentSlice.state.contentPosts, shootPlans: contentSlice.state.shootPlans, isDocModalOpen: contentSlice.state.isDocModalOpen, activeDocId: contentSlice.state.activeDocId, targetFolderId: contentSlice.state.targetFolderId, editingDoc: contentSlice.state.editingDoc,
-      departments: financeSlice.state.departments, financeCategories: financeSlice.state.financeCategories, funds: financeSlice.state.funds, financePlan: financeSlice.state.financePlan, purchaseRequests: financeSlice.state.purchaseRequests, financialPlanDocuments: financeSlice.state.financialPlanDocuments, financialPlannings: financeSlice.state.financialPlannings, bdr: financeSlice.state.bdr,
+      departments: financeSlice.state.departments, financeCategories: financeSlice.state.financeCategories, funds: financeSlice.state.funds, financePlan: financeSlice.state.financePlan, purchaseRequests: financeSlice.state.purchaseRequests, financialPlanDocuments: financeSlice.state.financialPlanDocuments, financialPlannings: financeSlice.state.financialPlannings, incomeReports: financeSlice.state.incomeReports, bdr: financeSlice.state.bdr,
       orgPositions: bpmSlice.state.orgPositions, businessProcesses: bpmSlice.state.businessProcesses,
       warehouses: inventorySlice.state.warehouses, inventoryItems: inventorySlice.state.items, inventoryMovements: inventorySlice.state.movements, inventoryBalances: inventorySlice.state.balances, inventoryRevisions: inventorySlice.state.revisions,
       salesFunnels: salesFunnels,
+      productionPipelines,
+      productionBoardOrders,
       inboxMessages, outboxMessages,
       darkMode: settingsSlice.state.darkMode, tables: settingsSlice.state.tables, activityLogs: settingsSlice.state.activityLogs, currentView: settingsSlice.state.currentView, activeTableId: settingsSlice.state.activeTableId, viewMode: settingsSlice.state.viewMode, searchQuery: settingsSlice.state.searchQuery, settingsActiveTab: settingsSlice.state.settingsActiveTab, isCreateTableModalOpen: settingsSlice.state.isCreateTableModalOpen, createTableType: settingsSlice.state.createTableType, isEditTableModalOpen: settingsSlice.state.isEditTableModalOpen, editingTable: settingsSlice.state.editingTable, notificationPrefs: settingsSlice.state.notificationPrefs, automationRules: settingsSlice.state.automationRules, activeSpaceTab: settingsSlice.state.activeSpaceTab,
       workdeskTab: settingsSlice.state.workdeskTab,
@@ -1230,7 +1255,10 @@ export const useAppLogic = () => {
           }
         }
       },
-      deletePurchaseRequest: financeSlice.actions.deletePurchaseRequest, saveFinancialPlanDocument: financeSlice.actions.saveFinancialPlanDocument, deleteFinancialPlanDocument: financeSlice.actions.deleteFinancialPlanDocument, saveFinancialPlanning: financeSlice.actions.saveFinancialPlanning,       deleteFinancialPlanning: financeSlice.actions.deleteFinancialPlanning,
+      deletePurchaseRequest: financeSlice.actions.deletePurchaseRequest,
+      refreshPurchaseRequests: financeSlice.actions.refreshPurchaseRequests,
+      saveFinancialPlanDocument: financeSlice.actions.saveFinancialPlanDocument, deleteFinancialPlanDocument: financeSlice.actions.deleteFinancialPlanDocument, saveFinancialPlanning: financeSlice.actions.saveFinancialPlanning,       deleteFinancialPlanning: financeSlice.actions.deleteFinancialPlanning,
+      refreshIncomeReports: financeSlice.actions.refreshIncomeReports,
       loadBdr: financeSlice.actions.loadBdr,
       saveBdr: financeSlice.actions.saveBdr,
       saveWarehouse: inventorySlice.actions.saveWarehouse, deleteWarehouse: inventorySlice.actions.deleteWarehouse, saveInventoryItem: inventorySlice.actions.saveItem, deleteInventoryItem: inventorySlice.actions.deleteItem, createInventoryMovement: inventorySlice.actions.createMovement, createInventoryRevision: inventorySlice.actions.createRevision, updateInventoryRevision: inventorySlice.actions.updateRevision, postInventoryRevision: inventorySlice.actions.postRevision,
@@ -1269,6 +1297,120 @@ export const useAppLogic = () => {
               console.error('Ошибка удаления воронки:', error);
               showNotification('Ошибка удаления воронки');
           }
+      },
+      refreshProductionRoutes: async () => {
+        try {
+          const [pipes, ords] = await Promise.all([api.production.getPipelines(), api.production.getOrders()]);
+          setProductionPipelines(
+            (Array.isArray(pipes) ? pipes : [])
+              .map(normalizeProductionPipeline)
+              .filter((x): x is ProductionRoutePipeline => x != null && !x.isArchived)
+          );
+          setProductionBoardOrders(
+            (Array.isArray(ords) ? ords : [])
+              .map(normalizeProductionOrder)
+              .filter((x): x is ProductionRouteOrder => x != null && !x.isArchived)
+          );
+        } catch (error) {
+          console.error(error);
+          showNotification('Не удалось обновить производство');
+        }
+      },
+      saveProductionPipeline: async (p: ProductionRoutePipeline) => {
+        try {
+          await api.production.putPipelines([pipelineToBulk(p)]);
+          const pipes = await api.production.getPipelines();
+          setProductionPipelines(
+            (Array.isArray(pipes) ? pipes : [])
+              .map(normalizeProductionPipeline)
+              .filter((x): x is ProductionRoutePipeline => x != null && !x.isArchived)
+          );
+          showNotification('Маршрут сохранён');
+        } catch (error) {
+          console.error(error);
+          showNotification('Ошибка сохранения маршрута');
+        }
+      },
+      deleteProductionPipeline: async (id: string) => {
+        try {
+          const pipesRaw = await api.production.getPipelines();
+          const found = (Array.isArray(pipesRaw) ? pipesRaw : [])
+            .map(normalizeProductionPipeline)
+            .find((x) => x?.id === id);
+          if (!found) return;
+          await api.production.putPipelines([pipelineToBulk({ ...found, isArchived: true })]);
+          const next = await api.production.getPipelines();
+          setProductionPipelines(
+            (Array.isArray(next) ? next : [])
+              .map(normalizeProductionPipeline)
+              .filter((x): x is ProductionRoutePipeline => x != null && !x.isArchived)
+          );
+          showNotification('Маршрут в архиве');
+        } catch (error) {
+          console.error(error);
+          showNotification('Ошибка архивации маршрута');
+        }
+      },
+      createProductionRouteOrder: async (pipelineId: string, title: string) => {
+        try {
+          await api.production.createOrder({ pipelineId, title });
+          const ords = await api.production.getOrders();
+          setProductionBoardOrders(
+            (Array.isArray(ords) ? ords : [])
+              .map(normalizeProductionOrder)
+              .filter((x): x is ProductionRouteOrder => x != null && !x.isArchived)
+          );
+          showNotification('Заказ создан');
+        } catch (error) {
+          console.error(error);
+          showNotification('Ошибка создания заказа');
+        }
+      },
+      productionHandOver: async (orderId: string, notes?: string) => {
+        try {
+          await api.production.handOver(orderId, { notes: notes || null });
+          const ords = await api.production.getOrders();
+          setProductionBoardOrders(
+            (Array.isArray(ords) ? ords : [])
+              .map(normalizeProductionOrder)
+              .filter((x): x is ProductionRouteOrder => x != null && !x.isArchived)
+          );
+        } catch (error) {
+          console.error(error);
+          showNotification('Не удалось передать этап');
+        }
+      },
+      productionResolveHandoff: async (
+        handoffId: string,
+        payload: { action: 'accept' | 'reject'; hasDefects?: boolean; defectNotes?: string | null }
+      ) => {
+        try {
+          await api.production.resolveHandoff(handoffId, payload);
+          const ords = await api.production.getOrders();
+          setProductionBoardOrders(
+            (Array.isArray(ords) ? ords : [])
+              .map(normalizeProductionOrder)
+              .filter((x): x is ProductionRouteOrder => x != null && !x.isArchived)
+          );
+        } catch (error) {
+          console.error(error);
+          showNotification('Не удалось обработать приёмку');
+        }
+      },
+      productionCompleteOrder: async (orderId: string) => {
+        try {
+          await api.production.completeOrder(orderId);
+          const ords = await api.production.getOrders();
+          setProductionBoardOrders(
+            (Array.isArray(ords) ? ords : [])
+              .map(normalizeProductionOrder)
+              .filter((x): x is ProductionRouteOrder => x != null && !x.isArchived)
+          );
+          showNotification('Заказ завершён');
+        } catch (error) {
+          console.error(error);
+          showNotification('Не удалось завершить заказ');
+        }
       },
       restoreUser: async (userId: string) => {
           try {

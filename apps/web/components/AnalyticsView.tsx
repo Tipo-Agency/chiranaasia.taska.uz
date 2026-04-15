@@ -276,7 +276,7 @@ const AnalyticsView: React.FC<AnalyticsViewProps> = ({
                 </div>
            </div>
 
-           {/* Финансы: выписки + проведённые планирования */}
+           {/* Финансы: выписки + проведённые бюджеты */}
            <div className="rounded-2xl border border-sky-200/80 dark:border-sky-800/50 bg-gradient-to-br from-sky-50/90 via-white to-white dark:from-sky-950/30 dark:via-[#252525] dark:to-[#252525] p-6 shadow-sm">
               <div className="flex flex-wrap items-end justify-between gap-3 mb-6">
                 <div>
@@ -285,7 +285,7 @@ const AnalyticsView: React.FC<AnalyticsViewProps> = ({
                     Финансы по периоду
                   </h3>
                   <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-                    Расчётный счёт (выписки) и модуль «Финансы» — проведённые планирования и план-документы. Период: {periodHint}.
+                    Расчётный счёт (выписки) и модуль «Финансы» — проведённые бюджеты и документы планов. Период: {periodHint}.
                   </p>
                 </div>
                 {bankLoadState === 'loading' && (
@@ -332,7 +332,7 @@ const AnalyticsView: React.FC<AnalyticsViewProps> = ({
                 <div className="rounded-xl border border-gray-200 dark:border-[#333] bg-white/80 dark:bg-[#1e1e1e] p-5">
                   <div className="flex items-center gap-2 mb-4 text-sm font-semibold text-gray-800 dark:text-gray-100">
                     <FileText className="text-sky-600 dark:text-sky-400" size={18} />
-                    Проведённые планирования (касса)
+                    Проведённые бюджеты (касса)
                   </div>
                   <div className="space-y-3">
                     <div className="flex justify-between text-sm">
@@ -359,7 +359,7 @@ const AnalyticsView: React.FC<AnalyticsViewProps> = ({
                 <div className="rounded-xl border border-gray-200 dark:border-[#333] bg-white/80 dark:bg-[#1e1e1e] p-5 lg:col-span-2">
                   <div className="flex items-center gap-2 mb-4 text-sm font-semibold text-gray-800 dark:text-gray-100">
                     <BarChart3 className="text-violet-600 dark:text-violet-400" size={18} />
-                    Проведённые финансовые план-документы (по статьям)
+                    Проведённые планы (по статьям)
                   </div>
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                     <div>

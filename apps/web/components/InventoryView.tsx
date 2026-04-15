@@ -1,5 +1,7 @@
-import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Department, Warehouse, InventoryItem, StockBalance, StockMovement, InventoryRevision } from '../types';
+import type { NomenclatureAttachment, NomenclatureAttribute } from '../types/inventory';
+import { NomenclatureExtendedFields } from './inventory/NomenclatureExtendedFields';
 import {
   Layers,
   Package,
@@ -88,6 +90,12 @@ const InventoryView: React.FC<InventoryViewProps> = ({
   const [newItemUnit, setNewItemUnit] = useState('');
   const [newItemCategory, setNewItemCategory] = useState('');
   const [newItemNotes, setNewItemNotes] = useState('');
+  const [newItemDraftKey, setNewItemDraftKey] = useState(() => `inv-new-${Date.now()}`);
+  const [newItemBarcode, setNewItemBarcode] = useState('');
+  const [newItemManufacturer, setNewItemManufacturer] = useState('');
+  const [newItemConsumptionHint, setNewItemConsumptionHint] = useState('');
+  const [newItemAttributes, setNewItemAttributes] = useState<NomenclatureAttribute[]>([]);
+  const [newItemAttachments, setNewItemAttachments] = useState<NomenclatureAttachment[]>([]);
 
   // Form state: edit item
   const [editingItemId, setEditingItemId] = useState<string | null>(null);
@@ -96,6 +104,11 @@ const InventoryView: React.FC<InventoryViewProps> = ({
   const [editItemUnit, setEditItemUnit] = useState('');
   const [editItemCategory, setEditItemCategory] = useState('');
   const [editItemNotes, setEditItemNotes] = useState('');
+  const [editItemBarcode, setEditItemBarcode] = useState('');
+  const [editItemManufacturer, setEditItemManufacturer] = useState('');
+  const [editItemConsumptionHint, setEditItemConsumptionHint] = useState('');
+  const [editItemAttributes, setEditItemAttributes] = useState<NomenclatureAttribute[]>([]);
+  const [editItemAttachments, setEditItemAttachments] = useState<NomenclatureAttachment[]>([]);
 
   // Form state: new warehouse
   const [newWarehouseName, setNewWarehouseName] = useState('');
@@ -172,6 +185,21 @@ const InventoryView: React.FC<InventoryViewProps> = ({
       .sort((a, b) => a.name.localeCompare(b.name));
   }, [items, search, filterCategory]);
 
+  const openCreateItemModal = useCallback(() => {
+    setNewItemDraftKey(`inv-new-${Date.now()}`);
+    setNewItemBarcode('');
+    setNewItemManufacturer('');
+    setNewItemConsumptionHint('');
+    setNewItemAttributes([]);
+    setNewItemAttachments([]);
+    setNewItemSku('');
+    setNewItemName('');
+    setNewItemUnit('');
+    setNewItemCategory('');
+    setNewItemNotes('');
+    setIsCreateItemOpen(true);
+  }, []);
+
   const filteredMovements = useMemo(() => {
     const q = search.trim().toLowerCase();
     return movements
@@ -201,6 +229,11 @@ const InventoryView: React.FC<InventoryViewProps> = ({
       unit: newItemUnit.trim() || 'шт',
       category: newItemCategory.trim() || undefined,
       notes: newItemNotes.trim() || undefined,
+      barcode: newItemBarcode.trim() || undefined,
+      manufacturer: newItemManufacturer.trim() || undefined,
+      consumptionHint: newItemConsumptionHint.trim() || undefined,
+      attributes: newItemAttributes.length ? newItemAttributes : [],
+      attachments: newItemAttachments.length ? newItemAttachments : [],
     };
     onSaveItem(item);
     setNewItemSku('');
@@ -208,6 +241,11 @@ const InventoryView: React.FC<InventoryViewProps> = ({
     setNewItemUnit('');
     setNewItemCategory('');
     setNewItemNotes('');
+    setNewItemBarcode('');
+    setNewItemManufacturer('');
+    setNewItemConsumptionHint('');
+    setNewItemAttributes([]);
+    setNewItemAttachments([]);
     setIsCreateItemOpen(false);
   };
 
@@ -218,6 +256,11 @@ const InventoryView: React.FC<InventoryViewProps> = ({
     setEditItemUnit(item.unit || '');
     setEditItemCategory(item.category || '');
     setEditItemNotes(item.notes || '');
+    setEditItemBarcode(item.barcode || '');
+    setEditItemManufacturer(item.manufacturer || '');
+    setEditItemConsumptionHint(item.consumptionHint || '');
+    setEditItemAttributes(item.attributes?.length ? [...item.attributes] : []);
+    setEditItemAttachments(item.attachments?.length ? [...item.attachments] : []);
     setIsEditItemOpen(true);
   };
 
@@ -234,6 +277,11 @@ const InventoryView: React.FC<InventoryViewProps> = ({
       unit: editItemUnit.trim() || 'шт',
       category: editItemCategory.trim() || undefined,
       notes: editItemNotes.trim() || undefined,
+      barcode: editItemBarcode.trim() || undefined,
+      manufacturer: editItemManufacturer.trim() || undefined,
+      consumptionHint: editItemConsumptionHint.trim() || undefined,
+      attributes: editItemAttributes.length ? editItemAttributes : [],
+      attachments: editItemAttachments.length ? editItemAttachments : [],
     });
     setIsEditItemOpen(false);
     setEditingItemId(null);
@@ -458,7 +506,7 @@ const InventoryView: React.FC<InventoryViewProps> = ({
               id: 'nom',
               label: 'Новая номенклатура',
               icon: Package,
-              onClick: () => setIsCreateItemOpen(true),
+              onClick: openCreateItemModal,
               iconClassName: 'text-emerald-600 dark:text-emerald-400',
             },
             {
@@ -508,6 +556,7 @@ const InventoryView: React.FC<InventoryViewProps> = ({
     selectedWarehouseId,
     setLeading,
     setModule,
+    openCreateItemModal,
   ]);
 
   return (
@@ -882,7 +931,7 @@ const InventoryView: React.FC<InventoryViewProps> = ({
             isOpen={isCreateItemOpen}
             onClose={() => setIsCreateItemOpen(false)}
             title="Новая номенклатура"
-            size="md"
+            size="lg"
             footer={
               <div className="flex justify-end gap-2">
                 <button
@@ -923,6 +972,20 @@ const InventoryView: React.FC<InventoryViewProps> = ({
                 <span className="text-xs font-medium text-gray-600 dark:text-gray-300">Комментарий</span>
                 <input value={newItemNotes} onChange={e => setNewItemNotes(e.target.value)} placeholder="Опционально" className="rounded-xl border border-gray-200 dark:border-[#333] px-3 py-2.5 text-sm bg-gray-50 dark:bg-[#252525]" />
               </label>
+              <NomenclatureExtendedFields
+                uploadKey={newItemDraftKey}
+                barcode={newItemBarcode}
+                setBarcode={setNewItemBarcode}
+                manufacturer={newItemManufacturer}
+                setManufacturer={setNewItemManufacturer}
+                consumptionHint={newItemConsumptionHint}
+                setConsumptionHint={setNewItemConsumptionHint}
+                attributes={newItemAttributes}
+                setAttributes={setNewItemAttributes}
+                attachments={newItemAttachments}
+                setAttachments={setNewItemAttachments}
+                setAlertMessage={setAlertMessage}
+              />
             </div>
           </StandardModal>
 
@@ -930,7 +993,7 @@ const InventoryView: React.FC<InventoryViewProps> = ({
             isOpen={isEditItemOpen}
             onClose={() => setIsEditItemOpen(false)}
             title="Редактировать номенклатуру"
-            size="md"
+            size="lg"
             footer={
               <div className="flex items-center justify-between gap-2">
                 <button
@@ -980,6 +1043,22 @@ const InventoryView: React.FC<InventoryViewProps> = ({
                 <span className="text-xs font-medium text-gray-600 dark:text-gray-300">Комментарий</span>
                 <input value={editItemNotes} onChange={e => setEditItemNotes(e.target.value)} placeholder="Опционально" className="rounded-xl border border-gray-200 dark:border-[#333] px-3 py-2.5 text-sm bg-gray-50 dark:bg-[#252525]" />
               </label>
+              {editingItemId && (
+                <NomenclatureExtendedFields
+                  uploadKey={editingItemId}
+                  barcode={editItemBarcode}
+                  setBarcode={setEditItemBarcode}
+                  manufacturer={editItemManufacturer}
+                  setManufacturer={setEditItemManufacturer}
+                  consumptionHint={editItemConsumptionHint}
+                  setConsumptionHint={setEditItemConsumptionHint}
+                  attributes={editItemAttributes}
+                  setAttributes={setEditItemAttributes}
+                  attachments={editItemAttachments}
+                  setAttachments={setEditItemAttachments}
+                  setAlertMessage={setAlertMessage}
+                />
+              )}
             </div>
           </StandardModal>
 

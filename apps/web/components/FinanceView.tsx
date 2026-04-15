@@ -1,10 +1,10 @@
 
 import React, { useState, useRef, useMemo, useEffect, useCallback, useLayoutEffect } from 'react';
 import { TaskSelect } from './TaskSelect';
-import { FinanceCategory, Fund, FinancePlan, PurchaseRequest, Department, User, FinancialPlanDocument, FinancialPlanning, Bdr } from '../types';
+import { FinanceCategory, Fund, FinancePlan, PurchaseRequest, Department, User, FinancialPlanDocument, FinancialPlanning, Bdr, IncomeReport } from '../types';
 import type { SavePurchaseRequestOptions } from '../frontend/hooks/slices/useFinanceLogic';
 import { hasPermission } from '../utils/permissions';
-import { Plus, X, Edit2, Trash2, PieChart, TrendingUp, DollarSign, Check, AlertCircle, Calendar, Settings, ArrowLeft, ArrowRight, Save, FileText, Clock, CheckCircle2, ChevronDown, Upload, Archive, RotateCcw } from 'lucide-react';
+import { Plus, X, Edit2, Trash2, PieChart, TrendingUp, DollarSign, Check, AlertCircle, Calendar, Settings, ArrowLeft, ArrowRight, Save, FileText, Clock, CheckCircle2, ChevronDown, Upload, Archive, RotateCcw, Printer } from 'lucide-react';
 import {
   Button,
   ModulePageShell,
@@ -23,6 +23,16 @@ import { useAppToolbar } from '../contexts/AppToolbarContext';
 import { BankStatementsView, type BankStatementsViewHandle } from './finance/BankStatementsView';
 import { BdrView } from './finance/BdrView';
 import { FilterConfig } from './FiltersPanel';
+import { uploadFile } from '../services/localStorageService';
+import { splitMonthIntoWeekSegments } from '../utils/financeMonthWeeks';
+import {
+  sumIncomeReportInRange,
+  sumIncomeReportsInRange,
+  distributeIncomeFromPlanDocuments,
+  approvedAmountByFund,
+  parseRequestAmountUzs,
+  fundAvailableBalances,
+} from '../utils/financePlanningUtils';
 
 function requestAmountLabel(amount: PurchaseRequest['amount']): string {
   const raw = (
@@ -70,6 +80,7 @@ interface FinanceViewProps {
   currentUser: User;
   financialPlanDocuments?: FinancialPlanDocument[];
   financialPlannings?: FinancialPlanning[];
+  incomeReports?: IncomeReport[];
   bdr?: Bdr | null;
   onLoadBdr?: (year?: string) => Promise<void>;
   onSaveBdr?: (payload: { year: string; rows: Bdr['rows'] }) => Promise<void>;
@@ -79,14 +90,18 @@ interface FinanceViewProps {
   onDeleteFinancialPlanDocument?: (id: string) => void;
   onSaveFinancialPlanning?: (planning: FinancialPlanning) => void;
   onDeleteFinancialPlanning?: (id: string) => void;
+  onRefreshPurchaseRequests?: () => void | Promise<void>;
+  onRefreshIncomeReports?: () => void | Promise<void>;
 }
 
 const FinanceView: React.FC<FinanceViewProps> = ({ 
     categories, funds = [], plan, requests, departments, users, currentUser,
-    financialPlanDocuments = [], financialPlannings = [], bdr = null,
+    financialPlanDocuments = [], financialPlannings = [], incomeReports = [], bdr = null,
     onLoadBdr, onSaveBdr,
     onSaveRequest, onDeleteRequest,
-    onSaveFinancialPlanDocument, onDeleteFinancialPlanDocument, onSaveFinancialPlanning, onDeleteFinancialPlanning
+    onSaveFinancialPlanDocument, onDeleteFinancialPlanDocument, onSaveFinancialPlanning, onDeleteFinancialPlanning,
+    onRefreshPurchaseRequests,
+    onRefreshIncomeReports,
 }) => {
   const { setLeading, setModule } = useAppToolbar();
   const [activeTab, setActiveTab] = useState<'planning' | 'requests' | 'plan' | 'statements' | 'bdr'>('planning');
@@ -139,7 +154,13 @@ const FinanceView: React.FC<FinanceViewProps> = ({
   const [reqCat, setReqCat] = useState('');
   const [reqPaymentDate, setReqPaymentDate] = useState('');
   const [reqTitle, setReqTitle] = useState('');
-  
+  const [reqInn, setReqInn] = useState('');
+  const [reqInvoiceNumber, setReqInvoiceNumber] = useState('');
+  const [reqInvoiceDate, setReqInvoiceDate] = useState('');
+  const [reqAttachments, setReqAttachments] = useState<NonNullable<PurchaseRequest['attachments']>>([]);
+  const [createRequestId, setCreateRequestId] = useState('');
+  const reqAttachInputRef = useRef<HTMLInputElement>(null);
+
   const getDefaultRangeForMonth = useCallback((yyyyMm: string) => {
     const d = new Date(`${yyyyMm}-01T00:00:00`);
     const start = new Date(d.getFullYear(), d.getMonth(), 1);
@@ -194,6 +215,11 @@ const FinanceView: React.FC<FinanceViewProps> = ({
     periodEnd?: string;
     fundAllocations?: Record<string, number>;
     requestFundIds?: Record<string, string>;
+    planDocumentIds?: string[];
+    incomeReportId?: string;
+    incomeReportIds?: string[];
+    expenseDistribution?: Record<string, number>;
+    fundMovements?: NonNullable<FinancialPlanning['fundMovements']>;
   } | null>(null);
   const [planningDetailDepartmentId, setPlanningDetailDepartmentId] = useState('');
   const [planningDetailPeriodStart, setPlanningDetailPeriodStart] = useState('');
@@ -203,6 +229,14 @@ const FinanceView: React.FC<FinanceViewProps> = ({
   const [planningDetailIncome, setPlanningDetailIncome] = useState<number>(0);
   const [planningDetailFundAllocations, setPlanningDetailFundAllocations] = useState<Record<string, number>>({});
   const [planningDetailRequestFundIds, setPlanningDetailRequestFundIds] = useState<Record<string, string>>({});
+  const [planningDetailPlanDocumentIds, setPlanningDetailPlanDocumentIds] = useState<string[]>([]);
+  const [planningDetailIncomeReportIds, setPlanningDetailIncomeReportIds] = useState<string[]>([]);
+  const [planningDetailExpenseDistribution, setPlanningDetailExpenseDistribution] = useState<Record<string, number>>({});
+  const [planningDetailFundMovements, setPlanningDetailFundMovements] = useState<NonNullable<FinancialPlanning['fundMovements']>>([]);
+  const [planningFundTransferOpen, setPlanningFundTransferOpen] = useState(false);
+  const [fundTransferFrom, setFundTransferFrom] = useState('');
+  const [fundTransferTo, setFundTransferTo] = useState('');
+  const [fundTransferAmount, setFundTransferAmount] = useState('');
   
   // Состояния для детальной страницы плана
   const planDetailInitialValuesRef = useRef<{
@@ -227,6 +261,10 @@ const FinanceView: React.FC<FinanceViewProps> = ({
   useEffect(() => {
     if (selectedPlanning) {
       const fallback = getDefaultRangeForMonth(selectedPlanning.period || currentPeriod);
+      const pids = (selectedPlanning.planDocumentIds?.length ? selectedPlanning.planDocumentIds : selectedPlanning.planDocumentId ? [selectedPlanning.planDocumentId] : []);
+      const irRaw = [...(selectedPlanning.incomeReportIds || [])];
+      const irSingle = (selectedPlanning.incomeReportId || '').trim();
+      const incomeReportIdsMerged = irSingle && !irRaw.includes(irSingle) ? [irSingle, ...irRaw] : irRaw.length ? irRaw : irSingle ? [irSingle] : [];
       planningDetailInitialValuesRef.current = {
         requestIds: selectedPlanning.requestIds,
         notes: selectedPlanning.notes,
@@ -235,7 +273,12 @@ const FinanceView: React.FC<FinanceViewProps> = ({
         periodStart: selectedPlanning.periodStart || fallback.start,
         periodEnd: selectedPlanning.periodEnd || fallback.end,
         fundAllocations: selectedPlanning.fundAllocations ?? {},
-        requestFundIds: selectedPlanning.requestFundIds ?? {}
+        requestFundIds: selectedPlanning.requestFundIds ?? {},
+        planDocumentIds: pids,
+        incomeReportId: incomeReportIdsMerged[0] || '',
+        incomeReportIds: incomeReportIdsMerged,
+        expenseDistribution: selectedPlanning.expenseDistribution ?? {},
+        fundMovements: selectedPlanning.fundMovements ?? [],
       };
       setPlanningDetailDepartmentId(selectedPlanning.departmentId || '');
       setPlanningDetailPeriodStart(selectedPlanning.periodStart || fallback.start);
@@ -245,6 +288,10 @@ const FinanceView: React.FC<FinanceViewProps> = ({
       setPlanningDetailIncome(selectedPlanning.income ?? 0);
       setPlanningDetailFundAllocations(selectedPlanning.fundAllocations ?? {});
       setPlanningDetailRequestFundIds(selectedPlanning.requestFundIds ?? {});
+      setPlanningDetailPlanDocumentIds(pids);
+      setPlanningDetailIncomeReportIds(incomeReportIdsMerged);
+      setPlanningDetailExpenseDistribution(selectedPlanning.expenseDistribution ?? {});
+      setPlanningDetailFundMovements(selectedPlanning.fundMovements ?? []);
     } else {
       planningDetailInitialValuesRef.current = null;
       setPlanningDetailDepartmentId('');
@@ -255,6 +302,10 @@ const FinanceView: React.FC<FinanceViewProps> = ({
       setPlanningDetailIncome(0);
       setPlanningDetailFundAllocations({});
       setPlanningDetailRequestFundIds({});
+      setPlanningDetailPlanDocumentIds([]);
+      setPlanningDetailIncomeReportIds([]);
+      setPlanningDetailExpenseDistribution({});
+      setPlanningDetailFundMovements([]);
     }
   }, [selectedPlanning]);
   
@@ -550,17 +601,24 @@ const FinanceView: React.FC<FinanceViewProps> = ({
   const handleOpenRequestCreate = () => {
       setFinanceArchiveScope('active');
       setEditingRequest(null);
+      const nid = `pr-${Date.now()}`;
+      setCreateRequestId(nid);
       setReqAmount('');
       setReqTitle('');
       setReqDesc('');
       setReqDep(departments[0]?.id || '');
       setReqCat(categories[0]?.id || '');
       setReqPaymentDate('');
+      setReqInn('');
+      setReqInvoiceNumber('');
+      setReqInvoiceDate('');
+      setReqAttachments([]);
       setIsRequestModalOpen(true);
   };
   
   const handleOpenRequestEdit = (req: PurchaseRequest) => {
       setEditingRequest(req);
+      setCreateRequestId(req.id);
       setReqAmount(String(req.amount ?? '').replace(/\s/g, ''));
       setReqTitle(req.title || '');
       const sourceDesc = req.description ?? req.comment ?? '';
@@ -569,16 +627,24 @@ const FinanceView: React.FC<FinanceViewProps> = ({
       setReqDesc(sourceDesc.replace(/\s*\[paymentDate:[0-9]{4}-[0-9]{2}-[0-9]{2}\]\s*/g, '').trim());
       setReqDep(req.departmentId || '');
       setReqCat(req.categoryId || req.category || '');
+      setReqInn(req.counterpartyInn || '');
+      setReqInvoiceNumber(req.invoiceNumber || '');
+      setReqInvoiceDate(req.invoiceDate || '');
+      setReqAttachments(req.attachments?.length ? [...req.attachments] : []);
       setIsRequestModalOpen(true);
   };
 
   const handleRequestSubmit = (e?: React.FormEvent) => {
       if (e) e.preventDefault();
+      if (editingRequest && (editingRequest.status === 'approved' || editingRequest.status === 'paid')) {
+        return;
+      }
       const amountStr = reqAmount.replace(/\s/g, '').replace(/,/g, '.').trim() || '0';
       const title =
         reqTitle.trim() || (reqDesc.trim().slice(0, 500) || 'Заявка');
+      const rid = editingRequest?.id ?? (createRequestId || `pr-${Date.now()}`);
       onSaveRequest({
-          id: editingRequest ? editingRequest.id : `pr-${Date.now()}`,
+          id: rid,
           title,
           comment: reqDesc.trim(),
           requesterId: editingRequest?.requesterId ?? currentUser.id,
@@ -592,8 +658,54 @@ const FinanceView: React.FC<FinanceViewProps> = ({
           status: editingRequest ? editingRequest.status : 'pending',
           date: editingRequest?.date ?? new Date().toISOString(),
           isArchived: editingRequest?.isArchived,
+          attachments: reqAttachments.length ? reqAttachments : undefined,
+          counterpartyInn: reqInn.trim() || undefined,
+          invoiceNumber: reqInvoiceNumber.trim() || undefined,
+          invoiceDate: reqInvoiceDate || undefined,
+          version: editingRequest?.version,
       });
       setIsRequestModalOpen(false);
+  };
+
+  const handleSaveRequestMetadata = () => {
+    if (!editingRequest) return;
+    onSaveRequest(
+      {
+        ...editingRequest,
+        attachments: reqAttachments,
+        counterpartyInn: reqInn.trim() || undefined,
+        invoiceNumber: reqInvoiceNumber.trim() || undefined,
+        invoiceDate: reqInvoiceDate || undefined,
+      },
+      { metadataOnly: true }
+    );
+    setIsRequestModalOpen(false);
+  };
+
+  const handleRequestAttachmentFiles = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files?.length) return;
+    const uid = editingRequest?.id || createRequestId;
+    if (!uid) return;
+    const next = [...reqAttachments];
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      try {
+        const r = await uploadFile(file, `finance-requests/${uid}/`);
+        next.push({
+          id: `fra-${Date.now()}-${i}`,
+          name: file.name,
+          url: r.url,
+          type: file.type || 'application/octet-stream',
+          uploadedAt: new Date().toISOString(),
+          storagePath: r.path,
+        });
+      } catch {
+        setAlertText('Не удалось загрузить файл');
+      }
+    }
+    setReqAttachments(next);
+    e.target.value = '';
   };
 
   const handleStatusChange = (req: PurchaseRequest, status: PurchaseRequest['status']) => {
@@ -612,6 +724,24 @@ const FinanceView: React.FC<FinanceViewProps> = ({
         return;
       }
       if (status === 'approved') {
+        const pl = financialPlannings.find((p) => (p.requestIds || []).includes(req.id));
+        if (pl) {
+          const fid = pl.requestFundIds?.[req.id] || '';
+          if (!fid) {
+            setAlertText('В бюджете для этой заявки не выбран фонд. Откройте бюджет и назначьте фонд заявке.');
+            return;
+          }
+          const alloc = Number(pl.fundAllocations?.[fid]) || 0;
+          const used = approvedAmountByFund(pl, requests, req.id);
+          const need = parseRequestAmountUzs(req);
+          if (used[fid] + need > alloc + 0.01) {
+            const free = alloc - (used[fid] || 0);
+            setAlertText(
+              `Недостаточно средств на фонде. Доступно ${free.toLocaleString('ru-RU')} UZS, нужно ${need.toLocaleString('ru-RU')} UZS. Сделайте перераспределение в карточке бюджета.`
+            );
+            return;
+          }
+        }
         onSaveRequest({ ...req, status }, { statusPatch: 'approve' });
         return;
       }
@@ -629,7 +759,7 @@ const FinanceView: React.FC<FinanceViewProps> = ({
   const archiveFinancialPlanning = useCallback((e: React.MouseEvent, p: FinancialPlanning) => {
     e.stopPropagation();
     if (!onSaveFinancialPlanning) return;
-    if (!confirm('Переместить финансовое планирование в архив?')) return;
+    if (!confirm('Переместить бюджет в архив?')) return;
     onSaveFinancialPlanning({ ...p, isArchived: true, updatedAt: new Date().toISOString() });
   }, [onSaveFinancialPlanning]);
 
@@ -642,7 +772,7 @@ const FinanceView: React.FC<FinanceViewProps> = ({
   const archiveFinancialPlanDocument = useCallback((e: React.MouseEvent, d: FinancialPlanDocument) => {
     e.stopPropagation();
     if (!onSaveFinancialPlanDocument) return;
-    if (!confirm('Переместить документ финансового плана в архив?')) return;
+    if (!confirm('Переместить документ плана в архив?')) return;
     onSaveFinancialPlanDocument({ ...d, isArchived: true, updatedAt: new Date().toISOString() });
   }, [onSaveFinancialPlanDocument]);
 
@@ -692,12 +822,12 @@ const FinanceView: React.FC<FinanceViewProps> = ({
           <div className="bg-white dark:bg-[#252525] border border-gray-200 dark:border-[#333] rounded-xl p-12 text-center">
             <FileText size={48} className="mx-auto text-gray-300 dark:text-gray-600 mb-4" />
             <p className="text-gray-400 dark:text-gray-500 text-sm mb-2">
-              {financeArchiveScope === 'archived' ? 'Нет архивных планирований' : 'Нет финансовых планирований'}
+              {financeArchiveScope === 'archived' ? 'Нет архивных бюджетов' : 'Нет бюджетов'}
             </p>
             <p className="text-xs text-gray-400 dark:text-gray-500">
               {financeArchiveScope === 'archived'
                 ? 'Архивные записи появятся после перемещения в архив'
-                : 'Создайте первое планирование через кнопку с плюсом в шапке'}
+                : 'Создайте первый бюджет через кнопку с плюсом в шапке'}
             </p>
           </div>
         ) : (
@@ -795,7 +925,11 @@ const FinanceView: React.FC<FinanceViewProps> = ({
         planningDetailPeriodStart !== (ref.periodStart || '') ||
         planningDetailPeriodEnd !== (ref.periodEnd || '') ||
         JSON.stringify(planningDetailFundAllocations) !== JSON.stringify(ref.fundAllocations || {}) ||
-        JSON.stringify(planningDetailRequestFundIds) !== JSON.stringify(ref.requestFundIds || {})
+        JSON.stringify(planningDetailRequestFundIds) !== JSON.stringify(ref.requestFundIds || {}) ||
+        JSON.stringify([...planningDetailPlanDocumentIds].sort()) !== JSON.stringify([...(ref.planDocumentIds || [])].sort()) ||
+        JSON.stringify([...planningDetailIncomeReportIds].sort()) !== JSON.stringify([...(ref.incomeReportIds || [])].sort()) ||
+        JSON.stringify(planningDetailExpenseDistribution) !== JSON.stringify(ref.expenseDistribution || {}) ||
+        JSON.stringify(planningDetailFundMovements || []) !== JSON.stringify(ref.fundMovements || [])
       );
     };
     
@@ -816,6 +950,8 @@ const FinanceView: React.FC<FinanceViewProps> = ({
     
     const handleSave = () => {
       if (!onSaveFinancialPlanning) return;
+      const docIds = [...planningDetailPlanDocumentIds];
+      const irs = [...planningDetailIncomeReportIds];
       const updated: FinancialPlanning = {
         ...selectedPlanning,
         departmentId: planningDetailDepartmentId || selectedPlanning.departmentId,
@@ -827,9 +963,16 @@ const FinanceView: React.FC<FinanceViewProps> = ({
         income: planningDetailIncome,
         fundAllocations: Object.keys(planningDetailFundAllocations).length ? planningDetailFundAllocations : undefined,
         requestFundIds: Object.keys(planningDetailRequestFundIds).length ? planningDetailRequestFundIds : undefined,
+        planDocumentIds: docIds.length ? docIds : undefined,
+        planDocumentId: docIds[0] || selectedPlanning.planDocumentId,
+        incomeReportIds: irs.length ? irs : undefined,
+        incomeReportId: irs[0] || undefined,
+        expenseDistribution: Object.keys(planningDetailExpenseDistribution).length ? planningDetailExpenseDistribution : undefined,
+        fundMovements: planningDetailFundMovements?.length ? planningDetailFundMovements : undefined,
         updatedAt: new Date().toISOString()
       };
       onSaveFinancialPlanning(updated);
+      void onRefreshIncomeReports?.();
       planningDetailInitialValuesRef.current = {
         requestIds: planningDetailRequestIds,
         notes: planningDetailNotes,
@@ -838,7 +981,12 @@ const FinanceView: React.FC<FinanceViewProps> = ({
         periodStart: planningDetailPeriodStart,
         periodEnd: planningDetailPeriodEnd,
         fundAllocations: planningDetailFundAllocations,
-        requestFundIds: planningDetailRequestFundIds
+        requestFundIds: planningDetailRequestFundIds,
+        planDocumentIds: docIds,
+        incomeReportId: irs[0] || '',
+        incomeReportIds: irs,
+        expenseDistribution: planningDetailExpenseDistribution,
+        fundMovements: planningDetailFundMovements,
       };
     };
     
@@ -870,7 +1018,7 @@ const FinanceView: React.FC<FinanceViewProps> = ({
     
     const handleApprove = () => {
       if (!onSaveFinancialPlanning || !hasPermission(currentUser, 'finance.approve')) return;
-      if (confirm('Одобрить финансовое планирование?')) {
+      if (confirm('Одобрить бюджет?')) {
         const updated: FinancialPlanning = {
           ...selectedPlanning,
           status: 'approved',
@@ -898,7 +1046,7 @@ const FinanceView: React.FC<FinanceViewProps> = ({
 
     const handleArchivePlanningFromDetail = () => {
       if (!onSaveFinancialPlanning) return;
-      if (!confirm('Переместить финансовое планирование в архив?')) return;
+      if (!confirm('Переместить бюджет в архив?')) return;
       onSaveFinancialPlanning({ ...selectedPlanning, isArchived: true, updatedAt: new Date().toISOString() });
       setPlanningSubView('list');
       setSelectedPlanning(null);
@@ -911,7 +1059,12 @@ const FinanceView: React.FC<FinanceViewProps> = ({
     
     return (
       <div className="flex flex-col flex-1 min-h-0 -mx-4 md:-mx-6">
-        <div className="sticky top-0 z-20 flex flex-wrap items-center gap-3 px-4 py-3 border-b border-gray-200 dark:border-[#333] bg-white/95 dark:bg-[#191919]/95 backdrop-blur-md">
+        <div className="hidden print:block px-4 py-4 border-b-2 border-black text-black">
+          <h1 className="text-xl font-bold">Бюджет (печать)</h1>
+          <p className="text-sm mt-1">{dep?.name || '—'} · {periodLabel}</p>
+          <p className="text-xs text-gray-600 mt-2">Сформировано: {new Date().toLocaleString('ru-RU')}</p>
+        </div>
+        <div className="sticky top-0 z-20 flex flex-wrap items-center gap-3 px-4 py-3 border-b border-gray-200 dark:border-[#333] bg-white/95 dark:bg-[#191919]/95 backdrop-blur-md print:hidden">
           <button
             type="button"
             onClick={handleBack}
@@ -921,13 +1074,21 @@ const FinanceView: React.FC<FinanceViewProps> = ({
           </button>
           <div className="flex-1 min-w-0">
             <h2 className="text-lg font-bold text-gray-900 dark:text-white truncate">
-              Финансовое планирование
+              Бюджет
             </h2>
             <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
               {dep?.name || '—'} · {periodLabel}
             </p>
           </div>
-          <div className="flex items-center gap-2 flex-wrap justify-end">
+          <div className="flex items-center gap-2 flex-wrap justify-end print:hidden">
+            <button
+              type="button"
+              onClick={() => window.print()}
+              className="px-3 py-2 border border-gray-200 dark:border-[#444] text-gray-700 dark:text-gray-200 text-sm font-medium rounded-xl flex items-center gap-2"
+            >
+              <Printer size={16} />
+              Печать
+            </button>
             {isPlanningArchived ? (
               <button
                 type="button"
@@ -986,8 +1147,8 @@ const FinanceView: React.FC<FinanceViewProps> = ({
             )}
           </div>
         </div>
-        <div className={`${MODULE_PAGE_GUTTER} py-6 flex-1 overflow-y-auto custom-scrollbar min-h-0`}>
-        <fieldset disabled={isPlanningArchived} className="border-0 p-0 m-0 min-w-0 space-y-6 flex flex-col">
+        <div className={`${MODULE_PAGE_GUTTER} py-6 flex-1 overflow-y-auto custom-scrollbar min-h-0 print:overflow-visible print:py-4`}>
+        <fieldset disabled={isPlanningArchived} className="border-0 p-0 m-0 min-w-0 space-y-6 flex flex-col print:shadow-none">
 
         {/* Период + подразделение */}
         <div className="bg-white dark:bg-[#252525] border border-gray-200 dark:border-[#333] rounded-xl p-6">
@@ -1012,6 +1173,124 @@ const FinanceView: React.FC<FinanceViewProps> = ({
               </div>
             </div>
           </div>
+        </div>
+
+        {/* Справка о доходах и планы */}
+        <div className="bg-white dark:bg-[#252525] border border-gray-200 dark:border-[#333] rounded-xl p-6 space-y-4 print:break-inside-avoid">
+          <h3 className="text-sm font-bold text-gray-800 dark:text-white uppercase">Справка о доходах и планы</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">
+                Справки за месяц {selectedPlanning.period} (можно несколько)
+              </label>
+              <div className="max-h-36 overflow-y-auto space-y-1 border border-gray-200 dark:border-[#444] rounded-lg p-2 text-sm">
+                {incomeReports.filter(
+                  (r) =>
+                    r.period === selectedPlanning.period &&
+                    (!r.lockedByPlanningId || r.lockedByPlanningId === selectedPlanning.id)
+                ).length === 0 ? (
+                  <span className="text-xs text-gray-500 dark:text-gray-400">Нет доступных справок</span>
+                ) : (
+                  incomeReports
+                    .filter(
+                      (r) =>
+                        r.period === selectedPlanning.period &&
+                        (!r.lockedByPlanningId || r.lockedByPlanningId === selectedPlanning.id)
+                    )
+                    .map((r) => (
+                      <label key={r.id} className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={planningDetailIncomeReportIds.includes(r.id)}
+                          onChange={() => {
+                            setPlanningDetailIncomeReportIds((prev) =>
+                              prev.includes(r.id) ? prev.filter((x) => x !== r.id) : [...prev, r.id]
+                            );
+                          }}
+                        />
+                        <span className="truncate text-gray-800 dark:text-gray-100">
+                          {r.period} (справка)
+                          {r.lockedByPlanningId === selectedPlanning.id ? ' · привязана к этому бюджету' : ''}
+                        </span>
+                      </label>
+                    ))
+                )}
+              </div>
+              <button
+                type="button"
+                className="mt-2 text-xs text-[#3337AD] hover:underline print:hidden"
+                onClick={() => {
+                  if (!planningDetailIncomeReportIds.length) {
+                    setAlertText('Отметьте одну или несколько справок');
+                    return;
+                  }
+                  const sum = sumIncomeReportsInRange(
+                    incomeReports,
+                    planningDetailIncomeReportIds,
+                    planningDetailPeriodStart,
+                    planningDetailPeriodEnd
+                  );
+                  setPlanningDetailIncome(sum);
+                }}
+              >
+                Подтянуть доход из выбранных справок за даты периода
+              </button>
+            </div>
+            <div>
+              <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">Планы (тот же месяц и подразделение)</label>
+              <div className="max-h-36 overflow-y-auto space-y-1 border border-gray-200 dark:border-[#444] rounded-lg p-2 text-sm">
+                {financialPlanDocuments
+                  .filter(
+                    (d) =>
+                      !d.isArchived &&
+                      d.departmentId === planningDetailDepartmentId &&
+                      d.period === selectedPlanning.period
+                  )
+                  .map((d) => (
+                    <label key={d.id} className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={planningDetailPlanDocumentIds.includes(d.id)}
+                        onChange={() => {
+                          setPlanningDetailPlanDocumentIds((prev) =>
+                            prev.includes(d.id) ? prev.filter((x) => x !== d.id) : [...prev, d.id]
+                          );
+                        }}
+                      />
+                      <span className="truncate text-gray-800 dark:text-gray-100">
+                        {d.periodLabel || `${d.periodStart || ''}→${d.periodEnd || ''}`} · {(d.income || 0).toLocaleString('ru-RU')} UZS
+                      </span>
+                    </label>
+                  ))}
+              </div>
+              <button
+                type="button"
+                className="mt-2 px-3 py-1.5 rounded-lg bg-indigo-600 text-white text-xs print:hidden"
+                onClick={() => {
+                  const docs = financialPlanDocuments.filter((d) => planningDetailPlanDocumentIds.includes(d.id));
+                  setPlanningDetailExpenseDistribution(distributeIncomeFromPlanDocuments(planningDetailIncome, docs, categories));
+                }}
+              >
+                Распределить доход по статьям из планов
+              </button>
+            </div>
+          </div>
+          {Object.keys(planningDetailExpenseDistribution).length > 0 && (
+            <div className="border-t border-gray-100 dark:border-[#333] pt-3">
+              <div className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase mb-2">Распределение по статьям (расчёт)</div>
+              <ul className="text-sm space-y-1">
+                {(Object.entries(planningDetailExpenseDistribution) as [string, number][]).map(([cid, amt]) => {
+                  const cn = categories.find((c) => c.id === cid)?.name || cid;
+                  return (
+                    <li key={cid} className="flex justify-between gap-2">
+                      <span className="text-gray-600 dark:text-gray-400">{cn}</span>
+                      <span className="font-mono tabular-nums">{Number(amt).toLocaleString('ru-RU')} UZS</span>
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          )}
         </div>
         
         {/* Доход */}
@@ -1062,6 +1341,61 @@ const FinanceView: React.FC<FinanceViewProps> = ({
           </div>
         )}
 
+        {funds.filter((f) => !f.isArchived).length > 0 && (
+          <div className="bg-white dark:bg-[#252525] border border-gray-200 dark:border-[#333] rounded-xl p-6 print:break-inside-avoid">
+            <h3 className="text-sm font-bold text-gray-800 dark:text-white uppercase mb-2">Остатки на фондах</h3>
+            <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
+              После одобрения заявок остаток уменьшается. Перераспределение фиксируется в бюджете (движения).
+            </p>
+            <div className="space-y-2 text-sm">
+              {funds
+                .filter((f) => !f.isArchived)
+                .map((fund) => {
+                  const synthetic: FinancialPlanning = {
+                    ...selectedPlanning,
+                    fundAllocations: planningDetailFundAllocations,
+                    requestFundIds: planningDetailRequestFundIds,
+                    requestIds: planningDetailRequestIds,
+                  };
+                  const bal = fundAvailableBalances(synthetic, requests)[fund.id] ?? 0;
+                  return (
+                    <div key={fund.id} className="flex justify-between gap-2">
+                      <span className="text-gray-700 dark:text-gray-300">{fund.name}</span>
+                      <span className={`tabular-nums font-medium ${bal < 0 ? 'text-red-600 dark:text-red-400' : 'text-gray-900 dark:text-white'}`}>
+                        {bal.toLocaleString('ru-RU')} UZS
+                      </span>
+                    </div>
+                  );
+                })}
+            </div>
+            {planningDetailFundMovements && planningDetailFundMovements.length > 0 && (
+              <div className="mt-4 border-t border-gray-100 dark:border-[#333] pt-3 text-xs text-gray-500 dark:text-gray-400">
+                <div className="font-bold text-gray-600 dark:text-gray-300 mb-1">Движения между фондами</div>
+                <ul className="space-y-1">
+                  {planningDetailFundMovements.map((m) => {
+                    const fromN = funds.find((f) => f.id === m.fromFundId)?.name || m.fromFundId;
+                    const toN = funds.find((f) => f.id === m.toFundId)?.name || m.toFundId;
+                    return (
+                      <li key={m.id}>
+                        {fromN} → {toN}: {m.amount.toLocaleString('ru-RU')} UZS
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
+            )}
+            {!isPlanningArchived && (
+              <button
+                type="button"
+                className="mt-3 text-sm text-[#3337AD] hover:underline print:hidden"
+                onClick={() => setPlanningFundTransferOpen(true)}
+              >
+                Перераспределить между фондами
+              </button>
+            )}
+          </div>
+        )}
+
         {/* Info */}
         <div className="bg-white dark:bg-[#252525] border border-gray-200 dark:border-[#333] rounded-xl p-6">
           <div className="grid grid-cols-2 gap-4">
@@ -1081,7 +1415,7 @@ const FinanceView: React.FC<FinanceViewProps> = ({
         {/* Заявки */}
         <div className="bg-white dark:bg-[#252525] border border-gray-200 dark:border-[#333] rounded-xl overflow-hidden">
           <div className="p-4 border-b border-gray-200 dark:border-[#333] flex items-center justify-between flex-wrap gap-2">
-            <h3 className="font-bold text-gray-800 dark:text-white">Заявки в планировании ({planningRequests.length})</h3>
+            <h3 className="font-bold text-gray-800 dark:text-white">Заявки в бюджете ({planningRequests.length})</h3>
             <div className="flex items-center gap-4">
               <div className="text-xs text-gray-500 dark:text-gray-400">
                 Сумма: {sumRequestAmountsUzs(planningRequests)} UZS
@@ -1098,7 +1432,7 @@ const FinanceView: React.FC<FinanceViewProps> = ({
           <div className="p-4">
             {planningRequests.length === 0 ? (
               <div className="text-center py-8 text-gray-400 dark:text-gray-500 text-sm">
-                Нет заявок в планировании
+                Нет заявок в бюджете
               </div>
             ) : (
               <div className="space-y-2">
@@ -1184,6 +1518,85 @@ const FinanceView: React.FC<FinanceViewProps> = ({
         </div>
         </fieldset>
         </div>
+        {planningFundTransferOpen && (
+          <div
+            className="fixed inset-0 z-[280] flex items-center justify-center bg-black/40 p-4 print:hidden"
+            onClick={() => setPlanningFundTransferOpen(false)}
+            role="presentation"
+          >
+            <div
+              className="bg-white dark:bg-[#252525] rounded-xl p-6 max-w-md w-full border border-gray-200 dark:border-[#333] shadow-xl"
+              onClick={(e) => e.stopPropagation()}
+              role="dialog"
+            >
+              <h4 className="font-bold text-gray-900 dark:text-white mb-4">Перераспределение между фондами</h4>
+              <div className="space-y-3 text-sm">
+                <div>
+                  <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">Из фонда</label>
+                  <TaskSelect
+                    value={fundTransferFrom}
+                    onChange={setFundTransferFrom}
+                    options={[
+                      { value: '', label: '—' },
+                      ...funds.filter((f) => !f.isArchived).map((f) => ({ value: f.id, label: f.name })),
+                    ]}
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">В фонд</label>
+                  <TaskSelect
+                    value={fundTransferTo}
+                    onChange={setFundTransferTo}
+                    options={[
+                      { value: '', label: '—' },
+                      ...funds.filter((f) => !f.isArchived).map((f) => ({ value: f.id, label: f.name })),
+                    ]}
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">Сумма UZS</label>
+                  <input
+                    value={fundTransferAmount}
+                    onChange={(e) => setFundTransferAmount(e.target.value)}
+                    className="w-full border border-gray-300 dark:border-[#555] rounded-lg px-3 py-2 bg-white dark:bg-[#333] text-gray-900 dark:text-gray-100"
+                  />
+                </div>
+              </div>
+              <div className="flex justify-end gap-2 mt-6">
+                <Button type="button" variant="secondary" onClick={() => setPlanningFundTransferOpen(false)} size="md">
+                  Отмена
+                </Button>
+                <Button
+                  type="button"
+                  size="md"
+                  onClick={() => {
+                    const amt = Number(fundTransferAmount.replace(/\s/g, '').replace(/,/g, '.')) || 0;
+                    if (amt <= 0 || !fundTransferFrom || !fundTransferTo || fundTransferFrom === fundTransferTo) return;
+                    setPlanningDetailFundMovements((prev) => [
+                      ...prev,
+                      {
+                        id: `fm-${Date.now()}`,
+                        fromFundId: fundTransferFrom,
+                        toFundId: fundTransferTo,
+                        amount: amt,
+                        at: new Date().toISOString(),
+                      },
+                    ]);
+                    setPlanningDetailFundAllocations((prev) => ({
+                      ...prev,
+                      [fundTransferFrom]: (Number(prev[fundTransferFrom]) || 0) - amt,
+                      [fundTransferTo]: (Number(prev[fundTransferTo]) || 0) + amt,
+                    }));
+                    setPlanningFundTransferOpen(false);
+                    setFundTransferAmount('');
+                  }}
+                >
+                  Применить
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     );
   };
@@ -1199,7 +1612,7 @@ const FinanceView: React.FC<FinanceViewProps> = ({
           <div className="bg-white dark:bg-[#252525] border border-gray-200 dark:border-[#333] rounded-xl p-12 text-center">
             <FileText size={48} className="mx-auto text-gray-300 dark:text-gray-600 mb-4" />
             <p className="text-gray-400 dark:text-gray-500 text-sm mb-2">
-              {financeArchiveScope === 'archived' ? 'Нет архивных документов плана' : 'Нет финансовых планов'}
+              {financeArchiveScope === 'archived' ? 'Нет архивных документов плана' : 'Нет планов'}
             </p>
             <p className="text-xs text-gray-400 dark:text-gray-500">
               {financeArchiveScope === 'archived'
@@ -1365,7 +1778,7 @@ const FinanceView: React.FC<FinanceViewProps> = ({
     
     const handleApprove = () => {
       if (!onSaveFinancialPlanDocument || !hasPermission(currentUser, 'finance.approve')) return;
-      if (confirm('Утвердить финансовый план?')) {
+      if (confirm('Утвердить план?')) {
         const updated: FinancialPlanDocument = {
           ...selectedPlanDoc,
           status: 'approved',
@@ -1393,7 +1806,7 @@ const FinanceView: React.FC<FinanceViewProps> = ({
 
     const handleArchivePlanDocFromDetail = () => {
       if (!onSaveFinancialPlanDocument) return;
-      if (!confirm('Переместить документ финансового плана в архив?')) return;
+      if (!confirm('Переместить документ плана в архив?')) return;
       onSaveFinancialPlanDocument({ ...selectedPlanDoc, isArchived: true, updatedAt: new Date().toISOString() });
       setPlanSubView('list');
       setSelectedPlanDoc(null);
@@ -1405,26 +1818,91 @@ const FinanceView: React.FC<FinanceViewProps> = ({
     };
     
     const balance = planDetailIncome - planDetailTotalExpenses;
+
+    const handleSplitPlanToWeeks = () => {
+      if (!onSaveFinancialPlanDocument) return;
+      const ym = selectedPlanDoc.period;
+      const segs = splitMonthIntoWeekSegments(ym);
+      if (segs.length <= 1) {
+        setAlertText('Для этого месяца недельное разбиение не требуется или получается одна неделя.');
+        return;
+      }
+      if (
+        !confirm(
+          `Создать ${segs.length} документов плана по неделям (якорный месяц ${ym})? Текущий документ останется — при необходимости удалите его отдельно.`
+        )
+      )
+        return;
+      const seriesId = `pss-${Date.now()}`;
+      const totalDays = segs.reduce((a, s) => a + s.daysInTargetMonth, 0) || 1;
+      const baseIncome = Number(planDetailIncome) || 0;
+      const baseExp = { ...planDetailExpenses };
+      segs.forEach((seg, i) => {
+        const w = seg.daysInTargetMonth / totalDays;
+        const inc = Math.round(baseIncome * w * 100) / 100;
+        const exp: Record<string, number> = {};
+        for (const catId of planDetailSelectedCategories) {
+          const v = Number(baseExp[catId]) || 0;
+          exp[catId] = Math.round(v * w * 100) / 100;
+        }
+        const id = `fpd-${Date.now()}-${i}-${Math.floor(Math.random() * 1e6)}`;
+        onSaveFinancialPlanDocument({
+          id,
+          departmentId: planDetailDepartmentId || selectedPlanDoc.departmentId,
+          period: ym,
+          periodStart: seg.start,
+          periodEnd: seg.end,
+          planSeriesId: seriesId,
+          periodLabel: seg.label,
+          income: inc,
+          expenses: exp,
+          status: 'created',
+          createdAt: new Date().toISOString(),
+        });
+      });
+    };
     
     return (
       <div className="flex flex-col flex-1 min-h-0 -mx-4 md:-mx-6">
-        <div className="sticky top-0 z-20 flex flex-wrap items-center gap-3 px-4 py-3 border-b border-gray-200 dark:border-[#333] bg-white/95 dark:bg-[#191919]/95 backdrop-blur-md">
+        <div className="hidden print:block px-4 py-4 border-b-2 border-black text-black">
+          <h1 className="text-xl font-bold">План (печать)</h1>
+          <p className="text-sm mt-1">{dep?.name || '—'} · {periodLabel}</p>
+          <p className="text-xs text-gray-600 mt-2">Сформировано: {new Date().toLocaleString('ru-RU')}</p>
+        </div>
+        <div className="sticky top-0 z-20 flex flex-wrap items-center gap-3 px-4 py-3 border-b border-gray-200 dark:border-[#333] bg-white/95 dark:bg-[#191919]/95 backdrop-blur-md print:hidden">
           <button
             type="button"
             onClick={handleBack}
-            className="p-2 rounded-xl border border-gray-200 dark:border-[#333] hover:bg-gray-50 dark:hover:bg-[#252525] transition-colors"
+            className="p-2 rounded-xl border border-gray-200 dark:border-[#333] hover:bg-gray-50 dark:hover:bg-[#252525] transition-colors print:hidden"
           >
             <ArrowLeft size={20} className="text-gray-600 dark:text-gray-400" />
           </button>
           <div className="flex-1 min-w-0">
             <h2 className="text-lg font-bold text-gray-900 dark:text-white truncate">
-              Финансовый план
+              План
             </h2>
             <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
               {dep?.name || '—'} · {periodLabel}
             </p>
           </div>
-          <div className="flex items-center gap-2 flex-wrap justify-end">
+          <div className="flex items-center gap-2 flex-wrap justify-end print:hidden">
+            <button
+              type="button"
+              onClick={() => window.print()}
+              className="px-3 py-2 border border-gray-200 dark:border-[#444] text-gray-700 dark:text-gray-200 text-sm font-medium rounded-xl flex items-center gap-2"
+            >
+              <Printer size={16} />
+              Печать
+            </button>
+            {!isPlanDocArchived && (
+              <button
+                type="button"
+                onClick={handleSplitPlanToWeeks}
+                className="px-3 py-2 border border-indigo-200 dark:border-indigo-900 text-indigo-800 dark:text-indigo-200 text-sm font-medium rounded-xl"
+              >
+                Разбить месяц на недели
+              </button>
+            )}
             {isPlanDocArchived ? (
               <button
                 type="button"
@@ -1876,11 +2354,11 @@ const FinanceView: React.FC<FinanceViewProps> = ({
 
   const financeTabOptions = useMemo(
     () => [
-      { value: 'planning' as const, label: 'Планирование' },
+      { value: 'planning' as const, label: 'Бюджет' },
       { value: 'bdr' as const, label: 'БДР' },
       { value: 'requests' as const, label: 'Заявки' },
       { value: 'statements' as const, label: 'Выписки и сверка' },
-      ...(hasPermission(currentUser, 'finance.approve') ? [{ value: 'plan' as const, label: 'Финансовый план' }] : []),
+      ...(hasPermission(currentUser, 'finance.approve') ? [{ value: 'plan' as const, label: 'План' }] : []),
     ],
     [currentUser.permissions]
   );
@@ -1993,7 +2471,7 @@ const FinanceView: React.FC<FinanceViewProps> = ({
             },
             {
               id: 'create-fin-plan',
-              label: 'Финансовый план',
+              label: 'План',
               icon: FileText,
               onClick: () => {
                 handleQuickCreatePlan();
@@ -2001,7 +2479,7 @@ const FinanceView: React.FC<FinanceViewProps> = ({
             },
             {
               id: 'create-fin-planning',
-              label: 'Финансовое планирование',
+              label: 'Бюджет',
               icon: PieChart,
               onClick: () => {
                 handleQuickCreatePlanning();
@@ -2044,7 +2522,13 @@ const FinanceView: React.FC<FinanceViewProps> = ({
       (showRequestFilters && activeTab === 'requests'));
 
   return (
-    <ModulePageShell className="flex-1 min-h-0 flex flex-col overflow-hidden">
+    <ModulePageShell className="finance-print-shell flex-1 min-h-0 flex flex-col overflow-hidden">
+      <style>{`
+        @media print {
+          .finance-print-shell * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+          .finance-print-shell .custom-scrollbar { overflow: visible !important; height: auto !important; }
+        }
+      `}</style>
       {!financeFullScreen && showPlanningFilters && activeTab === 'planning' && planningSubView === 'list' && (
         <div className={`${MODULE_PAGE_GUTTER} ${MODULE_PAGE_TOP_PAD} pb-2 flex-shrink-0 border-b border-gray-200 dark:border-[#333]`}>
           <div className="p-4 bg-gray-50 dark:bg-[#252525] rounded-lg border border-gray-200 dark:border-[#333]">
@@ -2157,7 +2641,14 @@ const FinanceView: React.FC<FinanceViewProps> = ({
              <BdrView bdr={bdr ?? null} onLoadBdr={onLoadBdr} onSaveBdr={onSaveBdr} />
            )}
            {activeTab === 'requests' && renderRequestsTab()}
-           {activeTab === 'statements' && <BankStatementsView ref={bankStatementsRef} />}
+           {activeTab === 'statements' && (
+             <BankStatementsView
+               ref={bankStatementsRef}
+               purchaseRequests={requests}
+               financialPlannings={financialPlannings}
+               onRefreshPurchaseRequests={onRefreshPurchaseRequests}
+             />
+           )}
            {activeTab === 'plan' && planSubView === 'list' && renderPlanList()}
            {activeTab === 'plan' && planSubView === 'detail' && selectedPlanDoc && renderPlanDetail()}
          </div>
@@ -2166,19 +2657,30 @@ const FinanceView: React.FC<FinanceViewProps> = ({
        {/* Request Modal */}
        {isRequestModalOpen && (
         <div className="fixed inset-0 bg-black/35 backdrop-blur-sm flex items-end md:items-center justify-center z-[220] animate-in fade-in duration-200" onClick={(e) => { if(e.target === e.currentTarget) setIsRequestModalOpen(false) }}>
-            <div className="bg-white dark:bg-[#252525] rounded-t-2xl md:rounded-xl shadow-2xl w-full max-w-lg max-h-[95vh] md:max-h-[90vh] overflow-hidden border border-gray-200 dark:border-[#333]">
-                <div className="p-4 border-b border-gray-100 dark:border-[#333] flex justify-between items-center bg-white dark:bg-[#252525]">
+            <div className="bg-white dark:bg-[#252525] rounded-t-2xl md:rounded-xl shadow-2xl w-full max-w-2xl max-h-[95vh] md:max-h-[90vh] overflow-hidden border border-gray-200 dark:border-[#333] flex flex-col">
+                <div className="p-4 border-b border-gray-100 dark:border-[#333] flex justify-between items-center bg-white dark:bg-[#252525] shrink-0">
                     <h3 className="font-bold text-gray-800 dark:text-white">Заявка на приобретение</h3>
                     <button onClick={() => setIsRequestModalOpen(false)} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 p-1 rounded-full hover:bg-gray-100 dark:hover:bg-[#333]"><X size={18} /></button>
                 </div>
-                <form onSubmit={handleRequestSubmit} className="p-6 space-y-4">
+                {(() => {
+                  const reqLocked = Boolean(
+                    editingRequest && (editingRequest.status === 'approved' || editingRequest.status === 'paid')
+                  );
+                  return (
+                <form onSubmit={handleRequestSubmit} className="p-6 space-y-4 overflow-y-auto flex-1 min-h-0 custom-scrollbar">
+                    {reqLocked && (
+                      <p className="text-xs text-amber-800 dark:text-amber-200 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900/40 rounded-lg px-3 py-2">
+                        Заявка одобрена или оплачена: сумму и описание менять нельзя. Ниже — реквизиты для сверки с банковской выпиской (ИНН, счёт, вложения).
+                      </p>
+                    )}
                     <div>
                         <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 mb-1">Название</label>
                         <input
                             type="text"
                             value={reqTitle}
+                            readOnly={reqLocked}
                             onChange={(e) => setReqTitle(e.target.value)}
-                            className="w-full border border-gray-300 dark:border-gray-600 rounded px-3 py-2 text-sm bg-white dark:bg-[#333] text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500"
+                            className="w-full border border-gray-300 dark:border-gray-600 rounded px-3 py-2 text-sm bg-white dark:bg-[#333] text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 disabled:opacity-60"
                             placeholder="Кратко, для списка заявок"
                         />
                     </div>
@@ -2187,10 +2689,11 @@ const FinanceView: React.FC<FinanceViewProps> = ({
                         <input 
                             type="text" 
                             inputMode="decimal"
-                            required 
+                            required={!reqLocked}
+                            readOnly={reqLocked}
                             value={reqAmount} 
                             onChange={e => setReqAmount(e.target.value)} 
-                            className="w-full border border-gray-300 dark:border-gray-600 rounded px-3 py-2 text-sm bg-white dark:bg-[#333] text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500"
+                            className="w-full border border-gray-300 dark:border-gray-600 rounded px-3 py-2 text-sm bg-white dark:bg-[#333] text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 disabled:opacity-60"
                             placeholder="Например 1500000.50"
                         />
                     </div>
@@ -2200,6 +2703,7 @@ const FinanceView: React.FC<FinanceViewProps> = ({
                             <TaskSelect
                                 value={reqDep}
                                 onChange={setReqDep}
+                                disabled={reqLocked}
                                 options={[
                                     { value: '', label: 'Выберите подразделение' },
                                     ...departments.map(d => ({ value: d.id, label: d.name }))
@@ -2211,6 +2715,7 @@ const FinanceView: React.FC<FinanceViewProps> = ({
                             <TaskSelect
                                 value={reqCat}
                                 onChange={setReqCat}
+                                disabled={reqLocked}
                                 options={[
                                     { value: '', label: 'Выберите статью' },
                                     ...categories.map(c => ({ value: c.id, label: c.name }))
@@ -2220,17 +2725,56 @@ const FinanceView: React.FC<FinanceViewProps> = ({
                     </div>
                     <div>
                       <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 mb-1">Плановая дата оплаты</label>
-                      <DateInput value={reqPaymentDate} onChange={setReqPaymentDate} placeholder="Выберите дату оплаты" />
+                      <DateInput value={reqPaymentDate} onChange={setReqPaymentDate} placeholder="Выберите дату оплаты" disabled={reqLocked} />
                     </div>
                     <div>
                         <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 mb-1">Описание / Обоснование</label>
-                        <textarea required value={reqDesc} onChange={e => setReqDesc(e.target.value)} className="w-full h-24 border border-gray-300 dark:border-gray-600 rounded px-3 py-2 text-sm bg-white dark:bg-[#333] text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 resize-none" placeholder="Что покупаем и зачем?"/>
+                        <textarea required={!reqLocked} readOnly={reqLocked} value={reqDesc} onChange={e => setReqDesc(e.target.value)} className="w-full h-24 border border-gray-300 dark:border-gray-600 rounded px-3 py-2 text-sm bg-white dark:bg-[#333] text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 resize-none disabled:opacity-60" placeholder="Что покупаем и зачем?"/>
                     </div>
-                    <div className="flex justify-end gap-2 pt-2">
-                        <Button type="button" variant="secondary" onClick={() => setIsRequestModalOpen(false)} size="md">Отмена</Button>
-                        <Button type="submit" size="md">Отправить</Button>
+                    <div className="border-t border-gray-100 dark:border-[#333] pt-4 space-y-3">
+                      <p className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase">Сверка с выпиской</p>
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                        <div>
+                          <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">ИНН контрагента</label>
+                          <input value={reqInn} onChange={(e) => setReqInn(e.target.value)} className="w-full border border-gray-300 dark:border-gray-600 rounded px-3 py-2 text-sm bg-white dark:bg-[#333]" placeholder="Необязательно" />
+                        </div>
+                        <div>
+                          <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">№ счёта</label>
+                          <input value={reqInvoiceNumber} onChange={(e) => setReqInvoiceNumber(e.target.value)} className="w-full border border-gray-300 dark:border-gray-600 rounded px-3 py-2 text-sm bg-white dark:bg-[#333]" placeholder="Необязательно" />
+                        </div>
+                        <div>
+                          <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">Дата счёта</label>
+                          <DateInput value={reqInvoiceDate} onChange={setReqInvoiceDate} placeholder="ГГГГ-ММ-ДД" />
+                        </div>
+                      </div>
+                      <div>
+                        <input ref={reqAttachInputRef} type="file" multiple accept="application/pdf,image/*" className="hidden" onChange={handleRequestAttachmentFiles} />
+                        <Button type="button" variant="secondary" size="sm" onClick={() => reqAttachInputRef.current?.click()}>
+                          Прикрепить PDF / изображение
+                        </Button>
+                        {reqAttachments.length > 0 && (
+                          <ul className="mt-2 text-xs text-gray-600 dark:text-gray-400 space-y-1">
+                            {reqAttachments.map((a) => (
+                              <li key={a.id} className="flex justify-between gap-2">
+                                <span className="truncate">{a.name}</span>
+                                <button type="button" className="text-red-600 shrink-0" onClick={() => setReqAttachments((prev) => prev.filter((x) => x.id !== a.id))}>Убрать</button>
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex justify-end gap-2 pt-2 border-t border-gray-100 dark:border-[#333]">
+                        <Button type="button" variant="secondary" onClick={() => setIsRequestModalOpen(false)} size="md">Закрыть</Button>
+                        {reqLocked ? (
+                          <Button type="button" size="md" onClick={handleSaveRequestMetadata}>Сохранить реквизиты</Button>
+                        ) : (
+                          <Button type="submit" size="md">Отправить</Button>
+                        )}
                     </div>
                 </form>
+                  );
+                })()}
             </div>
         </div>
        )}

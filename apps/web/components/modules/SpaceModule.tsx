@@ -1,6 +1,6 @@
 
 import React, { useMemo, useState } from 'react';
-import { TableCollection, Task, User, Project, StatusOption, PriorityOption, Doc, Folder, Meeting, ContentPost, ViewMode, BusinessProcess, Client, Deal, ShootPlan, NotificationPreferences } from '../../types';
+import { TableCollection, Task, User, Project, StatusOption, PriorityOption, Doc, Folder, Meeting, ContentPost, ViewMode, BusinessProcess, Client, Deal, ShootPlan, NotificationPreferences, InventoryItem } from '../../types';
 import type { AppActions } from '../../frontend/hooks/useAppLogic';
 import TableView from '../TableView';
 import KanbanBoard from '../KanbanBoard';
@@ -31,12 +31,13 @@ interface SpaceModuleProps {
   businessProcesses?: BusinessProcess[];
   clients?: Client[];
   deals?: Deal[];
+  inventoryItems?: InventoryItem[];
   notificationPrefs?: NotificationPreferences;
   actions: AppActions;
 }
 
 export const SpaceModule: React.FC<SpaceModuleProps> = ({
-  activeTable, viewMode, tasks, users, currentUser, projects, statuses, priorities, tables, docs, folders, meetings, contentPosts, shootPlans = [], businessProcesses = [], clients = [], deals = [], notificationPrefs, actions
+  activeTable, viewMode, tasks, users, currentUser, projects, statuses, priorities, tables, docs, folders, meetings, contentPosts, shootPlans = [], businessProcesses = [], clients = [], deals = [], inventoryItems = [], notificationPrefs, actions
 }) => {
   const isAggregator = activeTable?.isSystem && activeTable?.type === 'tasks';
 
@@ -449,6 +450,10 @@ export const SpaceModule: React.FC<SpaceModuleProps> = ({
                             actions.saveTask({ id: taskId, attachments: updatedAttachments });
                         }
                     }}
+                    deals={deals}
+                    inventoryItems={inventoryItems}
+                    onSaveDeal={actions.saveDeal}
+                    onSaveInventoryItem={actions.saveInventoryItem}
                 />
                 </div>
             </div>

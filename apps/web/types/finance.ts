@@ -15,6 +15,16 @@ export interface FinancePlan {
   currentIncome: number;
 }
 
+/** Вложение к заявке (PDF счёта и т.д.) для сверки с выпиской */
+export interface FinanceRequestAttachmentMeta {
+  id: string;
+  name: string;
+  url: string;
+  type: string;
+  uploadedAt?: string;
+  storagePath?: string;
+}
+
 export interface PurchaseRequest {
   id: string;
   title?: string;
@@ -37,6 +47,12 @@ export interface PurchaseRequest {
   isArchived?: boolean;
   /** Optimistic locking для PATCH /finance/requests/{id}. */
   version?: number;
+  attachments?: FinanceRequestAttachmentMeta[];
+  /** ИНН контрагента — для поиска в назначении платежа в выписке */
+  counterpartyInn?: string;
+  invoiceNumber?: string;
+  /** Дата счёта (YYYY-MM-DD) */
+  invoiceDate?: string;
 }
 
 export interface FinancialPlanDocument {
@@ -53,6 +69,9 @@ export interface FinancialPlanDocument {
   approvedBy?: string;
   approvedAt?: string;
   isArchived?: boolean;
+  /** Группа недельных срезов одного месяца (один department + месяц). */
+  planSeriesId?: string;
+  periodLabel?: string;
 }
 
 export interface Fund {
@@ -62,6 +81,16 @@ export interface Fund {
   isArchived?: boolean;
 }
 
+/** Движение между фондами внутри бюджета (перераспределение / «заём»). */
+export interface FinancialPlanningFundMovement {
+  id: string;
+  fromFundId: string;
+  toFundId: string;
+  amount: number;
+  note?: string;
+  at: string;
+}
+
 export interface FinancialPlanning {
   id: string;
   departmentId: string;
@@ -69,6 +98,8 @@ export interface FinancialPlanning {
   periodStart?: string;
   periodEnd?: string;
   planDocumentId?: string;
+  /** Несколько планов (например по неделям), суммарно по числу периодов. */
+  planDocumentIds?: string[];
   income?: number;
   fundAllocations?: Record<string, number>;
   requestFundIds?: Record<string, string>;
@@ -80,6 +111,23 @@ export interface FinancialPlanning {
   approvedAt?: string;
   notes?: string;
   isArchived?: boolean;
+  /** Справка о доходах (месяц); блокируется при проведённом/утверждённом бюджете. */
+  incomeReportId?: string | null;
+  /** Несколько справок, привязанных к бюджету (например по неделям). */
+  incomeReportIds?: string[];
+  fundMovements?: FinancialPlanningFundMovement[];
+  /** Распределение дохода по статьям (UZS), по данным планов. */
+  expenseDistribution?: Record<string, number>;
+}
+
+/** Справка о доходах по дням (модуль «Выписки»). */
+export interface IncomeReport {
+  id: string;
+  period: string;
+  data: Record<string, number>;
+  createdAt?: string;
+  updatedAt?: string;
+  lockedByPlanningId?: string | null;
 }
 
 export interface BdrRow {

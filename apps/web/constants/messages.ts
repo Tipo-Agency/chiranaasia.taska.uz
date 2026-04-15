@@ -24,10 +24,10 @@ export const NOTIFICATION_MESSAGES = {
   FUND_DELETED: 'Фонд удалён',
   PURCHASE_REQUEST_SAVED: 'Заявка сохранена',
   PURCHASE_REQUEST_DELETED: 'Заявка удалена',
-  FINANCIAL_PLAN_SAVED: 'Финансовый план сохранен',
-  FINANCIAL_PLAN_DELETED: 'Финансовый план удален',
-  FINANCIAL_PLANNING_SAVED: 'Финансовое планирование сохранено',
-  FINANCIAL_PLANNING_DELETED: 'Финансовое планирование удалено',
+  FINANCIAL_PLAN_SAVED: 'План сохранён',
+  FINANCIAL_PLAN_DELETED: 'План удалён',
+  FINANCIAL_PLANNING_SAVED: 'Бюджет сохранён',
+  FINANCIAL_PLANNING_DELETED: 'Бюджет удалён',
   
   // Задачи
   TASK_SAVED: 'Задача сохранена',

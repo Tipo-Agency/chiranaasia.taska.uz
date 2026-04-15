@@ -4,6 +4,7 @@ export * from './auth';
 export * from './clients';
 export * from './deals';
 export * from './funnels';
+export * from './productionRoutes';
 export * from './org';
 export * from './bpm';
 export * from './automation';

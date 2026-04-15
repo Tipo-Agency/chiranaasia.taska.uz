@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useMemo, useLayoutEffect, lazy, Suspense } from 'react';
-import { Project, Task, User, StatusOption, PriorityOption, NotificationPreferences, AutomationRule, TableCollection, Deal, Department, FinanceCategory, Fund, SalesFunnel, Doc, ContentPost, EmployeeInfo, Client, Contract, BusinessProcess, Meeting, Warehouse, OrgPosition } from '../types';
-import { User as UserIcon, Briefcase, Archive, Users, Building2, Wallet, TrendingUp, PiggyBank, ShieldAlert, Settings, BellRing, Zap, Package, ArrowLeft, ShieldCheck, Receipt, Link2 } from 'lucide-react';
+import { Project, Task, User, StatusOption, PriorityOption, NotificationPreferences, AutomationRule, TableCollection, Deal, Department, FinanceCategory, Fund, SalesFunnel, Doc, ContentPost, EmployeeInfo, Client, Contract, BusinessProcess, Meeting, Warehouse, OrgPosition, ProductionRoutePipeline } from '../types';
+import { User as UserIcon, Briefcase, Archive, Users, Building2, Wallet, TrendingUp, PiggyBank, ShieldAlert, Settings, BellRing, Zap, Package, ArrowLeft, ShieldCheck, Receipt, Link2, Factory } from 'lucide-react';
 import {
   Input,
   ModuleCreateDropdown,
@@ -21,6 +21,7 @@ import { SpaceSettings } from './settings/SpaceSettings';
 import { AutomationSettings } from './settings/AutomationSettings';
 import DepartmentsView from './DepartmentsView';
 import SalesFunnelsSettings from './settings/SalesFunnelsSettings';
+import ProductionRoutesSettings from './settings/ProductionRoutesSettings';
 import { DEFAULT_NOTIFICATION_PREFS } from '../constants';
 // Integrations are managed outside Settings now.
 import { ArchiveView, ARCHIVE_TAB_OPTIONS, type ArchiveTabId } from './settings/ArchiveView';
@@ -48,6 +49,7 @@ interface SettingsViewProps {
   funds?: Fund[];
   warehouses?: Warehouse[];
   salesFunnels?: SalesFunnel[];
+  productionPipelines?: ProductionRoutePipeline[];
   employeeInfos?: EmployeeInfo[];
   deals?: Deal[];
   clients?: Client[];
@@ -102,6 +104,8 @@ interface SettingsViewProps {
   onDeleteWarehouse?: (id: string) => void;
   onSaveSalesFunnel?: (funnel: SalesFunnel) => void;
   onDeleteSalesFunnel?: (id: string) => void;
+  onSaveProductionPipeline?: (p: ProductionRoutePipeline) => void | Promise<void>;
+  onDeleteProductionPipeline?: (id: string) => void | Promise<void>;
   notificationPrefs?: NotificationPreferences;
   
   initialTab?: string;
@@ -137,12 +141,21 @@ const SettingsView: React.FC<SettingsViewProps> = ({
   funds = [], onSaveFund, onDeleteFund,
   warehouses = [], onSaveWarehouse, onDeleteWarehouse,
   salesFunnels = [], onSaveSalesFunnel, onDeleteSalesFunnel,
+  productionPipelines = [], onSaveProductionPipeline, onDeleteProductionPipeline,
   employeeInfos = [], deals = [], clients = [], contracts = [], meetings = [], businessProcesses = [], orgPositions = [],
   notificationPrefs, onClose: _onClose
 }) => {
   const { setLeading, setModule } = useAppToolbar();
   const settingsTabs = useMemo(() => {
     const t = [...SETTINGS_TABS_BASE];
+    const sfIdx = t.findIndex((x) => x.id === 'sales-funnels');
+    if (currentUser && hasPermission(currentUser, 'org.production') && sfIdx >= 0) {
+      t.splice(sfIdx + 1, 0, {
+        id: 'production-routes',
+        label: 'Производственные маршруты',
+        icon: <Factory size={14} />,
+      });
+    }
     if (currentUser && hasPermission(currentUser, 'admin.system')) {
       t.push({ id: 'integrations-roadmap', label: 'Интеграции (план)', icon: <Link2 size={14} /> });
       t.push({ id: 'admin', label: 'Админ-панель', icon: <ShieldCheck size={14} /> });
@@ -160,6 +173,9 @@ const SettingsView: React.FC<SettingsViewProps> = ({
     ) {
       return 'users';
     }
+    if (t === 'production-routes' && (!currentUser || !hasPermission(currentUser, 'org.production'))) {
+      return 'users';
+    }
     return t;
   };
   const [activeTab, setActiveTab] = useState<string>(normalizeTab(initialTab));
@@ -173,6 +189,7 @@ const SettingsView: React.FC<SettingsViewProps> = ({
   const [structureCreateKind, setStructureCreateKind] = useState<null | 'project' | 'department' | 'warehouse'>(null);
   const [financeCreateKind, setFinanceCreateKind] = useState<null | 'category' | 'fund'>(null);
   const [salesFunnelsCreateRequested, setSalesFunnelsCreateRequested] = useState(0);
+  const [productionRoutesCreateRequested, setProductionRoutesCreateRequested] = useState(0);
 
   useEffect(() => {
     // When Settings opened with legacy tab ids, map them to new unified tab.
@@ -217,7 +234,8 @@ const SettingsView: React.FC<SettingsViewProps> = ({
       ((activeTab === 'users' && hasPermission(currentUser, 'access.users')) ||
         activeTab === 'structure' ||
         activeTab === 'finance-setup' ||
-        activeTab === 'sales-funnels');
+        activeTab === 'sales-funnels' ||
+        (activeTab === 'production-routes' && hasPermission(currentUser, 'org.production')));
 
     setModule(
       <div className={APP_TOOLBAR_MODULE_CLUSTER}>
@@ -308,6 +326,7 @@ const SettingsView: React.FC<SettingsViewProps> = ({
                   if (!canCreate) return;
                   if (activeTab === 'users') setOpenNewUserSignal((n) => n + 1);
                   if (activeTab === 'sales-funnels') setSalesFunnelsCreateRequested((x) => x + 1);
+                  if (activeTab === 'production-routes') setProductionRoutesCreateRequested((x) => x + 1);
                 }}
               />
             )}
@@ -338,6 +357,7 @@ const SettingsView: React.FC<SettingsViewProps> = ({
     archiveQuery,
     setLeading,
     setModule,
+    currentUser,
   ]);
 
   return (
@@ -459,6 +479,15 @@ const SettingsView: React.FC<SettingsViewProps> = ({
                   notificationPrefs={notificationPrefs}
                   onUpdatePrefs={onUpdateNotificationPrefs}
                   createRequested={salesFunnelsCreateRequested}
+                />
+              )}
+              {activeTab === 'production-routes' && currentUser && hasPermission(currentUser, 'org.production') && (
+                <ProductionRoutesSettings
+                  pipelines={productionPipelines}
+                  users={users}
+                  onSave={onSaveProductionPipeline!}
+                  onDelete={onDeleteProductionPipeline!}
+                  createRequested={productionRoutesCreateRequested}
                 />
               )}
               {activeTab === 'notifications' && (

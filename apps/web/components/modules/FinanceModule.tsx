@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { FinanceCategory, Fund, FinancePlan, PurchaseRequest, Department, User, FinancialPlanDocument, FinancialPlanning, Bdr } from '../../types';
+import { FinanceCategory, Fund, FinancePlan, PurchaseRequest, Department, User, FinancialPlanDocument, FinancialPlanning, Bdr, IncomeReport } from '../../types';
 import type { AppActions } from '../../frontend/hooks/useAppLogic';
 import FinanceView from '../FinanceView';
 
@@ -14,11 +14,12 @@ interface FinanceModuleProps {
   currentUser: User;
   financialPlanDocuments?: FinancialPlanDocument[];
   financialPlannings?: FinancialPlanning[];
+  incomeReports?: IncomeReport[];
   bdr?: Bdr | null;
   actions: AppActions;
 }
 
-export const FinanceModule: React.FC<FinanceModuleProps> = ({ categories, funds = [], plan, requests, departments, users, currentUser, financialPlanDocuments = [], financialPlannings = [], bdr = null, actions }) => {
+export const FinanceModule: React.FC<FinanceModuleProps> = ({ categories, funds = [], plan, requests, departments, users, currentUser, financialPlanDocuments = [], financialPlannings = [], incomeReports = [], bdr = null, actions }) => {
     return (
         <div className="h-full min-h-0 flex flex-col">
         <FinanceView 
@@ -31,7 +32,9 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ categories, funds 
             currentUser={currentUser}
             financialPlanDocuments={financialPlanDocuments}
             financialPlannings={financialPlannings}
+            incomeReports={incomeReports}
             bdr={bdr}
+            onRefreshIncomeReports={actions.refreshIncomeReports}
             onLoadBdr={actions.loadBdr}
             onSaveBdr={actions.saveBdr}
             onSaveRequest={actions.savePurchaseRequest} 
@@ -40,6 +43,7 @@ export const FinanceModule: React.FC<FinanceModuleProps> = ({ categories, funds 
             onDeleteFinancialPlanDocument={actions.deleteFinancialPlanDocument}
             onSaveFinancialPlanning={actions.saveFinancialPlanning}
             onDeleteFinancialPlanning={actions.deleteFinancialPlanning}
+            onRefreshPurchaseRequests={actions.refreshPurchaseRequests}
         />
         </div>
     );

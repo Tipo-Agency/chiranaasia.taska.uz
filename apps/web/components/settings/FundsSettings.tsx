@@ -63,7 +63,7 @@ const FundsSettings: React.FC<FundsSettingsProps> = ({ funds, onSave, onDelete }
         <div>
           <h3 className="text-2xl font-bold text-gray-800 dark:text-white">Фонды</h3>
           <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-            Распределение дохода по фондам для финансового планирования
+            Распределение дохода по фондам для бюджета
           </p>
         </div>
         <ModuleCreateIconButton accent="emerald" label="Добавить фонд" onClick={handleOpenCreate} />
