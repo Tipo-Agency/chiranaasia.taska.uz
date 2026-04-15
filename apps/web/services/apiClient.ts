@@ -385,6 +385,25 @@ type TaskListPage = {
 const TASK_PAGE_LIMIT = 500;
 const TASK_BATCH_MAX = 100;
 
+/** API TaskBatchItem: start_date/end_date — max 10 (YYYY-MM-DD). Иначе Pydantic → 422. */
+function toBatchDate10(v: string | undefined | null): string | undefined {
+  if (v == null) return undefined;
+  const s = String(v).trim();
+  if (!s) return undefined;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s.slice(0, 10);
+  const ms = Date.parse(s);
+  if (!Number.isNaN(ms)) return new Date(ms).toISOString().slice(0, 10);
+  return s.length >= 10 ? s.slice(0, 10) : undefined;
+}
+
+/** Колонка entity_type в БД — VARCHAR(30). */
+function toEntityType30(v: string | undefined | null): string | undefined {
+  if (v == null) return undefined;
+  const s = String(v).trim();
+  if (!s) return undefined;
+  return s.length > 30 ? s.slice(0, 30) : s;
+}
+
 function mapTaskCommentFromApi(c: Record<string, unknown>): TaskComment {
   return {
     id: String(c.id ?? ''),
@@ -465,18 +484,26 @@ function taskFromApi(r: Record<string, unknown>): Task {
 }
 
 function taskToBatchItem(t: Task): Record<string, unknown> {
+  const decision =
+    t.decisionDate != null && String(t.decisionDate).trim() !== ''
+      ? String(t.decisionDate).trim().slice(0, 50)
+      : undefined;
+  const createdAt =
+    t.createdAt != null && String(t.createdAt).trim() !== ''
+      ? String(t.createdAt).trim().slice(0, 50)
+      : undefined;
   return {
     id: t.id,
     table_id: t.tableId,
-    entity_type: t.entityType,
+    entity_type: toEntityType30(t.entityType),
     title: t.title,
     status: t.status,
     priority: t.priority,
     assignee_id: t.assigneeId,
     assignee_ids: t.assigneeIds,
     project_id: t.projectId,
-    start_date: t.startDate,
-    end_date: t.endDate,
+    start_date: toBatchDate10(t.startDate),
+    end_date: toBatchDate10(t.endDate),
     description: t.description,
     is_archived: t.isArchived,
     comments: t.comments,
@@ -490,12 +517,12 @@ function taskToBatchItem(t: Task): Record<string, unknown> {
     category: t.category,
     task_id: t.taskId,
     created_by_user_id: t.createdByUserId,
-    created_at: t.createdAt,
+    created_at: createdAt,
     requester_id: t.requesterId,
     department_id: t.departmentId,
     category_id: t.categoryId,
     amount: t.amount != null && !Number.isNaN(t.amount) ? String(t.amount) : undefined,
-    decision_date: t.decisionDate,
+    decision_date: decision,
   };
 }
 
