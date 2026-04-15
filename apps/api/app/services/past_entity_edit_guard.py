@@ -3,9 +3,9 @@ from __future__ import annotations
 
 from datetime import date, datetime
 from typing import Any
+from zoneinfo import ZoneInfo
 
 from fastapi import HTTPException, status
-from zoneinfo import ZoneInfo
 
 from app.core.config import get_settings
 

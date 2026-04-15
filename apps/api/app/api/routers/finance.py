@@ -48,8 +48,8 @@ from app.schemas.finance_bulk import (
     BdrPutBody,
     FinanceCategoryItem,
     FinancePlanUpsert,
-    FinancialPlanDocItem,
     FinanceReconciliationGroupItem,
+    FinancialPlanDocItem,
     FinancialPlanningItem,
     FundItem,
     IncomeReportItem,
@@ -63,9 +63,9 @@ from app.schemas.finance_requests import (
 from app.services.audit_log import log_mutation
 from app.services.bdr_totals import bdr_get_response, sanitize_bdr_rows
 from app.services.domain_events import log_entity_mutation
-from app.services.finance_request_workflow import normalize_status
 from app.services.finance_fp_expense_match import auto_match_fp_expenses_to_paid
 from app.services.finance_planning_funds import assert_budget_fund_allows_approval
+from app.services.finance_request_workflow import normalize_status
 from app.services.finance_requests_service import (
     apply_finance_request_patch,
     assert_finance_request_patch_respects_lock,
@@ -75,11 +75,6 @@ from app.services.finance_requests_service import (
     new_finance_request_id,
     reject_comment_provided,
 )
-from app.services.past_entity_edit_guard import (
-    assert_may_edit_past_dated_entity,
-    calendar_year_is_strictly_past,
-    guard_finance_yyyy_mm_mutation,
-)
 from app.services.list_cursor_page import (
     ListCursorError,
     assert_cursor_matches,
@@ -88,6 +83,11 @@ from app.services.list_cursor_page import (
     encode_list_cursor,
     filter_fingerprint,
     row_seek_values,
+)
+from app.services.past_entity_edit_guard import (
+    assert_may_edit_past_dated_entity,
+    calendar_year_is_strictly_past,
+    guard_finance_yyyy_mm_mutation,
 )
 
 router = APIRouter(prefix="/finance", tags=["finance"], dependencies=[Depends(get_current_user)])

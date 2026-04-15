@@ -27,7 +27,6 @@ from app.models.finance import (
     PurchaseRequest,
 )
 from app.models.funnel import SalesFunnel
-from app.models.production import ProductionHandoff, ProductionOrder, ProductionPipeline
 from app.models.inventory import InventoryItem, InventoryRevision, StockMovement, Warehouse
 from app.models.mtproto_session import MtprotoSession
 from app.models.notification import (
@@ -38,6 +37,7 @@ from app.models.notification import (
     NotificationEvent,
     NotificationPreferences,
 )
+from app.models.production import ProductionHandoff, ProductionOrder, ProductionPipeline
 from app.models.refresh_token import RefreshToken
 from app.models.role import Role
 from app.models.settings import ActivityLog, InboxMessage, PriorityOption, StatusOption, TableCollection

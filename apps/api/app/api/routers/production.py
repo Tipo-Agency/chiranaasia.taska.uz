@@ -3,9 +3,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import UTC, datetime
-from typing import Any
-
-from typing import Annotated
+from typing import Annotated, Any
 
 from fastapi import APIRouter, Body, Depends, Header, HTTPException, Query, Request
 from sqlalchemy import select
@@ -25,8 +23,8 @@ from app.models.production import ProductionHandoff, ProductionOrder, Production
 from app.models.user import User
 from app.schemas.common_responses import OkResponse
 from app.schemas.production import (
-    HandOverBody,
     HandoffResolveBody,
+    HandOverBody,
     ProductionHandoffRead,
     ProductionOrderCreate,
     ProductionOrderPatch,
