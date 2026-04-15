@@ -74,7 +74,12 @@ import {
 import { getFunnelKanbanCardAccent } from '../utils/funnelVisual';
 import { uploadDealAttachment } from '../services/localStorageService';
 import { devWarn } from '../utils/devLog';
-import { formatDate } from '../utils/dateUtils';
+import {
+  formatDate,
+  normalizeDateForInput,
+  normalizeWallClockTimeForApi,
+  isWallClockStartInPastBeforeNow,
+} from '../utils/dateUtils';
 import { useAppToolbar } from '../contexts/AppToolbarContext';
 import { DealCommentAttachments } from './DealCommentAttachments';
 
@@ -1934,6 +1939,20 @@ const SalesFunnelView: React.FC<SalesFunnelViewProps> = ({ deals, clients, users
                                                     setAlertState({ open: true, title: 'Заполните дату и время', message: 'Для создания встречи обязательно укажите дату и время.' });
                                                     return;
                                                   }
+                                                  const dateOk =
+                                                    (normalizeDateForInput(newMeetingDate) || newMeetingDate || '').trim().slice(0, 10);
+                                                  const timeOk = normalizeWallClockTimeForApi(newMeetingTime);
+                                                  if (
+                                                    !/^\d{4}-\d{2}-\d{2}$/.test(dateOk) ||
+                                                    isWallClockStartInPastBeforeNow(dateOk, timeOk)
+                                                  ) {
+                                                    setAlertState({
+                                                      open: true,
+                                                      title: 'Некорректное время',
+                                                      message: 'Время начала встречи не может быть в прошлом.',
+                                                    });
+                                                    return;
+                                                  }
                                                   const now = new Date();
                                                   const newMeeting: Meeting = {
                                                     id: `m-${now.getTime()}`,
@@ -1942,8 +1961,8 @@ const SalesFunnelView: React.FC<SalesFunnelViewProps> = ({ deals, clients, users
                                                     dealId: editingDeal.id,
                                                     clientId: editingDeal.clientId,
                                                     title: `Встреча: ${editingDeal.title}`,
-                                                    date: newMeetingDate,
-                                                    time: newMeetingTime,
+                                                    date: dateOk,
+                                                    time: timeOk,
                                                     participantIds: editingDeal.assigneeId ? [editingDeal.assigneeId] : [],
                                                     summary: '',
                                                     isArchived: false,

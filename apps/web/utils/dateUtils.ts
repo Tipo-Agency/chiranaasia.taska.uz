@@ -111,6 +111,32 @@ export function normalizeWallClockTimeForApi(time: string | undefined | null, fa
 }
 
 /**
+ * Локальное сравнение даты YYYY-MM-DD + времени HH:mm с «сейчас» в браузере.
+ * graceMs — допуск (по умолчанию 2 мин), как на API.
+ */
+export function isWallClockStartInPastBeforeNow(
+  dateYmd: string,
+  timeHm: string,
+  graceMs = 120_000
+): boolean {
+  const d = (dateYmd || '').trim().slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(d)) return false;
+  const t = normalizeWallClockTimeForApi(timeHm);
+  const [y, mo, day] = d.split('-').map((x) => parseInt(x, 10));
+  const [h, mi] = t.split(':').map((x) => parseInt(x, 10));
+  if (!Number.isFinite(y) || !Number.isFinite(h)) return false;
+  const start = new Date(y, mo - 1, day, h, Number.isFinite(mi) ? mi : 0, 0, 0);
+  return start.getTime() < Date.now() - graceMs;
+}
+
+/** Ключ «дата|время» для сравнения, менялось ли начало встречи. */
+export function wallClockStartKey(dateYmd: string, timeHm: string): string {
+  const d = (dateYmd || '').trim().slice(0, 10);
+  const t = normalizeWallClockTimeForApi(timeHm);
+  return `${d}|${t}`;
+}
+
+/**
  * Форматировать дату для отображения
  * @param dateStr - дата в формате YYYY-MM-DD или ISO строке
  * @param format - формат даты (по умолчанию 'DD.MM.YYYY')

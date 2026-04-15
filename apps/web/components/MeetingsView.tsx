@@ -19,6 +19,8 @@ import {
   compareDates,
   getTodayLocalDate,
   normalizeWallClockTimeForApi,
+  isWallClockStartInPastBeforeNow,
+  wallClockStartKey,
 } from '../utils/dateUtils';
 import { ModulePageShell, MODULE_PAGE_GUTTER, SystemConfirmDialog, APP_TOOLBAR_MODULE_CLUSTER } from './ui';
 import { ModuleCreateDropdown } from './ui/ModuleCreateDropdown';
@@ -360,6 +362,21 @@ const MeetingsView: React.FC<MeetingsViewProps> = ({
       const dateFinal = /^\d{4}-\d{2}-\d{2}$/.test(dateNorm) ? dateNorm : getTodayLocalDate();
       const timeFinal = normalizeWallClockTimeForApi(time);
 
+      const prevKey = editingMeeting
+        ? wallClockStartKey(
+            normalizeDateForInput(editingMeeting.date) || editingMeeting.date || '',
+            editingMeeting.time
+          )
+        : null;
+      const nextKey = wallClockStartKey(dateFinal, timeFinal);
+      if (
+        isWallClockStartInPastBeforeNow(dateFinal, timeFinal) &&
+        (!editingMeeting || prevKey !== nextKey)
+      ) {
+        alert('Время начала встречи не может быть в прошлом');
+        return;
+      }
+
       if (editingMeeting) {
           // Редактирование существующей встречи
           onSaveMeeting({
@@ -420,6 +437,12 @@ const MeetingsView: React.FC<MeetingsViewProps> = ({
           if (meeting && meeting.date !== targetDate) {
               const dNorm = normalizeDateForInput(targetDate) || targetDate || getTodayLocalDate();
               const dFinal = /^\d{4}-\d{2}-\d{2}$/.test(dNorm) ? dNorm : getTodayLocalDate();
+              const tFinal = normalizeWallClockTimeForApi(meeting.time);
+              if (isWallClockStartInPastBeforeNow(dFinal, tFinal)) {
+                alert('Нельзя перенести встречу на дату и время в прошлом');
+                setDraggedMeetingId(null);
+                return;
+              }
               onSaveMeeting({ ...meeting, date: dFinal });
           }
           setDraggedMeetingId(null);

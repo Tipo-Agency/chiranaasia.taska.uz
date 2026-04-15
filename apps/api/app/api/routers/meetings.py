@@ -18,7 +18,9 @@ from app.schemas.meetings import MeetingBulkItem, MeetingParticipantRead, Meetin
 from app.services.domain_events import emit_domain_event, log_entity_mutation
 from app.services.meeting_validation import (
     apply_participants_to_row,
+    assert_meeting_start_not_in_past,
     assert_valid_meeting_datetime,
+    meeting_wall_start_unchanged,
     normalize_participants_payload,
     participant_user_ids_from_row,
 )
@@ -162,6 +164,7 @@ async def get_meeting(meeting_id: str, db: AsyncSession = Depends(get_db)):
 async def create_meeting(body: MeetingCreate, db: AsyncSession = Depends(get_db)):
     await _assert_deal_exists(db, body.deal_id)
     assert_valid_meeting_datetime(body.date, body.time)
+    assert_meeting_start_not_in_past(body.date, body.time)
     parts, pids = normalize_participants_payload(
         _participants_models_to_plain(body.participants),
         body.participant_ids,
@@ -224,10 +227,11 @@ async def patch_meeting(
     if "deal_id" in raw:
         await _assert_deal_exists(db, raw["deal_id"])
     if "date" in raw or "time" in raw:
-        assert_valid_meeting_datetime(
-            str(raw.get("date", row.date) or ""),
-            str(raw.get("time", row.time) or ""),
-        )
+        merged_date = str(raw.get("date", row.date) or "")
+        merged_time = str(raw.get("time", row.time) or "")
+        assert_valid_meeting_datetime(merged_date, merged_time)
+        if not meeting_wall_start_unchanged(row.date, row.time, merged_date, merged_time):
+            assert_meeting_start_not_in_past(merged_date, merged_time)
 
     if "table_id" in raw and raw["table_id"] is not None:
         row.table_id = str(raw["table_id"]).strip()[:36] or None
@@ -311,10 +315,11 @@ async def put_meetings_bulk(meetings: list[MeetingBulkItem], db: AsyncSession = 
         existing = await db.get(Meeting, mid)
         if existing:
             if "date" in fs or "time" in fs:
-                assert_valid_meeting_datetime(
-                    str(item.date if "date" in fs else (existing.date or "")),
-                    str(item.time if "time" in fs else (existing.time or "")),
-                )
+                merged_date = str(item.date if "date" in fs else (existing.date or ""))
+                merged_time = str(item.time if "time" in fs else (existing.time or ""))
+                assert_valid_meeting_datetime(merged_date, merged_time)
+                if not meeting_wall_start_unchanged(existing.date, existing.time, merged_date, merged_time):
+                    assert_meeting_start_not_in_past(merged_date, merged_time)
             if "dealId" in fs:
                 await _assert_deal_exists(db, item.dealId)
 
@@ -374,6 +379,7 @@ async def put_meetings_bulk(meetings: list[MeetingBulkItem], db: AsyncSession = 
                 str(item.date or ""),
                 str(item.time or ""),
             )
+            assert_meeting_start_not_in_past(str(item.date or ""), str(item.time or ""))
             p_parts, p_ids = normalize_participants_payload(
                 _participants_models_to_plain(item.participants),
                 item.participantIds,

@@ -11,6 +11,9 @@ from fastapi import HTTPException
 
 from app.core.config import get_settings
 
+# Допуск на рассинхрон часов клиента/сети при запрете «встреча в прошлом».
+MEETING_PAST_GRACE = timedelta(minutes=2)
+
 
 def parse_meeting_wall_clock(
     date_s: str,
@@ -53,6 +56,40 @@ def assert_valid_meeting_datetime(date_str: str, time_str: str) -> None:
         raise HTTPException(
             status_code=422,
             detail="Некорректная дата или время встречи (ожидается date YYYY-MM-DD и time HH:mm)",
+        )
+
+
+def meeting_wall_start_unchanged(
+    row_date: str | None,
+    row_time: str | None,
+    merged_date: str,
+    merged_time: str,
+) -> bool:
+    """Тот же момент начала (дата+время в TZ календаря), что и у существующей строки."""
+    old = parse_meeting_wall_clock(str(row_date or ""), str(row_time or ""))
+    new = parse_meeting_wall_clock(merged_date, merged_time)
+    if old is None or new is None:
+        return False
+    return old[0] == new[0]
+
+
+def assert_meeting_start_not_in_past(date_str: str, time_str: str) -> None:
+    """
+    HTTP 422, если начало встречи в прошлом (в CALENDAR_EXPORT_TZID).
+    Вызывать после assert_valid_meeting_datetime.
+    """
+    parsed = parse_meeting_wall_clock(date_str, time_str)
+    if parsed is None:
+        return
+    start_local, _ = parsed
+    tz = start_local.tzinfo
+    if tz is None:
+        return
+    now_local = datetime.now(tz)
+    if start_local < now_local - MEETING_PAST_GRACE:
+        raise HTTPException(
+            status_code=422,
+            detail="Время начала встречи не может быть в прошлом",
         )
 
 
