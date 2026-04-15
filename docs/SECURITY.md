@@ -40,7 +40,7 @@
 | **Cache-Control на auth** | `no-store` для `/api/auth/login`, `/refresh`, `/me`. |
 | **Frontend XSS / dangerouslySetInnerHTML** | **Сделано для редактора документов:** `sanitizeDocHtml` / `setDocEditorHtml` (DOMPurify), см. §1. |
 | **Meta CSP в index.html для dev** | **Не добавляем:** Vite HMR требует ослабленной политики; в dev полагаемся на отсутствие nginx CSP или отдельный профиль. |
-| **npm audit / lockfile / supply chain** | **Частично:** в [`.github/workflows/ci-web.yml`](../.github/workflows/ci-web.yml) шаг `npm audit --audit-level=high` с `continue-on-error: true` (видимость без блокировки merge при известном долге, напр. `xlsx`). Локально — `npm audit` / `npm audit fix`. |
+| **npm audit / lockfile / supply chain** | **Частично:** в [`.github/workflows/ci-web.yml`](../.github/workflows/ci-web.yml) шаг `npm audit --audit-level=high` с `continue-on-error: true` (видимость без блокировки merge при обнаружении moderate и ниже у транзитивов). Локально — `npm audit` / `npm audit fix`. |
 | **Мониторинг security events + алерты** | **[TARGET]** (SIEM / метрики по логам). |
 | **DoS: workers / concurrent** | Настройка uvicorn/gunicorn — эксплуатация. |
 | **Timeouts внешних HTTP** | Вызовы через httpx с timeout где используется; единая политика — **[TARGET]** для всех интеграций. |

@@ -45,7 +45,7 @@
 - **HTTP / схемы:** основные роуты задач и сделок с `response_model` и Pydantic — [API.md](./API.md); новые внешние контракты — политика strict в [ARCHITECTURE.md](./ARCHITECTURE.md) §13.
 - **БД:** схема — [DATABASE.md](./DATABASE.md); эпик выравнивания типов — закрыт (§13).
 - **Безопасность (база):** HttpOnly cookie-сессия SPA, CSRF, rate limit, DOMPurify в редакторе документов — [SECURITY.md](./SECURITY.md).
-- **CI web:** шаг `npm audit --audit-level=high` (не валит job при известных долгах, напр. `xlsx`) — [SECURITY.md](./SECURITY.md) сводка.
+- **CI web:** шаг `npm audit --audit-level=high` (не валит job при moderate/ниже у транзитивов) — [SECURITY.md](./SECURITY.md) сводка.
 - **Optimistic locking (бэкенд):** миграция `048_entity_version_optimistic_locking`, колонка `version` и `version_id_col` у **Task**, **Client**, **Deal**, **FinanceRequest**; PATCH с опциональными **`If-Match`** и полем **`version`** в теле; **409** (`stale_version` / concurrent) через проверку и `StaleDataError` на commit. См. [ENTITIES.md](./ENTITIES.md) §0.
 - **Optimistic locking (SPA):** поле `version` в типах и мапперах (`taskFromApi`, `clientFromApi`, `dealFromApi`, `purchaseRequestFromApi`); `version` в PATCH там, где одиночные обновления (архив задачи/клиента, заявки finance, восстановление клиента); тост при **409** в `apiClient.fetchJson`. Пакетные `PUT` (задачи/сделки) — без per-row `version` в текущей модели UI.
 - **Prometheus:** на `/metrics` дополнительно gauge `inbox_messages_count`, `notification_deliveries_dead_count`, `dlq_unresolved_count` (обновление при scrape, см. `observability.py`); админ JSON `/admin/metrics/queues` без изменений.
@@ -65,7 +65,7 @@
 | **Сущности / API** | PATCH сделок/задач через bulk `PUT` без per-row `version`; при появлении одиночного PATCH сделок в UI — прокинуть `version`. Расширение `extra=forbid` на новые партнёрские POST — §13 [ARCHITECTURE](./ARCHITECTURE.md). |
 | **Prometheus**     | Алертинг и дашборды по новым gauge — эксплуатация.                                                                                                                                               |
 | **Безопасность**   | SIEM, полный secret scanning, circuit breaker, единые таймауты HTTP — [SECURITY.md](./SECURITY.md) / §13.                                                                                           |
-| **Зависимости**    | Замена или изоляция `xlsx` при появлении фикса уязвимостей — отдельное решение + ADR при необходимости.                                                                                          |
+| **Зависимости**    | Снижение транзитивных moderate (напр. обновления lockfile после `npm audit fix`) — по приоритету; критичные — без откладывания.                                                                                          |
 | **Тесты**          | Покрытие `services/` и контрактов — §13.                                                                                                                                                         |
 | **Lifespan**       | Дальнейший вынос из lifespan только не обязательного для старта API — §13.                                                                                                                       |
 | **Фронт**          | Разбиение крупных хуков/видов, Zustand — [README.md](./README.md), [FRONTEND.md](./FRONTEND.md).                                                                                                 |

@@ -3,8 +3,10 @@
  * Поддерживает «плоский» формат (заголовок в первой строке) и
  * выписки Узбекистана / АПП (шапка сверху, таблица операций ниже — как AccountStatementForPeriod.xlsx).
  */
+import type { CellValue } from 'exceljs';
+import ExcelJS from 'exceljs';
+import Papa from 'papaparse';
 import type { BankStatementLineApi } from '../services/apiClient';
-import * as XLSX from 'xlsx';
 
 export interface ParsedStatement {
   name?: string;
@@ -19,14 +21,82 @@ function normalizeHeader(value: unknown): string {
     .replace(/[._-]/g, '');
 }
 
+/** Excel serial 25569 = 1970-01-01 в типичной формуле JS↔Excel (как в SheetJS SSF для современных дат). */
+function excelSerialToYMD(serial: number): string | null {
+  if (!Number.isFinite(serial)) return null;
+  const utc_days = Math.floor(serial - 25569);
+  const d = new Date(utc_days * 86400000);
+  if (Number.isNaN(d.getTime())) return null;
+  const y = d.getUTCFullYear();
+  const m = String(d.getUTCMonth() + 1).padStart(2, '0');
+  const day = String(d.getUTCDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+function normalizeExcelCellValue(value: CellValue): unknown {
+  if (value === null || value === undefined) return '';
+  if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') return value;
+  if (value instanceof Date) return value;
+  if (typeof value === 'object') {
+    if ('richText' in value && Array.isArray((value as ExcelJS.CellRichTextValue).richText)) {
+      return (value as ExcelJS.CellRichTextValue).richText.map((r) => r.text).join('');
+    }
+    if ('formula' in value) {
+      const f = value as ExcelJS.CellFormulaValue;
+      return f.result ?? '';
+    }
+    if ('text' in value && 'hyperlink' in value) {
+      return (value as ExcelJS.CellHyperlinkValue).text;
+    }
+  }
+  return String(value);
+}
+
+/** Первая страница в виде массива строк (как sheet_to_json header:1, blankrows: false). */
+async function xlsxBufferToRows(data: ArrayBuffer): Promise<unknown[][]> {
+  const workbook = new ExcelJS.Workbook();
+  await workbook.xlsx.load(data);
+  const sheet = workbook.worksheets[0];
+  if (!sheet) return [];
+
+  const rows: unknown[][] = [];
+  sheet.eachRow({ includeEmpty: false }, (row) => {
+    let maxCol = 0;
+    row.eachCell({ includeEmpty: true }, (_cell, colNumber) => {
+      if (colNumber > maxCol) maxCol = colNumber;
+    });
+    const arr: unknown[] = Array.from({ length: maxCol }, () => '');
+    row.eachCell({ includeEmpty: true }, (cell, colNumber) => {
+      arr[colNumber - 1] = normalizeExcelCellValue(cell.value);
+    });
+    if (arr.some((c) => c !== '' && c != null)) rows.push(arr);
+  });
+  return rows;
+}
+
+function csvBufferToRows(data: ArrayBuffer): unknown[][] {
+  const text = new TextDecoder('utf-8').decode(data);
+  const parsed = Papa.parse<unknown[]>(text, {
+    header: false,
+    skipEmptyLines: true,
+    dynamicTyping: false,
+  });
+  return (parsed.data as unknown[][]).filter((row) =>
+    row.some((c) => c !== '' && c != null && String(c).trim() !== '')
+  );
+}
+
 function parseDateCell(value: unknown): string {
   if (value == null || value === '') return '';
-  if (typeof value === 'number') {
-    const parsed = XLSX.SSF.parse_date_code(value);
-    if (parsed) {
-      const m = String(parsed.m).padStart(2, '0');
-      const d = String(parsed.d).padStart(2, '0');
-      return `${parsed.y}-${m}-${d}`;
+  if (value instanceof Date && !Number.isNaN(value.getTime())) {
+    return value.toISOString().slice(0, 10);
+  }
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    const whole = Math.floor(value);
+    const ymd = excelSerialToYMD(whole);
+    if (ymd) {
+      const y = Number(ymd.slice(0, 4));
+      if (y >= 1980 && y <= 2100) return ymd;
     }
   }
   const raw = String(value).trim();
@@ -155,17 +225,22 @@ function isStatementSummaryRow(description: string, row: unknown[]): boolean {
 
 export async function parseBankStatementFile(file: ArrayBuffer | File): Promise<ParsedStatement> {
   const data = file instanceof File ? await file.arrayBuffer() : file;
-  const workbook = XLSX.read(data, { type: 'array', cellDates: false });
-  const sheetName = workbook.SheetNames[0];
-  const sheet = workbook.Sheets[sheetName];
-  if (!sheet) return { lines: [] };
-  const rows = XLSX.utils.sheet_to_json<unknown[]>(sheet, { header: 1, blankrows: false, raw: true });
+  const name = file instanceof File ? file.name.toLowerCase() : '';
+
+  let rows: unknown[][];
+  if (name.endsWith('.csv')) {
+    rows = csvBufferToRows(data);
+  } else {
+    rows = await xlsxBufferToRows(data);
+  }
+
   if (!rows.length) return { lines: [] };
 
   const headerRowIdx = findTableHeaderRowIndex(rows);
   const header = rows[headerRowIdx] || [];
   const idx = detectIndexes(header);
   const meta = headerRowIdx > 0 ? extractUzMeta(rows, headerRowIdx) : {};
+  const sheetName = 'Выписка';
 
   const dataRows = rows.slice(headerRowIdx + 1);
   const lines: BankStatementLineApi[] = [];
