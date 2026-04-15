@@ -3,6 +3,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 from sqlalchemy.orm import DeclarativeBase
 
 from app.core.config import get_settings
+from app.services.domain_events import DOMAIN_EVENTS_POST_COMMIT_QUEUE_KEY, flush_pending_domain_stream_publish
 
 settings = get_settings()
 
@@ -39,6 +40,14 @@ async def get_db():
             await session.commit()
         except Exception:
             await session.rollback()
+            session.info.pop(DOMAIN_EVENTS_POST_COMMIT_QUEUE_KEY, None)
             raise
+        else:
+            try:
+                await flush_pending_domain_stream_publish(session)
+                await session.commit()
+            except Exception:
+                await session.rollback()
+                raise
         finally:
             await session.close()

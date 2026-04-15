@@ -646,25 +646,48 @@ async def admin_redis_monitor(
     except Exception as exc:
         redis_error = str(exc)
 
-    events_total = (
-        await db.execute(text("SELECT COUNT(*) FROM notification_events"))
-    ).scalar() or 0
-    events_published = (
-        await db.execute(text("SELECT COUNT(*) FROM notification_events WHERE published_to_stream = true"))
-    ).scalar() or 0
-    deliveries_pending = (
-        await db.execute(
-            select(func.count(NotificationDelivery.id)).where(
-                NotificationDelivery.status.in_(("pending", "retry", "sending"))
-            )
+    events_total = 0
+    events_published = 0
+    deliveries_pending = 0
+    deliveries_failed = 0
+    deliveries_sent = 0
+    try:
+        await db.execute(text("SET LOCAL statement_timeout = '8000ms'"))
+        events_total = int((await db.execute(text("SELECT COUNT(*) FROM notification_events"))).scalar() or 0)
+        events_published = int(
+            (
+                await db.execute(
+                    text("SELECT COUNT(*) FROM notification_events WHERE published_to_stream = true")
+                )
+            ).scalar()
+            or 0
         )
-    ).scalar() or 0
-    deliveries_failed = (
-        await db.execute(select(func.count(NotificationDelivery.id)).where(NotificationDelivery.status == "dead"))
-    ).scalar() or 0
-    deliveries_sent = (
-        await db.execute(select(func.count(NotificationDelivery.id)).where(NotificationDelivery.status == "sent"))
-    ).scalar() or 0
+        deliveries_pending = int(
+            (
+                await db.execute(
+                    select(func.count(NotificationDelivery.id)).where(
+                        NotificationDelivery.status.in_(("pending", "retry", "sending"))
+                    )
+                )
+            ).scalar()
+            or 0
+        )
+        deliveries_failed = int(
+            (
+                await db.execute(
+                    select(func.count(NotificationDelivery.id)).where(NotificationDelivery.status == "dead")
+                )
+            ).scalar()
+            or 0
+        )
+        deliveries_sent = int(
+            (
+                await db.execute(select(func.count(NotificationDelivery.id)).where(NotificationDelivery.status == "sent"))
+            ).scalar()
+            or 0
+        )
+    except Exception:
+        pass
 
     return RedisMonitorResponse(
         redis_ok=redis_ok,

@@ -1,6 +1,7 @@
 """Helpers to emit canonical domain events from business routers."""
 from __future__ import annotations
 
+import logging
 from datetime import UTC, datetime
 from typing import Any
 from uuid import uuid4
@@ -8,11 +9,16 @@ from uuid import uuid4
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import get_settings
+from app.core.redis import get_redis_client
 from app.models.notification import NotificationEvent
 from app.services.event_bus import publish_domain_event
 from app.services.notification_hub import process_domain_event
 
 DEFAULT_ORG_ID = "default"
+_LOG = logging.getLogger(__name__)
+
+# Ключ session.info для отложенного XADD (см. flush_pending_domain_stream_publish, get_db).
+DOMAIN_EVENTS_POST_COMMIT_QUEUE_KEY = "_post_commit_domain_publish"
 
 
 async def log_entity_mutation(
@@ -92,16 +98,44 @@ async def emit_domain_event(
         "correlationId": correlation_id,
         "payload": payload,
     }
+    settings = get_settings()
+    redis = await get_redis_client()
+    # Иначе воркер читает XADD до commit HTTP-транзакции и не видит строку в БД → PEL без XACK.
+    if settings.DOMAIN_EVENTS_HUB_ASYNC and redis is not None:
+        db.info.setdefault(DOMAIN_EVENTS_POST_COMMIT_QUEUE_KEY, []).append({"eid": eid, "raw": raw})
+        await db.flush()
+        return eid
+
     published, stream_id = await publish_domain_event(raw)
-    row.published_to_stream = published
+    row.published_to_stream = bool(published)
     row.stream_id = stream_id
     await db.flush()
-
-    settings = get_settings()
-    if settings.DOMAIN_EVENTS_HUB_ASYNC and published:
-        return eid
 
     await process_domain_event(db, raw)
     row.hub_processed_at = datetime.now(UTC)
     await db.flush()
     return eid
+
+
+async def flush_pending_domain_stream_publish(session: AsyncSession) -> None:
+    """Вызвать после успешного commit сессии из get_db: XADD в Redis для отложенных async-событий."""
+    pending = session.info.pop(DOMAIN_EVENTS_POST_COMMIT_QUEUE_KEY, None)
+    if not pending:
+        return
+    for item in pending:
+        eid = str(item.get("eid") or "")
+        raw = item.get("raw")
+        if not eid or not isinstance(raw, dict):
+            continue
+        try:
+            published, stream_id = await publish_domain_event(raw)
+        except Exception as exc:
+            _LOG.exception("flush_pending_domain_stream_publish: XADD failed eid=%s: %s", eid, exc)
+            continue
+        row = await session.get(NotificationEvent, eid)
+        if row is None:
+            _LOG.error("flush_pending_domain_stream_publish: row missing after commit eid=%s", eid)
+            continue
+        row.published_to_stream = bool(published)
+        row.stream_id = stream_id
+        await session.flush()

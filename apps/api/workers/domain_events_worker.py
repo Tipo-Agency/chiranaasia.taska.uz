@@ -63,30 +63,34 @@ async def _process_stream_message(redis, msg_id: str, fields: dict[str, str]) ->
         return
 
     try:
-        async with AsyncSessionLocal() as session:
-            stmt = select(NotificationEvent).where(NotificationEvent.id == eid).with_for_update()
-            result = await session.execute(stmt)
-            row = result.scalar_one_or_none()
-            if row is None:
-                await session.rollback()
-                log.debug(
-                    "domain_events_worker: event row not visible yet id=%s stream_msg=%s (no XACK)",
-                    eid,
-                    msg_id,
-                )
-                return
-            if row.hub_processed_at is not None:
-                await session.commit()
-                await ack()
-                return
+        for _attempt in range(40):
+            async with AsyncSessionLocal() as session:
+                stmt = select(NotificationEvent).where(NotificationEvent.id == eid).with_for_update()
+                result = await session.execute(stmt)
+                row = result.scalar_one_or_none()
+                if row is None:
+                    await session.rollback()
+                    await asyncio.sleep(0.025)
+                    continue
+                if row.hub_processed_at is not None:
+                    await session.commit()
+                    await ack()
+                    return
 
-            t0 = time.monotonic()
-            await process_domain_event(session, event)
-            row.hub_processed_at = datetime.now(timezone.utc)
-            await session.commit()
-            ms = (time.monotonic() - t0) * 1000
-            log.info("domain_events_worker: notification_build_ms=%.1f event_id=%s", ms, eid)
-        await ack()
+                t0 = time.monotonic()
+                await process_domain_event(session, event)
+                row.hub_processed_at = datetime.now(timezone.utc)
+                await session.commit()
+                ms = (time.monotonic() - t0) * 1000
+                log.info("domain_events_worker: notification_build_ms=%.1f event_id=%s", ms, eid)
+            await ack()
+            return
+
+        log.warning(
+            "domain_events_worker: event row not visible after retries id=%s stream_msg=%s (no XACK)",
+            eid,
+            msg_id,
+        )
     except Exception as exc:
         kind = classify_worker_exception(exc)
         log_worker_exception(
