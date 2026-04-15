@@ -4,8 +4,8 @@ from alembic import op
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 
-revision = "058_finance_multi_income_reports"
-down_revision = "057_finance_plan_budget_enhancements"
+revision = "058_fin_ir_multi"
+down_revision = "057_fin_fp_plan_budget"
 branch_labels = None
 depends_on = None
 

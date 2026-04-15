@@ -4,7 +4,8 @@ from alembic import op
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 
-revision = "057_finance_plan_budget_enhancements"
+# Имя ревизии ≤32 символов: колонка alembic_version.version_num — VARCHAR(32).
+revision = "057_fin_fp_plan_budget"
 down_revision = "056_finance_fp_matching"
 branch_labels = None
 depends_on = None
