@@ -9,6 +9,7 @@ from app.core.config import get_settings
 from app.core.redis import get_redis_client
 from app.db import get_db
 from app.models.notification import Notification
+from app.models.user import User
 from app.schemas.notification_events import NotificationReadStateBody
 from app.schemas.notifications_api import (
     NotificationDeliveriesRunResponse,
@@ -32,7 +33,10 @@ async def list_notifications(
     unread_only: bool = Query(False),
     limit: int = Query(50, ge=1, le=500),
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
+    if (user_id or "").strip() != str(current_user.id):
+        raise HTTPException(status_code=403, detail="notification_user_mismatch")
     q = select(Notification).where(Notification.user_id == user_id)
     if unread_only:
         q = q.where(Notification.is_read == False)  # noqa: E712
@@ -58,7 +62,10 @@ async def list_notifications(
 async def unread_count(
     user_id: str = Query(...),
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
+    if (user_id or "").strip() != str(current_user.id):
+        raise HTTPException(status_code=403, detail="notification_user_mismatch")
     count = (
         await db.execute(
             select(func.count(Notification.id)).where(

@@ -64,8 +64,15 @@ export const useAuthLogic = (showNotification: (msg: string) => void) => {
         if (!cancelled && me?.id === currentUser.id) {
           setCurrentUser(withAvatarFallback({ ...currentUser, ...me }));
         }
-      } catch {
-        // ignore
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        // Сессия протухла, а локальный currentUser ещё есть — иначе поллинг /notifications/* шумит 401.
+        if (
+          /not authenticated|session expired|session invalidated|invalid or expired token|401/i.test(msg)
+        ) {
+          setCurrentUser(null);
+          storageService.clearActiveUserId();
+        }
       }
     })();
     return () => {
