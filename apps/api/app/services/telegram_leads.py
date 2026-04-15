@@ -125,11 +125,12 @@ async def process_private_message_for_funnel(
     event_source: str,
     update_id: Any | None = None,
 ) -> bool:
-    """Handle one private chat message. Returns True if a deal row was created or updated (не дубликат)."""
+    """Handle one inbound Telegram message (личка, группа или супергруппа). Returns True if deal created/updated."""
     chat = msg.get("chat")
     if not isinstance(chat, dict):
         return False
-    if (chat.get("type") or "").lower() != "private":
+    chat_type = (chat.get("type") or "").lower()
+    if chat_type not in ("private", "group", "supergroup"):
         return False
 
     chat_id = str(chat.get("id") or "").strip()
@@ -137,13 +138,21 @@ async def process_private_message_for_funnel(
         return False
 
     frm = msg.get("from") or {}
-    username = None
+    sender_label = None
     if isinstance(frm, dict):
         if frm.get("username"):
-            username = f"@{frm.get('username')}"
+            sender_label = f"@{frm.get('username')}"
         else:
-            username = frm.get("first_name")
-    username = str(username or "Telegram").strip()
+            sender_label = str(frm.get("first_name") or "").strip() or None
+
+    if chat_type == "private":
+        username = str(sender_label or "Telegram").strip()
+    else:
+        group_title = str(chat.get("title") or "").strip() or ("Супергруппа" if chat_type == "supergroup" else "Группа")
+        if sender_label:
+            username = f"{group_title} · {sender_label}"
+        else:
+            username = group_title
 
     text = msg.get("text") or ""
     if not isinstance(text, str) or not text.strip():
@@ -267,7 +276,7 @@ async def process_telegram_update_dict(
     *,
     event_source: str,
 ) -> int:
-    """Process one Telegram Update object. Returns 1 if a private message was handled, else 0."""
+    """Process one Telegram Update object. Returns 1 if a chat message was handled, else 0."""
     st = await _ensure_telegram_state(db, funnel.id)
 
     uid = upd.get("update_id")
