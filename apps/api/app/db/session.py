@@ -3,7 +3,6 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 from sqlalchemy.orm import DeclarativeBase
 
 from app.core.config import get_settings
-from app.services.domain_events import DOMAIN_EVENTS_POST_COMMIT_QUEUE_KEY, flush_pending_domain_stream_publish
 
 settings = get_settings()
 
@@ -34,6 +33,9 @@ class Base(DeclarativeBase):
 
 async def get_db():
     """Dependency for getting async database session."""
+    # Ленивый импорт: иначе цикл app.db → domain_events → app.models → app.db (Alembic env падает).
+    from app.services.domain_events import DOMAIN_EVENTS_POST_COMMIT_QUEUE_KEY, flush_pending_domain_stream_publish
+
     async with AsyncSessionLocal() as session:
         try:
             yield session
