@@ -31,7 +31,8 @@ class AuthUserOut(BaseModel):
 
 
 class UserBulkItem(BaseModel):
-    model_config = ConfigDict(extra="forbid")
+    """Тело PUT /auth/users: допускаем поля ответа GET (roleSlug, permissions, …) — игнорируем лишнее."""
+    model_config = ConfigDict(extra="ignore")
 
     id: str | None = Field(default=None, max_length=36)
     name: str | None = Field(default=None, max_length=255)
