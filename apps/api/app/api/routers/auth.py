@@ -393,10 +393,13 @@ async def update_users(
                 if isinstance(raw_password, str) and looks_like_bcrypt_hash(raw_password):
                     existing.password_hash = raw_password
                 else:
-                    assert_new_password_policy(str(raw_password))
-                    await revoke_all_refresh_for_user(db, existing.id)
-                    existing.token_version = int(existing.token_version or 0) + 1
-                    existing.password_hash = get_password_hash(str(raw_password))
+                    pwd_plain = str(raw_password).strip()
+                    # Массовый PUT шлёт весь список; короткие строки (заглушки вроде "123") не трогаем пароль.
+                    if len(pwd_plain) >= 8:
+                        assert_new_password_policy(pwd_plain)
+                        await revoke_all_refresh_for_user(db, existing.id)
+                        existing.token_version = int(existing.token_version or 0) + 1
+                        existing.password_hash = get_password_hash(pwd_plain)
             if "mustChangePassword" in raw:
                 existing.must_change_password = bool(u.mustChangePassword)
             existing.is_archived = False
