@@ -23,7 +23,15 @@
 | [DECISIONS.md](./DECISIONS.md)         | ADR и решения                                                  | Актуален                                                      |
 | [SECURITY.md](./SECURITY.md)           | Политика, P0, сводка статусов                                  | Актуален; XSS редактор / HttpOnly — **as-built**              |
 | [FRONTEND.md](./FRONTEND.md)           | SPA, стейт, API-клиент                                         | Актуален                                                      |
-| [MODULES.md](./MODULES.md)             | Продуктовые модули                                             | Актуален                                                      |
+| [MODULES.md](./MODULES.md)             | Продуктовые модули (архитектура, компоненты, приёмочные критерии) | Актуален                                                   |
+| [modules/crm.md](./modules/crm.md)     | Бизнес-правила CRM: сделки, клиенты, воронки                   | Актуален                                                      |
+| [modules/tasks.md](./modules/tasks.md) | Бизнес-правила Tasks                                           | Актуален                                                      |
+| [modules/finance.md](./modules/finance.md) | Бизнес-правила Finance: заявки, планирование, БДР          | Актуален                                                      |
+| [modules/hr.md](./modules/hr.md)       | Бизнес-правила HR: сотрудники, отделы, должности               | Актуален                                                      |
+| [modules/bpm.md](./modules/bpm.md)     | Бизнес-правила BPM: процессы, шаги, экземпляры                 | Актуален                                                      |
+| [modules/spaces.md](./modules/spaces.md) | Бизнес-правила Spaces: таблицы, контент, встречи             | Актуален                                                      |
+| [modules/auth.md](./modules/auth.md)   | Бизнес-правила Auth: пользователи, роли, права                 | Актуален                                                      |
+| [modules/notifications.md](./modules/notifications.md) | Бизнес-правила Notifications: каналы, WS, автоматизации | Актуален                              |
 | [TESTING.md](./TESTING.md)             | Pytest, фронт, CI                                              | Актуален                                                      |
 
 

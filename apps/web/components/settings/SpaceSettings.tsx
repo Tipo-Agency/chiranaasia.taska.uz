@@ -124,8 +124,8 @@ export const SpaceSettings: React.FC<SpaceSettingsProps> = ({
       return (
           <div className="space-y-6 max-w-3xl">
               <div className="flex justify-between items-center mb-4">
-                  <h3 className="font-bold text-lg text-gray-800 dark:text-white">Проекты</h3>
-                  <ModuleCreateIconButton accent="indigo" label="Создать проект" onClick={onCreateTable} />
+                  <h3 className="font-bold text-lg text-gray-800 dark:text-white">Страницы</h3>
+                  <ModuleCreateIconButton accent="indigo" label="Создать страницу" onClick={onCreateTable} />
               </div>
               <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
                   Здесь отображаются только проекты внутри модулей (Контент планы, Идеи, Функционал). 

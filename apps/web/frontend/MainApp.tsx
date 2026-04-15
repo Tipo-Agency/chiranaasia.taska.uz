@@ -9,8 +9,8 @@ import IdeaModal from '../components/IdeaModal';
 import FeatureModal from '../components/FeatureModal';
 import DocModal from '../components/DocModal';
 import ProfileModal from '../components/ProfileModal';
-import SettingsModal from '../components/SettingsModal';
 import CreateTableModal from '../components/CreateTableModal';
+import { EditTablePageModal } from '../components/EditTablePageModal';
 import { MiniMessenger } from '../components/features/chat/MiniMessenger';
 import { ClientChatsPage } from '../components/pages/ClientChatsPage';
 import { ChatFloatingButton } from '../components/features/chat/ChatFloatingButton';
@@ -607,34 +607,11 @@ export function MainApp() {
         )}
 
         {state.isEditTableModalOpen && state.editingTable && (
-          <div
-            className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-[100]"
-            onClick={() => actions.closeEditTable()}
-          >
-            <div
-              className="bg-white dark:bg-[#252525] p-6 rounded-xl w-full max-w-md"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <h3 className="text-lg font-bold mb-4 text-gray-800 dark:text-white">Редактировать страницу</h3>
-              <SettingsModal
-                users={state.users}
-                projects={state.projects}
-                statuses={state.statuses}
-                priorities={state.priorities}
-                tables={state.tables}
-                initialTab="pages"
-                onClose={actions.closeEditTable}
-                onUpdateTable={actions.updateTable}
-                onCreateTable={() => {}}
-                onDeleteTable={() => {}}
-                onUpdateUsers={() => {}}
-                onUpdateProjects={() => {}}
-                onUpdateStatuses={() => {}}
-                onUpdatePriorities={() => {}}
-                onUpdateNotificationPrefs={() => {}}
-              />
-            </div>
-          </div>
+          <EditTablePageModal
+            table={state.editingTable}
+            onClose={actions.closeEditTable}
+            onSave={actions.updateTable}
+          />
         )}
       </div>
 

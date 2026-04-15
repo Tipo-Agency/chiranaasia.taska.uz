@@ -865,7 +865,7 @@ const ContentPlanView: React.FC<ContentPlanViewProps> = ({
           </div>
           {activeTable?.type === 'content-plan' && activeTable.isPublic === false && (
             <p className="text-xs text-amber-700 dark:text-amber-400 max-w-xl">
-              Публичный просмотр выключен. Включите «Публичная ссылка» в настройках → Страницы (редактирование этой страницы).
+              Публичный просмотр выключен. Включите «Публичная ссылка» в настройках страницы (шестерёнка на карточке в «Пространствах»).
             </p>
           )}
         </div>
