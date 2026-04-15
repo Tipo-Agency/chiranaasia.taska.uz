@@ -183,6 +183,7 @@ def row_to_plan(row):
 
 
 def row_to_plan_doc(row):
+    wb = getattr(row, "week_breakdown", None)
     return {
         "id": row.id,
         "departmentId": row.department_id,
@@ -199,6 +200,7 @@ def row_to_plan_doc(row):
         "periodEnd": getattr(row, "period_end", None),
         "planSeriesId": getattr(row, "plan_series_id", None),
         "periodLabel": getattr(row, "period_label", None),
+        "weekBreakdown": wb if isinstance(wb, list) else None,
     }
 
 
@@ -688,6 +690,11 @@ async def update_financial_plan_documents(
                 existing.plan_series_id = d.planSeriesId
             if "periodLabel" in dfs:
                 existing.period_label = d.periodLabel
+            if "weekBreakdown" in dfs:
+                if d.weekBreakdown is None or len(d.weekBreakdown) == 0:
+                    existing.week_breakdown = None
+                else:
+                    existing.week_breakdown = [s.model_dump(mode="json") for s in d.weekBreakdown]
         else:
             db.add(FinancialPlanDocument(
                 id=did,
@@ -705,6 +712,11 @@ async def update_financial_plan_documents(
                 period_end=d.periodEnd,
                 plan_series_id=d.planSeriesId,
                 period_label=d.periodLabel,
+                week_breakdown=(
+                    [s.model_dump(mode="json") for s in d.weekBreakdown]
+                    if d.weekBreakdown and len(d.weekBreakdown) > 0
+                    else None
+                ),
             ))
         await db.flush()
         doc_row = await db.get(FinancialPlanDocument, did)

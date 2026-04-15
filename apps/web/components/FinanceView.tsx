@@ -1,7 +1,19 @@
 
 import React, { useState, useRef, useMemo, useEffect, useCallback, useLayoutEffect } from 'react';
 import { TaskSelect } from './TaskSelect';
-import { FinanceCategory, Fund, FinancePlan, PurchaseRequest, Department, User, FinancialPlanDocument, FinancialPlanning, Bdr, IncomeReport } from '../types';
+import {
+  FinanceCategory,
+  Fund,
+  FinancePlan,
+  PurchaseRequest,
+  Department,
+  User,
+  FinancialPlanDocument,
+  FinancialPlanWeekSlice,
+  FinancialPlanning,
+  Bdr,
+  IncomeReport,
+} from '../types';
 import type { SavePurchaseRequestOptions } from '../frontend/hooks/slices/useFinanceLogic';
 import { hasPermission } from '../utils/permissions';
 import { Plus, X, Edit2, Trash2, PieChart, TrendingUp, DollarSign, Check, AlertCircle, Calendar, Settings, ArrowLeft, ArrowRight, Save, FileText, Clock, CheckCircle2, ChevronDown, Upload, Archive, RotateCcw, Printer } from 'lucide-react';
@@ -24,7 +36,7 @@ import { BankStatementsView, type BankStatementsViewHandle } from './finance/Ban
 import { BdrView } from './finance/BdrView';
 import { FilterConfig } from './FiltersPanel';
 import { uploadFile } from '../services/localStorageService';
-import { splitMonthIntoWeekSegments } from '../utils/financeMonthWeeks';
+import { allocateMonthPlanToWeekSlices } from '../utils/financeMonthWeeks';
 import {
   sumIncomeReportInRange,
   sumIncomeReportsInRange,
@@ -191,7 +203,17 @@ const FinanceView: React.FC<FinanceViewProps> = ({
     }
     return '—';
   }, []);
-  
+
+  const planDocRowPeriodLabel = useCallback(
+    (planDoc: FinancialPlanDocument) => {
+      const base = formatRangeLabel(planDoc.periodStart, planDoc.periodEnd, planDoc.period);
+      const n = planDoc.weekBreakdown?.length;
+      if (n && n > 1) return `${base} · ${n} нед.`;
+      return base;
+    },
+    [formatRangeLabel]
+  );
+
   // Инициализируем текущий период (используем как дефолт при создании)
 
   useEffect(() => {
@@ -246,6 +268,7 @@ const FinanceView: React.FC<FinanceViewProps> = ({
     departmentId?: string;
     periodStart?: string;
     periodEnd?: string;
+    weekBreakdown: FinancialPlanWeekSlice[];
   } | null>(null);
   const [planDetailDepartmentId, setPlanDetailDepartmentId] = useState('');
   const [planDetailPeriodStart, setPlanDetailPeriodStart] = useState('');
@@ -256,6 +279,7 @@ const FinanceView: React.FC<FinanceViewProps> = ({
   /** Дропдаун «Добавить статью» на детальной странице плана — хуки на уровне FinanceView (нельзя в renderPlanDetail: React #310). */
   const [planDetailCategoryDropdownOpen, setPlanDetailCategoryDropdownOpen] = useState(false);
   const planDetailCategoryDropdownRef = useRef<HTMLDivElement>(null);
+  const [planDetailWeekBreakdown, setPlanDetailWeekBreakdown] = useState<FinancialPlanWeekSlice[]>([]);
   
   // Синхронизация состояний детальных страниц при изменении выбранных элементов
   useEffect(() => {
@@ -313,6 +337,10 @@ const FinanceView: React.FC<FinanceViewProps> = ({
     if (selectedPlanDoc) {
       const fallback = getDefaultRangeForMonth(selectedPlanDoc.period || currentPeriod);
       const selectedCats = Object.keys(selectedPlanDoc.expenses || {});
+      const wb =
+        selectedPlanDoc.weekBreakdown && Array.isArray(selectedPlanDoc.weekBreakdown)
+          ? selectedPlanDoc.weekBreakdown.map((w) => ({ ...w, expenses: { ...(w.expenses || {}) } }))
+          : [];
       planDetailInitialValuesRef.current = {
         income: selectedPlanDoc.income || 0,
         expenses: selectedPlanDoc.expenses || {},
@@ -320,6 +348,7 @@ const FinanceView: React.FC<FinanceViewProps> = ({
         departmentId: selectedPlanDoc.departmentId,
         periodStart: selectedPlanDoc.periodStart || fallback.start,
         periodEnd: selectedPlanDoc.periodEnd || fallback.end,
+        weekBreakdown: wb,
       };
       setPlanDetailDepartmentId(selectedPlanDoc.departmentId || '');
       setPlanDetailPeriodStart(selectedPlanDoc.periodStart || fallback.start);
@@ -327,6 +356,7 @@ const FinanceView: React.FC<FinanceViewProps> = ({
       setPlanDetailIncome(selectedPlanDoc.income || 0);
       setPlanDetailExpenses(selectedPlanDoc.expenses || {});
       setPlanDetailSelectedCategories(selectedCats);
+      setPlanDetailWeekBreakdown(wb);
     } else {
       // Сбрасываем значения, если план не выбран
       planDetailInitialValuesRef.current = null;
@@ -336,6 +366,7 @@ const FinanceView: React.FC<FinanceViewProps> = ({
       setPlanDetailIncome(0);
       setPlanDetailExpenses({});
       setPlanDetailSelectedCategories([]);
+      setPlanDetailWeekBreakdown([]);
     }
     setPlanDetailCategoryDropdownOpen(false);
   }, [selectedPlanDoc]);
@@ -1258,7 +1289,7 @@ const FinanceView: React.FC<FinanceViewProps> = ({
                         }}
                       />
                       <span className="truncate text-gray-800 dark:text-gray-100">
-                        {d.periodLabel || `${d.periodStart || ''}→${d.periodEnd || ''}`} · {(d.income || 0).toLocaleString('ru-RU')} UZS
+                        {planDocRowPeriodLabel(d)} · {(d.income || 0).toLocaleString('ru-RU')} UZS
                       </span>
                     </label>
                   ))}
@@ -1635,7 +1666,7 @@ const FinanceView: React.FC<FinanceViewProps> = ({
               </thead>
               <tbody className="divide-y divide-gray-100 dark:divide-[#333]">
                 {sorted.map((planDoc) => {
-                  const periodLabel = formatRangeLabel(planDoc.periodStart, planDoc.periodEnd, planDoc.period);
+                  const periodLabel = planDocRowPeriodLabel(planDoc);
                   const totalExpenses = (Object.values(planDoc.expenses || {}) as number[]).reduce((sum, val) => sum + val, 0);
                   const dep = departments.find((d) => d.id === planDoc.departmentId);
                   return (
@@ -1708,7 +1739,8 @@ const FinanceView: React.FC<FinanceViewProps> = ({
         JSON.stringify([...planDetailSelectedCategories].sort()) !== JSON.stringify([...planDetailInitialValuesRef.current.selectedCategories].sort()) ||
         planDetailDepartmentId !== (planDetailInitialValuesRef.current.departmentId || '') ||
         planDetailPeriodStart !== (planDetailInitialValuesRef.current.periodStart || '') ||
-        planDetailPeriodEnd !== (planDetailInitialValuesRef.current.periodEnd || '')
+        planDetailPeriodEnd !== (planDetailInitialValuesRef.current.periodEnd || '') ||
+        JSON.stringify(planDetailWeekBreakdown) !== JSON.stringify(planDetailInitialValuesRef.current.weekBreakdown ?? [])
       );
     };
     
@@ -1736,6 +1768,7 @@ const FinanceView: React.FC<FinanceViewProps> = ({
           filteredExpenses[catId] = planDetailExpenses[catId];
         }
       });
+      const hasWeeks = planDetailWeekBreakdown.length > 0;
       const updated: FinancialPlanDocument = {
         ...selectedPlanDoc,
         departmentId: planDetailDepartmentId || selectedPlanDoc.departmentId,
@@ -1744,7 +1777,10 @@ const FinanceView: React.FC<FinanceViewProps> = ({
         periodEnd: planDetailPeriodEnd || undefined,
         income: planDetailIncome,
         expenses: filteredExpenses,
-        updatedAt: new Date().toISOString()
+        weekBreakdown: hasWeeks ? planDetailWeekBreakdown : [],
+        planSeriesId: hasWeeks ? undefined : selectedPlanDoc.planSeriesId,
+        periodLabel: hasWeeks ? undefined : selectedPlanDoc.periodLabel,
+        updatedAt: new Date().toISOString(),
       };
       onSaveFinancialPlanDocument(updated);
       planDetailInitialValuesRef.current = {
@@ -1754,6 +1790,7 @@ const FinanceView: React.FC<FinanceViewProps> = ({
         departmentId: planDetailDepartmentId,
         periodStart: planDetailPeriodStart,
         periodEnd: planDetailPeriodEnd,
+        weekBreakdown: hasWeeks ? planDetailWeekBreakdown.map((w) => ({ ...w, expenses: { ...w.expenses } })) : [],
       };
     };
     
@@ -1819,47 +1856,69 @@ const FinanceView: React.FC<FinanceViewProps> = ({
     
     const balance = planDetailIncome - planDetailTotalExpenses;
 
+    const buildFilteredPlanExpenses = (): Record<string, number> => {
+      const out: Record<string, number> = {};
+      planDetailSelectedCategories.forEach((catId) => {
+        if (planDetailExpenses[catId] !== undefined) out[catId] = planDetailExpenses[catId];
+      });
+      return out;
+    };
+
     const handleSplitPlanToWeeks = () => {
-      if (!onSaveFinancialPlanDocument) return;
-      const ym = selectedPlanDoc.period;
-      const segs = splitMonthIntoWeekSegments(ym);
-      if (segs.length <= 1) {
+      const ym = /^\d{4}-\d{2}$/.test((selectedPlanDoc.period || '').trim())
+        ? selectedPlanDoc.period.trim()
+        : (planDetailPeriodStart || '').slice(0, 7);
+      if (!/^\d{4}-\d{2}$/.test(ym)) {
+        setAlertText('Укажите корректный месяц плана (период YYYY-MM).');
+        return;
+      }
+      const slices = allocateMonthPlanToWeekSlices(
+        ym,
+        Number(planDetailIncome) || 0,
+        buildFilteredPlanExpenses(),
+        planDetailSelectedCategories
+      );
+      if (slices.length <= 1) {
         setAlertText('Для этого месяца недельное разбиение не требуется или получается одна неделя.');
         return;
       }
       if (
         !confirm(
-          `Создать ${segs.length} документов плана по неделям (якорный месяц ${ym})? Текущий документ останется — при необходимости удалите его отдельно.`
+          `Заполнить разбиение по ${slices.length} неделям внутри этого плана (месяц ${ym})? Документ плана останется один; итоги месяца — в полях «Доход» и статьи выше. Не забудьте нажать «Сохранить».`
         )
       )
         return;
-      const seriesId = `pss-${Date.now()}`;
-      const totalDays = segs.reduce((a, s) => a + s.daysInTargetMonth, 0) || 1;
-      const baseIncome = Number(planDetailIncome) || 0;
-      const baseExp = { ...planDetailExpenses };
-      segs.forEach((seg, i) => {
-        const w = seg.daysInTargetMonth / totalDays;
-        const inc = Math.round(baseIncome * w * 100) / 100;
-        const exp: Record<string, number> = {};
-        for (const catId of planDetailSelectedCategories) {
-          const v = Number(baseExp[catId]) || 0;
-          exp[catId] = Math.round(v * w * 100) / 100;
-        }
-        const id = `fpd-${Date.now()}-${i}-${Math.floor(Math.random() * 1e6)}`;
-        onSaveFinancialPlanDocument({
-          id,
-          departmentId: planDetailDepartmentId || selectedPlanDoc.departmentId,
-          period: ym,
-          periodStart: seg.start,
-          periodEnd: seg.end,
-          planSeriesId: seriesId,
-          periodLabel: seg.label,
-          income: inc,
-          expenses: exp,
-          status: 'created',
-          createdAt: new Date().toISOString(),
-        });
-      });
+      const fb = getDefaultRangeForMonth(ym);
+      setPlanDetailPeriodStart(fb.start);
+      setPlanDetailPeriodEnd(fb.end);
+      setPlanDetailWeekBreakdown(slices);
+    };
+
+    const handleRecalculateWeekBreakdown = () => {
+      const ym = /^\d{4}-\d{2}$/.test((selectedPlanDoc.period || '').trim())
+        ? selectedPlanDoc.period.trim()
+        : (planDetailPeriodStart || '').slice(0, 7);
+      if (!/^\d{4}-\d{2}$/.test(ym)) {
+        setAlertText('Укажите корректный месяц плана (период YYYY-MM).');
+        return;
+      }
+      const slices = allocateMonthPlanToWeekSlices(
+        ym,
+        Number(planDetailIncome) || 0,
+        buildFilteredPlanExpenses(),
+        planDetailSelectedCategories
+      );
+      if (!slices.length) {
+        setAlertText('Не удалось пересчитать недели для выбранного месяца.');
+        return;
+      }
+      setPlanDetailWeekBreakdown(slices);
+    };
+
+    const handleClearWeekBreakdown = () => {
+      if (!planDetailWeekBreakdown.length) return;
+      if (!confirm('Убрать недельное разбиение из этого плана?')) return;
+      setPlanDetailWeekBreakdown([]);
     };
     
     return (
@@ -1868,6 +1927,38 @@ const FinanceView: React.FC<FinanceViewProps> = ({
           <h1 className="text-xl font-bold">План (печать)</h1>
           <p className="text-sm mt-1">{dep?.name || '—'} · {periodLabel}</p>
           <p className="text-xs text-gray-600 mt-2">Сформировано: {new Date().toLocaleString('ru-RU')}</p>
+          {planDetailWeekBreakdown.length > 0 && (
+            <table className="mt-4 w-full text-xs border border-black border-collapse">
+              <thead>
+                <tr>
+                  <th className="border border-black p-1 text-left">Неделя</th>
+                  <th className="border border-black p-1 text-left">Даты</th>
+                  <th className="border border-black p-1 text-right">Доход</th>
+                  {planDetailSelectedCategories.map((cid) => (
+                    <th key={cid} className="border border-black p-1 text-right">
+                      {categories.find((c) => c.id === cid)?.name || cid}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {planDetailWeekBreakdown.map((row, ri) => (
+                  <tr key={`p-${row.start}-${ri}`}>
+                    <td className="border border-black p-1">{row.label || `Неделя ${ri + 1}`}</td>
+                    <td className="border border-black p-1">
+                      {row.start} — {row.end}
+                    </td>
+                    <td className="border border-black p-1 text-right">{Number(row.income || 0).toLocaleString('ru-RU')}</td>
+                    {planDetailSelectedCategories.map((cid) => (
+                      <td key={cid} className="border border-black p-1 text-right">
+                        {Number(row.expenses?.[cid] || 0).toLocaleString('ru-RU')}
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
         </div>
         <div className="sticky top-0 z-20 flex flex-wrap items-center gap-3 px-4 py-3 border-b border-gray-200 dark:border-[#333] bg-white/95 dark:bg-[#191919]/95 backdrop-blur-md print:hidden">
           <button
@@ -1898,9 +1989,10 @@ const FinanceView: React.FC<FinanceViewProps> = ({
               <button
                 type="button"
                 onClick={handleSplitPlanToWeeks}
+                title="Заполнить таблицу недель в этом же документе (без создания новых планов)"
                 className="px-3 py-2 border border-indigo-200 dark:border-indigo-900 text-indigo-800 dark:text-indigo-200 text-sm font-medium rounded-xl"
               >
-                Разбить месяц на недели
+                Недели внутри плана
               </button>
             )}
             {isPlanDocArchived ? (
@@ -2160,6 +2252,80 @@ const FinanceView: React.FC<FinanceViewProps> = ({
             </div>
           </div>
         </div>
+
+        {planDetailWeekBreakdown.length > 0 && (
+          <div className="bg-white dark:bg-[#252525] border border-gray-200 dark:border-[#333] rounded-xl overflow-hidden">
+            <div className="p-4 border-b border-gray-200 dark:border-[#333] flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <h3 className="font-bold text-gray-800 dark:text-white">Разбиение по неделям</h3>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                  Один документ плана: ниже — доли по календарным неделям месяца. Итог месяца задаётся полями «Доход» и статьи выше.
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-2 print:hidden">
+                <button
+                  type="button"
+                  onClick={handleRecalculateWeekBreakdown}
+                  className="px-3 py-1.5 border border-gray-200 dark:border-[#444] text-gray-700 dark:text-gray-200 text-xs font-medium rounded-lg hover:bg-gray-50 dark:hover:bg-[#303030]"
+                >
+                  Пересчитать доли
+                </button>
+                <button
+                  type="button"
+                  onClick={handleClearWeekBreakdown}
+                  className="px-3 py-1.5 border border-red-200 dark:border-red-900 text-red-700 dark:text-red-300 text-xs font-medium rounded-lg hover:bg-red-50 dark:hover:bg-red-950/30"
+                >
+                  Убрать недели
+                </button>
+              </div>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-sm min-w-[640px]">
+                <thead className="bg-gray-50 dark:bg-[#202020] border-b border-gray-200 dark:border-[#333]">
+                  <tr>
+                    <th className="px-3 py-2 text-gray-600 dark:text-gray-400">Неделя</th>
+                    <th className="px-3 py-2 text-gray-600 dark:text-gray-400">Даты</th>
+                    <th className="px-3 py-2 text-gray-600 dark:text-gray-400 text-right">Доход</th>
+                    {planDetailSelectedCategories.map((cid) => (
+                      <th key={cid} className="px-3 py-2 text-gray-600 dark:text-gray-400 text-right whitespace-nowrap">
+                        {categories.find((c) => c.id === cid)?.name || cid}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100 dark:divide-[#333]">
+                  {planDetailWeekBreakdown.map((row, ri) => (
+                    <tr key={`${row.start}-${row.end}-${ri}`}>
+                      <td className="px-3 py-2 text-gray-800 dark:text-gray-200">{row.label || `Неделя ${ri + 1}`}</td>
+                      <td className="px-3 py-2 text-gray-600 dark:text-gray-400 text-xs whitespace-nowrap">
+                        {row.start} — {row.end}
+                      </td>
+                      <td className="px-3 py-2 text-right font-mono tabular-nums">{Number(row.income || 0).toLocaleString('ru-RU')}</td>
+                      {planDetailSelectedCategories.map((cid) => (
+                        <td key={cid} className="px-3 py-2 text-right font-mono tabular-nums text-xs">
+                          {Number(row.expenses?.[cid] || 0).toLocaleString('ru-RU')}
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                  <tr className="bg-gray-50 dark:bg-[#282828] font-semibold">
+                    <td className="px-3 py-2 text-gray-800 dark:text-gray-100" colSpan={2}>
+                      Σ по неделям
+                    </td>
+                    <td className="px-3 py-2 text-right font-mono tabular-nums">
+                      {planDetailWeekBreakdown.reduce((s, w) => s + (Number(w.income) || 0), 0).toLocaleString('ru-RU')}
+                    </td>
+                    {planDetailSelectedCategories.map((cid) => (
+                      <td key={cid} className="px-3 py-2 text-right font-mono tabular-nums text-xs">
+                        {planDetailWeekBreakdown.reduce((s, w) => s + (Number(w.expenses?.[cid]) || 0), 0).toLocaleString('ru-RU')}
+                      </td>
+                    ))}
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
         
         {/* Статус */}
         <div className="bg-white dark:bg-[#252525] border border-gray-200 dark:border-[#333] rounded-xl p-6">

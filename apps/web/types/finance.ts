@@ -55,6 +55,15 @@ export interface PurchaseRequest {
   invoiceDate?: string;
 }
 
+/** Одна неделя внутри месячного документа плана (не отдельный план в списке). */
+export interface FinancialPlanWeekSlice {
+  start: string;
+  end: string;
+  label?: string;
+  income: number;
+  expenses: Record<string, number>;
+}
+
 export interface FinancialPlanDocument {
   id: string;
   departmentId: string;
@@ -72,6 +81,8 @@ export interface FinancialPlanDocument {
   /** Группа недельных срезов одного месяца (один department + месяц). */
   planSeriesId?: string;
   periodLabel?: string;
+  /** Срезы по неделям внутри одного документа; итог месяца — поля income / expenses выше. */
+  weekBreakdown?: FinancialPlanWeekSlice[];
 }
 
 export interface Fund {

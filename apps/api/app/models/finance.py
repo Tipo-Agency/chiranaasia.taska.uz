@@ -118,6 +118,7 @@ class FinancialPlanDocument(Base):
     period_end = Column(String(20), nullable=True)
     plan_series_id = Column(String(36), nullable=True)  # группа недельных отрезков одного месяца
     period_label = Column(String(120), nullable=True)
+    week_breakdown = Column(JSONB, nullable=True)  # срезы по неделям внутри одного документа
 
 
 class FinancialPlanning(Base):

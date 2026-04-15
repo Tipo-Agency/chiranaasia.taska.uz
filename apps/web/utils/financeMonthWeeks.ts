@@ -4,6 +4,8 @@
  * в разбиение месяца YYYY-MM попадают только недели, «приписанные» к этому месяцу.
  */
 
+import type { FinancialPlanWeekSlice } from '../types/finance';
+
 function addDays(d: Date, n: number): Date {
   const x = new Date(d.getFullYear(), d.getMonth(), d.getDate() + n);
   return x;
@@ -109,4 +111,54 @@ export function splitMonthIntoWeekSegments(ym: string): MonthWeekSegment[] {
   }
 
   return segments;
+}
+
+/**
+ * Распределить итоги месяца по неделям пропорционально числу дней недели в этом месяце.
+ * Итоги по неделям сводятся к месячным суммам (подгонка округления на последней неделе).
+ */
+export function allocateMonthPlanToWeekSlices(
+  ym: string,
+  monthIncome: number,
+  monthExpenses: Record<string, number>,
+  categoryIds: string[]
+): FinancialPlanWeekSlice[] {
+  const segs = splitMonthIntoWeekSegments(ym);
+  if (!segs.length) return [];
+  const totalDays = segs.reduce((a, s) => a + s.daysInTargetMonth, 0) || 1;
+  const slices: FinancialPlanWeekSlice[] = segs.map((seg) => {
+    const w = seg.daysInTargetMonth / totalDays;
+    const expenses: Record<string, number> = {};
+    for (const catId of categoryIds) {
+      const v = Number(monthExpenses[catId]) || 0;
+      expenses[catId] = Math.round(v * w * 100) / 100;
+    }
+    return {
+      start: seg.start,
+      end: seg.end,
+      label: seg.label,
+      income: Math.round(monthIncome * w * 100) / 100,
+      expenses,
+    };
+  });
+
+  const sumInc = slices.reduce((a, s) => a + s.income, 0);
+  const incDiff = Math.round((monthIncome - sumInc) * 100) / 100;
+  if (slices.length && incDiff !== 0) {
+    const last = slices[slices.length - 1];
+    last.income = Math.round((last.income + incDiff) * 100) / 100;
+  }
+
+  for (const catId of categoryIds) {
+    const target = Number(monthExpenses[catId]) || 0;
+    let sumCat = 0;
+    for (const s of slices) sumCat += Number(s.expenses[catId]) || 0;
+    const diff = Math.round((target - sumCat) * 100) / 100;
+    if (slices.length && diff !== 0) {
+      const last = slices[slices.length - 1];
+      last.expenses[catId] = Math.round(((Number(last.expenses[catId]) || 0) + diff) * 100) / 100;
+    }
+  }
+
+  return slices;
 }

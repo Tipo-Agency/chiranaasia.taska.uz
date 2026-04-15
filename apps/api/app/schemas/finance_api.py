@@ -52,6 +52,7 @@ class FinancialPlanDocumentRead(BaseModel):
     periodEnd: str | None = None
     planSeriesId: str | None = None
     periodLabel: str | None = None
+    weekBreakdown: list[dict[str, Any]] | None = None
 
 
 class FinancialPlanningRead(BaseModel):

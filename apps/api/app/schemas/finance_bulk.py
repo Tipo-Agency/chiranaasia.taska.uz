@@ -25,6 +25,16 @@ class FundItem(BaseModel):
     isArchived: bool = False
 
 
+class FinancialPlanWeekSliceItem(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    start: str = Field(default="", max_length=20)
+    end: str = Field(default="", max_length=20)
+    label: str | None = Field(default=None, max_length=240)
+    income: Any = None
+    expenses: dict[str, Any] = Field(default_factory=dict)
+
+
 class FinancialPlanDocItem(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -43,6 +53,7 @@ class FinancialPlanDocItem(BaseModel):
     periodEnd: str | None = Field(default=None, max_length=20)
     planSeriesId: str | None = Field(default=None, max_length=36)
     periodLabel: str | None = Field(default=None, max_length=120)
+    weekBreakdown: list[FinancialPlanWeekSliceItem] | None = None
 
 
 class FinancialPlanningItem(BaseModel):
