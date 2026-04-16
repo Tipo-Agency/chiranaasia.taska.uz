@@ -1,7 +1,6 @@
 """Notification hub: маршрутизация доменных событий → уведомления и побочные эффекты (чат, realtime)."""
 from __future__ import annotations
 
-import logging
 import uuid
 from datetime import datetime
 from typing import Any
@@ -20,10 +19,8 @@ from app.services.notifications import (
     prefs_dict_from_pref_row,
     telegram_recipient_from,
 )
-from app.services.notifications_realtime import realtime_hub
 
 SYSTEM_SENDER_ID = "system"
-_hub_log = logging.getLogger("uvicorn.error")
 
 
 def _format_deal_assigned_body(payload: dict[str, Any]) -> str:
@@ -81,13 +78,16 @@ def _route_event(event: dict[str, Any]) -> list[dict[str, Any]]:
                 }
             )
     elif et == "task.status.changed":
-        for uid in [payload.get("assigneeId"), payload.get("createdByUserId")]:
+        title_q = payload.get("title") or "Без названия"
+        status_q = payload.get("status") or "Новый статус"
+        body_line = f'Задача "{title_q}" -> {status_q}'
+        for uid in (payload.get("assigneeId"), payload.get("createdByUserId")):
             if uid:
                 routes.append(
                     {
                         "recipient_id": uid,
                         "title": "Статус задачи изменен",
-                        "body": f'Задача "{payload.get("title") or "Без названия"}" -> {payload.get("status") or "Новый статус"}',
+                        "body": body_line,
                     }
                 )
     elif et == "deal.assigned":
@@ -117,6 +117,47 @@ def _route_event(event: dict[str, Any]) -> list[dict[str, Any]]:
                     "recipient_id": uid,
                     "title": "Документ открыт вам",
                     "body": f'Документ "{payload.get("title") or "Без названия"}" доступен для просмотра',
+                }
+            )
+    elif et == "purchase_request.status.changed":
+        uid = payload.get("requesterId")
+        if uid:
+            _status_map = {
+                "pending": "Ожидает",
+                "approved": "Одобрена",
+                "rejected": "Отклонена",
+                "paid": "Оплачена",
+            }
+            to_status = str(payload.get("toStatus") or "")
+            human_status = _status_map.get(to_status.lower(), to_status)
+            title_str = str(payload.get("title") or "Без названия")
+            routes.append(
+                {
+                    "recipient_id": uid,
+                    "title": f"Заявка: {human_status}",
+                    "body": f'Заявка "{title_str}" {human_status}',
+                }
+            )
+    elif et == "chat.message.sent":
+        uid = payload.get("recipientId")
+        if uid and payload.get("channel") == "internal":
+            routes.append(
+                {
+                    "recipient_id": uid,
+                    "title": "Новое сообщение",
+                    "body": "Входящее сообщение",
+                }
+            )
+    elif et == "meeting.updated":
+        for uid in payload.get("participantIds") or []:
+            title_str = str(payload.get("title") or "Без названия")
+            date_str = str(payload.get("date") or "")
+            time_str = str(payload.get("time") or "")
+            routes.append(
+                {
+                    "recipient_id": uid,
+                    "title": "Встреча изменена",
+                    "body": f'Встреча "{title_str}" перенесена на {date_str} {time_str}'.strip(),
                 }
             )
 
@@ -215,13 +256,15 @@ async def _apply_funnel_deal_templates(
     return out
 
 
-async def process_domain_event(db: AsyncSession, event: dict[str, Any]) -> list[str]:
+async def process_domain_event(db: AsyncSession, event: dict[str, Any]) -> tuple[list[str], list[tuple[str, dict]]]:
     """
     Для каждого получателя: одно `Notification`, затем отдельно — `NotificationDelivery` (telegram/email),
     опционально зеркало в internal chat и realtime.
 
-    Возвращает id созданных уведомлений для постановки в Redis **после** commit транзакции
-    (иначе воркер может прочитать XADD раньше INSERT и уйти в PEL/ретраи с повторной отправкой в TG).
+    Returns:
+        (notification_ids, realtime_payloads)
+        notification_ids: IDs of created Notification rows → enqueue to delivery stream after commit
+        realtime_payloads: list of (user_id, payload) → emit via realtime_hub AFTER commit
     """
     if event.get("type") == "deal.assigned":
         await _enrich_deal_assigned_event(db, event)
@@ -229,6 +272,9 @@ async def process_domain_event(db: AsyncSession, event: dict[str, Any]) -> list[
     if event.get("type") == "deal.assigned":
         routes = await _apply_funnel_deal_templates(db, event, routes)
     queued_notification_ids: list[str] = []
+    pending_realtime: list[tuple[str, dict]] = []
+    # chat.message.sent: message already in DB — don't create a duplicate InboxMessage
+    skip_chat_echo = event.get("type") in {"chat.message.sent"}
     for r in routes:
         user, pref_row = await load_user_and_notification_pref_row(db, r["recipient_id"])
         prefs = prefs_dict_from_pref_row(pref_row)
@@ -246,7 +292,7 @@ async def process_domain_event(db: AsyncSession, event: dict[str, Any]) -> list[
         await db.flush()
         queued_notification_ids.append(n.id)
 
-        if flags["chat"]:
+        if flags["chat"] and not skip_chat_echo:
             msg = InboxMessage(
                 id=str(uuid.uuid4()),
                 deal_id=None,
@@ -280,21 +326,18 @@ async def process_domain_event(db: AsyncSession, event: dict[str, Any]) -> list[
                 db.add(create_notification_delivery(notification_id=n.id, channel="email", recipient=em))
 
         if flags["in_app"]:
-            await realtime_hub.emit(
-                r["recipient_id"],
-                {
-                    "type": "notification.created",
-                    "userId": r["recipient_id"],
-                    "notification": {
-                        "id": n.id,
-                        "type": n.type,
-                        "title": n.title,
-                        "body": n.body,
-                        "entityType": n.entity_type,
-                        "entityId": n.entity_id,
-                        "isRead": bool(n.is_read),
-                        "createdAt": n.created_at.isoformat() if n.created_at else None,
-                    },
+            pending_realtime.append((r["recipient_id"], {
+                "type": "notification.created",
+                "userId": r["recipient_id"],
+                "notification": {
+                    "id": n.id,
+                    "type": n.type,
+                    "title": n.title,
+                    "body": n.body,
+                    "entityType": n.entity_type,
+                    "entityId": n.entity_id,
+                    "isRead": bool(n.is_read),
+                    "createdAt": n.created_at.isoformat() if n.created_at else None,
                 },
-            )
-    return queued_notification_ids
+            }))
+    return queued_notification_ids, pending_realtime

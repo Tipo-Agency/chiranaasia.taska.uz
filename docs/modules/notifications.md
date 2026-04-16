@@ -153,6 +153,10 @@ Backoff по числу попыток:
      → WebSocket push на все открытые вкладки
 ```
 
+При ``DOMAIN_EVENTS_HUB_ASYNC=true`` шаг 4 (**XADD** ``queue.notifications.v1``) выполняется **после** ``COMMIT`` в ``domain_events_worker`` (и dedupe по ``notification_id`` в одном батче). При синхронном hub (``false``) — через ``flush_post_commit_notification_jobs`` после commit HTTP-сессии.
+
+**Процессы, без которых «тишина» в Telegram/e-mail:** ``notifications-worker`` обязателен всегда; при ``DOMAIN_EVENTS_HUB_ASYNC=true`` ещё и ``domain_events_worker``. Старт API создаёт consumer group на ``queue.domain.v1`` через ``ensure_domain_events_hub_consumer_group`` (имя группы из ``REDIS_DOMAIN_EVENTS_HUB_GROUP``).
+
 ---
 
 ## WebSocket Realtime

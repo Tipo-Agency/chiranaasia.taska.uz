@@ -104,7 +104,6 @@ async def lifespan(app: FastAPI):
 
     try:
         from app.core.redis import get_redis_client
-        from app.services.domain_events_hub_stream import ensure_domain_events_hub_consumer_group
         from app.services.event_bus import ensure_redis_stream_and_group
         from app.services.integrations_stream import ensure_integrations_stream
         from app.services.notifications_stream import ensure_notifications_stream
@@ -112,7 +111,6 @@ async def lifespan(app: FastAPI):
         await ensure_redis_stream_and_group()
         r = await get_redis_client()
         if r:
-            await ensure_domain_events_hub_consumer_group(r)
             await ensure_integrations_stream(r)
             await ensure_notifications_stream(r)
     except Exception as e:

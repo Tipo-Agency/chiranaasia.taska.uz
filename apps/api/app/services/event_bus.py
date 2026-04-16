@@ -52,24 +52,22 @@ def deserialize_domain_event_fields(fields: dict[str, str]) -> dict[str, Any]:
 
 async def ensure_redis_stream_and_group() -> None:
     """
-    Создаёт Redis Stream для доменных событий и consumer group (для будущих воркеров / мониторинга).
-    Без Redis приложение работает: события пишутся в Postgres и обрабатываются синхронно.
+    Гарантирует Redis Stream доменных событий и consumer group для ``domain_events_worker``.
+
+    Имя группы берётся из настроек (``REDIS_DOMAIN_EVENTS_HUB_GROUP``), как в
+    ``domain_events_hub_stream.ensure_domain_events_hub_consumer_group`` — без дублирующей
+    устаревшей группы ``taska_domain_events``.
     """
-    settings = get_settings()
     redis = await get_redis_client()
     if redis is None:
         logger.warning("Redis недоступен: события только в БД, без stream.")
         return
-    name = settings.REDIS_EVENTS_STREAM
-    group = "taska_domain_events"
+    from app.services.domain_events_hub_stream import ensure_domain_events_hub_consumer_group
+
     try:
-        await redis.xgroup_create(name, group, id="0", mkstream=True)
-        logger.info("Redis stream %s + group %s OK", name, group)
+        await ensure_domain_events_hub_consumer_group(redis)
     except Exception as exc:
-        err = str(exc)
-        if "BUSYGROUP" in err or "already exists" in err.lower():
-            return
-        logger.warning("Redis xgroup_create: %s", exc)
+        logger.warning("ensure_domain_events_hub_consumer_group: %s", exc)
 
 
 async def publish_domain_event(event: dict[str, Any]) -> tuple[bool, str | None]:

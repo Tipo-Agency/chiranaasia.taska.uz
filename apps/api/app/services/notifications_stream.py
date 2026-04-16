@@ -60,10 +60,13 @@ async def enqueue_notification_delivery_jobs(notification_ids: list[str]) -> Non
     if not redis:
         return
     await ensure_notifications_stream(redis)
+    seen: set[str] = set()
     for raw_id in notification_ids:
         nid = (raw_id or "").strip()
-        if nid:
-            await xadd_notification_job(redis, nid)
+        if not nid or nid in seen:
+            continue
+        seen.add(nid)
+        await xadd_notification_job(redis, nid)
 
 
 async def notifications_xack(redis: Any, stream: str, group: str, message_id: str) -> None:
