@@ -7,14 +7,16 @@
 """
 from __future__ import annotations
 
+import hashlib
 import html
+import logging
 import smtplib
 import uuid
 from datetime import UTC, datetime, timedelta
 from email.message import EmailMessage
 from typing import Any
 
-from sqlalchemy import and_, or_, select, update
+from sqlalchemy import and_, or_, select, text, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import get_settings
@@ -24,6 +26,8 @@ from app.services.telegram_sender import (
     resolve_notification_telegram_bot_token,
     send_telegram_message,
 )
+
+_LOG = logging.getLogger(__name__)
 
 # Сколько раз разрешено получить ошибку отправки; на MAX_ATTEMPTS-й — только dead (без retry).
 MAX_ATTEMPTS = 5
@@ -147,164 +151,204 @@ def _should_ack_stream_for_deliveries(rows: list[NotificationDelivery]) -> bool:
     return True
 
 
+def _pg_advisory_keys_for_notification_id(notification_id: str) -> tuple[int, int]:
+    """Два int-ключа для pg_advisory_lock (один notification_id — одна критическая секция)."""
+    digest = hashlib.sha256(notification_id.encode("utf-8")).digest()
+    k1 = int.from_bytes(digest[0:4], "big", signed=False) & 0x7FFF_FFFF
+    k2 = int.from_bytes(digest[4:8], "big", signed=False) & 0x7FFF_FFFF
+    return k1, k2
+
+
+async def _pg_advisory_lock_notification(db: AsyncSession, notification_id: str) -> None:
+    k1, k2 = _pg_advisory_keys_for_notification_id(notification_id)
+    await db.execute(text("SELECT pg_advisory_lock(CAST(:k1 AS INT), CAST(:k2 AS INT))"), {"k1": k1, "k2": k2})
+
+
+async def _pg_advisory_unlock_notification(db: AsyncSession, notification_id: str) -> None:
+    k1, k2 = _pg_advisory_keys_for_notification_id(notification_id)
+    try:
+        await db.execute(text("SELECT pg_advisory_unlock(CAST(:k1 AS INT), CAST(:k2 AS INT))"), {"k1": k1, "k2": k2})
+    except Exception as exc:
+        _LOG.warning("pg_advisory_unlock failed notification_id=%s: %s", notification_id, exc)
+
+
 async def process_deliveries_for_notification(db: AsyncSession, notification_id: str) -> dict[str, Any]:
     """
     Обработать все «готовые» telegram/email доставки для одного уведомления.
-    Не делает commit — вызывающий коммитит после успеха.
+
+    Сериализация по ``notification_id`` (``pg_advisory_lock``): иначе два consumer'а Redis
+    могли параллельно сбросить ``sending`` → ``pending`` и оба вызвать Telegram API.
+
+    После успешной отправки во внешний канал (Telegram / SMTP) делает ``commit`` сразу,
+    чтобы при падении воркера / XAUTOCLAIM не повторить уже доставленное сообщение.
+    Вызывающий воркер всё равно делает финальный ``commit`` (часто no-op).
     """
     now = datetime.now(UTC)
     settings = get_settings()
 
-    await db.execute(
-        update(NotificationDelivery)
-        .where(
-            NotificationDelivery.notification_id == notification_id,
-            NotificationDelivery.status == "sending",
+    await _pg_advisory_lock_notification(db, notification_id)
+    try:
+        await db.execute(
+            update(NotificationDelivery)
+            .where(
+                NotificationDelivery.notification_id == notification_id,
+                NotificationDelivery.status == "sending",
+            )
+            .values(status="pending")
         )
-        .values(status="pending")
-    )
-    await db.flush()
+        await db.flush()
 
-    all_rows = (
-        (
-            await db.execute(
-                select(NotificationDelivery).where(
-                    NotificationDelivery.notification_id == notification_id,
-                    NotificationDelivery.channel.in_(("telegram", "email")),
+        all_rows = (
+            (
+                await db.execute(
+                    select(NotificationDelivery).where(
+                        NotificationDelivery.notification_id == notification_id,
+                        NotificationDelivery.channel.in_(("telegram", "email")),
+                    )
                 )
             )
+            .scalars()
+            .all()
         )
-        .scalars()
-        .all()
-    )
 
-    if not all_rows:
-        return {"processed": 0, "sent": 0, "failed": 0, "should_ack_stream": True}
+        if not all_rows:
+            return {"processed": 0, "sent": 0, "failed": 0, "should_ack_stream": True}
 
-    due = [
-        d
-        for d in all_rows
-        if d.status in ("pending", "retry")
-        and (d.next_retry_at is None or d.next_retry_at <= now)
-    ]
+        due = [
+            d
+            for d in all_rows
+            if d.status in ("pending", "retry")
+            and (d.next_retry_at is None or d.next_retry_at <= now)
+        ]
 
-    if not due:
-        return {
-            "processed": 0,
-            "sent": 0,
-            "failed": 0,
-            "should_ack_stream": _should_ack_stream_for_deliveries(list(all_rows)),
-        }
+        if not due:
+            return {
+                "processed": 0,
+                "sent": 0,
+                "failed": 0,
+                "should_ack_stream": _should_ack_stream_for_deliveries(list(all_rows)),
+            }
 
-    sent = 0
-    dead = 0
+        sent = 0
+        dead = 0
 
-    for d in due:
-        d.status = "sending"
-    await db.flush()
+        for d in due:
+            d.status = "sending"
+        await db.flush()
 
-    for d in due:
-        n = await db.get(Notification, d.notification_id)
-        if not n:
-            _mark_delivery_dead(d, "notification_not_found")
-            await _dead_letter_notification_delivery(db, d, reason="notification_not_found")
-            dead += 1
-            continue
-
-        rcpt = (d.recipient or "").strip()
-        if not rcpt:
-            _mark_delivery_dead(d, "recipient_empty")
-            await _dead_letter_notification_delivery(db, d, reason="recipient_empty")
-            dead += 1
-            continue
-
-        ok = False
-        err: str | None = None
-
-        if d.channel == "telegram":
-            bot_token = await resolve_notification_telegram_bot_token(db, n.user_id)
-            if not bot_token:
-                _mark_delivery_dead(d, "telegram_not_configured")
-                await _dead_letter_notification_delivery(db, d, reason="telegram_not_configured")
+        for d in due:
+            n = await db.get(Notification, d.notification_id)
+            if not n:
+                _mark_delivery_dead(d, "notification_not_found")
+                await _dead_letter_notification_delivery(db, d, reason="notification_not_found")
                 dead += 1
+                await db.commit()
                 continue
-            tg_text, tg_mode = _telegram_html_from_notification(n)
-            tg_out = await send_telegram_message(bot_token, rcpt, tg_text, parse_mode=tg_mode)
-            ok = tg_out.ok
-            err = tg_out.error
-            if tg_out.rate_limited:
-                sec = int(tg_out.retry_after_seconds or 60)
+
+            rcpt = (d.recipient or "").strip()
+            if not rcpt:
+                _mark_delivery_dead(d, "recipient_empty")
+                await _dead_letter_notification_delivery(db, d, reason="recipient_empty")
+                dead += 1
+                await db.commit()
+                continue
+
+            ok = False
+            err: str | None = None
+
+            if d.channel == "telegram":
+                bot_token = await resolve_notification_telegram_bot_token(db, n.user_id)
+                if not bot_token:
+                    _mark_delivery_dead(d, "telegram_not_configured")
+                    await _dead_letter_notification_delivery(db, d, reason="telegram_not_configured")
+                    dead += 1
+                    await db.commit()
+                    continue
+                tg_text, tg_mode = _telegram_html_from_notification(n)
+                tg_out = await send_telegram_message(bot_token, rcpt, tg_text, parse_mode=tg_mode)
+                ok = tg_out.ok
+                err = tg_out.error
+                if tg_out.rate_limited:
+                    sec = int(tg_out.retry_after_seconds or 60)
+                    d.status = "retry"
+                    d.last_error = err or "telegram_429"
+                    d.next_retry_at = now + timedelta(seconds=sec)
+                    await db.commit()
+                    continue
+            elif d.channel == "email":
+                if not settings.SMTP_HOST:
+                    _mark_delivery_dead(d, "smtp_not_configured")
+                    await _dead_letter_notification_delivery(db, d, reason="smtp_not_configured")
+                    dead += 1
+                    await db.commit()
+                    continue
+                ok, err = _send_email(
+                    host=settings.SMTP_HOST,
+                    port=settings.SMTP_PORT,
+                    user=settings.SMTP_USER,
+                    password=settings.SMTP_PASSWORD,
+                    sender=settings.SMTP_FROM,
+                    to_email=rcpt,
+                    subject=n.title,
+                    body=n.body or "",
+                    use_tls=settings.SMTP_USE_TLS,
+                )
+            else:
+                _mark_delivery_dead(d, "unknown_channel")
+                await _dead_letter_notification_delivery(db, d, reason="unknown_channel")
+                dead += 1
+                await db.commit()
+                continue
+
+            if ok:
+                d.status = "sent"
+                d.sent_at = now
+                d.next_retry_at = None
+                d.last_error = None
+                sent += 1
+                await db.commit()
+                continue
+
+            d.attempts = int(d.attempts or 0) + 1
+            d.last_error = err or "send_failed"
+            if d.attempts >= MAX_ATTEMPTS:
+                _mark_delivery_dead(d, d.last_error or "send_failed")
+                await _dead_letter_notification_delivery(
+                    db,
+                    d,
+                    reason="max_attempts_exhausted",
+                    extra={"transport_error": (err or "")[:2000]},
+                )
+                dead += 1
+            else:
                 d.status = "retry"
-                d.last_error = err or "telegram_429"
-                d.next_retry_at = now + timedelta(seconds=sec)
-                continue
-        elif d.channel == "email":
-            if not settings.SMTP_HOST:
-                _mark_delivery_dead(d, "smtp_not_configured")
-                await _dead_letter_notification_delivery(db, d, reason="smtp_not_configured")
-                dead += 1
-                continue
-            ok, err = _send_email(
-                host=settings.SMTP_HOST,
-                port=settings.SMTP_PORT,
-                user=settings.SMTP_USER,
-                password=settings.SMTP_PASSWORD,
-                sender=settings.SMTP_FROM,
-                to_email=rcpt,
-                subject=n.title,
-                body=n.body or "",
-                use_tls=settings.SMTP_USE_TLS,
-            )
-        else:
-            _mark_delivery_dead(d, "unknown_channel")
-            await _dead_letter_notification_delivery(db, d, reason="unknown_channel")
-            dead += 1
-            continue
+                d.next_retry_at = now + timedelta(seconds=_backoff_seconds_for_retry(d.attempts))
 
-        if ok:
-            d.status = "sent"
-            d.sent_at = now
-            d.next_retry_at = None
-            d.last_error = None
-            sent += 1
-            continue
+            await db.commit()
 
-        d.attempts = int(d.attempts or 0) + 1
-        d.last_error = err or "send_failed"
-        if d.attempts >= MAX_ATTEMPTS:
-            _mark_delivery_dead(d, d.last_error or "send_failed")
-            await _dead_letter_notification_delivery(
-                db,
-                d,
-                reason="max_attempts_exhausted",
-                extra={"transport_error": (err or "")[:2000]},
-            )
-            dead += 1
-        else:
-            d.status = "retry"
-            d.next_retry_at = now + timedelta(seconds=_backoff_seconds_for_retry(d.attempts))
+        await db.flush()
 
-    await db.flush()
-
-    refreshed = (
-        (
-            await db.execute(
-                select(NotificationDelivery).where(
-                    NotificationDelivery.notification_id == notification_id,
-                    NotificationDelivery.channel.in_(("telegram", "email")),
+        refreshed = (
+            (
+                await db.execute(
+                    select(NotificationDelivery).where(
+                        NotificationDelivery.notification_id == notification_id,
+                        NotificationDelivery.channel.in_(("telegram", "email")),
+                    )
                 )
             )
+            .scalars()
+            .all()
         )
-        .scalars()
-        .all()
-    )
 
-    return {
-        "processed": len(due),
-        "sent": sent,
-        "failed": dead,
-        "should_ack_stream": _should_ack_stream_for_deliveries(list(refreshed)),
-    }
+        return {
+            "processed": len(due),
+            "sent": sent,
+            "failed": dead,
+            "should_ack_stream": _should_ack_stream_for_deliveries(list(refreshed)),
+        }
+    finally:
+        await _pg_advisory_unlock_notification(db, notification_id)
 
 
 async def enqueue_due_notification_delivery_jobs(

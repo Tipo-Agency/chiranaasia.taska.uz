@@ -215,18 +215,20 @@ async def _apply_funnel_deal_templates(
     return out
 
 
-async def process_domain_event(db: AsyncSession, event: dict[str, Any]) -> int:
+async def process_domain_event(db: AsyncSession, event: dict[str, Any]) -> list[str]:
     """
     Для каждого получателя: одно `Notification`, затем отдельно — `NotificationDelivery` (telegram/email),
     опционально зеркало в internal chat и realtime.
-    Returns created notifications count.
+
+    Возвращает id созданных уведомлений для постановки в Redis **после** commit транзакции
+    (иначе воркер может прочитать XADD раньше INSERT и уйти в PEL/ретраи с повторной отправкой в TG).
     """
     if event.get("type") == "deal.assigned":
         await _enrich_deal_assigned_event(db, event)
     routes = _route_event(event)
     if event.get("type") == "deal.assigned":
         routes = await _apply_funnel_deal_templates(db, event, routes)
-    created = 0
+    queued_notification_ids: list[str] = []
     for r in routes:
         user, pref_row = await load_user_and_notification_pref_row(db, r["recipient_id"])
         prefs = prefs_dict_from_pref_row(pref_row)
@@ -242,17 +244,7 @@ async def process_domain_event(db: AsyncSession, event: dict[str, Any]) -> int:
         )
         db.add(n)
         await db.flush()
-
-        try:
-            from app.core.redis import get_redis_client
-            from app.services.notifications_stream import ensure_notifications_stream, xadd_notification_job
-
-            redis = await get_redis_client()
-            if redis:
-                await ensure_notifications_stream(redis)
-                await xadd_notification_job(redis, n.id)
-        except Exception as exc:
-            _hub_log.warning("notification_hub: queue.notifications XADD failed: %s", exc)
+        queued_notification_ids.append(n.id)
 
         if flags["chat"]:
             msg = InboxMessage(
@@ -305,5 +297,4 @@ async def process_domain_event(db: AsyncSession, event: dict[str, Any]) -> int:
                     },
                 },
             )
-        created += 1
-    return created
+    return queued_notification_ids

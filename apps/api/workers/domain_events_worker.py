@@ -36,6 +36,7 @@ from app.services.domain_events_hub_stream import (
 )
 from app.services.event_bus import deserialize_domain_event_fields
 from app.services.notification_hub import process_domain_event
+from app.services.notifications_stream import enqueue_notification_delivery_jobs
 from app.services.worker_error_policy import classify_worker_exception, log_worker_exception
 
 log = logging.getLogger("uvicorn.error")
@@ -78,9 +79,10 @@ async def _process_stream_message(redis, msg_id: str, fields: dict[str, str]) ->
                     return
 
                 t0 = time.monotonic()
-                await process_domain_event(session, event)
+                queued_notifications = await process_domain_event(session, event)
                 row.hub_processed_at = datetime.now(timezone.utc)
                 await session.commit()
+                await enqueue_notification_delivery_jobs(queued_notifications)
                 ms = (time.monotonic() - t0) * 1000
                 log.info("domain_events_worker: notification_build_ms=%.1f event_id=%s", ms, eid)
             await ack()

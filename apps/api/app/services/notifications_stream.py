@@ -50,6 +50,22 @@ async def xadd_notification_job(redis: Any, notification_id: str) -> str:
     return msg_id
 
 
+async def enqueue_notification_delivery_jobs(notification_ids: list[str]) -> None:
+    """XADD в ``queue.notifications`` после того, как строки уведомлений/доставок уже закоммичены в БД."""
+    if not notification_ids:
+        return
+    from app.core.redis import get_redis_client
+
+    redis = await get_redis_client()
+    if not redis:
+        return
+    await ensure_notifications_stream(redis)
+    for raw_id in notification_ids:
+        nid = (raw_id or "").strip()
+        if nid:
+            await xadd_notification_job(redis, nid)
+
+
 async def notifications_xack(redis: Any, stream: str, group: str, message_id: str) -> None:
     await redis.xack(stream, group, message_id)
 
