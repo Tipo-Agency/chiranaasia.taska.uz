@@ -49,7 +49,7 @@ export const ARCHIVE_TAB_OPTIONS: Array<{ id: ArchiveTabId; label: string }> = [
   { id: 'employees', label: 'Сотрудники' },
   { id: 'projects', label: 'Проекты' },
   { id: 'departments', label: 'Подразделения' },
-  { id: 'financeCategories', label: 'Статьи расходов' },
+  { id: 'financeCategories', label: 'Фонды' },
   { id: 'salesFunnels', label: 'Воронки' },
   { id: 'tables', label: 'Таблицы' },
   { id: 'businessProcesses', label: 'Бизнес-процессы' },
@@ -236,7 +236,7 @@ export const ArchiveView: React.FC<{
       case 'employees': return 'Архив сотрудников пуст';
       case 'projects': return 'Архив проектов пуст';
       case 'departments': return 'Архив подразделений пуст';
-      case 'financeCategories': return 'Архив статей расходов пуст';
+      case 'financeCategories': return 'Архив фондов пуст';
       case 'salesFunnels': return 'Архив воронок пуст';
       case 'tables': return 'Архив таблиц пуст';
       case 'businessProcesses': return 'Архив бизнес-процессов пуст';

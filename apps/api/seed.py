@@ -19,7 +19,7 @@ from app.models.settings import TableCollection, StatusOption, PriorityOption
 from app.models.notification import NotificationPreferences as NPrefModel, AutomationRule as ARModel
 from app.models.client import Client, Deal, EmployeeInfo, AccountsReceivable
 from app.models.content import Doc, Folder, Meeting, ContentPost
-from app.models.finance import Department, FinanceCategory, Fund, FinancePlan
+from app.models.finance import Department, FinanceCategory, FinancePlan
 from app.models.funnel import SalesFunnel
 
 
@@ -121,17 +121,19 @@ async def seed():
         for p in projects:
             db.add(p)
 
-        # Finance categories
-        for c in [
-            ("fc1", "ФОТ (Зарплаты)", "percent", "40"), ("fc2", "Налоги", "percent", "12"),
-            ("fc3", "Реклама", "percent", "15"), ("fc4", "Аренда офиса", "fixed", "5000000"),
-            ("fc5", "Сервисы / Софт", "fixed", "1000000"), ("fc6", "Дивиденды", "percent", "10"),
+        # Фонды (единый справочник finance_categories)
+        for cid, name, typ, val, sort_o in [
+            ("fund-1", "Операционный", "fixed", None, 1),
+            ("fund-2", "Закупки", "fixed", None, 2),
+            ("fund-3", "Резерв", "fixed", None, 3),
+            ("fc1", "ФОТ (Зарплаты)", "percent", "40", 10),
+            ("fc2", "Налоги", "percent", "12", 11),
+            ("fc3", "Реклама", "percent", "15", 12),
+            ("fc4", "Аренда офиса", "fixed", "5000000", 13),
+            ("fc5", "Сервисы / Софт", "fixed", "1000000", 14),
+            ("fc6", "Дивиденды", "percent", "10", 15),
         ]:
-            db.add(FinanceCategory(id=c[0], name=c[1], type=c[2], value=c[3]))
-
-        # Funds
-        for f in [("fund-1", "Зарплаты", "1"), ("fund-2", "Закупки", "2"), ("fund-3", "Резерв", "3")]:
-            db.add(Fund(id=f[0], name=f[1], order_val=f[2]))
+            db.add(FinanceCategory(id=cid, name=name, type=typ, value=val, sort_order=sort_o))
 
         # Sales funnel
         db.add(SalesFunnel(

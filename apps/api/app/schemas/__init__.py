@@ -51,7 +51,6 @@ from app.schemas.finance_bulk import (
     FinanceCategoryItem,
     FinancialPlanDocItem,
     FinancialPlanningItem,
-    FundItem,
     IncomeReportItem,
 )
 from app.schemas.finance_requests import FinanceRequestRead
@@ -133,7 +132,6 @@ __all__ = [
     "FinancialPlanningItem",
     "FolderItem",
     "FolderRead",
-    "FundItem",
     "FunnelBulkItem",
     "FunnelCreateBody",
     "FunnelPatchBody",

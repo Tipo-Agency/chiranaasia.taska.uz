@@ -17,7 +17,6 @@ import type {
   TableCollection,
   Department,
   FinanceCategory,
-  Fund,
   FinancePlan,
   PurchaseRequest,
   FinancialPlanDocument,
@@ -74,7 +73,6 @@ export interface AppRouterProps {
   tables: TableCollection[];
   departments: Department[];
   financeCategories: FinanceCategory[];
-  funds: Fund[];
   financePlan: FinancePlan | null;
   purchaseRequests: PurchaseRequest[];
   financialPlanDocuments?: FinancialPlanDocument[];

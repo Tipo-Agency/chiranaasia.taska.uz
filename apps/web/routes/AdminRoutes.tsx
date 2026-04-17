@@ -24,7 +24,6 @@ export function AdminRoutesView(props: AppRouterProps) {
         docs={props.docs}
         contentPosts={props.contentPosts}
         financeCategories={props.financeCategories}
-        funds={props.funds}
         employeeInfos={props.employeeInfos}
         deals={props.deals}
         clients={props.clients}
@@ -54,8 +53,6 @@ export function AdminRoutesView(props: AppRouterProps) {
         onDeleteDepartment={actions.deleteDepartment}
         onSaveFinanceCategory={actions.saveFinanceCategory}
         onDeleteFinanceCategory={actions.deleteFinanceCategory}
-        onSaveFund={actions.saveFund}
-        onDeleteFund={actions.deleteFund}
         onSaveWarehouse={actions.saveWarehouse}
         onDeleteWarehouse={actions.deleteWarehouse}
         warehouses={props.warehouses}

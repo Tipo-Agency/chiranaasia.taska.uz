@@ -7,20 +7,13 @@ from pydantic import BaseModel, ConfigDict, Field
 
 
 class FinanceCategoryItem(BaseModel):
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="ignore", populate_by_name=True)
 
     id: str = Field(..., min_length=1, max_length=100)
     name: str = Field(default="", max_length=500)
     type: str = Field(default="fixed", max_length=50)
     value: Any = None
     color: str | None = Field(default=None, max_length=200)
-
-
-class FundItem(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-    id: str = Field(..., min_length=1, max_length=100)
-    name: str = Field(default="", max_length=500)
     order: int = Field(default=0, ge=0)
     isArchived: bool = False
 

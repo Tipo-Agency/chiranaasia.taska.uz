@@ -1,6 +1,6 @@
 
 import { useCallback, useState } from 'react';
-import { Department, FinanceCategory, Fund, FinancePlan, PurchaseRequest, FinancialPlanDocument, FinancialPlanning, Bdr, IncomeReport } from '../../../types';
+import { Department, FinanceCategory, FinancePlan, PurchaseRequest, FinancialPlanDocument, FinancialPlanning, Bdr, IncomeReport } from '../../../types';
 import { api } from '../../../backend/api';
 import { createSaveHandler, createDeleteHandler, saveItem } from '../../../utils/crudUtils';
 import { NOTIFICATION_MESSAGES } from '../../../constants/messages';
@@ -82,7 +82,6 @@ function withRequestVersion(
 export const useFinanceLogic = (showNotification: (msg: string) => void) => {
   const [departments, setDepartments] = useState<Department[]>([]);
   const [financeCategories, setFinanceCategories] = useState<FinanceCategory[]>([]);
-  const [funds, setFunds] = useState<Fund[]>([]);
   const [financePlan, setFinancePlan] = useState<FinancePlan | null>(null);
   const [purchaseRequests, setPurchaseRequests] = useState<PurchaseRequest[]>([]);
   const [financialPlanDocuments, setFinancialPlanDocuments] = useState<FinancialPlanDocument[]>([]);
@@ -127,21 +126,6 @@ export const useFinanceLogic = (showNotification: (msg: string) => void) => {
     api.finance.updateCategories,
     showNotification,
     NOTIFICATION_MESSAGES.FINANCE_CATEGORY_DELETED
-  );
-
-  // Funds
-  const saveFund = createSaveHandler(
-    setFunds,
-    api.finance.updateFunds,
-    showNotification,
-    NOTIFICATION_MESSAGES.FUND_SAVED
-  );
-
-  const deleteFund = createDeleteHandler(
-    setFunds,
-    api.finance.updateFunds,
-    showNotification,
-    NOTIFICATION_MESSAGES.FUND_DELETED
   );
 
   // Finance Plan
@@ -299,12 +283,11 @@ export const useFinanceLogic = (showNotification: (msg: string) => void) => {
   };
 
   return {
-    state: { departments, financeCategories, funds, financePlan, purchaseRequests, financialPlanDocuments, financialPlannings, incomeReports, bdr },
-    setters: { setDepartments, setFinanceCategories, setFunds, setFinancePlan, setPurchaseRequests, setFinancialPlanDocuments, setFinancialPlannings, setIncomeReports, setBdr },
+    state: { departments, financeCategories, financePlan, purchaseRequests, financialPlanDocuments, financialPlannings, incomeReports, bdr },
+    setters: { setDepartments, setFinanceCategories, setFinancePlan, setPurchaseRequests, setFinancialPlanDocuments, setFinancialPlannings, setIncomeReports, setBdr },
     actions: { 
         saveDepartment, deleteDepartment, 
         saveFinanceCategory, deleteFinanceCategory,
-        saveFund, deleteFund,
         updateFinancePlan,
         savePurchaseRequest, deletePurchaseRequest, refreshPurchaseRequests,
         saveFinancialPlanDocument, deleteFinancialPlanDocument,

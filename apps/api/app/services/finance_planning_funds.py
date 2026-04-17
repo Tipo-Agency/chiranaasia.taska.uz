@@ -1,4 +1,4 @@
-"""Проверка лимитов фондов бюджета при одобрении заявки."""
+"""Проверка лимитов бюджета по фондам (ключи fund_allocations = id справочника finance_categories)."""
 from __future__ import annotations
 
 from decimal import Decimal, InvalidOperation
@@ -30,6 +30,20 @@ def _decimal_from_json(val: Any) -> Decimal:
         return Decimal(0)
 
 
+def _bucket_id_for_request(
+    planning: FinancialPlanning,
+    rid_s: str,
+    req: FinanceRequest | None,
+) -> str:
+    rmap = planning.request_fund_ids if isinstance(planning.request_fund_ids, dict) else {}
+    mapped = str(rmap.get(rid_s) or "").strip()
+    if mapped:
+        return mapped
+    if req:
+        return str(req.category or "").strip()
+    return ""
+
+
 def _approved_by_fund(
     planning: FinancialPlanning,
     *,
@@ -40,7 +54,6 @@ def _approved_by_fund(
     rids = planning.request_ids or []
     if not isinstance(rids, list):
         return out
-    req_funds = planning.request_fund_ids if isinstance(planning.request_fund_ids, dict) else {}
     for rid in rids:
         rid_s = str(rid).strip()
         if not rid_s or (exclude_request_id and rid_s == exclude_request_id):
@@ -48,10 +61,10 @@ def _approved_by_fund(
         req = request_by_id.get(rid_s)
         if not req or (str(req.status or "").strip().lower() != "approved"):
             continue
-        fid = str(req_funds.get(rid_s) or "").strip()
-        if not fid:
+        bid = _bucket_id_for_request(planning, rid_s, req)
+        if not bid:
             continue
-        out[fid] = out.get(fid, Decimal(0)) + parse_request_amount_uzs(req.amount)
+        out[bid] = out.get(bid, Decimal(0)) + parse_request_amount_uzs(req.amount)
     return out
 
 
@@ -61,7 +74,7 @@ async def assert_budget_fund_allows_approval(
     finance_request_id: str,
     row: FinanceRequest,
 ) -> None:
-    """Если заявка в бюджете — нужен фонд и достаточный остаток по fund_allocations."""
+    """Если заявка в бюджете — нужен фонд (категория) и достаточный остаток по fund_allocations."""
     amount = parse_request_amount_uzs(row.amount)
     plannings_r = await db.execute(select(FinancialPlanning))
     plannings = [p for p in plannings_r.scalars().all() if not (p.is_archived or False)]
@@ -71,12 +84,11 @@ async def assert_budget_fund_allows_approval(
     req_rows = list((await db.execute(select(FinanceRequest))).scalars().all())
     request_by_id = {str(r.id): r for r in req_rows}
     for pl in containing:
-        rmap = pl.request_fund_ids if isinstance(pl.request_fund_ids, dict) else {}
-        fid = str(rmap.get(finance_request_id) or "").strip()
-        if not fid:
-            raise HTTPException(status_code=400, detail="finance_request_budget_fund_required")
-        alloc = _decimal_from_json((pl.fund_allocations or {}).get(fid) if isinstance(pl.fund_allocations, dict) else 0)
+        bid = _bucket_id_for_request(pl, finance_request_id, row)
+        if not bid:
+            raise HTTPException(status_code=400, detail="finance_request_budget_category_required")
+        alloc = _decimal_from_json((pl.fund_allocations or {}).get(bid) if isinstance(pl.fund_allocations, dict) else 0)
         used = _approved_by_fund(pl, request_by_id=request_by_id, exclude_request_id=finance_request_id)
-        used_fid = used.get(fid, Decimal(0))
-        if used_fid + amount > alloc + Decimal("0.01"):
-            raise HTTPException(status_code=400, detail="finance_request_fund_insufficient")
+        used_bid = used.get(bid, Decimal(0))
+        if used_bid + amount > alloc + Decimal("0.01"):
+            raise HTTPException(status_code=400, detail="finance_request_budget_insufficient")

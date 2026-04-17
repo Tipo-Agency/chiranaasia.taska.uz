@@ -111,11 +111,11 @@ Finance покрывает весь финансовый цикл компани
 2. Ищем FinancialPlanning содержащие этот request_id
 3. Если не в планировании → сразу разрешаем
 4. Для каждого планирования:
-   → fund_id = planning.request_fund_ids[request_id]
-   → если fund_id не задан: HTTP 400 "finance_request_budget_fund_required"
-   → allocation = planning.fund_allocations[fund_id]
+   → bucket_id = planning.request_fund_ids[request_id] или finance_requests.category (legacy map)
+   → если bucket_id не задан: HTTP 400 "finance_request_budget_category_required"
+   → allocation = planning.fund_allocations[bucket_id]  (ключ = id из finance_categories)
    → used = сумма amount всех approved заявок в том же фонде (кроме текущей)
-   → если used + amount > allocation + 0.01: HTTP 400 "finance_request_fund_insufficient"
+   → если used + amount > allocation + 0.01: HTTP 400 "finance_request_budget_insufficient"
    → tolerance 0.01 для ошибок округления
 ```
 
@@ -215,30 +215,14 @@ PATCH /api/finance/requests/{id}
 ```
 GET /api/finance/categories        → list[FinanceCategoryRead]
 PUT /api/finance/categories        → bulk upsert
-  item: { id(≤100), name(≤500), type(def:"fixed",≤50), value(Any), color(≤200) }
+  item: { id(≤100), name(≤500), type(def:"fixed",≤50), value(Any), color(≤200), order(≥0,def:0), isArchived(def:false) }
 ```
 
-### Фонды (Fund)
+### Фонды (единый справочник)
 
-Источники финансирования. При одобрении заявки деньги списываются из фонда.
+Таблица `finance_categories`: и статьи плана/БДР, и «подушки» бюджета (`fund_allocations` / `fund_movements`), и поле `category` у заявки — один id.
 
-**Дефолтные фонды:**
-
-
-| id     | Название     | Порядок |
-| ------ | ------------ | ------- |
-| fund-1 | Операционный | 1       |
-| fund-2 | Закупки      | 2       |
-| fund-3 | Резерв       | 3       |
-
-
-**API:**
-
-```
-GET /api/finance/funds             → list[FundRead] (is_archived=false, sorted by order)
-PUT /api/finance/funds             → bulk upsert
-  item: { id(≤100), name(≤500), order(≥0,def:0), isArchived(def:false) }
-```
+**Пример дефолтных фондов (см. сиды):** `fund-1` … `fund-3` (операционный / закупки / резерв) плюс процентные статьи `fc1` … `fc6`.
 
 ---
 
@@ -454,8 +438,8 @@ PUT /api/accounts-receivable    → bulk upsert
 | 400  | `finance_request_invalid_initial_status`    | Создание не с draft/pending                                      |
 | 400  | `finance_request_invalid_status_transition` | Запрещённый переход                                              |
 | 400  | `finance_request_locked`                    | Изменение locked-полей у approved/paid                           |
-| 400  | `finance_request_budget_fund_required`      | Нет fund_id для заявки в планировании                            |
-| 400  | `finance_request_fund_insufficient`         | Бюджет фонда превышен                                            |
+| 400  | `finance_request_budget_category_required`  | Нет фонда (category) у заявки в планировании                     |
+| 400  | `finance_request_budget_insufficient`       | Лимит фонда в бюджете превышен                                   |
 | 403  | —                                           | finance.approve требуется для одобрения/отклонения               |
 | 403  | —                                           | system.full_access требуется для редактирования прошлых периодов |
 | 409  | `stale_version`                             | Optimistic lock conflict                                         |
@@ -472,7 +456,6 @@ PUT /api/accounts-receivable    → bulk upsert
 | `finance_request.updated`          | PATCH (не статус)       |
 | `finance_request.status.changed`   | PATCH (статус меняется) |
 | `finance_category.created/updated` | PUT /finance/categories |
-| `finance_fund.created/updated`     | PUT /finance/funds      |
 
 
 ---
@@ -496,7 +479,7 @@ PUT /api/accounts-receivable    → bulk upsert
 | Ситуация                                  | Поведение                                                               |
 | ----------------------------------------- | ----------------------------------------------------------------------- |
 | Одобрить заявку вне планирования          | OK, бюджет не проверяется                                               |
-| Одобрить без fund_id в планировании       | 400 finance_request_budget_fund_required                                |
+| Одобрить без фонда (category) в планировании | 400 finance_request_budget_category_required                         |
 | Бюджет фонда превышен на 0.005 UZS        | OK (tolerance 0.01)                                                     |
 | Повторная загрузка выписки                | Все старые строки удаляются, записываются новые; сверка пересчитывается |
 | Заблокированный IncomeReport              | Редактировать только через отвязку от Planning                          |

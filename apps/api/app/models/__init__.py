@@ -22,7 +22,6 @@ from app.models.finance import (
     FinanceRequest,
     FinancialPlanDocument,
     FinancialPlanning,
-    Fund,
     IncomeReport,
     PurchaseRequest,
 )
@@ -78,7 +77,6 @@ __all__ = [
     "ContentPost",
     "Department",
     "FinanceCategory",
-    "Fund",
     "FinancePlan",
     "FinanceRequest",
     "PurchaseRequest",

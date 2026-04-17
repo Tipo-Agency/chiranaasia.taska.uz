@@ -87,7 +87,7 @@ All bulk PUT endpoints must use schemas from `app/schemas/`.
 | `settings.py`            | StatusOptionItem, PriorityOptionItem, ProjectItem, DepartmentItem, FolderItem, TableItem, AutomationRuleItem    |
 | `content.py`             | DocItem, ContentPostItem, ActivityLogItem, ContentPostRead, DocRead, ActivityLogRead                            |
 | `accounts_receivable.py` | AccountsReceivableItem, AccountsReceivableRead                                                                  |
-| `finance_bulk.py`        | FinanceCategoryItem, FundItem, FinancialPlanDocItem, FinancialPlanningItem, BankStatementItem, IncomeReportItem |
+| `finance_bulk.py`        | FinanceCategoryItem, FinancialPlanDocItem, FinancialPlanningItem, BankStatementItem, IncomeReportItem |
 | `weekly_plans.py`        | WeeklyPlanItem, ProtocolItem, WeeklyPlanRead, ProtocolRead                                                      |
 | `shoot_plans.py`         | ShootPlanItem, ShootPlanRead                                                                                    |
 | `inventory.py`           | WarehouseItem, InventoryItemSchema, StockMovementItem, InventoryRevisionItem                                    |
@@ -222,7 +222,7 @@ All models in `app/models/`. Key files:
 - `role.py` — Role with `permissions: list[str]` (JSONB)
 - `client.py` — Client, EmployeeInfo, AccountsReceivable
 - `task.py` — Task, Project, TaskComment
-- `finance.py` — FinanceCategory, Fund, FinancePlan, FinancialPlanDocument, FinancialPlanning, Department
+- `finance.py` — FinanceCategory, FinancePlan, FinancialPlanDocument, FinancialPlanning, Department
 - `funnel.py` — SalesFunnel (stages + sources as JSONB)
 - `notification.py` — Notification, AutomationRule
 - `settings.py` — StatusOption, PriorityOption, ActivityLog, TableCollection

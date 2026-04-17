@@ -81,6 +81,18 @@ export function parseRequestAmountUzs(req: PurchaseRequest): number {
   return Number.isFinite(n) ? roundMoney(n) : 0;
 }
 
+/** Ключ лимита бюджета для заявки: requestFundIds (legacy) или category заявки. */
+export function budgetBucketIdForRequest(
+  planning: FinancialPlanning,
+  requestId: string,
+  requests: readonly PurchaseRequest[]
+): string {
+  const fromMap = String(planning.requestFundIds?.[requestId] ?? '').trim();
+  if (fromMap) return fromMap;
+  const req = requests.find((r) => r.id === requestId);
+  return String(req?.category ?? req?.categoryId ?? '').trim();
+}
+
 /** Суммы одобренных заявок по фондам в рамках бюджета. */
 export function approvedAmountByFund(
   planning: FinancialPlanning,
@@ -92,9 +104,9 @@ export function approvedAmountByFund(
     if (rid === excludeRequestId) continue;
     const req = requests.find((r) => r.id === rid);
     if (!req || req.status !== 'approved') continue;
-    const fid = planning.requestFundIds?.[rid];
-    if (!fid) continue;
-    out[fid] = sumMoney([out[fid] || 0, parseRequestAmountUzs(req)]);
+    const bid = budgetBucketIdForRequest(planning, rid, requests);
+    if (!bid) continue;
+    out[bid] = sumMoney([out[bid] || 0, parseRequestAmountUzs(req)]);
   }
   return out;
 }

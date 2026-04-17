@@ -132,6 +132,7 @@ def test_finance_approve_request_fund_insufficient_when_in_budget(api_client):
             "currency": "UZS",
             "status": "pending",
             "requesterId": "demo-user",
+            "category": "fund-1",
         },
         headers=browser_csrf_headers(api_client),
     )
@@ -159,7 +160,7 @@ def test_finance_approve_request_fund_insufficient_when_in_budget(api_client):
         headers=browser_csrf_headers(api_client),
     )
     assert r.status_code == 400, r.text
-    assert r.json().get("message") == "finance_request_fund_insufficient"
+    assert r.json().get("message") == "finance_request_budget_insufficient"
 
 
 def test_finance_approve_request_budget_fund_required(api_client):
@@ -204,7 +205,7 @@ def test_finance_approve_request_budget_fund_required(api_client):
         headers=browser_csrf_headers(api_client),
     )
     assert r.status_code == 400, r.text
-    assert r.json().get("message") == "finance_request_budget_fund_required"
+    assert r.json().get("message") == "finance_request_budget_category_required"
 
 
 def test_create_finance_request_idempotency_replay(api_client):

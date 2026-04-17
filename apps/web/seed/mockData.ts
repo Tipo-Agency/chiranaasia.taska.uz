@@ -6,7 +6,6 @@ import {
   DEFAULT_PRIORITIES,
   DEFAULT_NOTIFICATION_PREFS,
   DEFAULT_FINANCE_CATEGORIES,
-  DEFAULT_FUNDS,
   DEFAULT_AUTOMATION_RULES,
 } from '../constants';
 
@@ -395,9 +394,8 @@ export function runSeed(): void {
     { id: 'a1', userId: demoUserId, userName: 'Демо', userAvatar: '', action: 'task_created', details: 'Задача «Подготовить КП»', timestamp: now(), read: false },
   ]);
 
-  // Финансы: категории, фонды, план, планирования, заявки
+  // Финансы: фонды (справочник), план, планирования, заявки
   localStoreService.setAll('financeCategories', DEFAULT_FINANCE_CATEGORIES);
-  localStoreService.setAll('funds', DEFAULT_FUNDS);
   localStoreService.setAll('financePlan', [{ id: 'default', period: 'month', salesPlan: 50000000, currentIncome: 12000000 }]);
   const week1 = new Date();
   week1.setDate(week1.getDate() - 7);

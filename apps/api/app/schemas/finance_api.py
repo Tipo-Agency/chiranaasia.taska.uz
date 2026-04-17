@@ -14,14 +14,7 @@ class FinanceCategoryRead(BaseModel):
     type: str = ""
     value: Any = None
     color: str | None = None
-
-
-class FinanceFundRead(BaseModel):
-    model_config = ConfigDict(extra="ignore")
-
-    id: str
-    name: str = ""
-    order: Any = None
+    order: int = 0
     isArchived: bool = False
 
 

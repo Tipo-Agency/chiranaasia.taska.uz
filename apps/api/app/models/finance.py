@@ -44,15 +44,8 @@ class FinanceCategory(Base):
     type = Column(String(20), nullable=False)  # fixed, percent
     value = Column(String(50), nullable=True)
     color = Column(String(100), nullable=True)
-
-
-class Fund(Base):
-    __tablename__ = "funds"
-
-    id = Column(String(36), primary_key=True, default=gen_id)
-    name = Column(String(255), nullable=False)
-    order_val = Column(String(10), default="0")
-    is_archived = Column(Boolean, default=False)
+    sort_order = Column(Integer, nullable=False, server_default=text("0"))
+    is_archived = Column(Boolean, nullable=False, server_default=text("false"))
 
 
 class FinancePlan(Base):

@@ -1,100 +1,73 @@
 import React, { useMemo, useState } from 'react';
-import { FinanceCategory, Fund } from '../../types';
+import { FinanceCategory } from '../../types';
 import { Button, Input, StandardModal } from '../ui';
 import { Edit2, Trash2 } from 'lucide-react';
 import { EntitySearchSelect } from '../ui/EntitySearchSelect';
 import { SystemConfirmDialog } from '../ui/SystemDialogs';
 
-type CreateKind = 'category' | 'fund';
-
 export const FinanceSetupSettings: React.FC<{
   categories: FinanceCategory[];
-  funds: Fund[];
   onSaveCategory: (cat: FinanceCategory) => void;
   onDeleteCategory: (id: string) => void;
-  onSaveFund: (fund: Fund) => void;
-  onDeleteFund: (id: string) => void;
-  createKind?: CreateKind | null;
+  createKind?: 'category' | null;
   onConsumedCreateKind?: () => void;
-}> = ({
-  categories,
-  funds,
-  onSaveCategory,
-  onDeleteCategory,
-  onSaveFund,
-  onDeleteFund,
-  createKind,
-  onConsumedCreateKind,
-}) => {
-  const activeCategories = useMemo(() => categories.filter((c) => !c.isArchived), [categories]);
-  const activeFunds = useMemo(() => funds.filter((f) => !f.isArchived), [funds]);
+}> = ({ categories, onSaveCategory, onDeleteCategory, createKind, onConsumedCreateKind }) => {
+  const sortedActive = useMemo(
+    () =>
+      categories
+        .filter((c) => !c.isArchived)
+        .slice()
+        .sort((a, b) => (a.order ?? 0) - (b.order ?? 0) || a.name.localeCompare(b.name)),
+    [categories]
+  );
 
   const [catModalOpen, setCatModalOpen] = useState(false);
   const [editingCategory, setEditingCategory] = useState<FinanceCategory | null>(null);
   const [catName, setCatName] = useState('');
   const [catType, setCatType] = useState<'fixed' | 'percent'>('fixed');
+  const [catValue, setCatValue] = useState('');
+  const [catOrder, setCatOrder] = useState(0);
   const [deleteCategoryId, setDeleteCategoryId] = useState<string | null>(null);
 
-  const [fundModalOpen, setFundModalOpen] = useState(false);
-  const [editingFund, setEditingFund] = useState<Fund | null>(null);
-  const [fundName, setFundName] = useState('');
-  const [fundOrder, setFundOrder] = useState(1);
-  const [deleteFundId, setDeleteFundId] = useState<string | null>(null);
-
-  const openCreate = (kind: CreateKind) => {
-    if (kind === 'category') {
-      setEditingCategory(null);
-      setCatName('');
-      setCatType('fixed');
-      setCatModalOpen(true);
-    }
-    if (kind === 'fund') {
-      setEditingFund(null);
-      setFundName('');
-      setFundOrder(activeFunds.length + 1 || 1);
-      setFundModalOpen(true);
-    }
-  };
-
   React.useEffect(() => {
-    if (!createKind) return;
-    openCreate(createKind);
+    if (createKind !== 'category') return;
+    setEditingCategory(null);
+    setCatName('');
+    setCatType('fixed');
+    setCatValue('');
+    setCatOrder(sortedActive.length + 1 || 1);
+    setCatModalOpen(true);
     onConsumedCreateKind?.();
-  }, [createKind]);
+  }, [createKind, onConsumedCreateKind, sortedActive.length]);
 
   const saveCategory = () => {
     const name = catName.trim();
     if (!name) return;
     const now = new Date().toISOString();
+    const rawVal = catValue.replace(/\s/g, '').replace(/,/g, '.').trim();
+    const vNum = rawVal === '' ? undefined : Number(rawVal);
     onSaveCategory({
       id: editingCategory?.id || `fc-${Date.now()}`,
       name,
       type: catType,
+      value: vNum !== undefined && Number.isFinite(vNum) ? vNum : undefined,
+      order: catOrder,
       updatedAt: now,
       isArchived: editingCategory?.isArchived || false,
+      color: editingCategory?.color,
     });
     setCatModalOpen(false);
-  };
-
-  const saveFund = () => {
-    const name = fundName.trim();
-    if (!name) return;
-    onSaveFund({
-      id: editingFund?.id || `fund-${Date.now()}`,
-      name,
-      order: fundOrder,
-      isArchived: editingFund?.isArchived || false,
-    });
-    setFundModalOpen(false);
   };
 
   return (
     <div className="space-y-8 w-full">
       <div>
         <div className="mb-3">
-          <div className="text-sm font-bold text-gray-900 dark:text-white">Статьи расходов</div>
+          <div className="text-sm font-bold text-gray-900 dark:text-white">Фонды</div>
           <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 space-y-1">
-            <p>Вид затрат (фикс или %): план по подразделениям, заявки на закупку, БДР. Это не «фонды».</p>
+            <p>
+              Единый справочник лимитов бюджета, статей в планах и категорий в заявках — одна запись, один id.
+            </p>
             <p className="text-gray-400 dark:text-gray-500">Создание — через «+» в шапке.</p>
           </div>
         </div>
@@ -104,21 +77,24 @@ export const FinanceSetupSettings: React.FC<{
             <table className="min-w-full text-sm">
               <thead className="bg-gray-50 dark:bg-[#202020] border-b border-gray-200 dark:border-[#333]">
                 <tr className="text-[11px] uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                  <th className="text-left font-bold px-4 py-3">Порядок</th>
                   <th className="text-left font-bold px-4 py-3">Название</th>
                   <th className="text-left font-bold px-4 py-3">Тип</th>
+                  <th className="text-left font-bold px-4 py-3">Значение</th>
                   <th className="text-right font-bold px-4 py-3">Действия</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100 dark:divide-[#333]">
-                {activeCategories.length === 0 ? (
+                {sortedActive.length === 0 ? (
                   <tr>
-                    <td colSpan={3} className="px-4 py-8 text-center text-gray-400 dark:text-gray-500">
-                      Нет статей расходов. Добавьте первую.
+                    <td colSpan={5} className="px-4 py-8 text-center text-gray-400 dark:text-gray-500">
+                      Нет фондов. Добавьте первый.
                     </td>
                   </tr>
                 ) : (
-                  activeCategories.map((c) => (
+                  sortedActive.map((c) => (
                     <tr key={c.id} className="hover:bg-gray-50 dark:hover:bg-[#303030]">
+                      <td className="px-4 py-3 text-gray-600 dark:text-gray-300">{c.order ?? 0}</td>
                       <td className="px-4 py-3 font-medium text-gray-900 dark:text-gray-100">{c.name}</td>
                       <td className="px-4 py-3">
                         <span
@@ -131,6 +107,9 @@ export const FinanceSetupSettings: React.FC<{
                           {c.type === 'fixed' ? 'Фикс' : 'Процент'}
                         </span>
                       </td>
+                      <td className="px-4 py-3 text-gray-600 dark:text-gray-300 tabular-nums">
+                        {c.value !== undefined && c.value !== null ? String(c.value) : '—'}
+                      </td>
                       <td className="px-4 py-3">
                         <div className="flex items-center justify-end gap-2">
                           <button
@@ -139,6 +118,10 @@ export const FinanceSetupSettings: React.FC<{
                               setEditingCategory(c);
                               setCatName(c.name);
                               setCatType(c.type);
+                              setCatValue(
+                                c.value !== undefined && c.value !== null ? String(c.value) : ''
+                              );
+                              setCatOrder(c.order ?? 0);
                               setCatModalOpen(true);
                             }}
                             className="p-2 rounded-xl text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-gray-50 dark:hover:bg-[#303030]"
@@ -150,7 +133,7 @@ export const FinanceSetupSettings: React.FC<{
                             type="button"
                             onClick={() => setDeleteCategoryId(c.id)}
                             className="p-2 rounded-xl text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20"
-                            title="Удалить"
+                            title="В архив"
                           >
                             <Trash2 size={16} />
                           </button>
@@ -165,81 +148,10 @@ export const FinanceSetupSettings: React.FC<{
         </div>
       </div>
 
-      <div>
-        <div className="mb-3">
-          <div className="text-sm font-bold text-gray-900 dark:text-white">Фонды</div>
-          <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 space-y-1">
-            <p>
-              Целевые «кошельки» для распределения поступившего дохода (касса → фонды). Отдельно от статей расхода: статья
-              отвечает на вопрос «на что тратим», фонд — «куда кладём выручку до оплат».
-            </p>
-            <p className="text-gray-400 dark:text-gray-500">Создание — через «+» в шапке.</p>
-          </div>
-        </div>
-
-        <div className="bg-white dark:bg-[#252525] border border-gray-200 dark:border-[#333] rounded-2xl overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="min-w-full text-sm">
-              <thead className="bg-gray-50 dark:bg-[#202020] border-b border-gray-200 dark:border-[#333]">
-                <tr className="text-[11px] uppercase tracking-wide text-gray-500 dark:text-gray-400">
-                  <th className="text-left font-bold px-4 py-3">Порядок</th>
-                  <th className="text-left font-bold px-4 py-3">Название</th>
-                  <th className="text-right font-bold px-4 py-3">Действия</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100 dark:divide-[#333]">
-                {activeFunds.length === 0 ? (
-                  <tr>
-                    <td colSpan={3} className="px-4 py-8 text-center text-gray-400 dark:text-gray-500">
-                      Нет фондов. Добавьте первый.
-                    </td>
-                  </tr>
-                ) : (
-                  activeFunds
-                    .slice()
-                    .sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
-                    .map((f) => (
-                      <tr key={f.id} className="hover:bg-gray-50 dark:hover:bg-[#303030]">
-                        <td className="px-4 py-3 text-gray-600 dark:text-gray-300">{f.order ?? 0}</td>
-                        <td className="px-4 py-3 font-medium text-gray-900 dark:text-gray-100">{f.name}</td>
-                        <td className="px-4 py-3">
-                          <div className="flex items-center justify-end gap-2">
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setEditingFund(f);
-                                setFundName(f.name);
-                                setFundOrder(f.order ?? 0);
-                                setFundModalOpen(true);
-                              }}
-                              className="p-2 rounded-xl text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-gray-50 dark:hover:bg-[#303030]"
-                              title="Редактировать"
-                            >
-                              <Edit2 size={16} />
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => setDeleteFundId(f.id)}
-                              className="p-2 rounded-xl text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20"
-                              title="Удалить"
-                            >
-                              <Trash2 size={16} />
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </div>
-
       <StandardModal
         isOpen={catModalOpen}
         onClose={() => setCatModalOpen(false)}
-        title={editingCategory ? 'Редактировать статью' : 'Новая статья расходов'}
+        title={editingCategory ? 'Редактировать фонд' : 'Новый фонд'}
         size="sm"
         footer={
           <div className="flex items-center justify-end gap-2">
@@ -254,11 +166,17 @@ export const FinanceSetupSettings: React.FC<{
       >
         <div className="space-y-3">
           <Input label="Название" value={catName} onChange={(e) => setCatName(e.target.value)} />
+          <Input
+            label="Порядок"
+            type="number"
+            value={String(catOrder)}
+            onChange={(e) => setCatOrder(parseInt(e.target.value, 10) || 0)}
+          />
           <div>
             <div className="text-xs font-bold text-gray-500 dark:text-gray-400 mb-1 uppercase">Тип</div>
             <EntitySearchSelect
               value={catType}
-              onChange={(v) => setCatType(v as any)}
+              onChange={(v) => setCatType(v as 'fixed' | 'percent')}
               options={[
                 { value: 'fixed', label: 'Фиксированная сумма', searchText: 'фиксированная сумма fixed' },
                 { value: 'percent', label: 'Процент от дохода', searchText: 'процент доход percent' },
@@ -266,42 +184,21 @@ export const FinanceSetupSettings: React.FC<{
               searchPlaceholder="Тип…"
             />
           </div>
-        </div>
-      </StandardModal>
-
-      <StandardModal
-        isOpen={fundModalOpen}
-        onClose={() => setFundModalOpen(false)}
-        title={editingFund ? 'Редактировать фонд' : 'Новый фонд'}
-        size="sm"
-        footer={
-          <div className="flex items-center justify-end gap-2">
-            <Button variant="secondary" onClick={() => setFundModalOpen(false)}>
-              Отмена
-            </Button>
-            <Button onClick={saveFund} disabled={!fundName.trim()}>
-              Сохранить
-            </Button>
-          </div>
-        }
-      >
-        <div className="space-y-3">
-          <Input label="Название" value={fundName} onChange={(e) => setFundName(e.target.value)} />
           <Input
-            label="Порядок"
-            type="number"
-            value={String(fundOrder)}
-            onChange={(e) => setFundOrder(parseInt(e.target.value, 10) || 0)}
+            label={catType === 'percent' ? 'Процент' : 'Сумма (UZS)'}
+            value={catValue}
+            onChange={(e) => setCatValue(e.target.value)}
+            placeholder={catType === 'percent' ? '12' : '5000000'}
           />
         </div>
       </StandardModal>
 
       <SystemConfirmDialog
         open={Boolean(deleteCategoryId)}
-        title="Удалить статью"
-        message="Удалить статью расходов?"
+        title="Архивировать фонд"
+        message="Убрать фонд в архив?"
         danger
-        confirmText="Удалить"
+        confirmText="В архив"
         cancelText="Отмена"
         onCancel={() => setDeleteCategoryId(null)}
         onConfirm={() => {
@@ -309,20 +206,6 @@ export const FinanceSetupSettings: React.FC<{
           setDeleteCategoryId(null);
         }}
       />
-      <SystemConfirmDialog
-        open={Boolean(deleteFundId)}
-        title="Удалить фонд"
-        message="Удалить фонд?"
-        danger
-        confirmText="Удалить"
-        cancelText="Отмена"
-        onCancel={() => setDeleteFundId(null)}
-        onConfirm={() => {
-          if (deleteFundId) onDeleteFund(deleteFundId);
-          setDeleteFundId(null);
-        }}
-      />
     </div>
   );
 };
-

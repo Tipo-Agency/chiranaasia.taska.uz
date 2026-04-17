@@ -12,7 +12,6 @@ export function FinanceRoutesView(props: AppRouterProps) {
     <Suspense fallback={<RouteFallback />}>
       <FinanceModuleLazy
         categories={props.financeCategories}
-        funds={props.funds}
         plan={props.financePlan}
         requests={props.purchaseRequests}
         departments={props.departments}

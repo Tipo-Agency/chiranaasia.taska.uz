@@ -456,7 +456,6 @@ export function MainApp() {
                 tables={state.tables}
                 departments={state.departments}
                 financeCategories={state.financeCategories}
-                funds={state.funds}
                 financePlan={state.financePlan}
                 purchaseRequests={state.purchaseRequests}
                 financialPlanDocuments={state.financialPlanDocuments}

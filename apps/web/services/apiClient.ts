@@ -1576,8 +1576,6 @@ export function purchaseRequestFromApi(r: Record<string, unknown>): PurchaseRequ
 export const financeEndpoint = {
   getCategories: () => get<unknown[]>('/finance/categories'),
   updateCategories: (categories: unknown[]) => put<{ ok: boolean }>('/finance/categories', categories),
-  getFunds: () => get<unknown[]>('/finance/funds'),
-  updateFunds: (funds: unknown[]) => put<{ ok: boolean }>('/finance/funds', funds),
   getPlan: () => get<unknown | null>('/finance/plan'),
   updatePlan: (plan: unknown) => put<{ ok: boolean }>('/finance/plan', plan),
   getRequests: (query?: FinanceRequestsListQuery) =>

@@ -20,8 +20,6 @@ export const NOTIFICATION_MESSAGES = {
   DEPARTMENT_DELETED: 'Подразделение удалено',
   FINANCE_CATEGORY_SAVED: 'Статья расходов сохранена',
   FINANCE_CATEGORY_DELETED: 'Статья расходов удалена',
-  FUND_SAVED: 'Фонд сохранён',
-  FUND_DELETED: 'Фонд удалён',
   PURCHASE_REQUEST_SAVED: 'Заявка сохранена',
   PURCHASE_REQUEST_DELETED: 'Заявка удалена',
   FINANCIAL_PLAN_SAVED: 'План сохранён',

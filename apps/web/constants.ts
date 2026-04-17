@@ -1,5 +1,5 @@
 
-import { Project, Role, TableCollection, Task, User, Doc, StatusOption, PriorityOption, NotificationPreferences, Department, FinanceCategory, Fund, OrgPosition, AutomationRule } from "./types";
+import { Project, Role, TableCollection, Task, User, Doc, StatusOption, PriorityOption, NotificationPreferences, Department, FinanceCategory, OrgPosition, AutomationRule } from "./types";
 
 
 export const TELEGRAM_CHAT_ID = '-1002719375477'; 
@@ -258,18 +258,14 @@ export const MOCK_DEPARTMENTS: Department[] = [];
 export const MOCK_ORG_POSITIONS: OrgPosition[] = [];
 
 export const DEFAULT_FINANCE_CATEGORIES: FinanceCategory[] = [
-    { id: 'fc1', name: 'ФОТ (Зарплаты)', type: 'percent', value: 40, color: 'bg-blue-100 text-blue-700' },
-    { id: 'fc2', name: 'Налоги', type: 'percent', value: 12, color: 'bg-red-100 text-red-700' },
-    { id: 'fc3', name: 'Реклама', type: 'percent', value: 15, color: 'bg-purple-100 text-purple-700' },
-    { id: 'fc4', name: 'Аренда офиса', type: 'fixed', value: 5000000, color: 'bg-orange-100 text-orange-700' },
-    { id: 'fc5', name: 'Сервисы / Софт', type: 'fixed', value: 1000000, color: 'bg-green-100 text-green-700' },
-    { id: 'fc6', name: 'Дивиденды', type: 'percent', value: 10, color: 'bg-yellow-100 text-yellow-700' },
-];
-
-/** Моковые фонды (имена не дублируют статьи расхода вроде «ФОТ», чтобы не путать сущности) */
-export const DEFAULT_FUNDS: Fund[] = [
-    { id: 'fund-1', name: 'Операционный', order: 1 },
-    { id: 'fund-2', name: 'Закупки', order: 2 },
-    { id: 'fund-3', name: 'Резерв', order: 3 },
+    { id: 'fund-1', name: 'Операционный', type: 'fixed', value: 0, order: 1, color: 'bg-slate-100 text-slate-700' },
+    { id: 'fund-2', name: 'Закупки', type: 'fixed', value: 0, order: 2, color: 'bg-emerald-100 text-emerald-700' },
+    { id: 'fund-3', name: 'Резерв', type: 'fixed', value: 0, order: 3, color: 'bg-amber-100 text-amber-800' },
+    { id: 'fc1', name: 'ФОТ (Зарплаты)', type: 'percent', value: 40, order: 10, color: 'bg-blue-100 text-blue-700' },
+    { id: 'fc2', name: 'Налоги', type: 'percent', value: 12, order: 11, color: 'bg-red-100 text-red-700' },
+    { id: 'fc3', name: 'Реклама', type: 'percent', value: 15, order: 12, color: 'bg-purple-100 text-purple-700' },
+    { id: 'fc4', name: 'Аренда офиса', type: 'fixed', value: 5000000, order: 13, color: 'bg-orange-100 text-orange-700' },
+    { id: 'fc5', name: 'Сервисы / Софт', type: 'fixed', value: 1000000, order: 14, color: 'bg-green-100 text-green-700' },
+    { id: 'fc6', name: 'Дивиденды', type: 'percent', value: 10, order: 15, color: 'bg-yellow-100 text-yellow-700' },
 ];
 

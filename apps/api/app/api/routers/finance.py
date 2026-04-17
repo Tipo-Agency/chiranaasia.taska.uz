@@ -1,4 +1,4 @@
-"""Finance router - categories, funds, plan, requests, bank statements, income reports."""
+"""Finance router - categories (фонды), plan, requests, bank statements, income reports."""
 from __future__ import annotations
 
 from datetime import UTC, date, datetime
@@ -27,7 +27,6 @@ from app.models.finance import (
     FinanceRequest,
     FinancialPlanDocument,
     FinancialPlanning,
-    Fund,
     IncomeReport,
 )
 from app.models.user import User
@@ -36,7 +35,6 @@ from app.schemas.finance_api import (
     BankStatementRead,
     BdrGetResponse,
     FinanceCategoryRead,
-    FinanceFundRead,
     FinancePlanRowRead,
     FinanceReconciliationGroupRead,
     FinancialPlanDocumentRead,
@@ -51,7 +49,6 @@ from app.schemas.finance_bulk import (
     FinanceReconciliationGroupItem,
     FinancialPlanDocItem,
     FinancialPlanningItem,
-    FundItem,
     IncomeReportItem,
 )
 from app.schemas.finance_requests import (
@@ -155,21 +152,15 @@ def _request_id(request: Request) -> str | None:
 
 
 def row_to_category(row):
+    so = int(getattr(row, "sort_order", 0) or 0)
     return {
         "id": row.id,
         "name": row.name,
         "type": row.type,
         "value": float(row.value) if row.value and str(row.value).replace(".", "").isdigit() else row.value,
         "color": row.color,
-    }
-
-
-def row_to_fund(row):
-    return {
-        "id": row.id,
-        "name": row.name,
-        "order": int(row.order_val) if row.order_val and str(row.order_val).isdigit() else row.order_val,
-        "isArchived": row.is_archived or False,
+        "order": so,
+        "isArchived": bool(getattr(row, "is_archived", False)),
     }
 
 
@@ -322,6 +313,8 @@ async def update_categories(categories: list[FinanceCategoryItem], db: AsyncSess
             existing.type = c.type or existing.type
             existing.value = str(c.value) if c.value is not None else None
             existing.color = c.color
+            existing.sort_order = int(c.order) if c.order is not None else (existing.sort_order or 0)
+            existing.is_archived = bool(c.isArchived)
         else:
             db.add(FinanceCategory(
                 id=cid,
@@ -329,6 +322,8 @@ async def update_categories(categories: list[FinanceCategoryItem], db: AsyncSess
                 type=c.type or "fixed",
                 value=str(c.value) if c.value is not None else None,
                 color=c.color,
+                sort_order=int(c.order) if c.order is not None else 0,
+                is_archived=bool(c.isArchived),
             ))
         await db.flush()
         await log_entity_mutation(
@@ -338,48 +333,6 @@ async def update_categories(categories: list[FinanceCategoryItem], db: AsyncSess
             entity_id=cid,
             source="finance-router",
             payload={"name": c.name},
-        )
-    await db.commit()
-    return {"ok": True}
-
-
-@router.get("/funds", response_model=list[FinanceFundRead])
-async def get_funds(db: AsyncSession = Depends(get_db)):
-    result = await db.execute(select(Fund).where(Fund.is_archived.is_(False)))
-    rows = result.scalars().all()
-    if not rows:
-        from app.core.seed_data import DEFAULT_FUNDS
-        return sorted(DEFAULT_FUNDS, key=lambda x: x.get("order", 0))
-    return sorted([row_to_fund(r) for r in rows], key=lambda x: x.get("order", 0))
-
-
-@router.put("/funds", response_model=OkResponse)
-async def update_funds(funds: list[FundItem], db: AsyncSession = Depends(get_db)):
-    for f in funds:
-        fid = f.id
-        if not fid:
-            continue
-        existing = await db.get(Fund, fid)
-        is_new = existing is None
-        if existing:
-            existing.name = f.name or existing.name
-            existing.order_val = str(f.order)
-            existing.is_archived = f.isArchived
-        else:
-            db.add(Fund(
-                id=fid,
-                name=f.name or "",
-                order_val=str(f.order),
-                is_archived=f.isArchived,
-            ))
-        await db.flush()
-        await log_entity_mutation(
-            db,
-            event_type="finance.fund.created" if is_new else "finance.fund.updated",
-            entity_type="fund",
-            entity_id=fid,
-            source="finance-router",
-            payload={"name": f.name},
         )
     await db.commit()
     return {"ok": True}

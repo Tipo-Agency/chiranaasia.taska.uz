@@ -4,6 +4,8 @@ export interface FinanceCategory {
   type: 'fixed' | 'percent';
   color?: string;
   value?: number;
+  /** Порядок в справочнике и в бюджете. */
+  order?: number;
   isArchived?: boolean;
   updatedAt?: string;
 }
@@ -83,13 +85,6 @@ export interface FinancialPlanDocument {
   periodLabel?: string;
   /** Срезы по неделям внутри одного документа; итог месяца — поля income / expenses выше. */
   weekBreakdown?: FinancialPlanWeekSlice[];
-}
-
-export interface Fund {
-  id: string;
-  name: string;
-  order?: number;
-  isArchived?: boolean;
 }
 
 /** Движение между фондами внутри бюджета (перераспределение / «заём»). */

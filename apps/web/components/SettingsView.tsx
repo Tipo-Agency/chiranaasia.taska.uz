@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useMemo, useLayoutEffect, lazy, Suspense } from 'react';
-import { Project, Task, User, StatusOption, PriorityOption, NotificationPreferences, AutomationRule, TableCollection, Deal, Department, FinanceCategory, Fund, SalesFunnel, Doc, ContentPost, EmployeeInfo, Client, Contract, BusinessProcess, Meeting, Warehouse, OrgPosition, ProductionRoutePipeline } from '../types';
-import { User as UserIcon, Briefcase, Archive, Users, Building2, Wallet, TrendingUp, PiggyBank, ShieldAlert, Settings, BellRing, Zap, Package, ArrowLeft, ShieldCheck, Receipt, Link2, Factory } from 'lucide-react';
+import { Project, Task, User, StatusOption, PriorityOption, NotificationPreferences, AutomationRule, TableCollection, Deal, Department, FinanceCategory, SalesFunnel, Doc, ContentPost, EmployeeInfo, Client, Contract, BusinessProcess, Meeting, Warehouse, OrgPosition, ProductionRoutePipeline } from '../types';
+import { User as UserIcon, Briefcase, Archive, Users, Building2, Wallet, TrendingUp, ShieldAlert, Settings, BellRing, Zap, Package, ArrowLeft, ShieldCheck, Receipt, Link2, Factory } from 'lucide-react';
 import {
   Input,
   ModuleCreateDropdown,
@@ -46,7 +46,6 @@ interface SettingsViewProps {
   currentUser?: User;
   departments?: Department[];
   financeCategories?: FinanceCategory[];
-  funds?: Fund[];
   warehouses?: Warehouse[];
   salesFunnels?: SalesFunnel[];
   productionPipelines?: ProductionRoutePipeline[];
@@ -98,8 +97,6 @@ interface SettingsViewProps {
   onDeleteDepartment?: (id: string) => void;
   onSaveFinanceCategory?: (cat: FinanceCategory) => void;
   onDeleteFinanceCategory?: (id: string) => void;
-  onSaveFund?: (fund: Fund) => void;
-  onDeleteFund?: (id: string) => void;
   onSaveWarehouse?: (warehouse: Warehouse) => void;
   onDeleteWarehouse?: (id: string) => void;
   onSaveSalesFunnel?: (funnel: SalesFunnel) => void;
@@ -138,7 +135,6 @@ const SettingsView: React.FC<SettingsViewProps> = ({
   currentUser, onUpdateProfile, initialTab = 'users',
   onSaveDeal, departments = [], onSaveDepartment, onDeleteDepartment,
   financeCategories = [], onSaveFinanceCategory, onDeleteFinanceCategory,
-  funds = [], onSaveFund, onDeleteFund,
   warehouses = [], onSaveWarehouse, onDeleteWarehouse,
   salesFunnels = [], onSaveSalesFunnel, onDeleteSalesFunnel,
   productionPipelines = [], onSaveProductionPipeline, onDeleteProductionPipeline,
@@ -187,7 +183,7 @@ const SettingsView: React.FC<SettingsViewProps> = ({
   /** Инкремент при нажатии «+» на вкладке пользователей — открывает форму создания в AccessSettings */
   const [openNewUserSignal, setOpenNewUserSignal] = useState(0);
   const [structureCreateKind, setStructureCreateKind] = useState<null | 'project' | 'department' | 'warehouse'>(null);
-  const [financeCreateKind, setFinanceCreateKind] = useState<null | 'category' | 'fund'>(null);
+  const [financeCreateKind, setFinanceCreateKind] = useState<null | 'category'>(null);
   const [salesFunnelsCreateRequested, setSalesFunnelsCreateRequested] = useState(0);
   const [productionRoutesCreateRequested, setProductionRoutesCreateRequested] = useState(0);
 
@@ -302,16 +298,9 @@ const SettingsView: React.FC<SettingsViewProps> = ({
                 items={[
                   {
                     id: 'category',
-                    label: 'Статья расходов',
+                    label: 'Фонд',
                     icon: Receipt,
                     onClick: () => setFinanceCreateKind('category'),
-                    iconClassName: 'text-slate-600 dark:text-slate-300',
-                  },
-                  {
-                    id: 'fund',
-                    label: 'Фонд',
-                    icon: PiggyBank,
-                    onClick: () => setFinanceCreateKind('fund'),
                     iconClassName: 'text-slate-600 dark:text-slate-300',
                   },
                 ]}
@@ -467,11 +456,8 @@ const SettingsView: React.FC<SettingsViewProps> = ({
               {activeTab === 'finance-setup' && (
                 <FinanceSetupSettings
                   categories={financeCategories}
-                  funds={funds}
                   onSaveCategory={onSaveFinanceCategory!}
                   onDeleteCategory={onDeleteFinanceCategory!}
-                  onSaveFund={onSaveFund!}
-                  onDeleteFund={onDeleteFund!}
                   createKind={financeCreateKind}
                   onConsumedCreateKind={() => setFinanceCreateKind(null)}
                 />
