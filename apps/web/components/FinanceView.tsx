@@ -46,6 +46,7 @@ import {
   sumIncomeReportsInRange,
   distributeIncomeFromPlanDocuments,
   approvedAmountByFund,
+  approvedBudgetUZSForRequest,
   budgetBucketIdForRequest,
   canonicalPlanningMonthYm,
   effectivePurchaseRequestDepartmentId,
@@ -849,7 +850,11 @@ const FinanceView: React.FC<FinanceViewProps> = ({
     e.target.value = '';
   };
 
-  const handleStatusChange = (req: PurchaseRequest, status: PurchaseRequest['status']) => {
+  const handleStatusChange = (
+    req: PurchaseRequest,
+    status: PurchaseRequest['status'],
+    approveOpts?: { budgetApprovedUzs?: number }
+  ) => {
       if (status === 'rejected') {
         const reason = typeof window !== 'undefined' ? window.prompt('Причина отклонения (обязательно):') : null;
         if (reason === null) return;
@@ -865,7 +870,20 @@ const FinanceView: React.FC<FinanceViewProps> = ({
         return;
       }
       if (status === 'approved') {
-        const pl = financialPlannings.find((p) => (p.requestIds || []).includes(req.id));
+        const planningsForCheck = financialPlannings.map((p) =>
+          selectedPlanning && p.id === selectedPlanning.id
+            ? ({
+                ...p,
+                fundAllocations:
+                  Object.keys(planningDetailFundAllocations).length > 0
+                    ? planningDetailFundAllocations
+                    : p.fundAllocations ?? {},
+                requestIds:
+                  planningDetailRequestIds.length > 0 ? planningDetailRequestIds : p.requestIds ?? [],
+              } satisfies FinancialPlanning)
+            : p
+        );
+        const pl = planningsForCheck.find((p) => (p.requestIds || []).includes(req.id));
         if (pl) {
           const bid = budgetBucketIdForRequest(pl, req.id, requests);
           if (!bid) {
@@ -876,16 +894,25 @@ const FinanceView: React.FC<FinanceViewProps> = ({
           }
           const alloc = Number(pl.fundAllocations?.[bid]) || 0;
           const used = approvedAmountByFund(pl, requests, req.id);
-          const need = parseRequestAmountUzs(req);
+          const full = parseRequestAmountUzs(req);
+          const need =
+            approveOpts?.budgetApprovedUzs != null && Number.isFinite(approveOpts.budgetApprovedUzs)
+              ? roundMoney(Math.min(Math.max(approveOpts.budgetApprovedUzs, 0), full))
+              : full;
           if (moneyToTiyin(used[bid] || 0) + moneyToTiyin(need) > moneyToTiyin(alloc)) {
-            const free = alloc - (used[bid] || 0);
+            const free = subtractMoney(alloc, used[bid] || 0);
             setAlertText(
               `Недостаточно средств на фонде. Доступно ${free.toLocaleString('ru-RU')} UZS, нужно ${need.toLocaleString('ru-RU')} UZS. Сделайте перераспределение в карточке бюджета.`
             );
             return;
           }
         }
-        onSaveRequest({ ...req, status }, { statusPatch: 'approve' });
+        onSaveRequest(
+          { ...req, status },
+          approveOpts?.budgetApprovedUzs != null && Number.isFinite(approveOpts.budgetApprovedUzs)
+            ? { statusPatch: 'approve', budgetApprovedUzs: approveOpts.budgetApprovedUzs }
+            : { statusPatch: 'approve' }
+        );
         return;
       }
       if (status === 'paid') {
@@ -1420,7 +1447,7 @@ const FinanceView: React.FC<FinanceViewProps> = ({
           <div>
             <h3 className="text-sm font-bold text-gray-800 dark:text-white uppercase mb-1">Доход и распределение</h3>
             <p className="text-xs text-gray-500 dark:text-gray-400">
-              Доход за период; ниже — только фонды: «План» — доля дохода из отмеченных планов (без переносов), «Остаток» — после переносов между фондами и одобренных заявок по фонду в карточке заявки. Переносы — ссылка внизу.
+              Доход за период. Лимиты по фондам и остатки — в таблице справа от заявок. Переносы между фондами — ссылка ниже.
             </p>
           </div>
           <div>
@@ -1435,180 +1462,360 @@ const FinanceView: React.FC<FinanceViewProps> = ({
             />
           </div>
 
-          {Object.keys(planningDetailFundAllocations).length > 0 && (
-            <>
-              <div className="border-t border-gray-100 dark:border-[#333] pt-4">
-                <div className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase mb-2">По фондам</div>
-                <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
-                  «План» — из планов по весам строк (до переносов). Переносы меняют только «Остаток» (и нераспределённое не трогают). «Остаток» — после переносов и одобренных заявок.
-                </p>
-                <div className="grid grid-cols-[1fr_auto_auto] gap-x-3 gap-y-2 text-xs font-bold uppercase tracking-wide text-gray-500 dark:text-gray-400 border-b border-gray-200 dark:border-[#333] pb-2 mb-2">
-                  <span>Фонд</span>
-                  <span className="text-right tabular-nums">План</span>
-                  <span className="text-right tabular-nums">Остаток</span>
-                </div>
-                <div className="space-y-2 text-sm">
-                  {[
-                    ...new Set([
-                      ...Object.keys(planningDetailFundPlanBaseline),
-                      ...Object.keys(planningDetailFundAllocations),
-                    ]),
-                  ]
-                    .sort((a, b) => {
-                      const oa = categories.find((c) => c.id === a)?.order ?? 0;
-                      const ob = categories.find((c) => c.id === b)?.order ?? 0;
-                      if (oa !== ob) return oa - ob;
-                      return a.localeCompare(b);
-                    })
-                    .map((fundId) => {
-                      const fund = categories.find((c) => c.id === fundId);
-                      const synthetic: FinancialPlanning = {
-                        ...selectedPlanning,
-                        fundAllocations: planningDetailFundAllocations,
-                        requestIds: planningDetailRequestIds,
-                      };
-                      const bal = fundAvailableBalances(synthetic, requests)[fundId] ?? 0;
-                      const planAmt = Number(planningDetailFundPlanBaseline[fundId]) || 0;
-                      return (
-                        <div key={fundId} className="grid grid-cols-[1fr_auto_auto] gap-x-3 gap-y-1 items-center">
-                          <span className="text-gray-700 dark:text-gray-300 font-medium">{fund?.name || fundId}</span>
-                          <span className="tabular-nums text-right text-gray-900 dark:text-gray-100">
-                            {formatWholeSumUzGrouped(planAmt)} UZS
-                          </span>
-                          <span
-                            className={`tabular-nums text-right font-medium ${bal < 0 ? 'text-red-600 dark:text-red-400' : 'text-gray-900 dark:text-white'}`}
-                          >
-                            {formatWholeSumUzGrouped(bal)} UZS
-                          </span>
-                        </div>
-                      );
-                    })}
-                </div>
-                {planningDetailIncome > 0 && (() => {
-                  const allocated = sumMoney(Object.values(planningDetailFundAllocations) as number[]);
-                  const rest = subtractMoney(planningDetailIncome, allocated);
-                  return (
-                    <div className="mt-3 text-xs text-gray-500 dark:text-gray-400">
-                      Всего по фондам: {formatWholeSumUzGrouped(allocated)} UZS · Нераспределённо: {formatWholeSumUzGrouped(rest)} UZS
-                      {rest < 0 && <span className="text-red-600 dark:text-red-400 ml-2">(превышение)</span>}
-                    </div>
-                  );
-                })()}
+          {Object.keys(planningDetailFundAllocations).length > 0 && planningDetailIncome > 0 && (() => {
+            const allocated = sumMoney(Object.values(planningDetailFundAllocations) as number[]);
+            const rest = subtractMoney(planningDetailIncome, allocated);
+            return (
+              <div className="text-xs text-gray-500 dark:text-gray-400 border-t border-gray-100 dark:border-[#333] pt-3">
+                Всего по фондам: {formatWholeSumUzGrouped(allocated)} UZS · Нераспределённо: {formatWholeSumUzGrouped(rest)} UZS
+                {rest < 0 && <span className="text-red-600 dark:text-red-400 ml-2">(превышение)</span>}
               </div>
-              {planningDetailFundMovements && planningDetailFundMovements.length > 0 && (
-                <div className="border-t border-gray-100 dark:border-[#333] pt-3 text-xs text-gray-500 dark:text-gray-400">
-                  <div className="font-bold text-gray-600 dark:text-gray-300 mb-1">Движения между фондами</div>
-                  <ul className="space-y-1">
-                    {planningDetailFundMovements.map((m) => {
-                      const fromN = categories.find((c) => c.id === m.fromFundId)?.name || m.fromFundId;
-                      const toN = categories.find((c) => c.id === m.toFundId)?.name || m.toFundId;
-                      return (
-                        <li key={m.id}>
-                          {fromN} → {toN}: {formatWholeSumUzGrouped(Number(m.amount) || 0)} UZS
-                        </li>
-                      );
-                    })}
-                  </ul>
-                </div>
-              )}
-              {!isPlanningArchived && (
-                <button
-                  type="button"
-                  className="text-sm text-[#3337AD] hover:underline print:hidden"
-                  onClick={() => setPlanningFundTransferOpen(true)}
-                >
-                  Перераспределить между фондами
-                </button>
-              )}
-            </>
+            );
+          })()}
+          {planningDetailFundMovements && planningDetailFundMovements.length > 0 && (
+            <div className="border-t border-gray-100 dark:border-[#333] pt-3 text-xs text-gray-500 dark:text-gray-400">
+              <div className="font-bold text-gray-600 dark:text-gray-300 mb-1">Движения между фондами</div>
+              <ul className="space-y-1">
+                {planningDetailFundMovements.map((m) => {
+                  const fromN = categories.find((c) => c.id === m.fromFundId)?.name || m.fromFundId;
+                  const toN = categories.find((c) => c.id === m.toFundId)?.name || m.toFundId;
+                  return (
+                    <li key={m.id}>
+                      {fromN} → {toN}: {formatWholeSumUzGrouped(Number(m.amount) || 0)} UZS
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          )}
+          {Object.keys(planningDetailFundAllocations).length > 0 && !isPlanningArchived && (
+            <button
+              type="button"
+              className="text-sm text-[#3337AD] hover:underline print:hidden"
+              onClick={() => setPlanningFundTransferOpen(true)}
+            >
+              Перераспределить между фондами
+            </button>
           )}
         </div>
 
-        {/* Заявки */}
-        <div className="bg-white dark:bg-[#252525] border border-gray-200 dark:border-[#333] rounded-xl overflow-hidden">
-          <div className="p-4 border-b border-gray-200 dark:border-[#333] flex items-center justify-between flex-wrap gap-2">
-            <h3 className="font-bold text-gray-800 dark:text-white">Заявки в бюджете ({planningRequests.length})</h3>
-            <div className="flex items-center gap-4">
-              <div className="text-xs text-gray-500 dark:text-gray-400">
-                Сумма: {formatWholeSumUzGrouped(sumMoney(planningRequests.map((r) => parseRequestAmountUzs(r))))} UZS
-              </div>
-              <button
-                onClick={handleRefreshRequests}
-                className="px-3 py-1.5 bg-blue-600 text-white text-xs font-medium hover:bg-blue-700 rounded-lg flex items-center gap-2"
-              >
-                <CheckCircle2 size={14} />
-                Обновить заявки
-              </button>
-            </div>
-          </div>
-          <div className="p-4">
-            {planningRequests.length === 0 ? (
-              <div className="text-center py-8 text-gray-400 dark:text-gray-500 text-sm">
-                Нет заявок в бюджете
-              </div>
-            ) : (
-              <div className="space-y-2">
-                {planningRequests.map(req => {
-                  const cat = categories.find(c => c.id === (req.categoryId || req.category));
-                  const user = users.find(u => u.id === (req.requesterId || req.requestedBy));
-                  const bucketId = budgetBucketIdForRequest(selectedPlanning, req.id, requests);
-                  return (
-                    <div
-                      key={req.id}
-                      className="flex items-center justify-between gap-4 p-3 bg-gray-50 dark:bg-[#303030] rounded-lg hover:bg-gray-100 dark:hover:bg-[#404040] transition-colors group"
-                    >
-                      <div className="flex-1 min-w-0">
-                        <div className="font-medium text-gray-900 dark:text-white">{req.title || cat?.name || 'Без названия'}</div>
-                        <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                          {user?.name} • {requestAmountLabel(req.amount)} UZS
-                          {req.date && (
-                            <> • {new Date(req.date).toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric' }).replace(/\//g, '.')}</>
-                          )}
-                        </div>
-                        <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                          Фонд:{' '}
-                          {bucketId ? (
-                            <span className="font-medium text-gray-700 dark:text-gray-200">
-                              {categories.find((c) => c.id === bucketId)?.name || bucketId}
-                            </span>
-                          ) : (
-                            <span className="text-amber-700 dark:text-amber-400">не выбран в заявке</span>
-                          )}
-                        </div>
-                        {(req.description || req.comment) && (
-                          <div className="text-xs text-gray-500 dark:text-gray-400 mt-1 line-clamp-1">
-                            {req.description || req.comment}
-                          </div>
-                        )}
-                      </div>
-                      <div className="flex items-center gap-2 shrink-0">
-                        <span className={`px-2 py-1 rounded text-xs font-bold ${
-                          req.status === 'paid' ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300' :
-                          req.status === 'approved' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' :
-                          req.status === 'rejected' ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' :
-                          req.status === 'draft' || req.status === 'deferred' ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300' :
-                          'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300'
-                        }`}>
-                          {req.status === 'paid' ? 'Оплачено' : req.status === 'approved' ? 'Одобрено' : req.status === 'rejected' ? 'Отклонено' : req.status === 'draft' || req.status === 'deferred' ? 'Черновик' : 'Ожидание'}
-                        </span>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleOpenRequestEdit(req);
-                          }}
-                          className="p-1.5 hover:bg-blue-100 dark:hover:bg-blue-900/30 rounded text-blue-600 dark:text-blue-400 opacity-0 group-hover:opacity-100 transition-opacity"
-                          title="Редактировать заявку"
-                        >
-                          <Edit2 size={14} />
-                        </button>
-                      </div>
+        {/* Заявки по фондам + таблица лимитов справа */}
+        {(() => {
+          const activeFundIdSet = new Set(budgetCategoriesSorted.map((c) => c.id));
+          const planningForBuckets: FinancialPlanning = {
+            ...selectedPlanning,
+            fundAllocations: planningDetailFundAllocations,
+            requestIds: planningDetailRequestIds,
+          };
+          const visibleFundIds = [
+            ...new Set([
+              ...Object.keys(planningDetailFundPlanBaseline),
+              ...Object.keys(planningDetailFundAllocations),
+            ]),
+          ]
+            .filter((id) => activeFundIdSet.has(id))
+            .sort((a, b) => {
+              const oa = categories.find((c) => c.id === a)?.order ?? 0;
+              const ob = categories.find((c) => c.id === b)?.order ?? 0;
+              if (oa !== ob) return oa - ob;
+              return a.localeCompare(b);
+            });
+          const byFund = new Map<string, PurchaseRequest[]>();
+          for (const r of planningRequests) {
+            const bid = budgetBucketIdForRequest(planningForBuckets, r.id, requests) || '__none__';
+            const arr = byFund.get(bid) ?? [];
+            arr.push(r);
+            byFund.set(bid, arr);
+          }
+          const sortedFundKeys = [...byFund.keys()].sort((a, b) => {
+            if (a === '__none__') return 1;
+            if (b === '__none__') return -1;
+            const oa = categories.find((c) => c.id === a)?.order ?? 0;
+            const ob = categories.find((c) => c.id === b)?.order ?? 0;
+            if (oa !== ob) return oa - ob;
+            return a.localeCompare(b);
+          });
+          const suggestApproveUzs = (r: PurchaseRequest): number => {
+            const bid = budgetBucketIdForRequest(planningForBuckets, r.id, requests);
+            if (!bid) return parseRequestAmountUzs(r);
+            const alloc = Number(planningDetailFundAllocations[bid]) || 0;
+            const used = approvedAmountByFund(planningForBuckets, requests, r.id);
+            const free = subtractMoney(alloc, used[bid] || 0);
+            return Math.min(parseRequestAmountUzs(r), Math.max(0, free));
+          };
+          const canApproveReq = hasPermission(currentUser, 'finance.approve');
+          const statusBadge = (req: PurchaseRequest) => (
+            <span
+              className={`px-2 py-1 rounded text-xs font-bold shrink-0 ${
+                req.status === 'paid'
+                  ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300'
+                  : req.status === 'approved'
+                    ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+                    : req.status === 'rejected'
+                      ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
+                      : req.status === 'draft' || req.status === 'deferred'
+                        ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300'
+                        : 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300'
+              }`}
+            >
+              {req.status === 'paid'
+                ? 'Оплачено'
+                : req.status === 'approved'
+                  ? 'Одобрено'
+                  : req.status === 'rejected'
+                    ? 'Отклонено'
+                    : req.status === 'draft' || req.status === 'deferred'
+                      ? 'Черновик'
+                      : 'Ожидание'}
+            </span>
+          );
+          const statusControls = (req: PurchaseRequest) => {
+            if (isPlanningArchived) return statusBadge(req);
+            if (req.status === 'paid' || req.status === 'rejected') return statusBadge(req);
+            if (!canApproveReq) return statusBadge(req);
+            if (req.status === 'approved') {
+              return (
+                <select
+                  value="approved"
+                  onChange={(e) => {
+                    if (e.target.value === 'paid') handleStatusChange(req, 'paid');
+                  }}
+                  className="text-xs border border-gray-300 dark:border-[#555] rounded-lg px-2 py-1 bg-white dark:bg-[#333] text-gray-900 dark:text-gray-100"
+                >
+                  <option value="approved">Одобрено</option>
+                  <option value="paid">Оплачено</option>
+                </select>
+              );
+            }
+            if (req.status === 'pending') {
+              return (
+                <select
+                  key={`${req.id}-pending`}
+                  defaultValue="pending"
+                  onChange={(e) => {
+                    if (e.target.value === 'rejected') handleStatusChange(req, 'rejected');
+                  }}
+                  className="text-xs border border-gray-300 dark:border-[#555] rounded-lg px-2 py-1 bg-white dark:bg-[#333] text-gray-900 dark:text-gray-100"
+                >
+                  <option value="pending">Ожидание</option>
+                  <option value="rejected">Отклонить</option>
+                </select>
+              );
+            }
+            if (req.status === 'draft' || req.status === 'deferred') {
+              return (
+                <select
+                  key={`${req.id}-${req.status}`}
+                  value={req.status === 'deferred' ? 'draft' : 'draft'}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    if (v === 'pending') handleStatusChange(req, 'pending');
+                    if (v === 'draft') handleStatusChange(req, 'draft');
+                  }}
+                  className="text-xs border border-gray-300 dark:border-[#555] rounded-lg px-2 py-1 bg-white dark:bg-[#333] text-gray-900 dark:text-gray-100"
+                >
+                  <option value="draft">Черновик</option>
+                  <option value="pending">На согласование</option>
+                </select>
+              );
+            }
+            return statusBadge(req);
+          };
+          return (
+            <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_minmax(260px,340px)] gap-4 print:grid-cols-1">
+              <div className="bg-white dark:bg-[#252525] border border-gray-200 dark:border-[#333] rounded-xl overflow-hidden min-w-0">
+                <div className="p-4 border-b border-gray-200 dark:border-[#333] flex items-center justify-between flex-wrap gap-2">
+                  <h3 className="font-bold text-gray-800 dark:text-white">Заявки в бюджете ({planningRequests.length})</h3>
+                  <div className="flex items-center gap-4">
+                    <div className="text-xs text-gray-500 dark:text-gray-400">
+                      Сумма: {formatWholeSumUzGrouped(sumMoney(planningRequests.map((r) => parseRequestAmountUzs(r))))} UZS
                     </div>
-                  );
-                })}
+                    <button
+                      type="button"
+                      onClick={handleRefreshRequests}
+                      className="px-3 py-1.5 bg-blue-600 text-white text-xs font-medium hover:bg-blue-700 rounded-lg flex items-center gap-2"
+                    >
+                      <CheckCircle2 size={14} />
+                      Обновить заявки
+                    </button>
+                  </div>
+                </div>
+                <div className="p-4 space-y-6">
+                  {planningRequests.length === 0 ? (
+                    <div className="text-center py-8 text-gray-400 dark:text-gray-500 text-sm">Нет заявок в бюджете</div>
+                  ) : (
+                    sortedFundKeys.map((fundKey) => {
+                      const list = byFund.get(fundKey) ?? [];
+                      const fundLabel =
+                        fundKey === '__none__'
+                          ? 'Без фонда'
+                          : categories.find((c) => c.id === fundKey)?.name || fundKey;
+                      const groupSum = sumMoney(list.map((r) => parseRequestAmountUzs(r)));
+                      return (
+                        <div key={fundKey}>
+                          <div className="flex flex-wrap items-baseline justify-between gap-2 mb-2 pb-2 border-b border-gray-200 dark:border-[#404040]">
+                            <span className="text-sm font-bold text-gray-800 dark:text-white">{fundLabel}</span>
+                            <span className="text-xs text-gray-500 dark:text-gray-400 tabular-nums">
+                              Заявок: {list.length} · на сумму {formatWholeSumUzGrouped(groupSum)} UZS
+                            </span>
+                          </div>
+                          <div className="space-y-2">
+                            {list.map((req) => {
+                              const cat = categories.find((c) => c.id === (req.categoryId || req.category));
+                              const user = users.find((u) => u.id === (req.requesterId || req.requestedBy));
+                              const full = parseRequestAmountUzs(req);
+                              const appr = approvedBudgetUZSForRequest(req);
+                              const suggested = suggestApproveUzs(req);
+                              return (
+                                <div
+                                  key={req.id}
+                                  className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 p-3 bg-gray-50 dark:bg-[#303030] rounded-lg hover:bg-gray-100 dark:hover:bg-[#404040] transition-colors group"
+                                >
+                                  <div className="flex-1 min-w-0">
+                                    <div className="font-medium text-gray-900 dark:text-white">
+                                      {req.title || cat?.name || 'Без названия'}
+                                    </div>
+                                    <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                                      {user?.name} • запрошено {requestAmountLabel(req.amount)} UZS
+                                      {req.status === 'approved' && appr < full && (
+                                        <span className="text-emerald-600 dark:text-emerald-400">
+                                          {' '}
+                                          · одобрено {formatWholeSumUzGrouped(appr)} UZS
+                                        </span>
+                                      )}
+                                      {req.date && (
+                                        <>
+                                          {' '}
+                                          ·{' '}
+                                          {new Date(req.date)
+                                            .toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric' })
+                                            .replace(/\//g, '.')}
+                                        </>
+                                      )}
+                                    </div>
+                                    {(req.description || req.comment) && (
+                                      <div className="text-xs text-gray-500 dark:text-gray-400 mt-1 line-clamp-2">
+                                        {req.description || req.comment}
+                                      </div>
+                                    )}
+                                    {req.status === 'pending' && canApproveReq && !isPlanningArchived && suggested < full && (
+                                      <div className="mt-2 flex flex-wrap items-center gap-2">
+                                        <label className="text-[11px] text-gray-500 dark:text-gray-400 whitespace-nowrap">
+                                          Одобрить на сумму (UZS)
+                                        </label>
+                                        <input
+                                          id={`budget-partial-${req.id}`}
+                                          key={`budget-partial-${req.id}-${suggested}`}
+                                          type="text"
+                                          defaultValue={String(suggested)}
+                                          className="w-32 border border-gray-300 dark:border-[#555] rounded px-2 py-1 text-xs bg-white dark:bg-[#333] text-gray-900 dark:text-gray-100 tabular-nums"
+                                        />
+                                        <button
+                                          type="button"
+                                          className="text-xs px-2 py-1 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700"
+                                          onClick={() => {
+                                            const el = document.getElementById(`budget-partial-${req.id}`) as HTMLInputElement | null;
+                                            const raw = el?.value ?? '';
+                                            const n = Number(String(raw).replace(/\s/g, '').replace(/,/g, '.'));
+                                            const amt = Number.isFinite(n) ? roundMoney(n) : suggested;
+                                            handleStatusChange(req, 'approved', { budgetApprovedUzs: amt });
+                                          }}
+                                        >
+                                          Одобрить сумму
+                                        </button>
+                                        <button
+                                          type="button"
+                                          className="text-xs text-[#3337AD] hover:underline"
+                                          onClick={() => handleStatusChange(req, 'approved')}
+                                        >
+                                          Всю сумму
+                                        </button>
+                                      </div>
+                                    )}
+                                  </div>
+                                  <div className="flex flex-wrap items-center gap-2 shrink-0">
+                                    {statusControls(req)}
+                                    {req.status === 'pending' && suggested >= full && canApproveReq && !isPlanningArchived && (
+                                      <button
+                                        type="button"
+                                        className="text-xs px-2 py-1 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700"
+                                        onClick={() => handleStatusChange(req, 'approved')}
+                                      >
+                                        Одобрить
+                                      </button>
+                                    )}
+                                    <button
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleOpenRequestEdit(req);
+                                      }}
+                                      className="p-1.5 hover:bg-blue-100 dark:hover:bg-blue-900/30 rounded text-blue-600 dark:text-blue-400 opacity-80 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity"
+                                      title="Редактировать заявку"
+                                      disabled={req.isArchived === true || req.status === 'approved' || req.status === 'paid'}
+                                    >
+                                      <Edit2 size={14} />
+                                    </button>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
               </div>
-            )}
-          </div>
-        </div>
+              {visibleFundIds.length > 0 && (
+                <div className="bg-white dark:bg-[#252525] border border-gray-200 dark:border-[#333] rounded-xl overflow-hidden xl:sticky xl:top-24 self-start print:hidden">
+                  <div className="p-3 border-b border-gray-200 dark:border-[#333]">
+                    <h3 className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase">По фондам</h3>
+                    <p className="text-[11px] text-gray-500 dark:text-gray-400 mt-1">
+                      Всего — лимит из планов (до переносов). Остаток — после переносов и одобренных сумм.
+                    </p>
+                  </div>
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="text-left text-[10px] font-bold uppercase text-gray-500 dark:text-gray-400 border-b border-gray-200 dark:border-[#333]">
+                        <th className="px-3 py-2">Фонд</th>
+                        <th className="px-3 py-2 text-right tabular-nums">Всего</th>
+                        <th className="px-3 py-2 text-right tabular-nums">Остаток</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {visibleFundIds.map((fundId) => {
+                        const fund = categories.find((c) => c.id === fundId);
+                        const synthetic: FinancialPlanning = {
+                          ...selectedPlanning,
+                          fundAllocations: planningDetailFundAllocations,
+                          requestIds: planningDetailRequestIds,
+                        };
+                        const bal = fundAvailableBalances(synthetic, requests)[fundId] ?? 0;
+                        const totalAmt = Number(planningDetailFundPlanBaseline[fundId]) || 0;
+                        return (
+                          <tr key={fundId} className="border-b border-gray-100 dark:border-[#333]">
+                            <td className="px-3 py-2 text-gray-800 dark:text-gray-100 font-medium">{fund?.name || fundId}</td>
+                            <td className="px-3 py-2 text-right tabular-nums text-gray-700 dark:text-gray-200">
+                              {formatWholeSumUzGrouped(totalAmt)}
+                            </td>
+                            <td
+                              className={`px-3 py-2 text-right tabular-nums font-medium ${
+                                bal < 0 ? 'text-red-600 dark:text-red-400' : 'text-gray-900 dark:text-white'
+                              }`}
+                            >
+                              {formatWholeSumUzGrouped(bal)}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          );
+        })()}
         
         {/* Примечания */}
         <div className="bg-white dark:bg-[#252525] border border-gray-200 dark:border-[#333] rounded-xl p-6">

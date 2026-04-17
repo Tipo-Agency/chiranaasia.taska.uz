@@ -46,6 +46,8 @@ export interface PurchaseRequest {
   paidAt?: string | null;
   decisionDate?: string;
   departmentId?: string;
+  /** Сумма против лимита фонда при частичном одобрении (UZS); иначе вся ``amount``. */
+  budgetApprovedAmount?: string | number;
   isArchived?: boolean;
   /** Optimistic locking для PATCH /finance/requests/{id}. */
   version?: number;

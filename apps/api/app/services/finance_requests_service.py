@@ -12,6 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.finance import FinanceRequest
 from app.schemas.finance_requests import FinanceRequestCreate, FinanceRequestPatch, FinanceRequestRead
+from app.services.finance_planning_funds import parse_request_amount_uzs
 from app.services.finance_request_meta import (
     extract_department_id,
     extract_payment_date_tag,
@@ -45,6 +46,13 @@ def finance_request_row_to_dict(row: FinanceRequest) -> dict:
     if not isinstance(atts, list):
         atts = []
     inv = getattr(row, "invoice_date", None)
+    ba = getattr(row, "budget_approved_amount", None)
+    budget_approved_out = None
+    if ba is not None:
+        bdec = ba if isinstance(ba, Decimal) else Decimal(str(ba))
+        budget_approved_out = format(bdec, "f")
+        if "." in budget_approved_out:
+            budget_approved_out = budget_approved_out.rstrip("0").rstrip(".") or "0"
     return {
         "id": row.id,
         "version": int(row.version) if row.version is not None else 1,
@@ -72,6 +80,7 @@ def finance_request_row_to_dict(row: FinanceRequest) -> dict:
         "counterpartyInn": getattr(row, "counterparty_inn", None),
         "invoiceNumber": getattr(row, "invoice_number", None),
         "invoiceDate": inv.isoformat() if inv else None,
+        "budgetApprovedAmount": budget_approved_out,
     }
 
 
@@ -307,6 +316,17 @@ def apply_finance_request_patch(
                 row.paid_at = now
             if new_s == "approved" and actor_user_id:
                 row.approved_by = str(actor_user_id).strip()[:36]
+            if prev_n == "approved" and new_s not in ("approved", "paid"):
+                row.budget_approved_amount = None
+            if new_s == "approved":
+                cap = parse_request_amount_uzs(row.amount)
+                ba_val = None
+                if "budget_approved_uzs" in fs and data.budget_approved_uzs is not None:
+                    want = parse_request_amount_uzs(data.budget_approved_uzs)
+                    eff = min(want, cap) if want > 0 else cap
+                    if eff > 0 and eff < cap:
+                        ba_val = eff
+                row.budget_approved_amount = ba_val
         row.status = new_s
 
     if "attachments" in fs and data.attachments is not None:

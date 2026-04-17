@@ -108,6 +108,18 @@ export function effectivePurchaseRequestDepartmentId(req: PurchaseRequest): stri
   return m ? String(m[1]).trim() : '';
 }
 
+/** Сумма заявки, засчитанная в лимит фонда (после одобрения). */
+export function approvedBudgetUZSForRequest(req: PurchaseRequest): number {
+  if (req.status !== 'approved') return 0;
+  const full = parseRequestAmountUzs(req);
+  const raw = req.budgetApprovedAmount;
+  if (raw == null || raw === '') return full;
+  const s = String(raw).replace(/\s/g, '').replace(/,/g, '.');
+  const n = Number(s);
+  if (!Number.isFinite(n)) return full;
+  return Math.min(roundMoney(n), full);
+}
+
 /** Ключ лимита бюджета для заявки: requestFundIds (legacy) или category заявки. */
 export function budgetBucketIdForRequest(
   planning: FinancialPlanning,
@@ -133,7 +145,7 @@ export function approvedAmountByFund(
     if (!req || req.status !== 'approved') continue;
     const bid = budgetBucketIdForRequest(planning, rid, requests);
     if (!bid) continue;
-    out[bid] = sumMoney([out[bid] || 0, parseRequestAmountUzs(req)]);
+    out[bid] = sumMoney([out[bid] || 0, approvedBudgetUZSForRequest(req)]);
   }
   return out;
 }

@@ -55,6 +55,11 @@ class FinanceRequestRead(BaseModel):
     counterparty_inn: str | None = Field(default=None, validation_alias="counterpartyInn", serialization_alias="counterpartyInn")
     invoice_number: str | None = Field(default=None, validation_alias="invoiceNumber", serialization_alias="invoiceNumber")
     invoice_date: str | None = Field(default=None, validation_alias="invoiceDate", serialization_alias="invoiceDate")
+    budget_approved_amount: str | None = Field(
+        default=None,
+        alias="budgetApprovedAmount",
+        description="Сумма против лимита фонда при частичном одобрении; null — полная amount.",
+    )
 
 
 class FinanceRequestListResponse(PaginatedResponse[FinanceRequestRead]):
@@ -132,10 +137,22 @@ class FinanceRequestPatch(BaseModel):
     counterparty_inn: str | None = Field(default=None, alias="counterpartyInn", max_length=32)
     invoice_number: str | None = Field(default=None, alias="invoiceNumber", max_length=100)
     invoice_date: date | None = Field(default=None, alias="invoiceDate")
+    budget_approved_uzs: Decimal | str | int | float | None = Field(
+        default=None,
+        alias="budgetApprovedUzs",
+        description="При одобрении: сумма против лимита фонда (частичное одобрение).",
+    )
 
     @field_validator("amount", mode="before")
     @classmethod
     def _amount(cls, v: Any) -> Any:
+        if v is None:
+            return None
+        return _amount_to_decimal(v)
+
+    @field_validator("budget_approved_uzs", mode="before")
+    @classmethod
+    def _budget_approved_uzs(cls, v: Any) -> Any:
         if v is None:
             return None
         return _amount_to_decimal(v)

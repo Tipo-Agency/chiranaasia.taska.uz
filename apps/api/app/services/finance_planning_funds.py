@@ -11,6 +11,16 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.finance import FinanceRequest, FinancialPlanning
 
 
+def committed_budget_amount_for_request(req: FinanceRequest) -> Decimal:
+    """Сумма заявки, засчитанная в лимит фонда (после одобрения)."""
+    if str(req.status or "").strip().lower() != "approved":
+        return Decimal(0)
+    extra = getattr(req, "budget_approved_amount", None)
+    if extra is not None:
+        return parse_request_amount_uzs(extra)
+    return parse_request_amount_uzs(req.amount)
+
+
 def parse_request_amount_uzs(amount: Any) -> Decimal:
     if amount is None:
         return Decimal(0)
@@ -64,7 +74,7 @@ def _approved_by_fund(
         bid = _bucket_id_for_request(planning, rid_s, req)
         if not bid:
             continue
-        out[bid] = out.get(bid, Decimal(0)) + parse_request_amount_uzs(req.amount)
+        out[bid] = out.get(bid, Decimal(0)) + committed_budget_amount_for_request(req)
     return out
 
 
@@ -75,7 +85,7 @@ async def assert_budget_fund_allows_approval(
     row: FinanceRequest,
 ) -> None:
     """Если заявка в бюджете — нужен фонд (категория) и достаточный остаток по fund_allocations."""
-    amount = parse_request_amount_uzs(row.amount)
+    amount = committed_budget_amount_for_request(row)
     plannings_r = await db.execute(select(FinancialPlanning))
     plannings = [p for p in plannings_r.scalars().all() if not (p.is_archived or False)]
     containing = [p for p in plannings if finance_request_id in (p.request_ids or [])]

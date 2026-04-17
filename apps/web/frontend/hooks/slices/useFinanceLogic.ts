@@ -38,6 +38,8 @@ export type SavePurchaseRequestOptions = {
   statusPatch?: PurchaseRequestStatusPatchMode;
   /** Обязателен при statusPatch === 'reject' */
   rejectComment?: string;
+  /** При statusPatch === 'approve': частичное одобрение (UZS против лимита фонда). */
+  budgetApprovedUzs?: number;
   /** Только вложения / ИНН / счёт (для одобренных и оплаченных заявок). */
   metadataOnly?: boolean;
 };
@@ -153,7 +155,15 @@ export const useFinanceLogic = (showNotification: (msg: string) => void) => {
       const optimistic =
         opts?.statusPatch === 'reject' && opts.rejectComment
           ? ({ ...item, status: 'rejected' as const, comment: opts.rejectComment.trim() } satisfies PurchaseRequest)
-          : item;
+          : opts?.statusPatch === 'approve' &&
+              opts.budgetApprovedUzs != null &&
+              Number.isFinite(opts.budgetApprovedUzs)
+            ? ({
+                ...item,
+                status: 'approved' as const,
+                budgetApprovedAmount: opts.budgetApprovedUzs,
+              } satisfies PurchaseRequest)
+            : item;
       const updated = saveItem(prevItems, optimistic);
       void (async () => {
         try {
@@ -182,7 +192,11 @@ export const useFinanceLogic = (showNotification: (msg: string) => void) => {
               if (item.departmentId) body.departmentId = item.departmentId;
               await api.finance.patchRequest(item.id, withRequestVersion(body, prevRow));
             } else if (opts?.statusPatch === 'approve') {
-              await api.finance.patchRequest(item.id, withRequestVersion({ status: 'approved' }, prevRow));
+              const body: Record<string, unknown> = { status: 'approved' };
+              if (opts.budgetApprovedUzs != null && Number.isFinite(opts.budgetApprovedUzs)) {
+                body.budgetApprovedUzs = opts.budgetApprovedUzs;
+              }
+              await api.finance.patchRequest(item.id, withRequestVersion(body, prevRow));
             } else if (opts?.statusPatch === 'paid') {
               await api.finance.patchRequest(item.id, withRequestVersion({ status: 'paid' }, prevRow));
             } else if (opts?.statusPatch === 'submit') {

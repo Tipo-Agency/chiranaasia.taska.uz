@@ -69,6 +69,8 @@ class FinanceRequest(Base):
     version = Column(Integer, nullable=False, server_default=text("1"))
     title = Column(String(500), nullable=False)
     amount = Column(Numeric(15, 2), nullable=False)
+    # Сумма против лимита фонда при частичном одобрении; NULL — вся amount.
+    budget_approved_amount = Column(Numeric(15, 2), nullable=True)
     currency = Column(String(10), nullable=False, server_default=text("'UZS'"))
     category = Column(String(100), nullable=True)
     counterparty = Column(String(255), nullable=True)

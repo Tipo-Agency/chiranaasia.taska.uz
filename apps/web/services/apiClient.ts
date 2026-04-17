@@ -1554,6 +1554,7 @@ export function purchaseRequestFromApi(r: Record<string, unknown>): PurchaseRequ
     paidAt: (r.paid_at ?? r.paidAt) as string | null | undefined,
     decisionDate: (r.decision_date ?? r.decisionDate) as string | undefined,
     departmentId: (r.department_id ?? r.departmentId) as string | undefined,
+    budgetApprovedAmount: (r.budget_approved_amount ?? r.budgetApprovedAmount) as string | number | undefined,
     isArchived: Boolean(r.is_archived ?? r.isArchived),
     version:
       typeof v === 'number' ? v : v != null && v !== '' ? Number(v) || undefined : undefined,

@@ -208,6 +208,54 @@ def test_finance_approve_request_budget_fund_required(api_client):
     assert r.json().get("message") == "finance_request_budget_category_required"
 
 
+def test_finance_approve_partial_within_budget(api_client):
+    """Частичное одобрение: сумма больше лимита, но budgetApprovedUzs в пределах — 200."""
+    _login(api_client, "demo")
+    rid = str(uuid.uuid4())
+    pid = str(uuid.uuid4())
+    ym = date.today().strftime("%Y-%m")
+    c = api_client.post(
+        "/api/finance/requests",
+        json={
+            "id": rid,
+            "title": "Частично",
+            "amount": "500",
+            "currency": "UZS",
+            "status": "pending",
+            "requesterId": "demo-user",
+            "category": "fund-1",
+        },
+        headers=browser_csrf_headers(api_client),
+    )
+    assert c.status_code == 201, c.text
+    put = api_client.put(
+        "/api/finance/financial-plannings",
+        json=[
+            {
+                "id": pid,
+                "departmentId": "d0",
+                "period": ym,
+                "status": "conducted",
+                "createdAt": "2020-01-01T00:00:00Z",
+                "requestIds": [rid],
+                "requestFundIds": {rid: "fund-1"},
+                "fundAllocations": {"fund-1": 100},
+            }
+        ],
+        headers=browser_csrf_headers(api_client),
+    )
+    assert put.status_code == 200, put.text
+    r = api_client.patch(
+        f"/api/finance/requests/{rid}",
+        json={"status": "approved", "budgetApprovedUzs": 80},
+        headers=browser_csrf_headers(api_client),
+    )
+    assert r.status_code == 200, r.text
+    data = r.json()
+    assert data.get("status") == "approved"
+    assert data.get("budgetApprovedAmount") == "80"
+
+
 def test_create_finance_request_idempotency_replay(api_client):
     """Повтор POST с тем же Idempotency-Key и телом — ответ из кэша (статус как у первого ответа, часто 201)."""
     _login(api_client, "demo")
