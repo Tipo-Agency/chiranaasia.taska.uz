@@ -50,10 +50,10 @@ import {
   parseRequestAmountUzs,
   fundAvailableBalances,
   filterRequestsForPlanningWindow,
-  fundAllocationsAfterMovements,
+  fundAllocationsFromDistributionAfterMovements,
   purchaseRequestDayKey,
 } from '../utils/financePlanningUtils';
-import { formatWholeSumUzGrouped, moneyToTiyin, mulPercentMoney, subtractMoney, sumMoney } from '../utils/uzsMoney';
+import { formatWholeSumUzGrouped, moneyToTiyin, mulPercentMoney, roundMoney, subtractMoney, sumMoney } from '../utils/uzsMoney';
 
 function requestAmountLabel(amount: PurchaseRequest['amount']): string {
   const raw = (
@@ -410,20 +410,35 @@ const FinanceView: React.FC<FinanceViewProps> = ({
     categories,
   ]);
 
-  /** Доход по фондам: равные доли по статьям из планов (+ сохранённые ключи лимитов), затем переносы. */
+  /** Лимиты по фондам: как распределение из планов (доля дохода бюджета), иначе сохранённые лимиты; затем переносы. */
   useEffect(() => {
     if (!selectedPlanning || planningSubView !== 'detail') return;
+    const dist = planningDetailExpenseDistribution || {};
     const initialAlloc = planningDetailInitialValuesRef.current?.fundAllocations ?? {};
-    const nonZero = Object.entries(planningDetailExpenseDistribution || {})
-      .filter(([, v]) => Math.abs(Number(v) || 0) > 0.001)
-      .map(([k]) => k);
-    const fundIds = Array.from(new Set([...nonZero, ...Object.keys(initialAlloc)]));
-    if (!fundIds.length) {
+    const hasDist = Object.values(dist).some((v) => Math.abs(Number(v) || 0) > 0.001);
+
+    const base: Record<string, number> = {};
+    if (hasDist) {
+      for (const [k, v] of Object.entries(dist)) {
+        base[k] = roundMoney(Number(v) || 0);
+      }
+    } else {
+      for (const [k, v] of Object.entries(initialAlloc)) {
+        base[k] = roundMoney(Number(v) || 0);
+      }
+    }
+    for (const m of planningDetailFundMovements) {
+      for (const id of [m.fromFundId, m.toFundId]) {
+        const s = String(id || '').trim();
+        if (s && !(s in base)) base[s] = 0;
+      }
+    }
+    if (!Object.keys(base).length) {
       setPlanningDetailFundAllocations({});
       return;
     }
     setPlanningDetailFundAllocations(
-      fundAllocationsAfterMovements(planningDetailIncome, fundIds, planningDetailFundMovements)
+      fundAllocationsFromDistributionAfterMovements(base, planningDetailFundMovements)
     );
   }, [
     selectedPlanning?.id,
@@ -1399,7 +1414,7 @@ const FinanceView: React.FC<FinanceViewProps> = ({
                   ))}
               </div>
               <p className="mt-2 text-[11px] text-gray-500 dark:text-gray-400 print:hidden">
-                Расчёт по статьям и фондам — в блоке «Доход и распределение» ниже; обновляется при выборе планов и сумме дохода.
+                Лимиты по фондам считаются из отмеченных планов и суммы дохода бюджета — см. блок «Доход и распределение» ниже.
               </p>
             </div>
           </div>
@@ -1410,7 +1425,7 @@ const FinanceView: React.FC<FinanceViewProps> = ({
           <div>
             <h3 className="text-sm font-bold text-gray-800 dark:text-white uppercase mb-1">Доход и распределение</h3>
             <p className="text-xs text-gray-500 dark:text-gray-400">
-              Доход за период; ниже — суммы по статьям из отмеченных планов; затем фонды: план (как лежит деньги до оплат) и остаток — уменьшается после одобрения заявок, назначенных на фонд.
+              Доход за период; ниже — только фонды: «План» из отмеченных финансовых планов (доля дохода бюджета), «Остаток» — после одобренных заявок с тем же фондом, что в карточке заявки. Переносы между фондами — ссылка внизу.
             </p>
           </div>
           <div>
@@ -1425,31 +1440,12 @@ const FinanceView: React.FC<FinanceViewProps> = ({
             />
           </div>
 
-          {Object.keys(planningDetailExpenseDistribution).length > 0 && (
-            <div className="border-t border-gray-100 dark:border-[#333] pt-4">
-              <div className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase mb-2">По статьям (из планов)</div>
-              <ul className="text-sm space-y-1">
-                {(Object.entries(planningDetailExpenseDistribution) as [string, number][])
-                  .filter(([, amt]) => Math.abs(Number(amt) || 0) >= 1)
-                  .map(([cid, amt]) => {
-                    const cn = categories.find((c) => c.id === cid)?.name || cid;
-                    return (
-                      <li key={cid} className="flex justify-between gap-2">
-                        <span className="text-gray-600 dark:text-gray-400">{cn}</span>
-                        <span className="font-mono tabular-nums">{formatWholeSumUzGrouped(Number(amt))} UZS</span>
-                      </li>
-                    );
-                  })}
-              </ul>
-            </div>
-          )}
-
           {Object.keys(planningDetailFundAllocations).length > 0 && (
             <>
               <div className="border-t border-gray-100 dark:border-[#333] pt-4">
                 <div className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase mb-2">По фондам</div>
                 <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
-                  Лимиты по фондам из выбранных планов; переносы — ссылка внизу. В «Остатке» — одобренные заявки с тем же фондом, что указан в карточке заявки.
+                  Колонка «План» совпадает с расчётом из планов (веса строк расхода в планах). Переносы меняют распределение до оплат. «Остаток» — с учётом одобренных заявок.
                 </p>
                 <div className="grid grid-cols-[1fr_auto_auto] gap-x-3 gap-y-2 text-xs font-bold uppercase tracking-wide text-gray-500 dark:text-gray-400 border-b border-gray-200 dark:border-[#333] pb-2 mb-2">
                   <span>Фонд</span>

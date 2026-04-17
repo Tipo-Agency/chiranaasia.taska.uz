@@ -191,3 +191,29 @@ export function fundAllocationsAfterMovements(
   }
   return alloc;
 }
+
+/** База — уже посчитанные суммы по фондам (из планов и дохода бюджета), затем переносы между фондами. */
+export function fundAllocationsFromDistributionAfterMovements(
+  baseDistribution: Record<string, number>,
+  movements: readonly FinancialPlanningFundMovement[]
+): Record<string, number> {
+  let alloc: Record<string, number> = {};
+  for (const [k, v] of Object.entries(baseDistribution)) {
+    alloc[k] = roundMoney(Number(v) || 0);
+  }
+  for (const m of movements) {
+    const amt = roundMoney(Number(m.amount) || 0);
+    if (amt <= 0) continue;
+    const fromId = String(m.fromFundId || '').trim();
+    const toId = String(m.toFundId || '').trim();
+    if (!fromId || !toId || fromId === toId) continue;
+    if (!(fromId in alloc)) alloc[fromId] = 0;
+    if (!(toId in alloc)) alloc[toId] = 0;
+    alloc = {
+      ...alloc,
+      [fromId]: subtractMoney(alloc[fromId] || 0, amt),
+      [toId]: sumMoney([alloc[toId] || 0, amt]),
+    };
+  }
+  return alloc;
+}

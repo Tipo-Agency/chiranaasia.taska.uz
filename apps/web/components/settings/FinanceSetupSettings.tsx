@@ -25,7 +25,6 @@ export const FinanceSetupSettings: React.FC<{
   const [editingCategory, setEditingCategory] = useState<FinanceCategory | null>(null);
   const [catName, setCatName] = useState('');
   const [catType, setCatType] = useState<'fixed' | 'percent'>('fixed');
-  const [catValue, setCatValue] = useState('');
   const [catOrder, setCatOrder] = useState(0);
   const [deleteCategoryId, setDeleteCategoryId] = useState<string | null>(null);
 
@@ -34,7 +33,6 @@ export const FinanceSetupSettings: React.FC<{
     setEditingCategory(null);
     setCatName('');
     setCatType('fixed');
-    setCatValue('');
     setCatOrder(sortedActive.length + 1 || 1);
     setCatModalOpen(true);
     onConsumedCreateKind?.();
@@ -44,18 +42,18 @@ export const FinanceSetupSettings: React.FC<{
     const name = catName.trim();
     if (!name) return;
     const now = new Date().toISOString();
-    const rawVal = catValue.replace(/\s/g, '').replace(/,/g, '.').trim();
-    const vNum = rawVal === '' ? undefined : Number(rawVal);
-    onSaveCategory({
+    const payload: FinanceCategory = {
       id: editingCategory?.id || `fc-${Date.now()}`,
       name,
       type: catType,
-      value: vNum !== undefined && Number.isFinite(vNum) ? vNum : undefined,
       order: catOrder,
       updatedAt: now,
       isArchived: editingCategory?.isArchived || false,
-      color: editingCategory?.color,
-    });
+    };
+    if (editingCategory?.color != null && editingCategory.color !== '') {
+      payload.color = editingCategory.color;
+    }
+    onSaveCategory(payload);
     setCatModalOpen(false);
   };
 
@@ -66,7 +64,8 @@ export const FinanceSetupSettings: React.FC<{
           <div className="text-sm font-bold text-gray-900 dark:text-white">Фонды</div>
           <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 space-y-1">
             <p>
-              Единый справочник лимитов бюджета, статей в планах и категорий в заявках — одна запись, один id.
+              Справочник фондов: название, порядок и тип строки в плане (фикс / процент). Сами суммы и доли задаются в{' '}
+              <span className="font-semibold text-gray-700 dark:text-gray-300">финансовом плане</span> по строкам расхода.
             </p>
             <p className="text-gray-400 dark:text-gray-500">Создание — через «+» в шапке.</p>
           </div>
@@ -79,15 +78,14 @@ export const FinanceSetupSettings: React.FC<{
                 <tr className="text-[11px] uppercase tracking-wide text-gray-500 dark:text-gray-400">
                   <th className="text-left font-bold px-4 py-3">Порядок</th>
                   <th className="text-left font-bold px-4 py-3">Название</th>
-                  <th className="text-left font-bold px-4 py-3">Тип</th>
-                  <th className="text-left font-bold px-4 py-3">Значение</th>
+                  <th className="text-left font-bold px-4 py-3">Тип в плане</th>
                   <th className="text-right font-bold px-4 py-3">Действия</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100 dark:divide-[#333]">
                 {sortedActive.length === 0 ? (
                   <tr>
-                    <td colSpan={5} className="px-4 py-8 text-center text-gray-400 dark:text-gray-500">
+                    <td colSpan={4} className="px-4 py-8 text-center text-gray-400 dark:text-gray-500">
                       Нет фондов. Добавьте первый.
                     </td>
                   </tr>
@@ -107,9 +105,6 @@ export const FinanceSetupSettings: React.FC<{
                           {c.type === 'fixed' ? 'Фикс' : 'Процент'}
                         </span>
                       </td>
-                      <td className="px-4 py-3 text-gray-600 dark:text-gray-300 tabular-nums">
-                        {c.value !== undefined && c.value !== null ? String(c.value) : '—'}
-                      </td>
                       <td className="px-4 py-3">
                         <div className="flex items-center justify-end gap-2">
                           <button
@@ -118,9 +113,6 @@ export const FinanceSetupSettings: React.FC<{
                               setEditingCategory(c);
                               setCatName(c.name);
                               setCatType(c.type);
-                              setCatValue(
-                                c.value !== undefined && c.value !== null ? String(c.value) : ''
-                              );
                               setCatOrder(c.order ?? 0);
                               setCatModalOpen(true);
                             }}
@@ -173,23 +165,21 @@ export const FinanceSetupSettings: React.FC<{
             onChange={(e) => setCatOrder(parseInt(e.target.value, 10) || 0)}
           />
           <div>
-            <div className="text-xs font-bold text-gray-500 dark:text-gray-400 mb-1 uppercase">Тип</div>
+            <div className="text-xs font-bold text-gray-500 dark:text-gray-400 mb-1 uppercase">Тип в плане</div>
             <EntitySearchSelect
               value={catType}
               onChange={(v) => setCatType(v as 'fixed' | 'percent')}
               options={[
-                { value: 'fixed', label: 'Фиксированная сумма', searchText: 'фиксированная сумма fixed' },
-                { value: 'percent', label: 'Процент от дохода', searchText: 'процент доход percent' },
+                { value: 'fixed', label: 'Фиксированная сумма (в плане)', searchText: 'фиксированная сумма fixed' },
+                { value: 'percent', label: 'Процент от дохода документа плана', searchText: 'процент доход percent' },
               ]}
               searchPlaceholder="Тип…"
             />
           </div>
-          <Input
-            label={catType === 'percent' ? 'Процент' : 'Сумма (UZS)'}
-            value={catValue}
-            onChange={(e) => setCatValue(e.target.value)}
-            placeholder={catType === 'percent' ? '12' : '5000000'}
-          />
+          <p className="text-xs text-gray-500 dark:text-gray-400 leading-relaxed">
+            Числа по фондам считаются из выручки и строк расхода в <span className="font-semibold">финансовом плане</span>, не
+            в этом справочнике.
+          </p>
         </div>
       </StandardModal>
 

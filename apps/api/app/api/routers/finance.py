@@ -306,24 +306,32 @@ async def update_categories(categories: list[FinanceCategoryItem], db: AsyncSess
         cid = c.id
         if not cid:
             continue
+        patch = c.model_dump(exclude_unset=True)
         existing = await db.get(FinanceCategory, cid)
         is_new = existing is None
         if existing:
-            existing.name = c.name or existing.name
-            existing.type = c.type or existing.type
-            existing.value = str(c.value) if c.value is not None else None
-            existing.color = c.color
-            existing.sort_order = int(c.order) if c.order is not None else (existing.sort_order or 0)
-            existing.is_archived = bool(c.isArchived)
+            if "name" in patch:
+                existing.name = str(patch.get("name") or existing.name)
+            if "type" in patch:
+                existing.type = str(patch.get("type") or existing.type)
+            if "value" in patch:
+                v = patch.get("value")
+                existing.value = str(v) if v is not None else None
+            if "color" in patch:
+                existing.color = patch.get("color")
+            if "order" in patch:
+                existing.sort_order = int(patch["order"]) if patch["order"] is not None else (existing.sort_order or 0)
+            if "isArchived" in patch:
+                existing.is_archived = bool(patch.get("isArchived"))
         else:
             db.add(FinanceCategory(
                 id=cid,
-                name=c.name or "",
-                type=c.type or "fixed",
-                value=str(c.value) if c.value is not None else None,
-                color=c.color,
-                sort_order=int(c.order) if c.order is not None else 0,
-                is_archived=bool(c.isArchived),
+                name=str(patch.get("name", c.name) or ""),
+                type=str(patch.get("type", c.type) or "fixed"),
+                value=str(patch["value"]) if "value" in patch and patch.get("value") is not None else None,
+                color=patch.get("color", c.color) if "color" in patch else c.color,
+                sort_order=int(patch["order"]) if "order" in patch and patch["order"] is not None else int(c.order or 0),
+                is_archived=bool(patch.get("isArchived")) if "isArchived" in patch else bool(c.isArchived),
             ))
         await db.flush()
         await log_entity_mutation(

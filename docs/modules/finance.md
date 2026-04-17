@@ -215,7 +215,7 @@ PATCH /api/finance/requests/{id}
 ```
 GET /api/finance/categories        → list[FinanceCategoryRead]
 PUT /api/finance/categories        → bulk upsert
-  item: { id(≤100), name(≤500), type(def:"fixed",≤50), value(Any), color(≤200), order(≥0,def:0), isArchived(def:false) }
+  item: { id(≤100), name(≤500), type(def:"fixed",≤50), value(Any, опц.), color(≤200), order(≥0,def:0), isArchived(def:false) } — поле `value` не задаётся из настроек фондов (суммы в плане); в PUT обновляется только если ключ передан.
 ```
 
 ### Фонды (единый справочник)
