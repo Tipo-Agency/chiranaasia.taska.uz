@@ -47,6 +47,8 @@ import {
   distributeIncomeFromPlanDocuments,
   approvedAmountByFund,
   budgetBucketIdForRequest,
+  canonicalPlanningMonthYm,
+  effectivePurchaseRequestDepartmentId,
   parseRequestAmountUzs,
   fundAvailableBalances,
   filterRequestsForPlanningWindow,
@@ -77,22 +79,6 @@ function requestAmountLabel(amount: PurchaseRequest['amount']): string {
 
 function normalizeRequestStatusForFilter(req: PurchaseRequest): string {
   return req.status === 'deferred' ? 'draft' : req.status;
-}
-
-/**
- * YYYY-MM якоря плана/бюджета: не выводить из periodStart — при разбиении по неделям
- * «по большинству дней» дата начала может попадать в предыдущий календарный месяц.
- */
-function canonicalFinancialMonthYm(
-  anchorPeriod: string | undefined,
-  periodStart: string | undefined,
-  fallbackYm: string
-): string {
-  const p = String(anchorPeriod ?? '').trim();
-  if (/^\d{4}-\d{2}$/.test(p)) return p;
-  const fromStart = String(periodStart ?? '').trim().slice(0, 7);
-  if (/^\d{4}-\d{2}$/.test(fromStart)) return fromStart;
-  return String(fallbackYm ?? '').trim();
 }
 
 interface FinanceViewProps {
@@ -288,6 +274,9 @@ const FinanceView: React.FC<FinanceViewProps> = ({
   const [planningDetailIncomeReportIds, setPlanningDetailIncomeReportIds] = useState<string[]>([]);
   const [planningDetailExpenseDistribution, setPlanningDetailExpenseDistribution] = useState<Record<string, number>>({});
   const [planningDetailFundMovements, setPlanningDetailFundMovements] = useState<NonNullable<FinancialPlanning['fundMovements']>>([]);
+  /** Лимиты по фондам из планов (до переносов) — для колонки «План»; после переносов — planningDetailFundAllocations. */
+  const [planningDetailFundPlanBaseline, setPlanningDetailFundPlanBaseline] = useState<Record<string, number>>({});
+  const prevPlanningDetailIdRef = useRef<string | null>(null);
   const [planningFundTransferOpen, setPlanningFundTransferOpen] = useState(false);
   const [fundTransferFrom, setFundTransferFrom] = useState('');
   const [fundTransferTo, setFundTransferTo] = useState('');
@@ -349,6 +338,7 @@ const FinanceView: React.FC<FinanceViewProps> = ({
       setPlanningDetailFundMovements(selectedPlanning.fundMovements ?? []);
     } else {
       planningDetailInitialValuesRef.current = null;
+      prevPlanningDetailIdRef.current = null;
       setPlanningDetailDepartmentId('');
       setPlanningDetailPeriodStart('');
       setPlanningDetailPeriodEnd('');
@@ -356,6 +346,7 @@ const FinanceView: React.FC<FinanceViewProps> = ({
       setPlanningDetailNotes('');
       setPlanningDetailIncome(0);
       setPlanningDetailFundAllocations({});
+      setPlanningDetailFundPlanBaseline({});
       setPlanningDetailPlanDocumentIds([]);
       setPlanningDetailIncomeReportIds([]);
       setPlanningDetailExpenseDistribution({});
@@ -363,20 +354,24 @@ const FinanceView: React.FC<FinanceViewProps> = ({
     }
   }, [selectedPlanning]);
 
-  /** Заявки бюджета: по датам в периоде + уже привязанные к бюджету id (не теряем при смене окна). */
+  /** Заявки бюджета: по датам якорного месяца YYYY-MM (недельные границы периода не отсекают заявки месяца) + привязанные id. */
   useEffect(() => {
     if (!selectedPlanning || planningSubView !== 'detail') return;
-    const fallback = getDefaultRangeForMonth(selectedPlanning.period || currentPeriod);
-    const start = (planningDetailPeriodStart || selectedPlanning.periodStart || fallback.start).slice(0, 10);
-    const end = (planningDetailPeriodEnd || selectedPlanning.periodEnd || fallback.end).slice(0, 10);
-    const departmentId = planningDetailDepartmentId || selectedPlanning.departmentId || '';
+    const currentId = selectedPlanning.id;
+    const sameDoc = prevPlanningDetailIdRef.current === currentId;
+    prevPlanningDetailIdRef.current = currentId;
+    const ym = canonicalPlanningMonthYm(selectedPlanning.period, planningDetailPeriodStart, currentPeriod);
+    const { start, end } = getDefaultRangeForMonth(ym);
+    const planningDept = String(selectedPlanning.departmentId ?? '').trim();
+    const detailDept = String(planningDetailDepartmentId ?? '').trim();
+    const departmentId = !sameDoc ? planningDept || detailDept : detailDept || planningDept;
     if (!departmentId) return;
     const matched = filterRequestsForPlanningWindow(requests, start, end, departmentId);
     const idSet = new Set(matched.map((r) => r.id));
     for (const id of selectedPlanning.requestIds ?? []) {
       const r = requests.find((x) => x.id === id);
       if (!r || r.isArchived || r.status === 'rejected') continue;
-      if (r.departmentId !== departmentId) continue;
+      if (effectivePurchaseRequestDepartmentId(r) !== departmentId) continue;
       idSet.add(id);
     }
     setPlanningDetailRequestIds(Array.from(idSet));
@@ -390,8 +385,6 @@ const FinanceView: React.FC<FinanceViewProps> = ({
     currentPeriod,
     getDefaultRangeForMonth,
     selectedPlanning?.period,
-    selectedPlanning?.periodStart,
-    selectedPlanning?.periodEnd,
     selectedPlanning?.departmentId,
     JSON.stringify(selectedPlanning?.requestIds ?? []),
   ]);
@@ -435,11 +428,12 @@ const FinanceView: React.FC<FinanceViewProps> = ({
     }
     if (!Object.keys(base).length) {
       setPlanningDetailFundAllocations({});
+      setPlanningDetailFundPlanBaseline({});
       return;
     }
-    setPlanningDetailFundAllocations(
-      fundAllocationsFromDistributionAfterMovements(base, planningDetailFundMovements)
-    );
+    const baseline = fundAllocationsFromDistributionAfterMovements(base, []);
+    setPlanningDetailFundPlanBaseline(baseline);
+    setPlanningDetailFundAllocations(fundAllocationsFromDistributionAfterMovements(base, planningDetailFundMovements));
   }, [
     selectedPlanning?.id,
     planningSubView,
@@ -1110,7 +1104,7 @@ const FinanceView: React.FC<FinanceViewProps> = ({
       const updated: FinancialPlanning = {
         ...selectedPlanning,
         departmentId: planningDetailDepartmentId || selectedPlanning.departmentId,
-        period: canonicalFinancialMonthYm(selectedPlanning.period, planningDetailPeriodStart, currentPeriod),
+        period: canonicalPlanningMonthYm(selectedPlanning.period, planningDetailPeriodStart, currentPeriod),
         periodStart: planningDetailPeriodStart || undefined,
         periodEnd: planningDetailPeriodEnd || undefined,
         requestIds: planningDetailRequestIds,
@@ -1146,17 +1140,18 @@ const FinanceView: React.FC<FinanceViewProps> = ({
     const handleRefreshRequests = () => {
       void onRefreshPurchaseRequests?.();
       if (!selectedPlanning) return;
-      const fallback = getDefaultRangeForMonth(selectedPlanning.period || currentPeriod);
-      const start = (planningDetailPeriodStart || selectedPlanning.periodStart || fallback.start).slice(0, 10);
-      const end = (planningDetailPeriodEnd || selectedPlanning.periodEnd || fallback.end).slice(0, 10);
-      const departmentId = planningDetailDepartmentId || selectedPlanning.departmentId || '';
+      const ym = canonicalPlanningMonthYm(selectedPlanning.period, planningDetailPeriodStart, currentPeriod);
+      const { start, end } = getDefaultRangeForMonth(ym);
+      const planningDept = String(selectedPlanning.departmentId ?? '').trim();
+      const detailDept = String(planningDetailDepartmentId ?? '').trim();
+      const departmentId = detailDept || planningDept;
       if (!departmentId) return;
       const matched = filterRequestsForPlanningWindow(requests, start, end, departmentId);
       const idSet = new Set(matched.map((r) => r.id));
       for (const id of selectedPlanning.requestIds ?? []) {
         const r = requests.find((x) => x.id === id);
         if (!r || r.isArchived || r.status === 'rejected') continue;
-        if (r.departmentId !== departmentId) continue;
+        if (effectivePurchaseRequestDepartmentId(r) !== departmentId) continue;
         idSet.add(id);
       }
       setPlanningDetailRequestIds(Array.from(idSet));
@@ -1425,7 +1420,7 @@ const FinanceView: React.FC<FinanceViewProps> = ({
           <div>
             <h3 className="text-sm font-bold text-gray-800 dark:text-white uppercase mb-1">Доход и распределение</h3>
             <p className="text-xs text-gray-500 dark:text-gray-400">
-              Доход за период; ниже — только фонды: «План» из отмеченных финансовых планов (доля дохода бюджета), «Остаток» — после одобренных заявок с тем же фондом, что в карточке заявки. Переносы между фондами — ссылка внизу.
+              Доход за период; ниже — только фонды: «План» — доля дохода из отмеченных планов (без переносов), «Остаток» — после переносов между фондами и одобренных заявок по фонду в карточке заявки. Переносы — ссылка внизу.
             </p>
           </div>
           <div>
@@ -1445,7 +1440,7 @@ const FinanceView: React.FC<FinanceViewProps> = ({
               <div className="border-t border-gray-100 dark:border-[#333] pt-4">
                 <div className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase mb-2">По фондам</div>
                 <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
-                  Колонка «План» совпадает с расчётом из планов (веса строк расхода в планах). Переносы меняют распределение до оплат. «Остаток» — с учётом одобренных заявок.
+                  «План» — из планов по весам строк (до переносов). Переносы меняют только «Остаток» (и нераспределённое не трогают). «Остаток» — после переносов и одобренных заявок.
                 </p>
                 <div className="grid grid-cols-[1fr_auto_auto] gap-x-3 gap-y-2 text-xs font-bold uppercase tracking-wide text-gray-500 dark:text-gray-400 border-b border-gray-200 dark:border-[#333] pb-2 mb-2">
                   <span>Фонд</span>
@@ -1453,7 +1448,12 @@ const FinanceView: React.FC<FinanceViewProps> = ({
                   <span className="text-right tabular-nums">Остаток</span>
                 </div>
                 <div className="space-y-2 text-sm">
-                  {[...Object.keys(planningDetailFundAllocations)]
+                  {[
+                    ...new Set([
+                      ...Object.keys(planningDetailFundPlanBaseline),
+                      ...Object.keys(planningDetailFundAllocations),
+                    ]),
+                  ]
                     .sort((a, b) => {
                       const oa = categories.find((c) => c.id === a)?.order ?? 0;
                       const ob = categories.find((c) => c.id === b)?.order ?? 0;
@@ -1468,7 +1468,7 @@ const FinanceView: React.FC<FinanceViewProps> = ({
                         requestIds: planningDetailRequestIds,
                       };
                       const bal = fundAvailableBalances(synthetic, requests)[fundId] ?? 0;
-                      const planAmt = Number(planningDetailFundAllocations[fundId]) || 0;
+                      const planAmt = Number(planningDetailFundPlanBaseline[fundId]) || 0;
                       return (
                         <div key={fundId} className="grid grid-cols-[1fr_auto_auto] gap-x-3 gap-y-1 items-center">
                           <span className="text-gray-700 dark:text-gray-300 font-medium">{fund?.name || fundId}</span>
@@ -1874,7 +1874,7 @@ const FinanceView: React.FC<FinanceViewProps> = ({
       const updated: FinancialPlanDocument = {
         ...selectedPlanDoc,
         departmentId: planDetailDepartmentId || selectedPlanDoc.departmentId,
-        period: canonicalFinancialMonthYm(selectedPlanDoc.period, planDetailPeriodStart, currentPeriod),
+        period: canonicalPlanningMonthYm(selectedPlanDoc.period, planDetailPeriodStart, currentPeriod),
         periodStart: planDetailPeriodStart || undefined,
         periodEnd: planDetailPeriodEnd || undefined,
         income: planDetailIncome,

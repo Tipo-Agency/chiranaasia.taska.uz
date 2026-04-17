@@ -81,6 +81,33 @@ export function parseRequestAmountUzs(req: PurchaseRequest): number {
   return Number.isFinite(n) ? roundMoney(n) : 0;
 }
 
+const REQUEST_DEPT_TAG_RE = /\[departmentId:([^\]]+)\]/i;
+
+/**
+ * YYYY-MM якоря бюджета: не выводить из periodStart — при разбиении по неделям
+ * дата начала может попадать в предыдущий календарный месяц.
+ */
+export function canonicalPlanningMonthYm(
+  anchorPeriod: string | undefined,
+  periodStart: string | undefined,
+  fallbackYm: string
+): string {
+  const p = String(anchorPeriod ?? '').trim();
+  if (/^\d{4}-\d{2}$/.test(p)) return p;
+  const fromStart = String(periodStart ?? '').trim().slice(0, 7);
+  if (/^\d{4}-\d{2}$/.test(fromStart)) return fromStart;
+  return String(fallbackYm ?? '').trim();
+}
+
+/** Подразделение заявки: поле API или тег `[departmentId:…]` в описании (обратная совместимость). */
+export function effectivePurchaseRequestDepartmentId(req: PurchaseRequest): string {
+  const d = String(req.departmentId ?? '').trim();
+  if (d) return d;
+  const desc = String(req.description ?? '');
+  const m = REQUEST_DEPT_TAG_RE.exec(desc);
+  return m ? String(m[1]).trim() : '';
+}
+
 /** Ключ лимита бюджета для заявки: requestFundIds (legacy) или category заявки. */
 export function budgetBucketIdForRequest(
   planning: FinancialPlanning,
@@ -132,7 +159,7 @@ export function purchaseRequestDayKey(req: PurchaseRequest): string | null {
 }
 
 /**
- * Заявки в окне дат бюджета: дата (или createdAt) в [start,end], то же подразделение, не архив.
+ * Заявки в окне дат: дата (или createdAt) в [start,end], подразделение (поле или [departmentId:…] в описании), не архив.
  * Отклонённые не показываем; оплаченные показываем (остаток по фондам их не списывает как «одобренные»).
  */
 export function filterRequestsForPlanningWindow(
@@ -147,7 +174,7 @@ export function filterRequestsForPlanningWindow(
     const dk = purchaseRequestDayKey(req);
     if (dk && (dk < ds || dk > de)) return false;
     if (!dk) return false;
-    if (!departmentId || req.departmentId !== departmentId) return false;
+    if (!departmentId || effectivePurchaseRequestDepartmentId(req) !== departmentId) return false;
     if (req.isArchived) return false;
     if (req.status === 'rejected') return false;
     return true;
