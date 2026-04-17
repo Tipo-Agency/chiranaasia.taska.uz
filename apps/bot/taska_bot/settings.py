@@ -28,5 +28,5 @@ def load_settings() -> Settings:
     tz = (os.getenv("DEFAULT_TIMEZONE") or "Asia/Tashkent").strip()
     # Если переменные не заданы на сервере (apps/bot/.env), используем домен по умолчанию,
     # чтобы кнопки Web App работали "из коробки".
-    web = (os.getenv("WEB_APP_URL") or os.getenv("PUBLIC_APP_URL") or "https://tipa.taska.uz").strip().rstrip("/")
+    web = (os.getenv("WEB_APP_URL") or os.getenv("PUBLIC_APP_URL") or "https://chiranaasia.taska.uz").strip().rstrip("/")
     return Settings(telegram_token=token, backend_url=backend, timezone=tz, web_app_url=web)

@@ -1,6 +1,6 @@
 # API Reference
 
-Базовый URL: `https://tipa.taska.uz/api`  
+Базовый URL: `https://chiranaasia.taska.uz/api`  
 OpenAPI: `GET /openapi.json` при запущенном сервере.
 
 ---
@@ -850,12 +850,12 @@ Body: { "ids": ["uuid1", "uuid2"], "stage": "negotiation" }
 
 ## 11. WebSocket контракт
 
-**URL:** `wss://tipa.taska.uz/api/notifications/ws/{user_id}`
+**URL:** `wss://chiranaasia.taska.uz/api/notifications/ws/{user_id}`
 
 ### Подключение
 
 ```javascript
-const ws = new WebSocket(`wss://tipa.taska.uz/api/notifications/ws/${userId}`);
+const ws = new WebSocket(`wss://chiranaasia.taska.uz/api/notifications/ws/${userId}`);
 // Авторизация через cookie (access_token) — браузер шлёт автоматически при handshake
 ```
 

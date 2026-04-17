@@ -8,7 +8,7 @@
   3. Запустить: python scripts/migrate_firestore_to_postgres.py
 
 Переменные:
-  BACKEND_URL          — URL API (например https://api.tipa.taska.uz или http://localhost:8000).
+  BACKEND_URL          — URL API (например https://api.chiranaasia.taska.uz или http://localhost:8000).
   FIREBASE_CREDENTIALS — путь к JSON с ключом сервисного аккаунта Firebase
                          (или GOOGLE_APPLICATION_CREDENTIALS).
 

@@ -4,7 +4,7 @@
 
 set +e  # Не падаем на ошибках, обрабатываем их вручную
 
-SERVER_PATH="${SERVER_PATH:-/var/www/tipa.taska.uz}"
+SERVER_PATH="${SERVER_PATH:-/var/www/chiranaasia.taska.uz}"
 TELEGRAM_BOT_TOKEN="${TELEGRAM_BOT_TOKEN:-}"
 META_MARKER="${META_MARKER:-}"
 META_TASKA="${META_TASKA:-}"
@@ -293,7 +293,7 @@ fi
 # 5. Деплой конфига nginx и перезагрузка (статика + /api/ на 8003)
 echo ""
 echo "🌐 Step 5: Deploying nginx config and reloading..."
-NGINX_SITE_NAME="${NGINX_SITE_NAME:-tipa.taska.uz}"
+NGINX_SITE_NAME="${NGINX_SITE_NAME:-chiranaasia.taska.uz}"
 if [ -f "ops/nginx/nginx.conf" ]; then
   sudo cp ops/nginx/nginx.conf "/etc/nginx/sites-available/$NGINX_SITE_NAME" || true
   sudo ln -sf "/etc/nginx/sites-available/$NGINX_SITE_NAME" "/etc/nginx/sites-enabled/$NGINX_SITE_NAME" 2>/dev/null || true

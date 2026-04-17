@@ -8,7 +8,7 @@ on:
       base_url:
         description: "Базовый URL сайта (без /webhook/...)"
         required: false
-        default: "https://tipa.taska.uz"
+        default: "https://chiranaasia.taska.uz"
 
 jobs:
   verify:
@@ -26,7 +26,7 @@ jobs:
             exit 1
           fi
           BASE="${{ github.event.inputs.base_url }}"
-          BASE="${BASE:-https://tipa.taska.uz}"
+          BASE="${BASE:-https://chiranaasia.taska.uz}"
           CH=$(openssl rand -hex 16)
           URL="${BASE%/}/webhook/meta"
           echo "Запрос: GET $URL (hub.challenge=$CH)"

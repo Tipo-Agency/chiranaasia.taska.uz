@@ -24,18 +24,18 @@ def test_parse_cors_origins_trims_and_splits():
 def test_effective_browser_origin_allowlist_adds_public_base():
     out = effective_browser_origin_allowlist(
         "http://localhost:3000",
-        "https://tipa.taska.uz/api",
+        "https://chiranaasia.taska.uz/api",
     )
     assert "http://localhost:3000" in out
-    assert "https://tipa.taska.uz" in out
+    assert "https://chiranaasia.taska.uz" in out
 
 
 def test_effective_browser_origin_allowlist_dedupes_public_base():
     out = effective_browser_origin_allowlist(
-        "https://tipa.taska.uz,http://localhost:3000",
-        "https://tipa.taska.uz",
+        "https://chiranaasia.taska.uz,http://localhost:3000",
+        "https://chiranaasia.taska.uz",
     )
-    assert out.count("https://tipa.taska.uz") == 1
+    assert out.count("https://chiranaasia.taska.uz") == 1
 
 
 def test_cors_rejects_wildcard_only():

@@ -162,7 +162,7 @@ Backoff по числу попыток:
 ## WebSocket Realtime
 
 ```
-wss://tipa.taska.uz/api/notifications/ws/{user_id}
+wss://chiranaasia.taska.uz/api/notifications/ws/{user_id}
 ```
 
 - Клиент подключается при загрузке SPA

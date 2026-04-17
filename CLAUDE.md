@@ -1,4 +1,4 @@
-# tipa.taska.uz — Project Guide for Claude
+# chiranaasia.taska.uz — Project Guide for Claude
 
 ## What this project is
 

@@ -58,7 +58,7 @@ Telegram-аккаунтом сотрудника (MTProto/Telethon).
 {
   "bot_token": "123456:ABC-...",
   "chat_id": null,
-  "webhook_url": "https://tipa.taska.uz/api/integrations/telegram/webhook/<funnel_id>",
+  "webhook_url": "https://chiranaasia.taska.uz/api/integrations/telegram/webhook/<funnel_id>",
   "secret_token": "random-secret-32-chars"
 }
 ```

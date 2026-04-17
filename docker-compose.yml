@@ -130,7 +130,7 @@ services:
       SMTP_PORT: ${SMTP_PORT:-587}
       SMTP_USER: ${SMTP_USER:-}
       SMTP_PASSWORD: ${SMTP_PASSWORD:-}
-      SMTP_FROM: ${SMTP_FROM:-noreply@tipa.taska.uz}
+      SMTP_FROM: ${SMTP_FROM:-noreply@chiranaasia.taska.uz}
       SMTP_USE_TLS: ${SMTP_USE_TLS:-true}
     depends_on:
       db:

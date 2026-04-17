@@ -11,8 +11,8 @@
     "types:api": "openapi-typescript http://localhost:8000/openapi.json -o apps/web/types/api.d.ts",
     "docker:up": "docker-compose up -d",
     "docker:tools": "docker-compose --profile tools up -d",
-    "deploy": "git push origin main",
-    "push": "git push origin main",
+    "deploy": "git push origin main && git push tipa main",
+    "push": "git push origin main && git push tipa main",
     "lint:web": "npm --workspace apps/web run lint",
     "ci:web": "npm --workspace apps/web run lint && npm --workspace apps/web run typecheck && npm --workspace apps/web run build"
   },

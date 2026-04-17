@@ -430,7 +430,7 @@ Response: AuthUserOut
   "permissions": ["tasks.edit", "crm.sales_funnel", ...],
   "role": "manager",
   "calendarExportToken": "...",
-  "calendarExportUrl": "https://tipa.taska.uz/api/calendar-feed/..."
+  "calendarExportUrl": "https://chiranaasia.taska.uz/api/calendar-feed/..."
 }
 ```
 

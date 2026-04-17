@@ -126,7 +126,7 @@ class Settings(BaseSettings):
     SMTP_PORT: int = 587
     SMTP_USER: str = ""
     SMTP_PASSWORD: str = ""
-    SMTP_FROM: str = "noreply@tipa.taska.uz"
+    SMTP_FROM: str = "noreply@chiranaasia.taska.uz"
     SMTP_USE_TLS: bool = True
     NOTIFICATIONS_RETENTION_DAYS: int = 90
     NOTIFICATIONS_RETENTION_INTERVAL_SECONDS: int = 3600

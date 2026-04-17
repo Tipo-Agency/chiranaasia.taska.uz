@@ -184,7 +184,7 @@ emit(user_id, msg)  →  PUBLISH channel   →  подписчики
   WS-клиент A                             WS-клиент B
 ```
 
-**URL:** `wss://tipa.taska.uz/api/notifications/ws/{user_id}`  
+**URL:** `wss://chiranaasia.taska.uz/api/notifications/ws/{user_id}`  
 **nginx:** требует заголовок `Upgrade: websocket` + `Connection: Upgrade`.  
 **Переподключение:** клиент делает exponential backoff (1s → 2s → 4s → max 30s).
 
