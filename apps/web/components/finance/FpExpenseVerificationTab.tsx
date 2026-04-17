@@ -180,7 +180,7 @@ export function FpExpenseVerificationTab({
           <option value="">Заявка для привязки…</option>
           {fpRequests.map((r) => (
             <option key={r.id} value={r.id}>
-              {(r.title || r.id).slice(0, 60)} — {parseReqAmountUzs(r).toLocaleString('ru-RU')} UZS
+              {(r.title || r.id).slice(0, 60)} — {parseRequestAmountUzs(r).toLocaleString('ru-RU')} UZS
             </option>
           ))}
         </select>
