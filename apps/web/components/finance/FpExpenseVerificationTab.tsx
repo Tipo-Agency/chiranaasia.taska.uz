@@ -1,6 +1,8 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import type { FinancialPlanning, PurchaseRequest } from '../../types';
 import { financeEndpoint } from '../../services/apiClient';
+import { parseRequestAmountUzs } from '../../utils/financePlanningUtils';
+import { moneyToTiyin, sumMoney, tiyinToMoney } from '../../utils/uzsMoney';
 import { Loader2, Link2, Save } from 'lucide-react';
 
 export interface FpExpenseLine {
@@ -16,12 +18,6 @@ export interface FinanceReconciliationGroup {
   lineIds: string[];
   requestId: string | null;
   manualResolved: boolean;
-}
-
-function parseReqAmountUzs(r: PurchaseRequest): number {
-  const s = String(r.amount ?? '0').replace(/\s/g, '').replace(/,/g, '.');
-  const n = Number(s);
-  return Number.isFinite(n) ? n : 0;
 }
 
 function approvedFpRequestIds(plannings: FinancialPlanning[]): Set<string> {
@@ -95,17 +91,18 @@ export function FpExpenseVerificationTab({
   }, [groups]);
 
   const groupSum = (g: FinanceReconciliationGroup) =>
-    g.lineIds.reduce((acc, lid) => acc + (lineById.get(lid)?.amount || 0), 0);
+    sumMoney(g.lineIds.map((lid) => lineById.get(lid)?.amount || 0));
 
   const requestRowMeta = useMemo(() => {
     return fpRequests.map((req) => {
       const gs = groups.filter((g) => g.requestId === req.id);
-      const sum = gs.reduce((a, g) => a + groupSum(g), 0);
-      const expected = parseReqAmountUzs(req);
-      const delta = sum - expected;
-      const tight = Math.abs(delta) < 0.01;
+      const sum = sumMoney(gs.map((g) => groupSum(g)));
+      const expected = parseRequestAmountUzs(req);
+      const deltaTiyin = moneyToTiyin(sum) - moneyToTiyin(expected);
+      const delta = tiyinToMoney(deltaTiyin);
+      const tight = deltaTiyin === 0;
       const anyManual = gs.some((g) => g.manualResolved);
-      const paidAuto = req.status === 'paid' && gs.length === 0 && sum < 0.01;
+      const paidAuto = req.status === 'paid' && gs.length === 0 && moneyToTiyin(sum) === 0;
       let tone: 'ok' | 'warn' | 'bad' = 'ok';
       if (anyManual && tight) tone = 'warn';
       else if (!tight && req.status === 'approved') tone = 'bad';

@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Deal, Client, Contract, User, Project, Task, OneTimeDeal, AccountsReceivable, Meeting, SalesFunnel } from '../../types';
 import type { AppActions } from '../../frontend/hooks/useAppLogic';
@@ -6,10 +5,11 @@ import SalesFunnelView from '../SalesFunnelView';
 import ClientsView from '../ClientsView';
 
 interface CRMModuleProps {
-  view: 'sales-funnel' | 'clients';
+  view: 'sales-funnel' | 'clients' | 'crm-clients';
   /** Скрыть дублирующие кнопки в шапке страницы «Клиенты» — действия в верхней панели приложения */
   embedInCrmHub?: boolean;
-  forcedFunnelViewMode?: 'kanban' | 'list' | 'rejected';
+  /** Внутри хаба CRM: какой подраздел показать (вкладки вынесены в верхнее меню). */
+  crmClientsSection?: 'clients' | 'contracts' | 'receivables';
   deals: Deal[];
   clients: Client[];
   contracts: Contract[];
@@ -27,7 +27,25 @@ interface CRMModuleProps {
   headerSearchQuery?: string;
 }
 
-export const CRMModule: React.FC<CRMModuleProps> = ({ view, embedInCrmHub = false, forcedFunnelViewMode, deals, clients, contracts, oneTimeDeals = [], accountsReceivable = [], users, salesFunnels = [], projects, tasks, meetings = [], currentUser, actions, autoOpenCreateModal = false, headerSearchQuery = '' }) => {
+export const CRMModule: React.FC<CRMModuleProps> = ({
+  view,
+  embedInCrmHub = false,
+  crmClientsSection = 'clients',
+  deals,
+  clients,
+  contracts,
+  oneTimeDeals = [],
+  accountsReceivable = [],
+  users,
+  salesFunnels = [],
+  projects,
+  tasks,
+  meetings = [],
+  currentUser,
+  actions,
+  autoOpenCreateModal = false,
+  headerSearchQuery = '',
+}) => {
   if (view === 'sales-funnel') {
       return (
         <div className="h-full min-h-0 flex flex-col">
@@ -50,22 +68,23 @@ export const CRMModule: React.FC<CRMModuleProps> = ({ view, embedInCrmHub = fals
             onDeleteMeeting={actions.deleteMeeting}
             onUpdateMeetingSummary={actions.updateMeetingSummary}
             autoOpenCreateModal={autoOpenCreateModal}
-            forcedViewMode={forcedFunnelViewMode}
           />
         </div>
       );
   }
   
-  if (view === 'clients') {
+  if (view === 'clients' || view === 'crm-clients') {
       return (
         <div className="h-full min-h-0 flex flex-col">
           <ClientsView 
+            deals={deals}
             clients={clients} 
             contracts={contracts}
             oneTimeDeals={oneTimeDeals}
             accountsReceivable={accountsReceivable}
             salesFunnels={salesFunnels}
             embedInCrmHub={embedInCrmHub}
+            crmHubSection={view === 'crm-clients' ? crmClientsSection : undefined}
             onSaveClient={actions.saveClient} 
             onDeleteClient={actions.deleteClient} 
             onSaveContract={actions.saveContract} 

@@ -1,6 +1,13 @@
 
 import { useState, useEffect } from 'react';
-import { TableCollection, ActivityLog, ViewMode, NotificationPreferences, AutomationRule } from '../../../types';
+import {
+  TableCollection,
+  ActivityLog,
+  ViewMode,
+  NotificationPreferences,
+  AutomationRule,
+  type CrmHubTab,
+} from '../../../types';
 import { api } from '../../../backend/api';
 import { DEFAULT_NOTIFICATION_PREFS } from '../../../constants';
 import { parseLocation } from '../../../utils/urlSync';
@@ -85,7 +92,7 @@ export const useSettingsLogic = (showNotification: (msg: string) => void) => {
   /** Вкладка рабочего стола (дашборд, календарь, документы …); сразу из URL, чтобы не грузить лишние модули до гидрации */
   const [workdeskTab, setWorkdeskTab] = useState<WorkdeskTabState>(readWorkdeskTabFromUrl);
   /** Подраздел внутри «Воронка продаж»: воронка / диалоги / клиенты */
-  const [crmHubTab, setCrmHubTab] = useState<'funnel' | 'chats' | 'clients'>('funnel');
+  const [crmHubTab, setCrmHubTab] = useState<CrmHubTab>('funnel');
   /** Вкладка внутри «Сотрудники»: список / зарплата */
   const [employeesHubTab, setEmployeesHubTab] = useState<EmployeesHubTabState>(readEmployeesHubTabFromUrl);
 
@@ -231,7 +238,7 @@ export const useSettingsLogic = (showNotification: (msg: string) => void) => {
       return;
     }
     if (view === 'client-chats') {
-      setCrmHubTab('chats');
+      setCrmHubTab('funnel');
       setCurrentView('sales-funnel');
       return;
     }

@@ -1,10 +1,11 @@
 import React, { useMemo, useState } from 'react';
 import { Project, Department, Warehouse, User } from '../../types';
-import { ICON_OPTIONS, MODULE_ICON_HEX_COLORS, LEGACY_PROJECT_COLOR_TO_HEX } from '../../constants';
+import { ICON_OPTIONS, MODULE_ICON_HEX_COLORS, LEGACY_PROJECT_COLOR_TO_HEX, swatchHexForTableColorToken } from '../../constants';
 import { DynamicIcon } from '../AppIcons';
+import { normalizeHex6 } from '../../utils/moduleProjectColor';
 import { Button, Input, StandardModal } from '../ui';
 import { Edit2, Trash2 } from 'lucide-react';
-import { TaskSelect } from '../TaskSelect';
+import { EntitySearchSelect } from '../ui/EntitySearchSelect';
 
 type CreateKind = 'project' | 'department' | 'warehouse';
 
@@ -113,15 +114,17 @@ export const StructureSettings: React.FC<{
     setProjectIcon(p.icon || 'Briefcase');
     const raw = p.color || '';
     if (raw.startsWith('#')) {
-      setProjectColor(MODULE_ICON_HEX_COLORS.includes(raw) ? raw : '__custom__');
-      setProjectCustomColor(raw);
+      const normalized = normalizeHex6(raw) ?? raw.toLowerCase();
+      setProjectColor(MODULE_ICON_HEX_COLORS.includes(normalized) ? normalized : '__custom__');
+      setProjectCustomColor(normalized);
     } else if (raw && LEGACY_PROJECT_COLOR_TO_HEX[raw]) {
       const hex = LEGACY_PROJECT_COLOR_TO_HEX[raw];
       setProjectColor(MODULE_ICON_HEX_COLORS.includes(hex) ? hex : '__custom__');
       setProjectCustomColor(hex);
     } else if (raw) {
-      setProjectColor(raw);
-      setProjectCustomColor('#6366f1');
+      const hex = swatchHexForTableColorToken(raw);
+      setProjectColor(MODULE_ICON_HEX_COLORS.includes(hex) ? hex : '__custom__');
+      setProjectCustomColor(hex);
     } else {
       const d = MODULE_ICON_HEX_COLORS[0] || '#6366f1';
       setProjectColor(d);
@@ -413,7 +416,13 @@ export const StructureSettings: React.FC<{
             <div className="w-10 h-10 rounded-xl bg-white dark:bg-[#252525] border border-gray-200 dark:border-[#333] flex items-center justify-center">
               <DynamicIcon
                 name={projectIcon}
-                className={projectColor === '__custom__' ? projectCustomColor : projectColor}
+                className={
+                  projectColor === '__custom__'
+                    ? projectCustomColor
+                    : projectColor.startsWith('#')
+                      ? projectColor
+                      : swatchHexForTableColorToken(projectColor)
+                }
                 size={18}
               />
             </div>
@@ -445,10 +454,14 @@ export const StructureSettings: React.FC<{
           <Input label="Название" value={departmentName} onChange={(e) => setDepartmentName(e.target.value)} placeholder="Например: Продажи" />
           <div>
             <div className="text-xs font-bold text-gray-500 dark:text-gray-400 mb-1 uppercase">Руководитель</div>
-            <TaskSelect
+            <EntitySearchSelect
               value={departmentHeadId}
               onChange={setDepartmentHeadId}
-              options={[{ value: '', label: 'Не назначен' }, ...users.map((u) => ({ value: u.id, label: u.name }))]}
+              options={[
+                { value: '', label: 'Не назначен' },
+                ...users.map((u) => ({ value: u.id, label: u.name, searchText: u.name })),
+              ]}
+              searchPlaceholder="Сотрудник…"
             />
           </div>
           <div>
@@ -483,13 +496,14 @@ export const StructureSettings: React.FC<{
           <Input label="Локация" value={warehouseLocation} onChange={(e) => setWarehouseLocation(e.target.value)} placeholder="Адрес / город" />
           <div>
             <div className="text-xs font-bold text-gray-500 dark:text-gray-400 mb-1 uppercase">Подразделение</div>
-            <TaskSelect
+            <EntitySearchSelect
               value={warehouseDepartmentId}
               onChange={setWarehouseDepartmentId}
               options={[
                 { value: '', label: 'Без подразделения' },
-                ...activeDepartments.map((d) => ({ value: d.id, label: d.name })),
+                ...activeDepartments.map((d) => ({ value: d.id, label: d.name, searchText: d.name })),
               ]}
+              searchPlaceholder="Подразделение…"
             />
           </div>
         </div>

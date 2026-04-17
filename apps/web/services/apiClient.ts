@@ -5,6 +5,7 @@
 import type {
   Bdr,
   Client,
+  CrmContact,
   Deal,
   DealAttachment,
   EntityType,
@@ -780,6 +781,62 @@ export const clientsEndpoint = {
   updateAll: (clients: unknown[]) => put<{ ok: boolean }>('/clients', clients),
 };
 
+function crmContactFromApi(r: Record<string, unknown>): CrmContact {
+  const tagsRaw = r.tags;
+  return {
+    id: String(r.id ?? ''),
+    version:
+      typeof r.version === 'number'
+        ? r.version
+        : r.version != null && r.version !== ''
+          ? Number(r.version) || undefined
+          : undefined,
+    clientId: (r.client_id as string | null | undefined) ?? undefined,
+    name: String(r.name ?? ''),
+    phone: (r.phone as string | null | undefined) ?? undefined,
+    email: (r.email as string | null | undefined) ?? undefined,
+    telegram: (r.telegram as string | null | undefined) ?? undefined,
+    instagram: (r.instagram as string | null | undefined) ?? undefined,
+    jobTitle: (r.job_title as string | null | undefined) ?? undefined,
+    notes: (r.notes as string | null | undefined) ?? undefined,
+    tags: Array.isArray(tagsRaw) ? (tagsRaw as unknown[]).map((x) => String(x)) : undefined,
+    isArchived: Boolean(r.is_archived),
+  };
+}
+
+/** CRM-контакты компаний (лица); список с фильтром по client_id. */
+export const crmContactsEndpoint = {
+  list: async (opts?: { clientId?: string; limit?: number }): Promise<CrmContact[]> => {
+    const sp = new URLSearchParams();
+    sp.set('limit', String(Math.min(opts?.limit ?? 200, 500)));
+    if (opts?.clientId) sp.set('client_id', opts.clientId);
+    const res = await get<{ items: Record<string, unknown>[] }>(`/contacts?${sp.toString()}`);
+    return (res.items ?? []).map((row) => crmContactFromApi(row));
+  },
+  create: (body: {
+    name: string;
+    clientId?: string;
+    phone?: string;
+    email?: string;
+    telegram?: string;
+    instagram?: string;
+    jobTitle?: string;
+    notes?: string;
+    tags?: string[];
+  }) =>
+    post<Record<string, unknown>>('/contacts', {
+      name: body.name,
+      clientId: body.clientId,
+      phone: body.phone,
+      email: body.email,
+      telegram: body.telegram,
+      instagram: body.instagram,
+      jobTitle: body.jobTitle,
+      notes: body.notes,
+      tags: body.tags,
+    }).then((r) => crmContactFromApi(r as Record<string, unknown>)),
+};
+
 const isContractLikeDeal = (item: unknown): boolean => {
   if (!item || typeof item !== 'object') return false;
   const deal = item as Record<string, unknown>;
@@ -906,6 +963,7 @@ export function dealToBulkPutItem(d: Deal): Record<string, unknown> {
     id: dealId,
     title: d.title ?? '',
     clientId: d.clientId ?? null,
+    contactId: d.contactId ?? null,
     contactName: d.contactName ?? null,
     amount: d.amount ?? 0,
     currency: d.currency ?? 'UZS',
@@ -946,6 +1004,7 @@ export function dealToApiCreate(d: Deal, createdByUserId?: string | null): Recor
     id: b.id || undefined,
     title: (b.title as string) || 'Новая сделка',
     clientId: b.clientId,
+    contactId: b.contactId,
     contactName: b.contactName,
     amount: b.amount,
     currency: b.currency,
@@ -973,6 +1032,7 @@ export function dealToApiPatch(d: Deal, updatedByUserId?: string | null): Record
   const out: Record<string, unknown> = {
     title: b.title,
     clientId: b.clientId,
+    contactId: b.contactId,
     contactName: b.contactName,
     amount: b.amount,
     currency: b.currency,
@@ -1034,6 +1094,7 @@ export function dealFromApi(r: Record<string, unknown>): Deal {
     projectId: (r.project_id as string | undefined) ?? undefined,
     comments: (r.comments as Deal['comments']) ?? [],
     clientId: (r.client_id as string | undefined) ?? undefined,
+    contactId: (r.contact_id as string | undefined) ?? undefined,
     client:
       r.client && typeof r.client === 'object'
         ? clientFromApi(r.client as Record<string, unknown>)

@@ -9,6 +9,7 @@ import { normalizeDateForInput, isOverdue } from '../utils/dateUtils';
 import { UserAvatar } from './features/common/UserAvatar';
 import { DateInput } from './ui/DateInput';
 import { TaskBadgeInline } from './ui/TaskBadgeInline';
+import { isProjectLegacyFullTailwindClass, moduleProjectPillStyle } from '../utils/moduleProjectColor';
 
 interface TableViewProps {
   tasks: Task[];
@@ -76,6 +77,11 @@ const CustomSelect = ({ value, options, onChange, type }: { value: string, optio
     const selectedOption = options.find(o => (type === 'project' ? o.id : o.name) === value);
     const label = selectedOption ? selectedOption.name : (type === 'project' ? 'Без модуля' : value);
     const colorClass = selectedOption ? resolveColorClass(selectedOption.color, type) : 'text-gray-500 bg-gray-50 dark:bg-[#333]';
+    const projectPillStyle = type === 'project' && selectedOption ? moduleProjectPillStyle(selectedOption.color) : null;
+    const projectLegacyClass =
+      type === 'project' && selectedOption && isProjectLegacyFullTailwindClass(selectedOption.color)
+        ? selectedOption.color
+        : null;
 
     const updatePosition = () => {
         if (containerRef.current) {
@@ -147,6 +153,9 @@ const CustomSelect = ({ value, options, onChange, type }: { value: string, optio
             {options.map(opt => {
                 const val = type === 'project' ? opt.id : opt.name;
                 const optColor = resolveColorClass(opt.color, type);
+                const optProjectStyle = type === 'project' ? moduleProjectPillStyle(opt.color) : null;
+                const optProjectLegacy =
+                  type === 'project' && isProjectLegacyFullTailwindClass(opt.color) ? opt.color : null;
                 return (
                     <div 
                         key={opt.id}
@@ -170,8 +179,21 @@ const CustomSelect = ({ value, options, onChange, type }: { value: string, optio
                           <TaskBadgeInline color={opt.color} className="text-xs px-2 py-0.5">
                             {opt.name}
                           </TaskBadgeInline>
+                        ) : optProjectStyle ? (
+                          <span
+                            style={optProjectStyle}
+                            className="text-xs font-medium px-2 py-0.5 rounded inline-block border border-solid"
+                          >
+                            {opt.name}
+                          </span>
+                        ) : optProjectLegacy ? (
+                          <span className={`text-xs font-medium ${optProjectLegacy} px-2 py-0.5 rounded inline-block`}>
+                            {opt.name}
+                          </span>
                         ) : (
-                          <span className={`text-xs font-medium ${optColor} px-2 py-0.5 rounded inline-block`}>{opt.name}</span>
+                          <span className={`text-xs font-medium ${optColor} px-2 py-0.5 rounded inline-block`}>
+                            {opt.name}
+                          </span>
                         )}
                         {val === value && <Check size={14} className="text-slate-600 dark:text-slate-300 flex-shrink-0 ml-auto"/>}
                     </div>
@@ -198,8 +220,17 @@ const CustomSelect = ({ value, options, onChange, type }: { value: string, optio
                     e.preventDefault();
                 }}
                 className={`px-2 py-1.5 rounded-lg text-xs font-semibold cursor-pointer transition-colors w-full text-center flex items-center justify-center gap-1.5 hover:bg-black/5 dark:hover:bg-white/5 ${
-                  type === 'status' || type === 'priority' ? 'border border-transparent' : colorClass
+                  type === 'status' || type === 'priority'
+                    ? 'border border-transparent'
+                    : type === 'project' && projectPillStyle
+                      ? 'border border-solid'
+                      : type === 'project' && projectLegacyClass
+                        ? projectLegacyClass
+                        : type === 'project'
+                          ? 'text-gray-600 dark:text-gray-300 bg-gray-50 dark:bg-[#333] border border-gray-200 dark:border-gray-700'
+                          : colorClass
                 }`}
+                style={type === 'project' && projectPillStyle ? projectPillStyle : undefined}
             >
                 {type === 'status' || type === 'priority' ? (
                   selectedOption ? (
@@ -210,7 +241,13 @@ const CustomSelect = ({ value, options, onChange, type }: { value: string, optio
                     <span className="truncate text-gray-500">{label}</span>
                   )
                 ) : (
-                  <span className={`truncate ${colorClass}`}>{label}</span>
+                  <span
+                    className={
+                      projectPillStyle || projectLegacyClass ? 'truncate' : `truncate ${colorClass}`
+                    }
+                  >
+                    {label}
+                  </span>
                 )}
                 <ChevronDown size={12} className={`transition-transform flex-shrink-0 ${isOpen ? 'rotate-180' : ''}`} />
             </div>

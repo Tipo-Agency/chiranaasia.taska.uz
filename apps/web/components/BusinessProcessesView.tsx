@@ -4,7 +4,7 @@ import { BusinessProcess, ProcessStep, ProcessStepBranch, OrgPosition, User, Tas
 import { getStepsForInstance } from '../utils/bpmDealFunnel';
 import { resolveAssigneesForOrgPosition } from '../utils/orgPositionAssignee';
 import { Network, Plus, Edit2, Trash2, ChevronRight, User as UserIcon, Building2, Save, X, ArrowDown, Play, CheckCircle2, Clock, FileText, ArrowLeft, Calendar, Users, Layers3 } from 'lucide-react';
-import { TaskSelect } from './TaskSelect';
+import { EntitySearchSelect } from './ui/EntitySearchSelect';
 import { ProcessCard } from './features/processes/ProcessCard';
 import {
   Button,
@@ -1176,36 +1176,39 @@ const BusinessProcessesView: React.FC<BusinessProcessesViewProps> = ({
                                                       placeholder="Описание действий..."
                                                   />
                                                   <div className="flex gap-2">
-                                                      <TaskSelect
+                                                      <EntitySearchSelect
+                                                          searchable={false}
                                                           value={step.assigneeType}
                                                           onChange={(val) => handleUpdateStep(step.id, { assigneeType: val as any, assigneeId: '' })}
                                                           options={[
                                                               { value: 'position', label: 'Должность' },
-                                                              { value: 'user', label: 'Сотрудник' }
+                                                              { value: 'user', label: 'Сотрудник' },
                                                           ]}
                                                           className="w-1/3 text-xs"
                                                       />
-                                                      <TaskSelect
+                                                      <EntitySearchSelect
                                                           value={step.assigneeId}
                                                           onChange={(val) => handleUpdateStep(step.id, { assigneeId: val })}
                                                           options={[
                                                               { value: '', label: 'Выберите...' },
                                                               ...(step.assigneeType === 'position' 
-                                                                  ? activeOrgPositions.map(p => ({ value: p.id, label: p.title }))
-                                                                  : users.map(u => ({ value: u.id, label: u.name }))
+                                                                  ? activeOrgPositions.map(p => ({ value: p.id, label: p.title, searchText: p.title }))
+                                                                  : users.map(u => ({ value: u.id, label: u.name, searchText: u.name }))
                                                               )
                                                           ]}
                                                           className="flex-1 text-xs"
+                                                          searchPlaceholder="Поиск…"
                                                       />
                                                   </div>
                                                   <div className="mt-3 pt-3 border-t border-gray-200 dark:border-[#444]">
                                                       <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 mb-2">Тип шага</label>
-                                                      <TaskSelect
+                                                      <EntitySearchSelect
+                                                          searchable={false}
                                                           value={step.stepType || 'normal'}
                                                           onChange={(val) => handleUpdateStep(step.id, { stepType: val as 'normal' | 'variant', branches: val === 'variant' ? (step.branches || [{ id: `br-${Date.now()}`, label: 'Вариант 1', nextStepId: steps[0]?.id || '' }]) : undefined })}
                                                           options={[
                                                               { value: 'normal', label: 'Обычный (линейный переход)' },
-                                                              { value: 'variant', label: 'Вариант (ветвление процесса)' }
+                                                              { value: 'variant', label: 'Вариант (ветвление процесса)' },
                                                           ]}
                                                           className="w-full text-xs"
                                                       />
@@ -1225,14 +1228,19 @@ const BusinessProcessesView: React.FC<BusinessProcessesViewProps> = ({
                                                                           placeholder="Название варианта"
                                                                           className="flex-1 px-2 py-1 text-xs border border-gray-200 dark:border-[#555] rounded bg-transparent text-gray-800 dark:text-gray-200"
                                                                       />
-                                                                      <TaskSelect
+                                                                      <EntitySearchSelect
                                                                           value={br.nextStepId}
                                                                           onChange={(val) => handleUpdateBranch(step.id, br.id, { nextStepId: val })}
                                                                           options={[
                                                                               { value: '', label: 'След. шаг...' },
-                                                                              ...steps.filter(s => s.id !== step.id).map(s => ({ value: s.id, label: s.title || '(без названия)' }))
+                                                                              ...steps.filter(s => s.id !== step.id).map(s => ({
+                                                                                  value: s.id,
+                                                                                  label: s.title || '(без названия)',
+                                                                                  searchText: s.title || '',
+                                                                              }))
                                                                           ]}
                                                                           className="w-40 text-xs"
+                                                                          searchPlaceholder="Шаг…"
                                                                       />
                                                                       <button type="button" onClick={() => handleRemoveBranch(step.id, br.id)} className="p-1 text-gray-400 hover:text-red-500"><Trash2 size={12}/></button>
                                                                   </div>
@@ -1721,29 +1729,31 @@ const BusinessProcessesView: React.FC<BusinessProcessesViewProps> = ({
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                           <div>
                             <span className="text-[10px] font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-1 block">Кому</span>
-                            <TaskSelect
+                            <EntitySearchSelect
+                              searchable={false}
                               value={step.assigneeType}
                               onChange={(val) => handleUpdateStep(step.id, { assigneeType: val as any, assigneeId: '' })}
                               options={[
                                 { value: 'position', label: 'Должность' },
-                                { value: 'user', label: 'Сотрудник' }
+                                { value: 'user', label: 'Сотрудник' },
                               ]}
                               className="w-full text-xs"
                             />
                           </div>
                           <div>
                             <span className="text-[10px] font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-1 block">Выбор</span>
-                            <TaskSelect
+                            <EntitySearchSelect
                               value={step.assigneeId}
                               onChange={(val) => handleUpdateStep(step.id, { assigneeId: val })}
                               options={[
                                 { value: '', label: 'Выберите...' },
                                 ...(step.assigneeType === 'position'
-                                  ? activeOrgPositions.map(p => ({ value: p.id, label: p.title }))
-                                  : users.map(u => ({ value: u.id, label: u.name }))
+                                  ? activeOrgPositions.map(p => ({ value: p.id, label: p.title, searchText: p.title }))
+                                  : users.map(u => ({ value: u.id, label: u.name, searchText: u.name }))
                                 )
                               ]}
                               className="w-full text-xs"
+                              searchPlaceholder="Поиск…"
                             />
                           </div>
                         </div>

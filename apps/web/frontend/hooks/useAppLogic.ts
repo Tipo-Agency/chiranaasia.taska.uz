@@ -28,6 +28,7 @@ import { useBPMLogic } from './slices/useBPMLogic';
 import { useInventoryLogic } from './slices/useInventoryLogic';
 import { STANDARD_FEATURES } from '../../components/FunctionalityView';
 import { buildLocation, parseLocation } from '../../utils/urlSync';
+import { normalizeCrmHubTab } from '../../types/crmHub';
 import { devWarn } from '../../utils/devLog';
 import { resolveAssigneesForOrgPosition } from '../../utils/orgPositionAssignee';
 import { useAuthScopeStore } from '../stores/authScopeStore';
@@ -356,7 +357,7 @@ export const useAppLogic = () => {
       settingsSlice.setters.setWorkdeskTab(parsed.workdeskTab);
     }
     if (parsed.crmHubTab) {
-      settingsSlice.setters.setCrmHubTab(parsed.crmHubTab);
+      settingsSlice.setters.setCrmHubTab(normalizeCrmHubTab(parsed.crmHubTab));
     }
     if (parsed.view === 'employees') {
       settingsSlice.setters.setEmployeesHubTab(parsed.employeesHubTab === 'payroll' ? 'payroll' : 'team');
@@ -421,7 +422,7 @@ export const useAppLogic = () => {
         settingsSlice.setters.setWorkdeskTab(parsed.workdeskTab);
       }
       if (parsed.crmHubTab) {
-        settingsSlice.setters.setCrmHubTab(parsed.crmHubTab);
+        settingsSlice.setters.setCrmHubTab(normalizeCrmHubTab(parsed.crmHubTab));
       }
       if (parsed.view === 'employees') {
         settingsSlice.setters.setEmployeesHubTab(parsed.employeesHubTab === 'payroll' ? 'payroll' : 'team');
@@ -1043,7 +1044,7 @@ export const useAppLogic = () => {
       return;
     }
     if (v === 'client-chats') {
-      st.setCrmHubTab('chats');
+      st.setCrmHubTab('funnel');
       st.setCurrentView('sales-funnel');
       st.setActiveTableId('');
       return;
@@ -1077,6 +1078,69 @@ export const useAppLogic = () => {
       return;
     }
     st.setCurrentView(v);
+  };
+
+  /** «Назад» в шапке: внутри вкладок (рабочий стол, CRM, пространства, настройки), не через window.history. */
+  const goBackWithinApp = () => {
+    const v = settingsSlice.state.currentView;
+    const st = settingsSlice.setters;
+    if (v === 'home' && settingsSlice.state.workdeskTab !== 'dashboard') {
+      st.setWorkdeskTab('dashboard');
+      return;
+    }
+    if (v === 'sales-funnel' && settingsSlice.state.crmHubTab !== 'funnel') {
+      st.setCrmHubTab('funnel');
+      return;
+    }
+    if (v === 'employees' && settingsSlice.state.employeesHubTab === 'payroll') {
+      st.setEmployeesHubTab('team');
+      return;
+    }
+    if (v === 'spaces') {
+      const tab = settingsSlice.state.activeSpaceTab;
+      if (tab === 'functionality') {
+        st.setActiveSpaceTab('backlog');
+        return;
+      }
+      if (tab === 'backlog') {
+        st.setActiveSpaceTab('content-plan');
+        return;
+      }
+    }
+    if (v === 'settings') {
+      if (settingsSlice.state.settingsActiveTab !== 'users') {
+        st.setSettingsActiveTab('users');
+        return;
+      }
+      settingsSlice.actions.closeSettings();
+      return;
+    }
+    if (v === 'table') {
+      st.setActiveTableId('');
+      setCurrentView('home');
+      return;
+    }
+    if (v === 'doc-editor') {
+      contentSlice.setters.setActiveDocId('');
+      setCurrentView('home');
+      st.setWorkdeskTab('documents');
+      return;
+    }
+    if (
+      v === 'tasks' ||
+      v === 'inbox' ||
+      v === 'search' ||
+      v === 'finance' ||
+      v === 'inventory' ||
+      v === 'business-processes' ||
+      v === 'chat' ||
+      v === 'production'
+    ) {
+      st.setActiveTableId('');
+      st.setWorkdeskTab('dashboard');
+      st.setCrmHubTab('funnel');
+      setCurrentView('home');
+    }
   };
 
   return {
@@ -1678,7 +1742,7 @@ export const useAppLogic = () => {
               showNotification('Ошибка восстановления приоритета');
           }
       },
-      toggleDarkMode: settingsSlice.actions.toggleDarkMode, createTable: createTableWrapper, updateTable: settingsSlice.actions.updateTable, deleteTable: settingsSlice.actions.deleteTable, markAllRead: settingsSlice.actions.markAllRead, navigate: settingsSlice.actions.navigate, openSettings: settingsSlice.actions.openSettings, closeSettings: settingsSlice.actions.closeSettings, openCreateTable: settingsSlice.actions.openCreateTable, closeCreateTable: settingsSlice.actions.closeCreateTable, openEditTable: settingsSlice.actions.openEditTable, closeEditTable: settingsSlice.actions.closeEditTable, updateNotificationPrefs: settingsSlice.actions.updateNotificationPrefs, saveAutomationRule: settingsSlice.actions.saveAutomationRule, deleteAutomationRule: settingsSlice.actions.deleteAutomationRule, setActiveSpaceTab: settingsSlice.actions.setActiveSpaceTab,
+      toggleDarkMode: settingsSlice.actions.toggleDarkMode, createTable: createTableWrapper, updateTable: settingsSlice.actions.updateTable, deleteTable: settingsSlice.actions.deleteTable, markAllRead: settingsSlice.actions.markAllRead, navigate: settingsSlice.actions.navigate, goBackWithinApp, openSettings: settingsSlice.actions.openSettings, closeSettings: settingsSlice.actions.closeSettings, openCreateTable: settingsSlice.actions.openCreateTable, closeCreateTable: settingsSlice.actions.closeCreateTable, openEditTable: settingsSlice.actions.openEditTable, closeEditTable: settingsSlice.actions.closeEditTable, updateNotificationPrefs: settingsSlice.actions.updateNotificationPrefs, saveAutomationRule: settingsSlice.actions.saveAutomationRule, deleteAutomationRule: settingsSlice.actions.deleteAutomationRule, setActiveSpaceTab: settingsSlice.actions.setActiveSpaceTab,
       setActiveTableId: settingsSlice.setters.setActiveTableId, setCurrentView, setViewMode: settingsSlice.setters.setViewMode, setSearchQuery: settingsSlice.setters.setSearchQuery, setSettingsActiveTab: settingsSlice.setters.setSettingsActiveTab,
       setWorkdeskTab: settingsSlice.setters.setWorkdeskTab,
       setCrmHubTab: settingsSlice.setters.setCrmHubTab,

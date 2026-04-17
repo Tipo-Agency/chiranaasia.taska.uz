@@ -1,23 +1,18 @@
 /**
- * ClientsPage - страница клиентов (рефакторенная версия)
- * 
- * Зачем отдельно:
- * - Только композиция компонентов
- * - Не содержит бизнес-логику
- * - Использует переиспользуемые компоненты
+ * ClientsPage — отдельная композиция (поиск по API клиентов + вкладки).
  */
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { Client, Deal, AccountsReceivable, SalesFunnel } from '../../types';
 import { api } from '../../backend/api';
 import { clientFromApi } from '../../services/apiClient';
 import { PageLayout } from '../ui/PageLayout';
 import { Container } from '../ui/Container';
+import { FilterConfig } from '../FiltersPanel';
 import {
   ClientsHeader,
   ClientsTabs,
   ClientsTab,
   ContractsTab,
-  FinanceTab,
   ReceivablesTab,
   ClientModal,
   ContractModal,
@@ -27,8 +22,8 @@ import {
 
 interface ClientsPageProps {
   clients: Client[];
-  contracts: Deal[]; // Договоры (recurring: true)
-  oneTimeDeals?: Deal[]; // Продажи (recurring: false)
+  contracts: Deal[];
+  oneTimeDeals?: Deal[];
   accountsReceivable?: AccountsReceivable[];
   salesFunnels?: SalesFunnel[];
   onSaveClient: (client: Client) => void;
@@ -56,7 +51,7 @@ export const ClientsPage: React.FC<ClientsPageProps> = ({
   onSaveAccountsReceivable,
   onDeleteAccountsReceivable,
 }) => {
-  const [activeTab, setActiveTab] = useState<'clients' | 'contracts' | 'finance' | 'receivables'>('clients');
+  const [activeTab, setActiveTab] = useState<'clients' | 'contracts' | 'receivables'>('clients');
   const [searchQuery, setSearchQuery] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [serverClientHits, setServerClientHits] = useState<Client[] | null>(null);
@@ -84,9 +79,7 @@ export const ClientsPage: React.FC<ClientsPageProps> = ({
           is_archived: false,
         });
         if (!cancelled) {
-          setServerClientHits(
-            (page.items ?? []).map((row) => clientFromApi(row as Record<string, unknown>))
-          );
+          setServerClientHits((page.items ?? []).map((row) => clientFromApi(row as Record<string, unknown>)));
         }
       } catch {
         if (!cancelled) setServerClientHits([]);
@@ -98,11 +91,11 @@ export const ClientsPage: React.FC<ClientsPageProps> = ({
       cancelled = true;
     };
   }, [debouncedSearch]);
+
   const [contractStatusFilter, setContractStatusFilter] = useState<string>('all');
   const [selectedFunnelId, setSelectedFunnelId] = useState<string>('');
   const [showFilters, setShowFilters] = useState(false);
-  
-  // Modal states
+
   const [isClientModalOpen, setIsClientModalOpen] = useState(false);
   const [editingClient, setEditingClient] = useState<Client | null>(null);
 
@@ -113,12 +106,11 @@ export const ClientsPage: React.FC<ClientsPageProps> = ({
   const [isOneTimeDealModalOpen, setIsOneTimeDealModalOpen] = useState(false);
   const [editingOneTimeDeal, setEditingOneTimeDeal] = useState<Deal | null>(null);
   const [oneTimeDealClientId, setOneTimeDealClientId] = useState<string>('');
-  
+
   const [isReceivableModalOpen, setIsReceivableModalOpen] = useState(false);
   const [editingReceivable, setEditingReceivable] = useState<AccountsReceivable | null>(null);
   const [receivableClientId, setReceivableClientId] = useState<string>('');
 
-  // Filtered data
   const filteredClients = useMemo(() => {
     if (!clients || !Array.isArray(clients)) {
       return [];
@@ -134,11 +126,12 @@ export const ClientsPage: React.FC<ClientsPageProps> = ({
     if (!contracts || !Array.isArray(contracts)) {
       return [];
     }
-    const activeContracts = contracts.filter(c => c && !c.isArchived);
-    return activeContracts.filter(c => {
+    const activeContracts = contracts.filter((c) => c && !c.isArchived);
+    return activeContracts.filter((c) => {
       if (selectedFunnelId && c.funnelId !== selectedFunnelId) return false;
-      
-      const matchesSearch = !debouncedSearch.trim() ||
+
+      const matchesSearch =
+        !debouncedSearch.trim() ||
         (c.number && c.number.includes(debouncedSearch)) ||
         clients.some(
           (cl) =>
@@ -147,12 +140,40 @@ export const ClientsPage: React.FC<ClientsPageProps> = ({
             cl.name &&
             cl.name.toLowerCase().includes(debouncedSearch.toLowerCase())
         );
-      
+
       const matchesStatus = contractStatusFilter === 'all' || c.status === contractStatusFilter;
-      
+
       return matchesSearch && matchesStatus;
     });
   }, [contracts, clients, debouncedSearch, contractStatusFilter, selectedFunnelId]);
+
+  const contractFilters: FilterConfig[] = useMemo(
+    () => [
+      {
+        label: 'Статус',
+        value: contractStatusFilter,
+        onChange: setContractStatusFilter,
+        options: [
+          { value: 'all', label: 'Все статусы' },
+          { value: 'active', label: 'Активен' },
+          { value: 'pending', label: 'Ожидание' },
+          { value: 'completed', label: 'Закрыт' },
+        ],
+      },
+    ],
+    [contractStatusFilter]
+  );
+
+  const hasActiveContractFilters = useMemo(() => contractStatusFilter !== 'all', [contractStatusFilter]);
+
+  const clearContractFilters = useCallback(() => {
+    setContractStatusFilter('all');
+  }, []);
+
+  const activeFiltersCount = useMemo(
+    () => contractFilters.filter((f) => f.value && f.value !== 'all' && f.value !== '').length,
+    [contractFilters]
+  );
 
   const handleCreateClient = () => {
     setEditingClient(null);
@@ -222,10 +243,9 @@ export const ClientsPage: React.FC<ClientsPageProps> = ({
     setIsReceivableModalOpen(true);
   };
 
-  const handleSaveReceivable = (receivable: AccountsReceivable) => {
-    if (onSaveAccountsReceivable) {
-      onSaveAccountsReceivable(receivable);
-    }
+  const handleSaveReceivableBatch = (rows: AccountsReceivable[]) => {
+    if (!onSaveAccountsReceivable) return;
+    rows.forEach((r) => onSaveAccountsReceivable(r));
     setIsReceivableModalOpen(false);
     setEditingReceivable(null);
     setReceivableClientId('');
@@ -235,20 +255,21 @@ export const ClientsPage: React.FC<ClientsPageProps> = ({
     <PageLayout>
       <Container safeArea className="py-4 flex flex-col flex-1">
         <ClientsHeader
-          searchQuery={searchQuery}
-          onSearchChange={setSearchQuery}
-          showFilters={showFilters}
-          onToggleFilters={() => setShowFilters(!showFilters)}
-          onCreateClick={handleCreateClient}
+          embedSearch={{ value: searchQuery, onChange: setSearchQuery, placeholder: 'Поиск клиентов…' }}
+          salesFunnels={salesFunnels}
           selectedFunnelId={selectedFunnelId}
           onFunnelChange={setSelectedFunnelId}
-          salesFunnels={salesFunnels}
+          showFunnelFilter={activeTab === 'clients' || activeTab === 'contracts'}
           activeTab={activeTab}
-        />
-        
-        <ClientsTabs
-          activeTab={activeTab}
-          onTabChange={setActiveTab}
+          onCreateClient={handleCreateClient}
+          onCreateContract={() => handleCreateContract()}
+          onCreateSale={() => handleCreateOneTimeDeal()}
+          onCreateReceivable={() => handleCreateReceivable()}
+          onFiltersClick={activeTab === 'contracts' ? () => setShowFilters((v) => !v) : undefined}
+          showFilters={showFilters}
+          hasActiveFilters={hasActiveContractFilters}
+          activeFiltersCount={activeFiltersCount}
+          tabs={<ClientsTabs activeTab={activeTab} onTabChange={setActiveTab} />}
         />
 
         {activeTab === 'clients' && (
@@ -264,18 +285,10 @@ export const ClientsPage: React.FC<ClientsPageProps> = ({
           <ContractsTab
             contracts={filteredContracts}
             clients={clients}
-            contractStatusFilter={contractStatusFilter}
-            onStatusFilterChange={setContractStatusFilter}
+            filters={contractFilters}
+            showFilters={showFilters}
+            onClearFilters={clearContractFilters}
             onEditContract={handleEditContract}
-            onDeleteContract={onDeleteContract}
-          />
-        )}
-
-        {activeTab === 'finance' && (
-          <FinanceTab
-            contracts={contracts || []}
-            clients={clients || []}
-            onOpenContractEdit={handleEditContract}
           />
         )}
 
@@ -288,7 +301,6 @@ export const ClientsPage: React.FC<ClientsPageProps> = ({
           />
         )}
 
-        {/* Modals */}
         <ClientModal
           isOpen={isClientModalOpen}
           editingClient={editingClient}
@@ -300,50 +312,55 @@ export const ClientsPage: React.FC<ClientsPageProps> = ({
           }}
           onSave={handleSaveClient}
           onDelete={onDeleteClient}
+          onEditContract={handleEditContract}
+          onEditOneTimeDeal={handleEditOneTimeDeal}
         />
 
         <ContractModal
           isOpen={isContractModalOpen}
+          editingContract={editingContract}
+          targetClientId={targetClientId}
+          clients={clients}
           onClose={() => {
             setIsContractModalOpen(false);
             setEditingContract(null);
             setTargetClientId('');
           }}
-          contract={editingContract}
           onSave={handleSaveContract}
-          clients={clients}
-          targetClientId={targetClientId}
-          salesFunnels={salesFunnels}
         />
 
-        <OneTimeDealModal
-          isOpen={isOneTimeDealModalOpen}
-          onClose={() => {
-            setIsOneTimeDealModalOpen(false);
-            setEditingOneTimeDeal(null);
-            setOneTimeDealClientId('');
-          }}
-          deal={editingOneTimeDeal}
-          onSave={handleSaveOneTimeDeal}
-          clients={clients}
-          targetClientId={oneTimeDealClientId}
-          salesFunnels={salesFunnels}
-        />
+        {onSaveOneTimeDeal && (
+          <OneTimeDealModal
+            isOpen={isOneTimeDealModalOpen}
+            editingDeal={editingOneTimeDeal}
+            clientId={oneTimeDealClientId}
+            clients={clients}
+            onClose={() => {
+              setIsOneTimeDealModalOpen(false);
+              setEditingOneTimeDeal(null);
+              setOneTimeDealClientId('');
+            }}
+            onSave={handleSaveOneTimeDeal}
+            onDelete={onDeleteOneTimeDeal}
+          />
+        )}
 
-        <AccountsReceivableModal
-          isOpen={isReceivableModalOpen}
-          onClose={() => {
-            setIsReceivableModalOpen(false);
-            setEditingReceivable(null);
-            setReceivableClientId('');
-          }}
-          receivable={editingReceivable}
-          onSave={handleSaveReceivable}
-          clients={clients}
-          contracts={contracts}
-          oneTimeDeals={oneTimeDeals}
-          targetClientId={receivableClientId}
-        />
+        {onSaveAccountsReceivable && (
+          <AccountsReceivableModal
+            isOpen={isReceivableModalOpen}
+            editingReceivable={editingReceivable}
+            clientId={receivableClientId}
+            clients={clients}
+            deals={[...contracts, ...oneTimeDeals]}
+            onClose={() => {
+              setIsReceivableModalOpen(false);
+              setEditingReceivable(null);
+              setReceivableClientId('');
+            }}
+            onSave={handleSaveReceivableBatch}
+            onDelete={onDeleteAccountsReceivable}
+          />
+        )}
       </Container>
     </PageLayout>
   );

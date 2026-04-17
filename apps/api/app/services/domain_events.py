@@ -20,6 +20,7 @@ _LOG = logging.getLogger(__name__)
 # Ключ session.info для отложенного XADD (см. flush_pending_domain_stream_publish, get_db).
 DOMAIN_EVENTS_POST_COMMIT_QUEUE_KEY = "_post_commit_domain_publish"
 POST_COMMIT_NOTIFICATION_JOBS_KEY = "_post_commit_notification_jobs"
+POST_COMMIT_REALTIME_KEY = "_post_commit_realtime_emits"
 
 
 async def log_entity_mutation(
@@ -112,9 +113,11 @@ async def emit_domain_event(
     row.stream_id = stream_id
     await db.flush()
 
-    queued_notifications = await process_domain_event(db, raw)
+    queued_notifications, realtime_payloads = await process_domain_event(db, raw)
     if queued_notifications:
         db.info.setdefault(POST_COMMIT_NOTIFICATION_JOBS_KEY, []).extend(queued_notifications)
+    if realtime_payloads:
+        db.info.setdefault(POST_COMMIT_REALTIME_KEY, []).extend(realtime_payloads)
     row.hub_processed_at = datetime.now(UTC)
     await db.flush()
     return eid
@@ -131,6 +134,20 @@ async def flush_post_commit_notification_jobs(session: AsyncSession) -> None:
         await enqueue_notification_delivery_jobs([str(x) for x in ids if x])
     except Exception as exc:
         _LOG.exception("flush_post_commit_notification_jobs: %s", exc)
+
+
+async def flush_post_commit_realtime_emits(session: AsyncSession) -> None:
+    """После commit: emit WebSocket уведомлений (только после записи Notification в БД)."""
+    pending = session.info.pop(POST_COMMIT_REALTIME_KEY, None)
+    if not pending:
+        return
+    from app.services.notifications_realtime import realtime_hub
+
+    for user_id, payload in pending:
+        try:
+            await realtime_hub.emit(user_id, payload)
+        except Exception as exc:
+            _LOG.warning("flush_post_commit_realtime_emits: emit failed user_id=%s: %s", user_id, exc)
 
 
 async def flush_pending_domain_stream_publish(session: AsyncSession) -> None:

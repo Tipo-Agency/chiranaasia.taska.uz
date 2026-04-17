@@ -1,14 +1,15 @@
 import type { FinancialPlanDocument, FinancialPlanning, IncomeReport, PurchaseRequest, FinanceCategory } from '../types';
+import { moneyToTiyin, roundMoney, splitTiyinProportionally, subtractMoney, sumMoney, tiyinToMoney } from './uzsMoney';
 
 export function sumIncomeReportInRange(report: IncomeReport | undefined, start: string, end: string): number {
   if (!report?.data) return 0;
   const ds = start <= end ? start : end;
   const de = start <= end ? end : start;
-  let s = 0;
+  const parts: number[] = [];
   for (const [day, val] of Object.entries(report.data)) {
-    if (day >= ds && day <= de) s += Number(val) || 0;
+    if (day >= ds && day <= de) parts.push(Number(val) || 0);
   }
-  return s;
+  return sumMoney(parts);
 }
 
 /** Сумма по нескольким справкам за интервал дат (даты YYYY-MM-DD). */
@@ -20,11 +21,11 @@ export function sumIncomeReportsInRange(
 ): number {
   if (!reports?.length || !ids.length) return 0;
   const byId = new Map(reports.map((r) => [r.id, r]));
-  let s = 0;
+  const parts: number[] = [];
   for (const id of ids) {
-    s += sumIncomeReportInRange(byId.get(id), start, end);
+    parts.push(sumIncomeReportInRange(byId.get(id), start, end));
   }
-  return s;
+  return sumMoney(parts);
 }
 
 /** Распределить доход бюджета по статьям пропорционально «весам» из выбранных планов. */
@@ -49,17 +50,20 @@ export function distributeIncomeFromPlanDocuments(
     }
   }
   if (totalWeight <= 0) return {};
+  const entries = Object.entries(catWeight).sort(([a], [b]) => a.localeCompare(b));
+  const weights = entries.map(([, w]) => w);
+  const parts = splitTiyinProportionally(moneyToTiyin(income), weights);
   const out: Record<string, number> = {};
-  for (const [cid, w] of Object.entries(catWeight)) {
-    out[cid] = Math.round(((income * w) / totalWeight) * 100) / 100;
-  }
+  entries.forEach(([cid], i) => {
+    out[cid] = tiyinToMoney(parts[i] ?? 0);
+  });
   return out;
 }
 
 export function parseRequestAmountUzs(req: PurchaseRequest): number {
   const s = String(req.amount ?? '0').replace(/\s/g, '').replace(/,/g, '.');
   const n = Number(s);
-  return Number.isFinite(n) ? n : 0;
+  return Number.isFinite(n) ? roundMoney(n) : 0;
 }
 
 /** Суммы одобренных заявок по фондам в рамках бюджета. */
@@ -75,7 +79,7 @@ export function approvedAmountByFund(
     if (!req || req.status !== 'approved') continue;
     const fid = planning.requestFundIds?.[rid];
     if (!fid) continue;
-    out[fid] = (out[fid] || 0) + parseRequestAmountUzs(req);
+    out[fid] = sumMoney([out[fid] || 0, parseRequestAmountUzs(req)]);
   }
   return out;
 }
@@ -87,7 +91,7 @@ export function fundAvailableBalances(planning: FinancialPlanning, requests: Pur
   for (const fid of new Set([...Object.keys(alloc), ...Object.keys(used)])) {
     const a = Number(alloc[fid]) || 0;
     const u = Number(used[fid]) || 0;
-    out[fid] = a - u;
+    out[fid] = subtractMoney(a, u);
   }
   return out;
 }

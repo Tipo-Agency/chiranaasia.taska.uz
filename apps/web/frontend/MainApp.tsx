@@ -12,20 +12,20 @@ import ProfileModal from '../components/ProfileModal';
 import CreateTableModal from '../components/CreateTableModal';
 import { EditTablePageModal } from '../components/EditTablePageModal';
 import { MiniMessenger } from '../components/features/chat/MiniMessenger';
-import { ClientChatsPage } from '../components/pages/ClientChatsPage';
 import { ChatFloatingButton } from '../components/features/chat/ChatFloatingButton';
 import { ErrorBoundary } from '../components/ErrorBoundary';
 import { useAppLogic } from './hooks/useAppLogic';
 import { useNotificationCenter } from './contexts/NotificationCenterContext';
 import { AppShellProviders } from '../providers/AppShellProviders';
-import { StandardModal, Input, Button, MODULE_ACCENTS } from '../components/ui';
+import { StandardModal, Input, Button } from '../components/ui';
+import { Maximize2, X } from 'lucide-react';
 import {
   createEntityFromChat as createEntityFromChatBridge,
   updateEntityFromChat as updateEntityFromChatBridge,
   startBusinessProcessFromTemplate as startBusinessProcessFromTemplateBridge,
 } from '../utils/miniMessengerBridge';
-import { getChatDefaultTab, setChatDefaultTab, type ChatMainTab } from '../utils/chatPreference';
 import { takeMustChangePasswordPromptSlot } from '../utils/authUiOnce';
+import { canShowAppBackButton } from '../utils/inAppNavigationBack';
 
 function SidebarWithUnread(props: Omit<SidebarProps, 'unreadCount'>) {
   const { unreadCount } = useNotificationCenter();
@@ -40,7 +40,13 @@ export function MainApp() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [chatPanelOpen, setChatPanelOpen] = useState(false);
   const [chatOpenToSystemFeed, setChatOpenToSystemFeed] = useState(false);
-  const [chatMainTab, setChatMainTab] = useState<ChatMainTab>('team');
+  /** Полноэкранный режим внутри окна браузера; после закрытия крестиком сбрасывается, следующий открытие — снова модалка. */
+  const [chatFullscreen, setChatFullscreen] = useState(false);
+  const closeChatPanel = useCallback(() => {
+    setChatPanelOpen(false);
+    setChatFullscreen(false);
+    setChatOpenToSystemFeed(false);
+  }, []);
   const deepLinkHandledRef = useRef(false);
   const [mustChangePwdOpen, setMustChangePwdOpen] = useState(false);
   const [mustChangePwdDraft, setMustChangePwdDraft] = useState('');
@@ -88,12 +94,6 @@ export function MainApp() {
     if (!takeMustChangePasswordPromptSlot(u.id)) return;
     setMustChangePwdOpen(true);
   }, [state.currentUser?.id, state.currentUser?.mustChangePassword]);
-
-  useEffect(() => {
-    const u = state.currentUser;
-    if (!u) return;
-    setChatMainTab(getChatDefaultTab(u.id));
-  }, [state.currentUser?.id]);
 
   const createEntityFromChat = useCallback(
     (type: 'task' | 'deal' | 'meeting' | 'doc', title: string) => {
@@ -274,6 +274,15 @@ export function MainApp() {
             currentView={state.currentView}
             currentUser={state.currentUser}
             searchQuery={state.searchQuery}
+            canGoBackInApp={canShowAppBackButton({
+              currentView: state.currentView,
+              workdeskTab: state.workdeskTab,
+              crmHubTab: state.crmHubTab,
+              employeesHubTab: state.employeesHubTab,
+              activeSpaceTab: state.activeSpaceTab,
+              settingsActiveTab: state.settingsActiveTab || 'users',
+            })}
+            onGoBackInApp={() => actions.goBackWithinApp()}
             searchPlaceholder={
               state.currentView === 'sales-funnel'
                 ? 'Поиск по сделкам в воронке'
@@ -289,7 +298,7 @@ export function MainApp() {
             }}
             onOpenSystemChat={() => {
               setChatOpenToSystemFeed(true);
-              setChatMainTab('team');
+              setChatFullscreen(false);
               setChatPanelOpen(true);
             }}
             onOpenSettings={(tab?: string) => {
@@ -307,124 +316,110 @@ export function MainApp() {
 
           {chatPanelOpen && (
             <div
-              className="fixed inset-0 z-50 flex flex-col md:items-center md:justify-center md:p-3 sm:p-6 bg-black/45 backdrop-blur-md animate-in fade-in duration-200"
+              className={
+                chatFullscreen
+                  ? 'fixed inset-0 z-50 flex flex-col bg-white dark:bg-[#191919]'
+                  : 'fixed inset-0 z-50 flex flex-col md:items-center md:justify-center md:p-3 sm:p-6 bg-black/45 backdrop-blur-md animate-in fade-in duration-200'
+              }
               role="dialog"
               aria-modal="true"
               aria-label="Чат"
-              onClick={() => setChatPanelOpen(false)}
+              onClick={chatFullscreen ? undefined : () => closeChatPanel()}
             >
               <div
-                className="flex flex-col flex-1 min-h-0 w-full md:flex-none md:max-w-5xl md:max-h-[min(720px,92vh)] md:h-[min(640px,90vh)] h-full md:rounded-2xl shadow-2xl overflow-hidden bg-white dark:bg-[#252525] border-0 md:border border-gray-200/90 dark:border-[#333]"
+                className={
+                  chatFullscreen
+                    ? 'flex flex-col flex-1 min-h-0 w-full h-full overflow-hidden'
+                    : 'flex flex-col flex-1 min-h-0 w-full md:flex-none md:max-w-5xl md:max-h-[min(720px,92vh)] md:h-[min(640px,90vh)] h-full md:rounded-2xl shadow-2xl overflow-hidden bg-white dark:bg-[#252525] border-0 md:border border-gray-200/90 dark:border-[#333]'
+                }
                 onClick={(e) => e.stopPropagation()}
               >
-                <div className="flex items-center gap-1.5 px-3 py-2 border-b border-gray-200/80 dark:border-[#333] bg-white/70 dark:bg-[#252525]/90 backdrop-blur-sm shrink-0">
-                  <button
-                    type="button"
-                    onClick={() => setChatMainTab('team')}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
-                      chatMainTab === 'team'
-                        ? MODULE_ACCENTS.teal.navIconActive
-                        : 'bg-white/70 dark:bg-[#1f1f1f]/60 text-gray-600 dark:text-gray-300 border border-gray-200/70 dark:border-[#3a3a3a] hover:border-teal-500/30'
-                    }`}
-                  >
-                    Сотрудники
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setChatOpenToSystemFeed(false);
-                      setChatMainTab('clients');
-                    }}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
-                      chatMainTab === 'clients'
-                        ? MODULE_ACCENTS.teal.navIconActive
-                        : 'bg-white/70 dark:bg-[#1f1f1f]/60 text-gray-600 dark:text-gray-300 border border-gray-200/70 dark:border-[#3a3a3a] hover:border-teal-500/30'
-                    }`}
-                  >
-                    Клиенты
-                  </button>
+                <div className="flex items-center gap-2 px-3 py-2 border-b border-gray-200/80 dark:border-[#333] bg-white/70 dark:bg-[#252525]/90 backdrop-blur-sm shrink-0">
+                  <span className="text-sm font-semibold text-gray-900 dark:text-white">Чат</span>
                   <div className="flex-1" />
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (!state.currentUser) return;
-                      setChatDefaultTab(state.currentUser.id, chatMainTab);
-                    }}
-                    className="text-[11px] font-semibold text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 px-2 py-1 rounded-lg hover:bg-gray-100 dark:hover:bg-[#333] transition-colors"
-                    title="Сделать вкладку основной"
-                  >
-                    По умолчанию
-                  </button>
+                  {!chatFullscreen ? (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => setChatFullscreen(true)}
+                        className="p-2 rounded-xl text-gray-500 hover:bg-gray-100 dark:hover:bg-[#333] transition-colors"
+                        title="На весь экран"
+                        aria-label="На весь экран"
+                      >
+                        <Maximize2 size={18} />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => closeChatPanel()}
+                        className="p-2 rounded-xl text-gray-500 hover:bg-gray-100 dark:hover:bg-[#333] transition-colors"
+                        title="Закрыть"
+                        aria-label="Закрыть"
+                      >
+                        <X size={18} />
+                      </button>
+                    </>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => closeChatPanel()}
+                      className="p-2 rounded-xl text-gray-500 hover:bg-gray-100 dark:hover:bg-[#333] transition-colors"
+                      title="Закрыть чат"
+                      aria-label="Закрыть чат"
+                    >
+                      <X size={20} />
+                    </button>
+                  )}
                 </div>
 
                 <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-                  {chatMainTab === 'team' ? (
-                    <MiniMessenger
-                      className="h-full min-h-0 rounded-none border-0 shadow-none"
-                      users={state.users}
-                      currentUser={state.currentUser}
-                      docs={state.docs}
-                      tasks={myTasks}
-                      deals={myDeals}
-                      meetings={myMeetings}
-                      onOpenDocument={(doc) => {
-                        actions.handleDocClick(doc);
-                        setChatPanelOpen(false);
-                      }}
-                      onOpenTask={(task) => {
-                        actions.openTaskModal(task);
-                        setChatPanelOpen(false);
-                      }}
-                      onOpenDeals={() => {
-                        actions.setCurrentView('sales-funnel');
-                        setChatPanelOpen(false);
-                      }}
-                      onOpenDeal={(deal) => {
-                        actions.setCurrentView('sales-funnel');
-                        window.setTimeout(() => {
-                          window.dispatchEvent(new CustomEvent('openDealFromChat', { detail: { dealId: deal.id } }));
-                        }, 0);
-                        setChatPanelOpen(false);
-                      }}
-                      onOpenMeetings={() => {
-                        actions.setCurrentView('meetings');
-                        setChatPanelOpen(false);
-                      }}
-                      onOpenMeeting={(meeting) => {
-                        actions.setCurrentView('meetings');
-                        window.setTimeout(() => {
-                          window.dispatchEvent(
-                            new CustomEvent('openMeetingFromChat', { detail: { meetingId: meeting.id } })
-                          );
-                        }, 0);
-                        setChatPanelOpen(false);
-                      }}
-                      onCreateEntity={createEntityFromChat}
-                      processTemplates={state.businessProcesses}
-                      onStartProcessTemplate={onStartProcessTemplate}
-                      initialOpenSystemFeed={chatOpenToSystemFeed}
-                      onConsumedInitialSystemFeed={() => setChatOpenToSystemFeed(false)}
-                      onUpdateEntity={updateEntityFromChat}
-                      onClose={() => setChatPanelOpen(false)}
-                    />
-                  ) : (
-                    <ClientChatsPage
-                      layout="embedded"
-                      deals={state.deals}
-                      clients={state.clients}
-                      users={state.users}
-                      currentUser={state.currentUser}
-                      salesFunnels={state.salesFunnels}
-                      onSaveDeal={actions.saveDeal}
-                      onOpenInFunnel={(deal) => {
-                        actions.setCurrentView('sales-funnel');
-                        window.setTimeout(() => {
-                          window.dispatchEvent(new CustomEvent('openDealFromChat', { detail: { dealId: deal.id } }));
-                        }, 0);
-                        setChatPanelOpen(false);
-                      }}
-                    />
-                  )}
+                  <MiniMessenger
+                    className="h-full min-h-0 rounded-none border-0 shadow-none"
+                    users={state.users}
+                    currentUser={state.currentUser}
+                    docs={state.docs}
+                    tasks={myTasks}
+                    deals={myDeals}
+                    meetings={myMeetings}
+                    onOpenDocument={(doc) => {
+                      actions.handleDocClick(doc);
+                      closeChatPanel();
+                    }}
+                    onOpenTask={(task) => {
+                      actions.openTaskModal(task);
+                      closeChatPanel();
+                    }}
+                    onOpenDeals={() => {
+                      actions.setCurrentView('sales-funnel');
+                      closeChatPanel();
+                    }}
+                    onOpenDeal={(deal) => {
+                      actions.setCurrentView('sales-funnel');
+                      window.setTimeout(() => {
+                        window.dispatchEvent(new CustomEvent('openDealFromChat', { detail: { dealId: deal.id } }));
+                      }, 0);
+                      closeChatPanel();
+                    }}
+                    onOpenMeetings={() => {
+                      actions.setCurrentView('meetings');
+                      closeChatPanel();
+                    }}
+                    onOpenMeeting={(meeting) => {
+                      actions.setCurrentView('meetings');
+                      window.setTimeout(() => {
+                        window.dispatchEvent(
+                          new CustomEvent('openMeetingFromChat', { detail: { meetingId: meeting.id } })
+                        );
+                      }, 0);
+                      closeChatPanel();
+                    }}
+                    onCreateEntity={createEntityFromChat}
+                    processTemplates={state.businessProcesses}
+                    onStartProcessTemplate={onStartProcessTemplate}
+                    initialOpenSystemFeed={chatOpenToSystemFeed}
+                    onConsumedInitialSystemFeed={() => setChatOpenToSystemFeed(false)}
+                    onUpdateEntity={updateEntityFromChat}
+                    onClose={() => closeChatPanel()}
+                  />
                 </div>
               </div>
             </div>
@@ -491,14 +486,11 @@ export function MainApp() {
           </div>
 
           <ChatFloatingButton
-            hidden={
-              state.currentView === 'chat' ||
-              chatPanelOpen ||
-              (state.currentView === 'sales-funnel' && state.crmHubTab === 'chats')
-            }
+            currentUserId={state.currentUser?.id}
+            hidden={state.currentView === 'chat' || chatPanelOpen}
             onOpen={() => {
               setChatOpenToSystemFeed(false);
-              if (state.currentUser) setChatMainTab(getChatDefaultTab(state.currentUser.id));
+              setChatFullscreen(false);
               setChatPanelOpen(true);
             }}
           />

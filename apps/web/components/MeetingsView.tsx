@@ -13,7 +13,6 @@ import {
   ChevronRight,
   Trash2,
 } from 'lucide-react';
-import { TaskSelect } from './TaskSelect';
 import {
   normalizeDateForInput,
   compareDates,
@@ -22,7 +21,7 @@ import {
   isWallClockStartInPastBeforeNow,
   wallClockStartKey,
 } from '../utils/dateUtils';
-import { ModulePageShell, MODULE_PAGE_GUTTER, SystemConfirmDialog, APP_TOOLBAR_MODULE_CLUSTER } from './ui';
+import { ModulePageShell, MODULE_PAGE_GUTTER, SystemConfirmDialog, APP_TOOLBAR_MODULE_CLUSTER, EntitySearchSelect } from './ui';
 import { ModuleCreateDropdown } from './ui/ModuleCreateDropdown';
 import { ModuleSelectDropdown } from './ui/ModuleSelectDropdown';
 import { useAppToolbar } from '../contexts/AppToolbarContext';
@@ -788,10 +787,9 @@ const MeetingsView: React.FC<MeetingsViewProps> = ({
                         {meetingType === 'client' && (
                             <div>
                                 <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1.5">Сделка <span className="text-red-500">*</span></label>
-                                <TaskSelect
+                                <EntitySearchSelect
                                     value={selectedDealId}
                                     onChange={setSelectedDealId}
-                                    searchable
                                     searchPlaceholder="Сделка, клиент, компания…"
                                     options={[
                                         { value: '', label: 'Выберите сделку' },
@@ -822,10 +820,9 @@ const MeetingsView: React.FC<MeetingsViewProps> = ({
                         {meetingType === 'project' && (
                             <div>
                                 <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1.5">Проект <span className="text-red-500">*</span></label>
-                                <TaskSelect
+                                <EntitySearchSelect
                                     value={selectedProjectId}
                                     onChange={setSelectedProjectId}
-                                    searchable
                                     searchPlaceholder="Название проекта…"
                                     options={[
                                         { value: '', label: 'Выберите проект' },
@@ -883,16 +880,17 @@ const MeetingsView: React.FC<MeetingsViewProps> = ({
                         {meetingType === 'work' && (
                             <div>
                                 <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1.5">Повторение</label>
-                                <TaskSelect
+                                <EntitySearchSelect
                                     value={recurrence}
                                     onChange={(val) => setRecurrence(val as 'none' | 'daily' | 'weekly' | 'monthly')}
                                     options={[
-                                        { value: 'none', label: 'Не повторять' },
-                                        { value: 'daily', label: 'Ежедневно' },
-                                        { value: 'weekly', label: 'Еженедельно' },
-                                        { value: 'monthly', label: 'Ежемесячно' }
+                                        { value: 'none', label: 'Не повторять', searchText: 'не повторять none' },
+                                        { value: 'daily', label: 'Ежедневно', searchText: 'ежедневно daily каждый день' },
+                                        { value: 'weekly', label: 'Еженедельно', searchText: 'еженедельно weekly неделя' },
+                                        { value: 'monthly', label: 'Ежемесячно', searchText: 'ежемесячно monthly месяц' },
                                     ]}
                                     className="w-full"
+                                    searchPlaceholder="Повторение…"
                                 />
                             </div>
                         )}
@@ -1063,7 +1061,7 @@ const MeetingsView: React.FC<MeetingsViewProps> = ({
           onSave={saveShootFromCalendar}
           onCancel={() => setShootModalDraft(null)}
           isNew={!shootPlans.some((p) => p.id === shootModalDraft.id)}
-          contentPlanOptions={contentPlanOptions.length > 1 ? contentPlanOptions : undefined}
+          contentPlanOptions={contentPlanOptions.length > 0 ? contentPlanOptions : undefined}
         />
       )}
     </ModulePageShell>

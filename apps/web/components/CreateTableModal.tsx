@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import { X, CheckSquare, FileText, Users, Instagram, Archive, Layers } from 'lucide-react';
 import { DynamicIcon } from './AppIcons';
-import { ICON_OPTIONS, COLOR_OPTIONS } from '../constants';
+import { ICON_OPTIONS, COLOR_OPTIONS, swatchHexForTableColorToken } from '../constants';
 
 interface CreateTableModalProps {
   onClose: () => void;
@@ -107,19 +107,23 @@ const CreateTableModal: React.FC<CreateTableModalProps> = ({ onClose, onCreate, 
 
             <div>
               <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 mb-2 uppercase">Цвет</label>
-              <div className="grid grid-cols-3 gap-2 bg-gray-50 dark:bg-[#202020] p-2 rounded-lg border border-gray-200 dark:border-[#333]">
-                {COLOR_OPTIONS.map(c => (
+              <div className="grid grid-cols-5 gap-2 bg-gray-50 dark:bg-[#202020] p-3 rounded-lg border border-gray-200 dark:border-[#333]">
+                {COLOR_OPTIONS.map((c) => (
                   <button
                     key={c}
                     type="button"
+                    title={c}
                     onClick={() => setColor(c)}
-                    className={`w-8 h-8 rounded-full cursor-pointer border-2 transition-all ${
+                    className={`mx-auto flex h-9 w-9 shrink-0 items-center justify-center rounded-full border-2 transition-transform ${
                       color === c
-                        ? 'border-gray-900 dark:border-white scale-110'
-                        : 'border-transparent hover:scale-105'
+                        ? 'border-gray-900 dark:border-white ring-2 ring-offset-1 ring-offset-gray-50 dark:ring-offset-[#202020] ring-blue-500/40 scale-105'
+                        : 'border-gray-200 dark:border-gray-600 hover:border-gray-400 dark:hover:border-gray-500'
                     }`}
                   >
-                    <div className={`w-full h-full rounded-full ${c.replace('text-', 'bg-').replace('500', '400')}`}></div>
+                    <span
+                      className="block h-6 w-6 rounded-full shadow-inner ring-1 ring-black/10 dark:ring-white/15"
+                      style={{ backgroundColor: swatchHexForTableColorToken(c) }}
+                    />
                   </button>
                 ))}
               </div>

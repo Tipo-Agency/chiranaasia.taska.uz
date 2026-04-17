@@ -2,7 +2,7 @@ import React, { useMemo } from 'react';
 import type { ContentPost, ShootPlan, ShootPlanItem, User } from '../types';
 import { Camera, Link2, ImageIcon, Save, X, Trash2 } from 'lucide-react';
 import { DateInput } from './ui/DateInput';
-import { TaskSelect } from './TaskSelect';
+import { EntitySearchSelect } from './ui/EntitySearchSelect';
 import { normalizeDateForInput } from '../utils/dateUtils';
 import { uploadFile } from '../services/localStorageService';
 import { isPostAvailableForShootRow } from '../utils/shootPlanUtils';
@@ -37,7 +37,7 @@ export interface ShootPlanModalProps {
   onSave: () => void;
   onCancel: () => void;
   isNew: boolean;
-  /** Если несколько контент-планов (календарь-агрегатор) */
+  /** Список контент-планов для привязки съёмки (в т.ч. один план — явный выбор) */
   contentPlanOptions?: { id: string; name: string }[];
 }
 
@@ -146,13 +146,18 @@ export const ShootPlanModal: React.FC<ShootPlanModalProps> = ({
           </button>
         </div>
         <div className="flex-1 overflow-y-auto custom-scrollbar px-5 py-4 space-y-4">
-          {contentPlanOptions && contentPlanOptions.length > 1 && (
+          {contentPlanOptions && contentPlanOptions.length > 0 && (
             <div>
               <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 mb-1">Контент-план</label>
-              <TaskSelect
+              <EntitySearchSelect
                 value={draft.tableId}
                 onChange={(v) => onDraftChange({ ...draft, tableId: v })}
-                options={contentPlanOptions.map((t) => ({ value: t.id, label: t.name }))}
+                searchPlaceholder="Название контент-плана…"
+                options={contentPlanOptions.map((t) => ({
+                  value: t.id,
+                  label: t.name,
+                  searchText: t.name,
+                }))}
                 className="w-full"
               />
             </div>
@@ -243,22 +248,30 @@ export const ShootPlanModal: React.FC<ShootPlanModalProps> = ({
                   <div className="flex justify-between items-start gap-2">
                     <div className="flex-1 min-w-0">
                       <label className="block text-[11px] font-bold text-gray-500 dark:text-gray-400 mb-1">Пост / формат из плана</label>
-                      <TaskSelect
+                      <EntitySearchSelect
                         value={it.postId}
                         onChange={(v) => updateItem(idx, { postId: v })}
+                        searchPlaceholder="Тема, формат…"
                         options={[
                           { value: '', label: 'Выберите пост' },
                           ...selectable.map((pp) => ({
                             value: pp.id,
                             label: `${pp.topic} · ${getFormatLabel(pp.format)}`,
+                            searchText: [pp.topic, getFormatLabel(pp.format), pp.format].filter(Boolean).join(' '),
                           })),
                           // текущее значение, если пост вне фильтра или «свой» занятый слот
                           ...(it.postId && !selectable.some((p) => p.id === it.postId)
                             ? (() => {
                                 const p = planPosts.find((x) => x.id === it.postId);
                                 return p
-                                  ? [{ value: p.id, label: `${p.topic} · ${getFormatLabel(p.format)} (текущий)` }]
-                                  : [{ value: it.postId, label: it.postId }];
+                                  ? [
+                                      {
+                                        value: p.id,
+                                        label: `${p.topic} · ${getFormatLabel(p.format)} (текущий)`,
+                                        searchText: [p.topic, getFormatLabel(p.format), p.format].filter(Boolean).join(' '),
+                                      },
+                                    ]
+                                  : [{ value: it.postId, label: it.postId, searchText: it.postId }];
                               })()
                             : []),
                         ]}

@@ -1,6 +1,5 @@
 
 import React, { useState, useRef, useMemo, useEffect, useCallback, useLayoutEffect } from 'react';
-import { TaskSelect } from './TaskSelect';
 import {
   FinanceCategory,
   Fund,
@@ -30,13 +29,14 @@ import {
   APP_TOOLBAR_MODULE_CLUSTER,
   MODULE_ACCENTS,
   MODULE_TOOLBAR_TAB_IDLE,
+  EntitySearchSelect,
 } from './ui';
 import { useAppToolbar } from '../contexts/AppToolbarContext';
 import { BankStatementsView, type BankStatementsViewHandle } from './finance/BankStatementsView';
 import { BdrView } from './finance/BdrView';
 import { FilterConfig } from './FiltersPanel';
 import { uploadFile } from '../services/localStorageService';
-import { allocateMonthPlanToWeekSlices } from '../utils/financeMonthWeeks';
+import { allocateMonthPlanToWeekSlices, getMajorityBasedMonthBounds } from '../utils/financeMonthWeeks';
 import {
   sumIncomeReportInRange,
   sumIncomeReportsInRange,
@@ -45,6 +45,7 @@ import {
   parseRequestAmountUzs,
   fundAvailableBalances,
 } from '../utils/financePlanningUtils';
+import { moneyToTiyin, mulPercentMoney, subtractMoney, sumMoney } from '../utils/uzsMoney';
 
 function requestAmountLabel(amount: PurchaseRequest['amount']): string {
   const raw = (
@@ -68,6 +69,22 @@ function requestAmountLabel(amount: PurchaseRequest['amount']): string {
 
 function normalizeRequestStatusForFilter(req: PurchaseRequest): string {
   return req.status === 'deferred' ? 'draft' : req.status;
+}
+
+/**
+ * YYYY-MM якоря плана/бюджета: не выводить из periodStart — при разбиении по неделям
+ * «по большинству дней» дата начала может попадать в предыдущий календарный месяц.
+ */
+function canonicalFinancialMonthYm(
+  anchorPeriod: string | undefined,
+  periodStart: string | undefined,
+  fallbackYm: string
+): string {
+  const p = String(anchorPeriod ?? '').trim();
+  if (/^\d{4}-\d{2}$/.test(p)) return p;
+  const fromStart = String(periodStart ?? '').trim().slice(0, 7);
+  if (/^\d{4}-\d{2}$/.test(fromStart)) return fromStart;
+  return String(fallbackYm ?? '').trim();
 }
 
 function sumRequestAmountsUzs(list: PurchaseRequest[]): string {
@@ -152,11 +169,9 @@ const FinanceView: React.FC<FinanceViewProps> = ({
   const [editingRequest, setEditingRequest] = useState<PurchaseRequest | null>(null);
   const [alertText, setAlertText] = useState<string | null>(null);
   const bankStatementsRef = useRef<BankStatementsViewHandle>(null);
-  /** Текущий календарный месяц (yyyy-mm) для планов и планирования */
-  const currentPeriod = useMemo(() => {
-    const now = new Date();
-    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-  }, []);
+  /** Текущий календарный месяц (yyyy-mm) для планов и планирования — пересчитывается на каждом рендере (без «залипания» на месяце открытия вкладки). */
+  const now = new Date();
+  const currentPeriod = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
   const [statementFiltersOpen, setStatementFiltersOpen] = useState(true);
 
   // Формы
@@ -174,7 +189,10 @@ const FinanceView: React.FC<FinanceViewProps> = ({
   const reqAttachInputRef = useRef<HTMLInputElement>(null);
 
   const getDefaultRangeForMonth = useCallback((yyyyMm: string) => {
-    const d = new Date(`${yyyyMm}-01T00:00:00`);
+    const trimmed = (yyyyMm || '').trim();
+    const majority = getMajorityBasedMonthBounds(trimmed);
+    if (majority) return majority;
+    const d = new Date(`${trimmed}-01T00:00:00`);
     const start = new Date(d.getFullYear(), d.getMonth(), 1);
     const end = new Date(d.getFullYear(), d.getMonth() + 1, 0);
     const toIso = (x: Date) => x.toISOString().slice(0, 10);
@@ -402,26 +420,27 @@ const FinanceView: React.FC<FinanceViewProps> = ({
     const cat = categories.find(c => c.id === catId);
     if (!cat || cat.type !== 'percent') return 0;
     const percent = planDetailExpenses[catId] || 0;
-    return (planDetailIncome * percent) / 100;
+    return mulPercentMoney(planDetailIncome, percent);
   }, [categories, planDetailExpenses, planDetailIncome]);
 
   const planDetailTotalPercentExpenses = useMemo(() => {
-    return planDetailSelectedCategories
-      .filter(catId => {
-        const cat = categories.find(c => c.id === catId);
+    const parts = planDetailSelectedCategories
+      .filter((catId) => {
+        const cat = categories.find((c) => c.id === catId);
         return cat && cat.type === 'percent';
       })
-      .reduce((sum, catId) => sum + calculatePlanDetailPercentAmount(catId), 0);
+      .map((catId) => calculatePlanDetailPercentAmount(catId));
+    return sumMoney(parts);
   }, [planDetailSelectedCategories, planDetailExpenses, planDetailIncome, categories, calculatePlanDetailPercentAmount]);
 
   const planDetailTotalExpenses = useMemo(() => {
-    const fixedTotal = planDetailSelectedCategories
-      .filter(catId => {
-        const cat = categories.find(c => c.id === catId);
+    const fixedParts = planDetailSelectedCategories
+      .filter((catId) => {
+        const cat = categories.find((c) => c.id === catId);
         return cat && cat.type === 'fixed';
       })
-      .reduce((sum, catId) => sum + (planDetailExpenses[catId] || 0), 0);
-    return planDetailTotalPercentExpenses + fixedTotal;
+      .map((catId) => planDetailExpenses[catId] || 0);
+    return sumMoney([planDetailTotalPercentExpenses, ...fixedParts]);
   }, [planDetailSelectedCategories, planDetailExpenses, planDetailTotalPercentExpenses, categories]);
 
   // Фильтруем финансовые планирования
@@ -765,7 +784,7 @@ const FinanceView: React.FC<FinanceViewProps> = ({
           const alloc = Number(pl.fundAllocations?.[fid]) || 0;
           const used = approvedAmountByFund(pl, requests, req.id);
           const need = parseRequestAmountUzs(req);
-          if (used[fid] + need > alloc + 0.01) {
+          if (moneyToTiyin(used[fid] || 0) + moneyToTiyin(need) > moneyToTiyin(alloc)) {
             const free = alloc - (used[fid] || 0);
             setAlertText(
               `Недостаточно средств на фонде. Доступно ${free.toLocaleString('ru-RU')} UZS, нужно ${need.toLocaleString('ru-RU')} UZS. Сделайте перераспределение в карточке бюджета.`
@@ -986,7 +1005,7 @@ const FinanceView: React.FC<FinanceViewProps> = ({
       const updated: FinancialPlanning = {
         ...selectedPlanning,
         departmentId: planningDetailDepartmentId || selectedPlanning.departmentId,
-        period: (planningDetailPeriodStart || selectedPlanning.periodStart || '') ? (planningDetailPeriodStart || '').slice(0, 7) : selectedPlanning.period,
+        period: canonicalFinancialMonthYm(selectedPlanning.period, planningDetailPeriodStart, currentPeriod),
         periodStart: planningDetailPeriodStart || undefined,
         periodEnd: planningDetailPeriodEnd || undefined,
         requestIds: planningDetailRequestIds,
@@ -1188,10 +1207,11 @@ const FinanceView: React.FC<FinanceViewProps> = ({
               <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 uppercase mb-2">
                 Подразделение
               </label>
-              <TaskSelect
+              <EntitySearchSelect
                 value={planningDetailDepartmentId}
                 onChange={setPlanningDetailDepartmentId}
-                options={departments.map((d) => ({ value: d.id, label: d.name }))}
+                options={departments.map((d) => ({ value: d.id, label: d.name, searchText: d.name }))}
+                searchPlaceholder="Подразделение…"
               />
             </div>
             <div>
@@ -1360,8 +1380,8 @@ const FinanceView: React.FC<FinanceViewProps> = ({
               ))}
             </div>
             {planningDetailIncome > 0 && (() => {
-              const allocated = (Object.values(planningDetailFundAllocations) as number[]).reduce((a, b) => a + b, 0);
-              const rest = planningDetailIncome - allocated;
+              const allocated = sumMoney(Object.values(planningDetailFundAllocations) as number[]);
+              const rest = subtractMoney(planningDetailIncome, allocated);
               return (
                 <div className="mt-3 text-xs text-gray-500 dark:text-gray-400">
                   Распределено: {allocated.toLocaleString()} UZS · Остаток: {rest.toLocaleString()} UZS
@@ -1564,24 +1584,26 @@ const FinanceView: React.FC<FinanceViewProps> = ({
               <div className="space-y-3 text-sm">
                 <div>
                   <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">Из фонда</label>
-                  <TaskSelect
+                  <EntitySearchSelect
                     value={fundTransferFrom}
                     onChange={setFundTransferFrom}
                     options={[
                       { value: '', label: '—' },
-                      ...funds.filter((f) => !f.isArchived).map((f) => ({ value: f.id, label: f.name })),
+                      ...funds.filter((f) => !f.isArchived).map((f) => ({ value: f.id, label: f.name, searchText: f.name })),
                     ]}
+                    searchPlaceholder="Фонд…"
                   />
                 </div>
                 <div>
                   <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">В фонд</label>
-                  <TaskSelect
+                  <EntitySearchSelect
                     value={fundTransferTo}
                     onChange={setFundTransferTo}
                     options={[
                       { value: '', label: '—' },
-                      ...funds.filter((f) => !f.isArchived).map((f) => ({ value: f.id, label: f.name })),
+                      ...funds.filter((f) => !f.isArchived).map((f) => ({ value: f.id, label: f.name, searchText: f.name })),
                     ]}
+                    searchPlaceholder="Фонд…"
                   />
                 </div>
                 <div>
@@ -1667,7 +1689,7 @@ const FinanceView: React.FC<FinanceViewProps> = ({
               <tbody className="divide-y divide-gray-100 dark:divide-[#333]">
                 {sorted.map((planDoc) => {
                   const periodLabel = planDocRowPeriodLabel(planDoc);
-                  const totalExpenses = (Object.values(planDoc.expenses || {}) as number[]).reduce((sum, val) => sum + val, 0);
+                  const totalExpenses = sumMoney(Object.values(planDoc.expenses || {}) as number[]);
                   const dep = departments.find((d) => d.id === planDoc.departmentId);
                   return (
                     <tr
@@ -1772,7 +1794,7 @@ const FinanceView: React.FC<FinanceViewProps> = ({
       const updated: FinancialPlanDocument = {
         ...selectedPlanDoc,
         departmentId: planDetailDepartmentId || selectedPlanDoc.departmentId,
-        period: (planDetailPeriodStart || selectedPlanDoc.periodStart || '') ? (planDetailPeriodStart || '').slice(0, 7) : selectedPlanDoc.period,
+        period: canonicalFinancialMonthYm(selectedPlanDoc.period, planDetailPeriodStart, currentPeriod),
         periodStart: planDetailPeriodStart || undefined,
         periodEnd: planDetailPeriodEnd || undefined,
         income: planDetailIncome,
@@ -1794,7 +1816,7 @@ const FinanceView: React.FC<FinanceViewProps> = ({
       };
     };
     
-    const remainingForFixed = planDetailIncome - planDetailTotalPercentExpenses;
+    const remainingForFixed = subtractMoney(planDetailIncome, planDetailTotalPercentExpenses);
 
     const availableCategories = categories.filter(cat => !planDetailSelectedCategories.includes(cat.id));
     
@@ -1854,7 +1876,7 @@ const FinanceView: React.FC<FinanceViewProps> = ({
       onSaveFinancialPlanDocument({ ...selectedPlanDoc, isArchived: false, updatedAt: new Date().toISOString() });
     };
     
-    const balance = planDetailIncome - planDetailTotalExpenses;
+    const balance = subtractMoney(planDetailIncome, planDetailTotalExpenses);
 
     const buildFilteredPlanExpenses = (): Record<string, number> => {
       const out: Record<string, number> = {};
@@ -1912,6 +1934,9 @@ const FinanceView: React.FC<FinanceViewProps> = ({
         setAlertText('Не удалось пересчитать недели для выбранного месяца.');
         return;
       }
+      const fb = getDefaultRangeForMonth(ym);
+      setPlanDetailPeriodStart(fb.start);
+      setPlanDetailPeriodEnd(fb.end);
       setPlanDetailWeekBreakdown(slices);
     };
 
@@ -2063,10 +2088,11 @@ const FinanceView: React.FC<FinanceViewProps> = ({
               <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 uppercase mb-2">
                 Подразделение
               </label>
-              <TaskSelect
+              <EntitySearchSelect
                 value={planDetailDepartmentId}
                 onChange={setPlanDetailDepartmentId}
-                options={departments.map((d) => ({ value: d.id, label: d.name }))}
+                options={departments.map((d) => ({ value: d.id, label: d.name, searchText: d.name }))}
+                searchPlaceholder="Подразделение…"
               />
             </div>
             <div>
@@ -2204,6 +2230,7 @@ const FinanceView: React.FC<FinanceViewProps> = ({
                         return cat && cat.type === 'fixed';
                       }).map(catId => {
                         const cat = categories.find(c => c.id === catId)!;
+                        const fixedCap = sumMoney([remainingForFixed, planDetailExpenses[catId] || 0]);
                         return (
                           <div key={catId} className="flex items-center gap-3 p-3 rounded-lg border bg-gray-50 dark:bg-[#303030] border-gray-200 dark:border-[#444]">
                             <div className="flex-1 flex items-center gap-3">
@@ -2213,14 +2240,14 @@ const FinanceView: React.FC<FinanceViewProps> = ({
                                 value={planDetailExpenses[catId] || ''}
                                 onChange={(e) => {
                                   const value = parseFloat(e.target.value) || 0;
-                                  if (value <= remainingForFixed + (planDetailExpenses[catId] || 0)) {
+                                  if (moneyToTiyin(value) <= moneyToTiyin(fixedCap)) {
                                     setPlanDetailExpenses({ ...planDetailExpenses, [catId]: value });
                                   }
                                 }}
                                 className="w-32 bg-white dark:bg-[#333] border border-gray-300 dark:border-[#555] rounded px-2 py-1 text-xs text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none text-right [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none [-moz-appearance:textfield]"
                                 placeholder="0"
                                 min="0"
-                                max={remainingForFixed + (planDetailExpenses[catId] || 0)}
+                                max={fixedCap}
                               />
                               <span className="text-xs text-gray-500 dark:text-gray-400">UZS</span>
                             </div>
@@ -2313,11 +2340,13 @@ const FinanceView: React.FC<FinanceViewProps> = ({
                       Σ по неделям
                     </td>
                     <td className="px-3 py-2 text-right font-mono tabular-nums">
-                      {planDetailWeekBreakdown.reduce((s, w) => s + (Number(w.income) || 0), 0).toLocaleString('ru-RU')}
+                      {sumMoney(planDetailWeekBreakdown.map((w) => Number(w.income) || 0)).toLocaleString('ru-RU')}
                     </td>
                     {planDetailSelectedCategories.map((cid) => (
                       <td key={cid} className="px-3 py-2 text-right font-mono tabular-nums text-xs">
-                        {planDetailWeekBreakdown.reduce((s, w) => s + (Number(w.expenses?.[cid]) || 0), 0).toLocaleString('ru-RU')}
+                        {sumMoney(
+                          planDetailWeekBreakdown.map((w) => Number(w.expenses?.[cid]) || 0)
+                        ).toLocaleString('ru-RU')}
                       </td>
                     ))}
                   </tr>
@@ -2714,7 +2743,11 @@ const FinanceView: React.FC<FinanceViewProps> = ({
               {planningFilters.map((filter, index) => (
                 <div key={index}>
                   <label className="block text-xs font-semibold text-gray-600 dark:text-gray-400 mb-1">{filter.label}</label>
-                  <TaskSelect value={filter.value} onChange={filter.onChange} options={filter.options} />
+                  <EntitySearchSelect
+                    value={filter.value}
+                    onChange={filter.onChange}
+                    options={filter.options.map((o) => ({ ...o, searchText: o.label }))}
+                  />
                 </div>
               ))}
             </div>
@@ -2747,7 +2780,11 @@ const FinanceView: React.FC<FinanceViewProps> = ({
               {planFilters.map((filter, index) => (
                 <div key={index}>
                   <label className="block text-xs font-semibold text-gray-600 dark:text-gray-400 mb-1">{filter.label}</label>
-                  <TaskSelect value={filter.value} onChange={filter.onChange} options={filter.options} />
+                  <EntitySearchSelect
+                    value={filter.value}
+                    onChange={filter.onChange}
+                    options={filter.options.map((o) => ({ ...o, searchText: o.label }))}
+                  />
                 </div>
               ))}
             </div>
@@ -2780,7 +2817,11 @@ const FinanceView: React.FC<FinanceViewProps> = ({
               {requestFilters.map((filter, index) => (
                 <div key={index}>
                   <label className="block text-xs font-semibold text-gray-600 dark:text-gray-400 mb-1">{filter.label}</label>
-                  <TaskSelect value={filter.value} onChange={filter.onChange} options={filter.options} />
+                  <EntitySearchSelect
+                    value={filter.value}
+                    onChange={filter.onChange}
+                    options={filter.options.map((o) => ({ ...o, searchText: o.label }))}
+                  />
                 </div>
               ))}
             </div>
@@ -2866,26 +2907,28 @@ const FinanceView: React.FC<FinanceViewProps> = ({
                     <div className="grid grid-cols-2 gap-4">
                         <div>
                             <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 mb-1">Подразделение</label>
-                            <TaskSelect
+                            <EntitySearchSelect
                                 value={reqDep}
                                 onChange={setReqDep}
                                 disabled={reqLocked}
                                 options={[
                                     { value: '', label: 'Выберите подразделение' },
-                                    ...departments.map(d => ({ value: d.id, label: d.name }))
+                                    ...departments.map((d) => ({ value: d.id, label: d.name, searchText: d.name })),
                                 ]}
+                                searchPlaceholder="Подразделение…"
                             />
                         </div>
                         <div>
                             <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 mb-1">Статья расходов</label>
-                            <TaskSelect
+                            <EntitySearchSelect
                                 value={reqCat}
                                 onChange={setReqCat}
                                 disabled={reqLocked}
                                 options={[
                                     { value: '', label: 'Выберите статью' },
-                                    ...categories.map(c => ({ value: c.id, label: c.name }))
+                                    ...categories.map((c) => ({ value: c.id, label: c.name, searchText: c.name })),
                                 ]}
+                                searchPlaceholder="Статья…"
                             />
                         </div>
                     </div>

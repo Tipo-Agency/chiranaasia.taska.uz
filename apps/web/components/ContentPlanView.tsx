@@ -13,7 +13,7 @@ import {
   MODULE_ACCENTS,
 } from './ui';
 import { useAppToolbar } from '../contexts/AppToolbarContext';
-import { TaskSelect } from './TaskSelect';
+import { EntitySearchSelect } from './ui/EntitySearchSelect';
 import { api } from '../backend/api';
 import { normalizeDateForInput } from '../utils/dateUtils';
 import { DateInput } from './ui/DateInput';
@@ -968,16 +968,17 @@ const ContentPlanView: React.FC<ContentPlanViewProps> = ({
                         <div>
                             <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 mb-1 uppercase">Формат</label>
                             <div className="relative">
-                                <TaskSelect
+                                <EntitySearchSelect
                                     value={format}
                                     onChange={(val) => setFormat(val as any)}
                                     options={[
-                                        { value: 'post', label: 'Пост' },
-                                        { value: 'reel', label: 'Reels' },
-                                        { value: 'story', label: 'Stories' },
-                                        { value: 'article', label: 'Статья' }
+                                        { value: 'post', label: 'Пост', searchText: 'пост post' },
+                                        { value: 'reel', label: 'Reels', searchText: 'reels рилс' },
+                                        { value: 'story', label: 'Stories', searchText: 'stories сторис' },
+                                        { value: 'article', label: 'Статья', searchText: 'статья article' },
                                     ]}
                                     className="w-full bg-gray-50 dark:bg-[#252525]"
+                                    searchPlaceholder="Формат…"
                                 />
                             </div>
                         </div>
@@ -986,18 +987,19 @@ const ContentPlanView: React.FC<ContentPlanViewProps> = ({
                     <div>
                         <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 mb-1 uppercase">Статус</label>
                         <div className="relative">
-                            <TaskSelect
+                            <EntitySearchSelect
                                 value={status}
                                 onChange={(val) => setStatus(val as any)}
                                 options={[
-                                    { value: 'idea', label: 'Идея' },
-                                    { value: 'copywriting', label: 'Копирайтинг' },
-                                    { value: 'design', label: 'Дизайн' },
-                                    { value: 'approval', label: 'Согласование' },
-                                    { value: 'scheduled', label: 'В плане' },
-                                    { value: 'published', label: 'Опубликовано' }
+                                    { value: 'idea', label: 'Идея', searchText: 'идея idea' },
+                                    { value: 'copywriting', label: 'Копирайтинг', searchText: 'копирайтинг copywriting' },
+                                    { value: 'design', label: 'Дизайн', searchText: 'дизайн design' },
+                                    { value: 'approval', label: 'Согласование', searchText: 'согласование approval' },
+                                    { value: 'scheduled', label: 'В плане', searchText: 'план scheduled' },
+                                    { value: 'published', label: 'Опубликовано', searchText: 'опубликовано published' },
                                 ]}
                                 className="w-full bg-gray-50 dark:bg-[#252525]"
+                                searchPlaceholder="Статус…"
                             />
                             <ChevronRight className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none rotate-90" size={16} />
                         </div>

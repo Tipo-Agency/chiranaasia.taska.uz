@@ -2,7 +2,7 @@ import React from 'react';
 import { Contract, Client } from '../../types';
 import { Edit2, X } from 'lucide-react';
 import { FilterConfig } from '../FiltersPanel';
-import { TaskSelect } from '../TaskSelect';
+import { EntitySearchSelect } from '../ui/EntitySearchSelect';
 
 interface ContractsTabProps {
   contracts: Contract[];
@@ -11,6 +11,9 @@ interface ContractsTabProps {
   showFilters: boolean;
   onClearFilters: () => void;
   onEditContract: (contract: Contract) => void;
+  /** Разовые продажи (dealKind / id из списка oneTimeDeals) — открыть другую модалку */
+  isOneTimeDeal?: (id: string) => boolean;
+  onEditOneTimeDeal?: (contract: Contract) => void;
 }
 
 export const ContractsTab: React.FC<ContractsTabProps> = ({
@@ -20,6 +23,8 @@ export const ContractsTab: React.FC<ContractsTabProps> = ({
   showFilters,
   onClearFilters,
   onEditContract,
+  isOneTimeDeal,
+  onEditOneTimeDeal,
 }) => {
   return (
     <>
@@ -37,10 +42,10 @@ export const ContractsTab: React.FC<ContractsTabProps> = ({
                 <label className="block text-xs font-semibold text-gray-600 dark:text-gray-400 mb-1">
                   {filter.label}
                 </label>
-                <TaskSelect
+                <EntitySearchSelect
                   value={filter.value}
                   onChange={filter.onChange}
-                  options={filter.options}
+                  options={filter.options.map((o) => ({ ...o, searchText: o.label }))}
                 />
               </div>
             ))}
@@ -74,7 +79,9 @@ export const ContractsTab: React.FC<ContractsTabProps> = ({
               const client = clients.find(cl => cl.id === c.clientId);
               return (
                 <tr key={c.id} className="hover:bg-gray-50 dark:hover:bg-[#303030]">
-                  <td className="px-4 py-3 font-medium text-gray-900 dark:text-gray-200">{c.number}</td>
+                  <td className="px-4 py-3 font-medium text-gray-900 dark:text-gray-200">
+                    {c.number || c.title || '—'}
+                  </td>
                   <td className="px-4 py-3 text-gray-800 dark:text-gray-300">{client?.name || '—'}</td>
                   <td className="px-4 py-3 text-gray-600 dark:text-gray-400 max-w-xs truncate">{c.services}</td>
                   <td className="px-4 py-3 font-bold text-gray-800 dark:text-gray-200">{c.amount.toLocaleString()}</td>
@@ -91,7 +98,12 @@ export const ContractsTab: React.FC<ContractsTabProps> = ({
                     </span>
                   </td>
                   <td className="px-4 py-3 text-right">
-                    <button onClick={() => onEditContract(c)} className="p-1 hover:bg-gray-200 dark:hover:bg-gray-700 rounded text-gray-500">
+                    <button
+                      onClick={() =>
+                        isOneTimeDeal?.(c.id) && onEditOneTimeDeal ? onEditOneTimeDeal(c) : onEditContract(c)
+                      }
+                      className="p-1 hover:bg-gray-200 dark:hover:bg-gray-700 rounded text-gray-500"
+                    >
                       <Edit2 size={14}/>
                     </button>
                   </td>

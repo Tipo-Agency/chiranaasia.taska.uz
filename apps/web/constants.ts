@@ -148,6 +148,12 @@ export const LEGACY_PROJECT_COLOR_TO_HEX: Record<string, string> = {
   'text-indigo-500': '#6366f1',
 };
 
+/** Hex для кружка в палитре COLOR_OPTIONS (без динамических `bg-*` — JIT их не подхватывает). */
+export function swatchHexForTableColorToken(token: string): string {
+  if (token.startsWith('#')) return token;
+  return LEGACY_PROJECT_COLOR_TO_HEX[token] ?? '#6b7280';
+}
+
 export const DEFAULT_STATUSES: StatusOption[] = [
     { id: 's1', name: 'Не начато', color: 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-700' },
     { id: 's2', name: 'В работе', color: 'bg-blue-100 dark:bg-blue-900/35 text-blue-800 dark:text-blue-200 border border-blue-200 dark:border-blue-800/60' },

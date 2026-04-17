@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Task, User, Project, StatusOption } from '../types';
 import { X, Save, Users, Tag, Layers } from 'lucide-react';
-import { TaskSelect } from './TaskSelect';
+import { EntitySearchSelect } from './ui/EntitySearchSelect';
 
 interface FeatureModalProps {
   feature: Partial<Task> | null;
@@ -215,13 +215,14 @@ const FeatureModal: React.FC<FeatureModalProps> = ({
               <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 uppercase mb-2">
                 Проект
               </label>
-              <TaskSelect
+              <EntitySearchSelect
                 value={projectId}
                 onChange={setProjectId}
                 options={[
                   { value: '', label: 'Без проекта' },
-                  ...projects.filter((p) => !p.isArchived).map(p => ({ value: p.id, label: p.name }))
+                  ...projects.filter((p) => !p.isArchived).map((p) => ({ value: p.id, label: p.name, searchText: p.name })),
                 ]}
+                searchPlaceholder="Проект…"
               />
             </div>
 
@@ -230,10 +231,13 @@ const FeatureModal: React.FC<FeatureModalProps> = ({
               <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 uppercase mb-2">
                 Статус
               </label>
-              <TaskSelect
+              <EntitySearchSelect
                 value={status}
                 onChange={setStatus}
-                options={statuses.filter((s) => !s.isArchived).map(s => ({ value: s.name, label: s.name }))}
+                options={statuses
+                  .filter((s) => !s.isArchived)
+                  .map((s) => ({ value: s.name, label: s.name, searchText: s.name }))}
+                searchPlaceholder="Статус…"
               />
             </div>
 
@@ -248,15 +252,16 @@ const FeatureModal: React.FC<FeatureModalProps> = ({
                   const user = users.find(u => u.id === userId);
                   return (
                     <div key={idx} className="flex items-center gap-2">
-                      <TaskSelect
+                      <EntitySearchSelect
                         value={userId}
                         onChange={(val) => {
                           const newIds = [...assigneeIds];
                           newIds[idx] = val;
                           setAssigneeIds(newIds);
                         }}
-                        options={users.map(u => ({ value: u.id, label: u.name }))}
+                        options={users.map((u) => ({ value: u.id, label: u.name, searchText: u.name }))}
                         className="flex-1"
+                        searchPlaceholder="Сотрудник…"
                       />
                       {assigneeIds.length > 1 && (
                         <button
@@ -286,13 +291,14 @@ const FeatureModal: React.FC<FeatureModalProps> = ({
                 <Tag size={14} />
                 Категория
               </label>
-              <TaskSelect
+              <EntitySearchSelect
                 value={category}
                 onChange={setCategory}
                 options={[
                   { value: '', label: 'Без категории' },
-                  ...STANDARD_CATEGORIES.map(cat => ({ value: cat, label: cat }))
+                  ...STANDARD_CATEGORIES.map((cat) => ({ value: cat, label: cat, searchText: cat })),
                 ]}
+                searchPlaceholder="Категория…"
               />
             </div>
           </div>

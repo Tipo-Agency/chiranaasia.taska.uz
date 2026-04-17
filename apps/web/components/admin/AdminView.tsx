@@ -15,6 +15,15 @@ import {
 } from 'lucide-react';
 import { adminEndpoint, systemEndpoint } from '../../services/apiClient';
 
+/** Ответ API без сессии или без admin.system — останавливаем опрос, чтобы не спамить консоль. */
+function isAdminAuthApiFailure(e: unknown): boolean {
+  const s = e instanceof Error ? e.message : String(e);
+  if (/\b401\b|\b403\b/.test(s)) return true;
+  return /not authenticated|session expired|session invalidated|invalid or expired token|admin access required|forbidden|permission denied/i.test(
+    s
+  );
+}
+
 type TabId = 'db' | 'errors' | 'load' | 'tests' | 'bot' | 'redis';
 
 const TABS: { id: TabId; label: string; icon: React.ReactNode }[] = [
@@ -97,7 +106,7 @@ function DbTab({ onAuthError }: { onAuthError: (msg: string | null) => void }) {
       if (data.length && !selectedTable) setSelectedTable(data[0].name);
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : 'Ошибка загрузки';
-      if (String(msg).includes('401') || String(msg).includes('403')) onAuthError(msg);
+      if (isAdminAuthApiFailure(e)) onAuthError(msg);
       else setLoadError(msg);
     } finally {
       setLoading(false);
@@ -117,7 +126,7 @@ function DbTab({ onAuthError }: { onAuthError: (msg: string | null) => void }) {
         setTableData({ columns: res.columns, rows: res.rows, total: res.total });
       })
       .catch((e) => {
-        if (String(e).includes('401') || String(e).includes('403')) onAuthError(String(e));
+        if (isAdminAuthApiFailure(e)) onAuthError(String(e));
       })
       .finally(() => setTableLoading(false));
   }, [selectedTable, page]);
@@ -251,7 +260,7 @@ function ErrorsTab({ onAuthError }: { onAuthError: (msg: string | null) => void 
       const data = await systemEndpoint.getLogs({ limit: 100, level: levelFilter || undefined });
       setLogs(data);
     } catch (e) {
-      if (String(e).includes('401') || String(e).includes('403')) onAuthError(String(e));
+      if (isAdminAuthApiFailure(e)) onAuthError(String(e));
     } finally {
       setLoading(false);
     }
@@ -334,7 +343,7 @@ function LoadTab({ onAuthError }: { onAuthError: (msg: string | null) => void })
       setHealth(h);
       setStats(s);
     } catch (e) {
-      if (String(e).includes('401') || String(e).includes('403')) onAuthError(String(e));
+      if (isAdminAuthApiFailure(e)) onAuthError(String(e));
     } finally {
       setLoading(false);
     }
@@ -463,7 +472,7 @@ function RedisTab({ onAuthError }: { onAuthError: (msg: string | null) => void }
   >([]);
   const [dlqBusyId, setDlqBusyId] = useState<string | null>(null);
 
-  const load = async () => {
+  const load = async (): Promise<boolean> => {
     setLoading(true);
     setLoadError(null);
     onAuthError(null);
@@ -476,19 +485,42 @@ function RedisTab({ onAuthError }: { onAuthError: (msg: string | null) => void }
       setMonitor(data);
       setFailedRows(failed || []);
       setDlqRows(dlq || []);
+      return true;
     } catch (e) {
       const s = String(e);
-      if (s.includes('401') || s.includes('403')) onAuthError(s);
-      else setLoadError(s);
+      if (isAdminAuthApiFailure(e)) {
+        onAuthError(s);
+        return false;
+      }
+      setLoadError(s);
+      return true;
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    load();
-    const timer = window.setInterval(load, 10000);
-    return () => window.clearInterval(timer);
+    let cancelled = false;
+    const timerRef: { id: number | null } = { id: null };
+    void (async () => {
+      const ok = await load();
+      if (cancelled || !ok) return;
+      timerRef.id = window.setInterval(() => {
+        void load().then((stillOk) => {
+          if (!stillOk && timerRef.id != null) {
+            window.clearInterval(timerRef.id);
+            timerRef.id = null;
+          }
+        });
+      }, 10000);
+    })();
+    return () => {
+      cancelled = true;
+      if (timerRef.id != null) {
+        window.clearInterval(timerRef.id);
+        timerRef.id = null;
+      }
+    };
   }, [failedChannelFilter, failedQuery]);
 
   return (
@@ -511,7 +543,7 @@ function RedisTab({ onAuthError }: { onAuthError: (msg: string | null) => void }
           <p className="font-medium">Запрос к API админки не выполнен</p>
           <p className="mt-1 text-xs break-all opacity-90">{loadError}</p>
           <p className="mt-2 text-xs opacity-80">
-            Пока запрос падает, блок ниже пустой — это не значит, что Redis «выключен», сначала убедитесь, что отвечает бэкенд и эндпоинт <code className="font-mono">/api/admin/redis/monitor</code>.
+            Пока запрос падает, блок ниже пустой — это не значит, что Redis «выключен». 401 — войдите заново; 403 — нет права <code className="font-mono">admin.system</code>. Проверьте бэкенд и эндпоинт <code className="font-mono">/api/admin/redis/monitor</code>.
           </p>
         </div>
       )}
@@ -838,7 +870,7 @@ function TestsTab({ onAuthError }: { onAuthError: (msg: string | null) => void }
       setResult(res);
     } catch (e) {
       setResult({ ok: false, output: String(e), exit_code: 1 });
-      if (String(e).includes('401') || String(e).includes('403')) onAuthError(String(e));
+      if (isAdminAuthApiFailure(e)) onAuthError(String(e));
     } finally {
       setRunning(false);
     }
@@ -892,7 +924,7 @@ function BotTab({ onAuthError }: { onAuthError: (msg: string | null) => void }) 
       const data = await adminEndpoint.getBotStatus();
       setStatus(data);
     } catch (e) {
-      if (String(e).includes('401') || String(e).includes('403')) onAuthError(String(e));
+      if (isAdminAuthApiFailure(e)) onAuthError(String(e));
     } finally {
       setLoading(false);
     }

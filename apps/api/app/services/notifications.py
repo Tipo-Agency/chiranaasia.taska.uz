@@ -99,15 +99,19 @@ def channel_flags_from_prefs(prefs: dict[str, Any]) -> dict[str, bool]:
 
 
 def telegram_recipient_from(user: User | None, pref_row: NotificationPreferences | None) -> str | None:
-    """chat_id для Telegram из prefs + пользователя (без запросов к БД)."""
+    """Личный chat_id для Telegram-уведомлений пользователя (без запросов к БД).
+
+    Приоритет:
+      1. prefs.telegramChatId — явно привязанный чат
+      2. user.telegram_user_id — ID из Telegram-авторизации
+
+    telegram_group_chat_id намеренно не используется: группы — для широковещательных
+    уведомлений (integrations), не для персональных доставок.
+    """
     prefs = pref_row.prefs if pref_row and pref_row.prefs else {}
     if not isinstance(prefs, dict):
         prefs = {}
-    chat_id = (
-        prefs.get("telegramChatId")
-        or (user.telegram_user_id if user else None)
-        or (pref_row.telegram_group_chat_id if pref_row else None)
-    )
+    chat_id = prefs.get("telegramChatId") or (user.telegram_user_id if user else None)
     return str(chat_id).strip() if chat_id else None
 
 

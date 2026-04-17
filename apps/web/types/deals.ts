@@ -28,6 +28,8 @@ export interface Deal {
   projectId?: string;
   comments?: Comment[];
   clientId?: string;
+  /** Основной CRM-контакт (контактное лицо компании), FK crm_contacts. */
+  contactId?: string;
   client?: Client;
   recurring?: boolean;
   number?: string;

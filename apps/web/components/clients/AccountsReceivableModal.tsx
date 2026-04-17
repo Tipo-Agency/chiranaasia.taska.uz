@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { AccountsReceivable, Client, Deal } from '../../types';
 import { X, Plus, Trash2, FileText, Receipt } from 'lucide-react';
-import { TaskSelect } from '../TaskSelect';
+import { EntitySearchSelect } from '../ui/EntitySearchSelect';
 import { normalizeDateForInput } from '../../utils/dateUtils';
 import { DateInput } from '../ui/DateInput';
 import { SystemAlertDialog, SystemConfirmDialog } from '../ui';
@@ -174,10 +174,15 @@ export const AccountsReceivableModal: React.FC<AccountsReceivableModalProps> = (
         <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto custom-scrollbar p-6 space-y-4">
           <div>
             <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 mb-1">Клиент *</label>
-            <TaskSelect
+            <EntitySearchSelect
               value={receivableClientId}
               onChange={setReceivableClientId}
-              options={clients.map(c => ({ value: c.id, label: c.name }))}
+              options={clients.map((c) => ({
+                value: c.id,
+                label: c.name,
+                searchText: [c.name, c.companyName, c.phone, c.email].filter(Boolean).join(' '),
+              }))}
+              searchPlaceholder="Клиент, компания…"
             />
           </div>
 
@@ -202,16 +207,22 @@ export const AccountsReceivableModal: React.FC<AccountsReceivableModalProps> = (
                   return (
                     <div key={item.id} className="flex items-center gap-3 pb-3 border-b border-gray-100 dark:border-[#333] last:border-0">
                       <div className="flex-1">
-                        <TaskSelect
+                        <EntitySearchSelect
                           value={item.dealId}
                           onChange={(val) => updateReceivableItem(item.id, { dealId: val })}
                           options={[
                             { value: '', label: 'Выберите продажу или договор...' },
-                            ...availableDeals.map(d => ({ 
-                              value: d.id, 
-                              label: `${d.recurring === false ? '💰 Продажа' : '📄 Договор'}: ${d.number} - ${d.amount.toLocaleString()} UZS` 
-                            }))
+                            ...availableDeals.map((d) => {
+                              const kind = d.recurring === false ? 'Продажа' : 'Договор';
+                              const label = `${d.recurring === false ? '💰 Продажа' : '📄 Договор'}: ${d.number} - ${d.amount.toLocaleString()} UZS`;
+                              return {
+                                value: d.id,
+                                label,
+                                searchText: [kind, d.number, String(d.amount), 'UZS'].join(' '),
+                              };
+                            }),
                           ]}
+                          searchPlaceholder="Номер, сумма…"
                         />
                       </div>
                       <div className="w-32">

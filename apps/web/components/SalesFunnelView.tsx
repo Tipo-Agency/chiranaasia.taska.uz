@@ -4,6 +4,7 @@ import {
   Deal,
   DealAttachment,
   Client,
+  CrmContact,
   User,
   Comment,
   Task,
@@ -61,7 +62,7 @@ import {
 } from './ui';
 import { MODULE_ACCENTS } from './ui/moduleAccent';
 import { DateInput } from './ui/DateInput';
-import { TaskSelect } from './TaskSelect';
+import { EntitySearchSelect } from './ui/EntitySearchSelect';
 import { api } from '../backend/api';
 import { isFunnelDeal } from '../utils/dealModel';
 import { normalizeHeaderSearchQuery, rowMatchesHeaderSearch } from '../utils/headerSearchMatch';
@@ -104,8 +105,6 @@ interface SalesFunnelViewProps {
   onDeleteMeeting?: (meetingId: string) => void;
   onUpdateMeetingSummary?: (meetingId: string, summary: string) => void;
   autoOpenCreateModal?: boolean; // Автоматически открыть модалку создания
-  /** Если задан — принудительно фиксирует режим просмотра (для вкладок CRMHub) */
-  forcedViewMode?: 'kanban' | 'list' | 'rejected';
 }
 
 const STAGES = [
@@ -146,10 +145,31 @@ function clientCompanyOrNameLabel(
   return (deal.title || '').trim() || 'Клиент';
 }
 
-const SalesFunnelView: React.FC<SalesFunnelViewProps> = ({ deals, clients, users, projects = [], tasks = [], meetings = [], salesFunnels = [], currentUser, headerSearchQuery = '', onSaveDeal, onDeleteDeal, onCreateTask, onCreateClient, onOpenTask, onSaveMeeting, onDeleteMeeting, onUpdateMeetingSummary, autoOpenCreateModal = false, forcedViewMode }) => {
+const SECONDARY_CONTACT_IDS_KEY = 'secondaryContactIds';
+
+const SalesFunnelView: React.FC<SalesFunnelViewProps> = ({
+  deals,
+  clients,
+  users,
+  projects = [],
+  tasks = [],
+  meetings = [],
+  salesFunnels = [],
+  currentUser,
+  headerSearchQuery = '',
+  onSaveDeal,
+  onDeleteDeal,
+  onCreateTask,
+  onCreateClient,
+  onOpenTask,
+  onSaveMeeting,
+  onDeleteMeeting,
+  onUpdateMeetingSummary,
+  autoOpenCreateModal = false,
+}) => {
   const { setModule } = useAppToolbar();
   const [funnelMenuOpen, setFunnelMenuOpen] = useState(false);
-  const [viewMode, setViewMode] = useState<'kanban' | 'list' | 'rejected'>(forcedViewMode || 'kanban');
+  const [viewMode, setViewMode] = useState<'kanban' | 'list'>('kanban');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingDeal, setEditingDeal] = useState<Deal | null>(null);
   const [dealAttachments, setDealAttachments] = useState<DealAttachment[]>([]);
@@ -184,6 +204,11 @@ const SalesFunnelView: React.FC<SalesFunnelViewProps> = ({ deals, clients, users
   const [chatSending, setChatSending] = useState(false);
   /** Черновик Telegram @username для карточки привязанного клиента (сохраняется в сущность Client) */
   const [clientTelegramDraft, setClientTelegramDraft] = useState('');
+  const [companyContacts, setCompanyContacts] = useState<CrmContact[]>([]);
+  const [primaryContactId, setPrimaryContactId] = useState('');
+  const [secondaryContactIds, setSecondaryContactIds] = useState<string[]>([]);
+  const [newContactName, setNewContactName] = useState('');
+  const [newContactPhone, setNewContactPhone] = useState('');
 
   const activeFunnels = useMemo(() => salesFunnels.filter((f) => !f.isArchived), [salesFunnels]);
 
@@ -352,6 +377,25 @@ const SalesFunnelView: React.FC<SalesFunnelViewProps> = ({ deals, clients, users
     };
   }, [isModalOpen, modalTab, editingDeal?.id, editingDeal?.source, editingDeal?.clientId, tgPersonal?.connected, clients]);
 
+  useEffect(() => {
+    if (!isModalOpen || !editingDeal?.clientId) {
+      setCompanyContacts([]);
+      return;
+    }
+    let cancelled = false;
+    void api.crmContacts
+      .list({ clientId: editingDeal.clientId, limit: 200 })
+      .then((rows) => {
+        if (!cancelled) setCompanyContacts(rows);
+      })
+      .catch(() => {
+        if (!cancelled) setCompanyContacts([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [isModalOpen, editingDeal?.clientId]);
+
   const handleOpenCreate = (presetStageId?: string) => { 
     setEditingDeal(null); 
     setTitle(''); 
@@ -369,6 +413,11 @@ const SalesFunnelView: React.FC<SalesFunnelViewProps> = ({ deals, clients, users
     setNotes('');
     setComments([]);
     setDealAttachments([]);
+    setPrimaryContactId('');
+    setSecondaryContactIds([]);
+    setCompanyContacts([]);
+    setNewContactName('');
+    setNewContactPhone('');
     setModalTab('chat');
     setIsModalOpen(true);
   };
@@ -380,9 +429,6 @@ const SalesFunnelView: React.FC<SalesFunnelViewProps> = ({ deals, clients, users
     if (!salesFunnels.length) {
       setModule(null);
       return;
-    }
-    if (forcedViewMode && viewMode !== forcedViewMode) {
-      setViewMode(forcedViewMode);
     }
     const tabActive = MODULE_ACCENTS.violet.navIconActive;
     const idle = 'text-gray-500 dark:text-gray-400';
@@ -474,8 +520,7 @@ const SalesFunnelView: React.FC<SalesFunnelViewProps> = ({ deals, clients, users
             },
           ]}
         />
-        {!forcedViewMode && (
-          <div className="flex items-center gap-0.5 shrink-0" role="tablist" aria-label="Вид воронки">
+        <div className="flex items-center gap-0.5 shrink-0" role="tablist" aria-label="Вид воронки">
             {(
               [
                 { id: 'kanban' as const, label: 'Канбан' },
@@ -496,11 +541,10 @@ const SalesFunnelView: React.FC<SalesFunnelViewProps> = ({ deals, clients, users
               </button>
             ))}
           </div>
-        )}
       </div>
     );
     return () => setModule(null);
-  }, [salesFunnels.length, viewMode, selectedFunnelId, activeFunnels, forcedViewMode, funnelMenuOpen, setModule]);
+  }, [salesFunnels.length, viewMode, selectedFunnelId, activeFunnels, funnelMenuOpen, setModule]);
   
   const handleOpenEdit = (d: Deal) => { 
     setEditingDeal(d); 
@@ -517,6 +561,14 @@ const SalesFunnelView: React.FC<SalesFunnelViewProps> = ({ deals, clients, users
     setNotes(d.notes || '');
     setComments(d.comments || []);
     setDealAttachments(d.attachments ?? []);
+    setPrimaryContactId(d.contactId || '');
+    const secRaw =
+      d.customFields && typeof d.customFields === 'object' && !Array.isArray(d.customFields)
+        ? (d.customFields as Record<string, unknown>)[SECONDARY_CONTACT_IDS_KEY]
+        : undefined;
+    setSecondaryContactIds(Array.isArray(secRaw) ? secRaw.map((x) => String(x)) : []);
+    setNewContactName('');
+    setNewContactPhone('');
     setModalTab('chat');
     setIsModalOpen(true);
   };
@@ -533,6 +585,27 @@ const SalesFunnelView: React.FC<SalesFunnelViewProps> = ({ deals, clients, users
     }
   };
 
+  const handleCreateCompanyContact = async () => {
+    const cid = editingDeal?.clientId;
+    if (!cid || !newContactName.trim()) {
+      setAlertState({ open: true, title: 'Контакт', message: 'Укажите имя контакта.' });
+      return;
+    }
+    try {
+      const row = await api.crmContacts.create({
+        name: newContactName.trim(),
+        clientId: cid,
+        phone: newContactPhone.trim() ? dealContactDigits(newContactPhone) : undefined,
+      });
+      setCompanyContacts((p) => [...p, row]);
+      setSecondaryContactIds((p) => (p.includes(row.id) ? p : [...p, row.id]));
+      setNewContactName('');
+      setNewContactPhone('');
+    } catch {
+      setAlertState({ open: true, title: 'Контакт', message: 'Не удалось сохранить контакт.' });
+    }
+  };
+
   const handleSubmit = async (e?: React.FormEvent) => {
       if (e) e.preventDefault();
       flushLinkedClientTelegram();
@@ -545,12 +618,23 @@ const SalesFunnelView: React.FC<SalesFunnelViewProps> = ({ deals, clients, users
               return;
           }
 
-          const phoneDigits = dealContactDigits(contactName);
-          if (!isDealContactPhoneValid(contactName)) {
+          const primaryRow = primaryContactId ? companyContacts.find((c) => c.id === primaryContactId) : undefined;
+          const phoneDigits =
+            dealContactDigits(contactName) ||
+            (primaryRow?.phone ? dealContactDigits(primaryRow.phone) : '');
+          if (!primaryContactId && !isDealContactPhoneValid(contactName)) {
               setAlertState({
                   open: true,
                   title: 'Проверьте данные',
-                  message: `Укажите номер телефона в поле «Контакт»: только цифры, от ${DEAL_PHONE_MIN_DIGITS} до ${DEAL_PHONE_MAX_DIGITS} знаков.`,
+                  message: `Укажите номер телефона в поле «Контакт» или выберите контакт компании: только цифры, от ${DEAL_PHONE_MIN_DIGITS} до ${DEAL_PHONE_MAX_DIGITS} знаков.`,
+              });
+              return;
+          }
+          if (primaryContactId && !isDealContactPhoneValid(phoneDigits)) {
+              setAlertState({
+                  open: true,
+                  title: 'Проверьте данные',
+                  message: 'У выбранного контакта нет подходящего телефона — введите номер в поле «Контакт».',
               });
               return;
           }
@@ -588,11 +672,17 @@ const SalesFunnelView: React.FC<SalesFunnelViewProps> = ({ deals, clients, users
           }
           
           const prev = editingDeal;
+          const baseCf =
+            prev?.customFields && typeof prev.customFields === 'object' && !Array.isArray(prev.customFields)
+              ? { ...prev.customFields }
+              : {};
+          baseCf[SECONDARY_CONTACT_IDS_KEY] = secondaryContactIds.filter((id) => id && id !== primaryContactId);
           const dealData: Deal = {
               ...(prev || {}),
               id: prev?.id ?? `deal-${Date.now()}`,
               title: trimmedTitle,
               clientId: prev?.clientId,
+              contactId: primaryContactId || undefined,
               contactName: phoneDigits,
               amount: parseFloat(amount) || 0,
               currency: prev?.currency || 'UZS',
@@ -607,7 +697,7 @@ const SalesFunnelView: React.FC<SalesFunnelViewProps> = ({ deals, clients, users
               createdAt: prev?.createdAt ?? new Date().toISOString(),
               comments: comments || [],
               updatedAt: new Date().toISOString(),
-              customFields: prev?.customFields,
+              customFields: baseCf,
               attachments: dealAttachments,
           };
           
@@ -943,30 +1033,6 @@ const SalesFunnelView: React.FC<SalesFunnelViewProps> = ({ deals, clients, users
   const wonDeals = filteredDeals.filter(d => d.stage === 'won');
   const lostDeals = filteredDeals.filter(d => d.stage === 'lost');
 
-  /** Этапы воронки сделки (для возврата из «Отказов» в активную воронку). */
-  const getActiveStagesForLostDeal = (deal: Deal): { id: string; label: string }[] => {
-    const fid = deal.funnelId || primaryFunnelId || salesFunnels[0]?.id || '';
-    const fu = fid ? salesFunnels.find((f) => f.id === fid) : undefined;
-    if (fu?.stages?.length) return fu.stages.map((s) => ({ id: String(s.id), label: s.label }));
-    return STAGES.map((s) => ({ id: s.id, label: s.label }));
-  };
-
-  const restoreLostDealToStage = (deal: Deal, stageId: string) => {
-    const opts = getActiveStagesForLostDeal(deal);
-    if (!opts.some((s) => String(s.id) === String(stageId))) return;
-    const nextFunnelId =
-      deal.funnelId ||
-      stageToFunnelId.get(String(stageId)) ||
-      primaryFunnelId ||
-      salesFunnels[0]?.id;
-    onSaveDeal({
-      ...deal,
-      stage: stageId,
-      funnelId: nextFunnelId || undefined,
-      updatedAt: new Date().toISOString(),
-    });
-  };
-
   const getSourceIcon = (s: string) => {
       switch(s) {
           case 'instagram': return <Instagram size={14} className="text-pink-500"/>;
@@ -998,11 +1064,16 @@ const SalesFunnelView: React.FC<SalesFunnelViewProps> = ({ deals, clients, users
                     </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100 dark:divide-[#333]">
-                    {activeDeals.map(deal => {
+                    {filteredDeals.map((deal) => {
                         const assignee = users.find(u => u.id === deal.assigneeId);
                         const dealFunnel = deal.funnelId ? salesFunnels.find(f => f.id === deal.funnelId) : null;
                         const dealStage = dealFunnel?.stages.find(s => s.id === deal.stage);
-                        const stageLabel = dealStage?.label || STAGES.find(s => s.id === deal.stage)?.label || deal.stage;
+                        const stageLabel =
+                          deal.stage === 'won'
+                            ? 'Выиграна'
+                            : deal.stage === 'lost'
+                              ? 'Отказ'
+                              : dealStage?.label || STAGES.find(s => s.id === deal.stage)?.label || deal.stage;
                         const dealProject = projects.find(p => p.id === deal.projectId);
                         return (
                             <tr key={deal.id} onClick={() => handleOpenEdit(deal)} className="hover:bg-gray-50 dark:hover:bg-[#2a2a2a] cursor-pointer group transition-colors">
@@ -1160,8 +1231,8 @@ const SalesFunnelView: React.FC<SalesFunnelViewProps> = ({ deals, clients, users
                       >
                           <XCircle size={20} className="md:w-6 md:h-6 text-red-600 dark:text-red-400 shrink-0" />
                           <div className="flex-1 min-w-0">
-                              <div className="font-bold text-sm md:text-base text-red-700 dark:text-red-400">Отказ</div>
-                              <div className="text-xs text-red-600 dark:text-red-500 hidden sm:block">Перетащите сюда → в базу отказов</div>
+                              <div className="font-bold text-sm md:text-base text-red-700 dark:text-red-400">Проиграна</div>
+                              <div className="text-xs text-red-600 dark:text-red-500 hidden sm:block">Перетащите сюда — сделка уйдёт в «Отказ»</div>
                           </div>
                           <span className="bg-red-200 dark:bg-red-900/30 text-red-700 dark:text-red-400 px-2 py-1 rounded text-xs font-bold shrink-0">{lostDeals.length}</span>
                       </div>
@@ -1171,77 +1242,9 @@ const SalesFunnelView: React.FC<SalesFunnelViewProps> = ({ deals, clients, users
                   </div>
                   )}
               </div>
-          ) : viewMode === 'rejected' ? (
-              <div className="bg-white dark:bg-[#1e1e1e] border border-gray-200 dark:border-[#333] rounded-xl overflow-hidden shadow-sm h-full flex flex-col">
-                  <p className="px-4 py-2 text-xs text-gray-500 dark:text-gray-400 border-b border-gray-100 dark:border-[#333] shrink-0">
-                    Верните сделку в воронку: выберите этап в колонке ниже или откройте карточку и смените «Стадию» в форме.
-                  </p>
-                  <div className="overflow-y-auto flex-1 custom-scrollbar">
-                    <table className="w-full text-left text-sm">
-                        <thead className="bg-gray-50 dark:bg-[#252525] border-b border-gray-200 dark:border-[#333] sticky top-0 z-10">
-                            <tr>
-                                <th className="px-4 py-3 font-semibold text-gray-600 dark:text-gray-400">Сделка</th>
-                                <th className="px-4 py-3 font-semibold text-gray-600 dark:text-gray-400">Сумма (UZS)</th>
-                                <th className="px-4 py-3 font-semibold text-gray-600 dark:text-gray-400">Вид услуг</th>
-                                <th className="px-4 py-3 font-semibold text-gray-600 dark:text-gray-400">Источник</th>
-                                <th className="px-4 py-3 font-semibold text-gray-600 dark:text-gray-400">Ответственный</th>
-                                <th className="px-4 py-3 font-semibold text-gray-600 dark:text-gray-400">Дата</th>
-                                <th className="px-4 py-3 font-semibold text-gray-600 dark:text-gray-400 min-w-[11rem]">В воронку</th>
-                                <th className="px-4 py-3 w-10"></th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-gray-100 dark:divide-[#333]">
-                            {lostDeals.map(deal => {
-                                const assignee = users.find(u => u.id === deal.assigneeId);
-                                const dealProject = projects.find(p => p.id === deal.projectId);
-                                const stageOpts = getActiveStagesForLostDeal(deal);
-                                return (
-                                    <tr key={deal.id} onClick={() => handleOpenEdit(deal)} className="hover:bg-gray-50 dark:hover:bg-[#2a2a2a] cursor-pointer group transition-colors">
-                                        <td className="px-4 py-3 font-medium text-gray-800 dark:text-gray-200">{deal.title}</td>
-                                        <td className="px-4 py-3 font-bold text-gray-900 dark:text-white">{(deal.amount || 0).toLocaleString()}</td>
-                                        <td className="px-4 py-3">
-                                            {dealProject ? (
-                                                <div className="flex items-center gap-1.5">
-                                                    <DynamicIcon name={dealProject.icon} className={`${dealProject.color} w-4 h-4`} />
-                                                    <span className="text-xs text-gray-600 dark:text-gray-400">{dealProject.name}</span>
-                                                </div>
-                                            ) : (
-                                                <span className="text-xs text-gray-400">—</span>
-                                            )}
-                                        </td>
-                                        <td className="px-4 py-3 flex items-center gap-2">{getSourceIcon(deal.source || 'manual')} <span className="text-xs text-gray-500 capitalize">{deal.source}</span></td>
-                                        <td className="px-4 py-3 text-xs text-gray-600 dark:text-gray-400">{assignee?.name}</td>
-                                        <td className="px-4 py-3 text-xs text-gray-500 dark:text-gray-400">{new Date(deal.createdAt).toLocaleDateString()}</td>
-                                        <td className="px-4 py-2 align-middle" onClick={(e) => e.stopPropagation()}>
-                                          <select
-                                            key={`${deal.id}-${deal.updatedAt || ''}`}
-                                            aria-label="Вернуть сделку на этап"
-                                            defaultValue=""
-                                            className="w-full max-w-[13rem] text-xs rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-[#252525] text-gray-900 dark:text-gray-100 py-1.5 px-2 outline-none focus:ring-2 focus:ring-violet-500/30"
-                                            onChange={(e) => {
-                                              const v = e.target.value;
-                                              if (v) restoreLostDealToStage(deal, v);
-                                            }}
-                                          >
-                                            <option value="" disabled>
-                                              На этап…
-                                            </option>
-                                            {stageOpts.map((s) => (
-                                              <option key={s.id} value={s.id}>
-                                                {s.label}
-                                              </option>
-                                            ))}
-                                          </select>
-                                        </td>
-                                        <td className="px-4 py-3 text-right"><button type="button" onClick={(e) => { e.stopPropagation(); handleOpenEdit(deal); }} className="text-gray-400 hover:text-blue-500 opacity-0 group-hover:opacity-100"><Edit2 size={14}/></button></td>
-                                    </tr>
-                                );
-                            })}
-                        </tbody>
-                    </table>
-                  </div>
-              </div>
-          ) : renderList()}
+          ) : (
+            renderList()
+          )}
         </div>
       </div>
       {isModalOpen && (
@@ -1295,12 +1298,13 @@ const SalesFunnelView: React.FC<SalesFunnelViewProps> = ({ deals, clients, users
                                       Воронка
                                   </div>
                                   <div className="flex-1 min-w-0">
-                                      <TaskSelect
+                                      <EntitySearchSelect
                                           size="compact"
                                           value={funnelId}
                                           onChange={handleDealFunnelChange}
-                                          options={salesFunnels.map(f => ({ value: f.id, label: f.name }))}
+                                          options={salesFunnels.map(f => ({ value: f.id, label: f.name, searchText: f.name }))}
                                           placeholder="Выберите воронку"
+                                          searchPlaceholder="Воронка…"
                                       />
                                   </div>
                               </div>
@@ -1310,7 +1314,7 @@ const SalesFunnelView: React.FC<SalesFunnelViewProps> = ({ deals, clients, users
                                       Стадия
                                   </div>
                                   <div className="flex-1 min-w-0">
-                                      <TaskSelect
+                                      <EntitySearchSelect
                                           size="compact"
                                           value={stage}
                                           onChange={setStage}
@@ -1319,13 +1323,14 @@ const SalesFunnelView: React.FC<SalesFunnelViewProps> = ({ deals, clients, users
                                                   ? (() => {
                                                         const currentFunnel = salesFunnels.find(f => f.id === funnelId);
                                                         return currentFunnel && currentFunnel.stages.length > 0
-                                                            ? currentFunnel.stages.map(s => ({ value: s.id, label: s.label }))
-                                                            : STAGES.map(s => ({ value: s.id, label: s.label }));
+                                                            ? currentFunnel.stages.map(s => ({ value: s.id, label: s.label, searchText: s.label }))
+                                                            : STAGES.map(s => ({ value: s.id, label: s.label, searchText: s.label }));
                                                     })()
-                                                  : STAGES.map(s => ({ value: s.id, label: s.label }))),
-                                              { value: 'won', label: 'Выиграна' },
-                                              { value: 'lost', label: 'Проиграна' },
+                                                  : STAGES.map(s => ({ value: s.id, label: s.label, searchText: s.label }))),
+                                              { value: 'won', label: 'Выиграна', searchText: 'выиграна won' },
+                                              { value: 'lost', label: 'Проиграна', searchText: 'проиграна lost' },
                                           ]}
+                                          searchPlaceholder="Стадия…"
                                       />
                                   </div>
                               </div>
@@ -1335,18 +1340,19 @@ const SalesFunnelView: React.FC<SalesFunnelViewProps> = ({ deals, clients, users
                                       Источник
                                   </div>
                                   <div className="flex-1 min-w-0">
-                                      <TaskSelect
+                                      <EntitySearchSelect
                                           size="compact"
                                           value={source}
                                           onChange={setSource}
                                           options={[
-                                              { value: 'manual', label: 'Вручную' },
-                                              { value: 'site', label: 'Заявка с сайта' },
-                                              { value: 'instagram', label: 'Instagram' },
-                                              { value: 'telegram', label: 'Telegram' },
-                                              { value: 'vk', label: 'ВКонтакте' },
-                                              { value: 'recommendation', label: 'Рекомендация' },
+                                              { value: 'manual', label: 'Вручную', searchText: 'вручную manual' },
+                                              { value: 'site', label: 'Заявка с сайта', searchText: 'сайт site заявка' },
+                                              { value: 'instagram', label: 'Instagram', searchText: 'instagram инстаграм' },
+                                              { value: 'telegram', label: 'Telegram', searchText: 'telegram телеграм' },
+                                              { value: 'vk', label: 'ВКонтакте', searchText: 'vk вконтакте' },
+                                              { value: 'recommendation', label: 'Рекомендация', searchText: 'рекомендация recommendation' },
                                           ]}
+                                          searchPlaceholder="Источник…"
                                       />
                                   </div>
                               </div>
@@ -1356,15 +1362,16 @@ const SalesFunnelView: React.FC<SalesFunnelViewProps> = ({ deals, clients, users
                                       Модуль
                                   </div>
                                   <div className="flex-1 min-w-0">
-                                      <TaskSelect
+                                      <EntitySearchSelect
                                           size="compact"
                                           value={dealProjectId}
                                           onChange={setDealProjectId}
                                           placeholder=""
                                           options={[
                                               { value: '', label: 'Не выбрано' },
-                                              ...(projects || []).map(p => ({ value: p.id, label: p.name })),
+                                              ...(projects || []).map(p => ({ value: p.id, label: p.name, searchText: p.name })),
                                           ]}
+                                          searchPlaceholder="Проект…"
                                       />
                                   </div>
                               </div>
@@ -1374,12 +1381,13 @@ const SalesFunnelView: React.FC<SalesFunnelViewProps> = ({ deals, clients, users
                                       Ответств.
                                   </div>
                                   <div className="flex-1 min-w-0">
-                                      <TaskSelect
+                                      <EntitySearchSelect
                                           size="compact"
                                           value={assigneeId}
                                           onChange={setAssigneeId}
-                                          options={users.map(u => ({ value: u.id, label: u.name }))}
+                                          options={users.map(u => ({ value: u.id, label: u.name, searchText: u.name }))}
                                           placeholder="Выберите исполнителя"
+                                          searchPlaceholder="Сотрудник…"
                                       />
                                   </div>
                               </div>
@@ -1397,15 +1405,13 @@ const SalesFunnelView: React.FC<SalesFunnelViewProps> = ({ deals, clients, users
                               </div>
                               <div>
                                   <label className="block text-[10px] font-bold text-gray-500 dark:text-gray-400 mb-1 uppercase">
-                                    Контакт <span className="text-red-500">*</span>
-                                    <span className="font-normal normal-case text-gray-400"> (телефон, только цифры)</span>
+                                    Телефон лида <span className="text-red-500">*</span>
+                                    <span className="font-normal normal-case text-gray-400"> или контакт компании ниже</span>
                                   </label>
                                   <input
                                       type="text"
                                       inputMode="numeric"
                                       autoComplete="tel"
-                                      required
-                                      aria-required
                                       value={contactName}
                                       onChange={(e) => setContactName(dealContactDigits(e.target.value))}
                                       maxLength={DEAL_PHONE_MAX_DIGITS}
@@ -1418,12 +1424,14 @@ const SalesFunnelView: React.FC<SalesFunnelViewProps> = ({ deals, clients, users
                                   <label className="block text-[10px] font-bold text-gray-500 dark:text-gray-400 uppercase">
                                     Привязка к клиенту (справочник)
                                   </label>
-                                  <TaskSelect
+                                  <EntitySearchSelect
                                     size="compact"
                                     value={editingDeal.clientId || ''}
                                     onChange={(val) => {
                                       const cid = String(val || '').trim();
                                       const c = clients.find((cl) => cl.id === cid);
+                                      setPrimaryContactId('');
+                                      setSecondaryContactIds([]);
                                       setEditingDeal((prev) =>
                                         prev ? { ...prev, clientId: cid || undefined } : prev
                                       );
@@ -1437,14 +1445,105 @@ const SalesFunnelView: React.FC<SalesFunnelViewProps> = ({ deals, clients, users
                                       { value: '', label: 'Не привязан' },
                                       ...clients
                                         .filter((cl) => !cl.isArchived)
-                                        .map((cl) => ({ value: cl.id, label: cl.name })),
+                                        .map((cl) => ({
+                                          value: cl.id,
+                                          label: cl.name,
+                                          searchText: [cl.name, cl.companyName, cl.phone, cl.email].filter(Boolean).join(' '),
+                                        })),
                                     ]}
+                                    searchPlaceholder="Клиент, компания, телефон…"
                                   />
                                   <p className="text-[10px] leading-snug text-gray-500 dark:text-gray-400">
-                                    Отдельно от поля «Клиент» выше: здесь связь с сущностью клиента (как в разделе «Клиенты»). От неё зависит Telegram ниже.
+                                    Связь с карточкой клиента в разделе «Клиенты». Контакты компании подгружаются автоматически; при сохранении сделки бэкенд может создать контакт из телефона.
                                   </p>
                                 </div>
                               )}
+                              {editingDeal?.clientId && (
+                                <div className="md:col-span-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50/60 dark:bg-[#222]/80 p-3 space-y-2">
+                                  <div className="text-[10px] font-bold text-gray-500 dark:text-gray-400 uppercase">
+                                    Контакты компании в сделке
+                                  </div>
+                                  <EntitySearchSelect
+                                    size="compact"
+                                    value={primaryContactId}
+                                    onChange={(val) => setPrimaryContactId(String(val || '').trim())}
+                                    placeholder="Основной контакт (опционально)"
+                                    options={[
+                                      { value: '', label: '— Не выбран —' },
+                                      ...companyContacts
+                                        .filter((c) => !c.isArchived)
+                                        .map((c) => ({
+                                          value: c.id,
+                                          label: `${c.name}${c.phone ? ` · ${c.phone}` : ''}`,
+                                          searchText: [c.name, c.phone, c.email].filter(Boolean).join(' '),
+                                        })),
+                                    ]}
+                                    searchPlaceholder="Контакт, телефон…"
+                                  />
+                                  <div className="text-[10px] text-gray-500 dark:text-gray-400">Дополнительные участники</div>
+                                  <div className="flex flex-wrap gap-2">
+                                    {companyContacts
+                                      .filter((c) => !c.isArchived && c.id !== primaryContactId)
+                                      .map((c) => (
+                                        <label
+                                          key={c.id}
+                                          className="inline-flex items-center gap-1.5 text-xs text-gray-700 dark:text-gray-200 cursor-pointer"
+                                        >
+                                          <input
+                                            type="checkbox"
+                                            checked={secondaryContactIds.includes(c.id)}
+                                            onChange={(e) => {
+                                              setSecondaryContactIds((prev) =>
+                                                e.target.checked
+                                                  ? prev.includes(c.id)
+                                                    ? prev
+                                                    : [...prev, c.id]
+                                                  : prev.filter((x) => x !== c.id)
+                                              );
+                                            }}
+                                          />
+                                          <span className="truncate max-w-[10rem]">{c.name}</span>
+                                        </label>
+                                      ))}
+                                  </div>
+                                  <div className="flex flex-col sm:flex-row gap-2 pt-1 border-t border-gray-200/80 dark:border-gray-600/80">
+                                    <input
+                                      value={newContactName}
+                                      onChange={(e) => setNewContactName(e.target.value)}
+                                      placeholder="Новый контакт — имя"
+                                      className="flex-1 min-w-0 border border-gray-300 dark:border-gray-600 rounded-md px-2 py-1.5 text-xs bg-white dark:bg-[#333]"
+                                    />
+                                    <input
+                                      value={newContactPhone}
+                                      onChange={(e) => setNewContactPhone(dealContactDigits(e.target.value))}
+                                      placeholder="Телефон"
+                                      className="w-full sm:w-36 border border-gray-300 dark:border-gray-600 rounded-md px-2 py-1.5 text-xs bg-white dark:bg-[#333]"
+                                    />
+                                    <button
+                                      type="button"
+                                      onClick={() => void handleCreateCompanyContact()}
+                                      className="shrink-0 px-2 py-1.5 rounded-md text-xs font-medium bg-violet-600 text-white hover:bg-violet-700"
+                                    >
+                                      Добавить
+                                    </button>
+                                  </div>
+                                </div>
+                              )}
+                              <div className="md:col-span-2">
+                                  <label className="block text-[10px] font-bold text-gray-500 dark:text-gray-400 mb-1 uppercase">Сумма (UZS)</label>
+                                  <input
+                                      type="number"
+                                      value={amount}
+                                      onChange={e => setAmount(e.target.value)}
+                                      className="w-full border border-gray-300 dark:border-gray-600 rounded-md px-2.5 py-1.5 min-h-[32px] text-sm bg-white dark:bg-[#333] text-gray-900 dark:text-gray-100 [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none [-moz-appearance:textfield]"
+                                      placeholder="0"
+                                  />
+                              </div>
+                              <details className="md:col-span-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white/50 dark:bg-[#1e1e1e]/50 group">
+                                <summary className="cursor-pointer text-[10px] font-bold text-gray-500 dark:text-gray-400 uppercase px-3 py-2">
+                                  Каналы, файлы, примечание
+                                </summary>
+                                <div className="px-3 pb-3 space-y-3 border-t border-gray-100 dark:border-gray-800 pt-2">
                               <div className="md:col-span-2 space-y-1">
                                   <label className="flex items-center gap-1.5 text-[10px] font-bold text-gray-500 dark:text-gray-400 uppercase">
                                       <MessageCircle size={14} className="text-sky-500 shrink-0" />
@@ -1496,17 +1595,6 @@ const SalesFunnelView: React.FC<SalesFunnelViewProps> = ({ deals, clients, users
                                     </p>
                                   )}
                               </div>
-                              <div className="md:col-span-2">
-                                  <label className="block text-[10px] font-bold text-gray-500 dark:text-gray-400 mb-1 uppercase">Сумма (UZS)</label>
-                                  <input
-                                      type="number"
-                                      value={amount}
-                                      onChange={e => setAmount(e.target.value)}
-                                      className="w-full border border-gray-300 dark:border-gray-600 rounded-md px-2.5 py-1.5 min-h-[32px] text-sm bg-white dark:bg-[#333] text-gray-900 dark:text-gray-100 [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none [-moz-appearance:textfield]"
-                                      placeholder="0"
-                                  />
-                              </div>
-                          </div>
 
                           <div className="rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50/80 dark:bg-[#252525]/80 p-3 space-y-2">
                             <div className="flex items-center justify-between gap-2">
@@ -1599,6 +1687,9 @@ const SalesFunnelView: React.FC<SalesFunnelViewProps> = ({ deals, clients, users
                                   className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-2.5 py-2 text-sm bg-white dark:bg-[#333] text-gray-900 dark:text-gray-100 resize-y min-h-[72px]"
                                   placeholder="Дополнительно о сделке..."
                               />
+                          </div>
+                                </div>
+                              </details>
                           </div>
 
                           <div className="flex flex-col sm:flex-row gap-2 pt-1">

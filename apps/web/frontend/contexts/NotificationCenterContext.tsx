@@ -33,6 +33,14 @@ function notificationsWsReconnectDelayMs(attemptIndex: number): number {
 
 const WS_MAX_FAILS_BEFORE_SESSION_DISABLE = 20;
 
+function isUnreadCountPollAuthStop(e: unknown): boolean {
+  const s = e instanceof Error ? e.message : String(e);
+  if (/\b401\b|\b403\b/.test(s)) return true;
+  return /not authenticated|session expired|session invalidated|invalid or expired token|forbidden|permission denied|admin access required/i.test(
+    s
+  );
+}
+
 export function NotificationCenterProvider({
   userId,
   children,
@@ -204,13 +212,15 @@ export function NotificationCenterProvider({
     connectSocket();
 
     const pollId = window.setInterval(() => {
-      api.notifications
+      void api.notifications
         .unreadCount(userId)
         .then((res) => {
           if (!mounted) return;
           setUnreadCount(res.unreadCount || 0);
         })
-        .catch(() => {});
+        .catch((err) => {
+          if (isUnreadCountPollAuthStop(err)) window.clearInterval(pollId);
+        });
     }, 30000);
 
     return () => {

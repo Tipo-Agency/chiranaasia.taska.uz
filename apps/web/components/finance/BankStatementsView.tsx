@@ -1,8 +1,9 @@
 import React, { useEffect, useImperativeHandle, useMemo, useRef, useState, forwardRef } from 'react';
 import { ChevronDown, ChevronRight, RefreshCw, Loader2, Plus } from 'lucide-react';
 import { financeEndpoint, type BankStatementApi, type IncomeReportApi } from '../../services/apiClient';
+import { subtractMoney, sumMoney } from '../../utils/uzsMoney';
 import { DateInput, ModuleSegmentedControl } from '../ui';
-import { TaskSelect } from '../TaskSelect';
+import { EntitySearchSelect } from '../ui/EntitySearchSelect';
 import { dedupeBankStatementFlatLines, parseBankStatementFile } from '../../utils/bankStatementParser';
 import type { FinancialPlanning, PurchaseRequest } from '../../types';
 import { FpExpenseVerificationTab } from './FpExpenseVerificationTab';
@@ -143,10 +144,10 @@ export const BankStatementsView = forwardRef<BankStatementsViewHandle, BankState
   }, [expenseLines]);
 
   const totals = useMemo(() => {
-    const income = incomeLines.reduce((s, l) => s + l.amount, 0);
-    const expense = expenseLines.reduce((s, l) => s + l.amount, 0);
-    const commission = commissionLines.reduce((s, l) => s + l.amount, 0);
-    return { income, expense, commission, balance: income - expense };
+    const income = sumMoney(incomeLines.map((l) => l.amount));
+    const expense = sumMoney(expenseLines.map((l) => l.amount));
+    const commission = sumMoney(commissionLines.map((l) => l.amount));
+    return { income, expense, commission, balance: subtractMoney(income, expense) };
   }, [incomeLines, expenseLines, commissionLines]);
 
   const salesIncomeByDay = useMemo(() => {
@@ -158,16 +159,21 @@ export const BankStatementsView = forwardRef<BankStatementsViewHandle, BankState
     const byDayBank = new Map<string, number>();
     incomeLines
       .filter((l) => l.lineType === 'in')
-      .forEach((l) => byDayBank.set(l.lineDate, (byDayBank.get(l.lineDate) || 0) + l.amount));
+      .forEach((l) =>
+        byDayBank.set(l.lineDate, sumMoney([byDayBank.get(l.lineDate) || 0, l.amount]))
+      );
     const days = Array.from(new Set([...Object.keys(salesIncomeByDay), ...Array.from(byDayBank.keys())])).sort();
     return days.map((day) => {
       const sales = Number(salesIncomeByDay[day] || 0);
       const bank = Number(byDayBank.get(day) || 0);
-      return { day, sales, bank, delta: bank - sales };
+      return { day, sales, bank, delta: subtractMoney(bank, sales) };
     });
   }, [incomeLines, salesIncomeByDay]);
 
-  const reconciliationTotal = useMemo(() => reconciliationRows.reduce((s, r) => s + r.delta, 0), [reconciliationRows]);
+  const reconciliationTotal = useMemo(
+    () => sumMoney(reconciliationRows.map((r) => r.delta)),
+    [reconciliationRows]
+  );
 
   const handleUpload = async (file: File) => {
     const parsed = await parseBankStatementFile(file);
@@ -248,15 +254,16 @@ export const BankStatementsView = forwardRef<BankStatementsViewHandle, BankState
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
         <DateInput value={startDate} onChange={setStartDate} placeholder="Период: с" />
         <DateInput value={endDate} onChange={setEndDate} placeholder="Период: по" />
-        <TaskSelect
+        <EntitySearchSelect
           value={department}
           onChange={setDepartment}
           options={[
-            { value: 'all', label: 'Подразделение: все' },
-            { value: 'sales', label: 'Продажи' },
-            { value: 'marketing', label: 'Маркетинг' },
-            { value: 'operations', label: 'Операционный отдел' },
+            { value: 'all', label: 'Подразделение: все', searchText: 'все all подразделение' },
+            { value: 'sales', label: 'Продажи', searchText: 'продажи sales' },
+            { value: 'marketing', label: 'Маркетинг', searchText: 'маркетинг marketing' },
+            { value: 'operations', label: 'Операционный отдел', searchText: 'операции operations' },
           ]}
+          searchPlaceholder="Подразделение…"
         />
       </div>
       )}
@@ -504,12 +511,13 @@ export const BankStatementsView = forwardRef<BankStatementsViewHandle, BankState
       {tab === 'income-reports' && (
         <div className="space-y-3">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-            <TaskSelect
+            <EntitySearchSelect
               value={reportPeriod}
               onChange={setReportPeriod}
               options={Array.from(new Set([new Date().toISOString().slice(0, 7), ...incomeReports.map((r) => r.period)]))
                 .sort()
-                .map((p) => ({ value: p, label: p }))}
+                .map((p) => ({ value: p, label: p, searchText: p }))}
+              searchPlaceholder="Период…"
             />
             <input
               value={reportIncome}

@@ -4,9 +4,10 @@
  */
 import React, { useState, useMemo, useEffect } from 'react';
 import { Bdr, BdrRow, BdrTotalsMonth } from '../../types';
+import { moneyToTiyin, splitTiyinProportionally, subtractMoney, sumMoney, tiyinToMoney } from '../../utils/uzsMoney';
 import { Trash2, Save, TrendingUp, TrendingDown, Check, Pencil } from 'lucide-react';
 import { ModuleCreateIconButton } from '../ui/ModuleCreateIconButton';
-import { TaskSelect } from '../TaskSelect';
+import { EntitySearchSelect } from '../ui/EntitySearchSelect';
 
 const MONTHS = ['Янв', 'Фев', 'Мар', 'Апр', 'Май', 'Июн', 'Июл', 'Авг', 'Сен', 'Окт', 'Ноя', 'Дек'];
 
@@ -28,16 +29,18 @@ function aggregateFromMonthTotals(
   period: { months: string[] },
   byMonth: Record<string, BdrTotalsMonth>
 ): { income: number; expense: number; profit: number } {
-  let income = 0;
-  let expense = 0;
+  const incParts: number[] = [];
+  const expParts: number[] = [];
   for (const m of period.months) {
     const cell = byMonth[m];
     if (cell) {
-      income += cell.income;
-      expense += cell.expense;
+      incParts.push(cell.income);
+      expParts.push(cell.expense);
     }
   }
-  return { income, expense, profit: income - expense };
+  const income = sumMoney(incParts);
+  const expense = sumMoney(expParts);
+  return { income, expense, profit: subtractMoney(income, expense) };
 }
 
 interface BdrViewProps {
@@ -94,15 +97,17 @@ export const BdrView: React.FC<BdrViewProps> = ({ bdr, onLoadBdr, onSaveBdr }) =
       const period = periods.find(p => p.key === periodKey);
       const monthKeys = period?.months || [periodKey];
       const n = monthKeys.length || 1;
-      monthKeys.forEach(m => { next.amounts[m] = Math.round((value / n) * 100) / 100; });
+      const parts = splitTiyinProportionally(moneyToTiyin(value), Array.from({ length: n }, () => 1));
+      monthKeys.forEach((m, i) => {
+        next.amounts[m] = tiyinToMoney(parts[i] ?? 0);
+      });
       return next;
     }));
     setDirty(true);
   };
 
   const getCellValue = (row: BdrRow, period: { months: string[] }): number => {
-    const sum = period.months.reduce((s, m) => s + (row.amounts[m] ?? 0), 0);
-    return Math.round(sum * 100) / 100;
+    return sumMoney(period.months.map((m) => row.amounts[m] ?? 0));
   };
 
   const addRow = (type: 'income' | 'expense') => {
@@ -172,10 +177,15 @@ export const BdrView: React.FC<BdrViewProps> = ({ bdr, onLoadBdr, onSaveBdr }) =
         <div className="flex flex-wrap items-center gap-3">
           <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Год:</label>
           <div className="w-36">
-            <TaskSelect
+            <EntitySearchSelect
               value={String(year)}
               onChange={(v) => setYear(parseInt(v, 10))}
-              options={[currentYear - 1, currentYear, currentYear + 1].map((y) => ({ value: String(y), label: String(y) }))}
+              options={[currentYear - 1, currentYear, currentYear + 1].map((y) => ({
+                value: String(y),
+                label: String(y),
+                searchText: String(y),
+              }))}
+              searchPlaceholder="Год…"
             />
           </div>
           <span className="text-sm text-gray-500 dark:text-gray-400">|</span>

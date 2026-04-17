@@ -174,12 +174,50 @@ export const MiniMessenger: React.FC<MiniMessengerProps> = ({
     refreshLocal();
   };
 
+  const markSystemFeedRead = async () => {
+    const all = chatLocalService.getMessagesForUser(currentUser.id);
+    const incomingUnread = all.filter(
+      (m) =>
+        m.fromId === SYSTEM_CHAT_SENDER_ID &&
+        m.toId === currentUser.id &&
+        m.read === false
+    );
+    if (!incomingUnread.length) return;
+    await Promise.all(
+      incomingUnread.map((m) => api.messages.markRead(m.id, true).catch(() => {}))
+    );
+    chatLocalService.upsertMessages(incomingUnread.map((m) => ({ ...m, read: true })));
+    refreshLocal();
+  };
+
+  const markBroadcastRead = async () => {
+    const all = chatLocalService.getMessagesForUser(currentUser.id);
+    const incomingUnread = all.filter(
+      (m) =>
+        m.toId === TO_ALL_ID &&
+        m.fromId !== currentUser.id &&
+        m.read === false
+    );
+    if (!incomingUnread.length) return;
+    await Promise.all(
+      incomingUnread.map((m) => api.messages.markRead(m.id, true).catch(() => {}))
+    );
+    chatLocalService.upsertMessages(incomingUnread.map((m) => ({ ...m, read: true })));
+    refreshLocal();
+  };
+
   useEffect(() => {
     if (!activeId) return;
-    if (activeId === SYSTEM_FEED_UI) return;
-    if (activeId === TO_ALL_ID) return;
+    if (activeId === SYSTEM_FEED_UI) {
+      void markSystemFeedRead();
+      return;
+    }
+    if (activeId === TO_ALL_ID) {
+      void markBroadcastRead();
+      return;
+    }
     void markThreadRead(activeId);
-  }, [activeId]);
+  }, [activeId, currentUser.id]);
 
   useEffect(() => {
     if (initialOpenSystemFeed) {

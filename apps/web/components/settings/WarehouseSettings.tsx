@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { Warehouse, Department } from '../../types';
 import { Plus, Trash2, Save } from 'lucide-react';
-import { TaskSelect } from '../TaskSelect';
+import { EntitySearchSelect } from '../ui/EntitySearchSelect';
 
 interface WarehouseSettingsProps {
   warehouses: Warehouse[];
@@ -63,10 +63,15 @@ export const WarehouseSettings: React.FC<WarehouseSettingsProps> = ({
           <p className="text-sm text-gray-500 dark:text-gray-400">Сначала создайте склад ниже.</p>
         ) : (
           <div className="max-w-md">
-            <TaskSelect
+            <EntitySearchSelect
               value={defaultWarehouseId}
               onChange={(v) => setDefaultWarehouse(v)}
-              options={activeWarehouses.map((w) => ({ value: w.id, label: w.name }))}
+              options={activeWarehouses.map((w) => ({
+                value: w.id,
+                label: w.name,
+                searchText: `${w.name} ${w.location || ''}`,
+              }))}
+              searchPlaceholder="Склад…"
             />
             <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
               Основной склад используется как выбор по умолчанию в модуле «Склад».
@@ -92,13 +97,14 @@ export const WarehouseSettings: React.FC<WarehouseSettingsProps> = ({
             className="md:col-span-1 border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-[#333] text-gray-900 dark:text-gray-100"
           />
           <div className="md:col-span-1">
-            <TaskSelect
+            <EntitySearchSelect
               value={departmentId}
               onChange={setDepartmentId}
               options={[
                 { value: '', label: 'Без подразделения' },
-                ...departments.filter((d) => !d.isArchived).map((d) => ({ value: d.id, label: d.name })),
+                ...departments.filter((d) => !d.isArchived).map((d) => ({ value: d.id, label: d.name, searchText: d.name })),
               ]}
+              searchPlaceholder="Подразделение…"
             />
           </div>
           <button

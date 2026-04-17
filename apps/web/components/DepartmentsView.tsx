@@ -2,7 +2,7 @@
 import React, { useState, useMemo, useCallback } from 'react';
 import { Department, User } from '../types';
 import { X, Edit2, Trash2, Building, GitFork } from 'lucide-react';
-import { TaskSelect } from './TaskSelect';
+import { EntitySearchSelect } from './ui/EntitySearchSelect';
 import { ModulePageShell, ModulePageHeader, MODULE_PAGE_GUTTER, ModuleCreateIconButton } from './ui';
 import { getDefaultAvatarForId } from '../constants/avatars';
 
@@ -254,13 +254,14 @@ const DepartmentsView: React.FC<DepartmentsViewProps> = ({ departments, users, o
                 <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 mb-1">
                   Родительское подразделение
                 </label>
-                <TaskSelect
+                <EntitySearchSelect
                   value={parentId}
                   onChange={setParentId}
                   options={[
-                    { value: '', label: 'Корень (верхний уровень)' },
-                    ...parentOptions.map((d) => ({ value: d.id, label: d.name })),
+                    { value: '', label: 'Корень (верхний уровень)', searchText: 'корень верхний уровень' },
+                    ...parentOptions.map((d) => ({ value: d.id, label: d.name, searchText: d.name })),
                   ]}
+                  searchPlaceholder="Подразделение…"
                 />
                 <p className="text-[11px] text-gray-500 dark:text-gray-400 mt-1">
                   Дочерние отделы отображаются вложенным списком под родителем.
@@ -269,10 +270,14 @@ const DepartmentsView: React.FC<DepartmentsViewProps> = ({ departments, users, o
 
               <div>
                 <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 mb-1">Руководитель</label>
-                <TaskSelect
+                <EntitySearchSelect
                   value={headId}
                   onChange={setHeadId}
-                  options={[{ value: '', label: 'Не назначен' }, ...users.map((u) => ({ value: u.id, label: u.name }))]}
+                  options={[
+                    { value: '', label: 'Не назначен' },
+                    ...users.map((u) => ({ value: u.id, label: u.name, searchText: u.name })),
+                  ]}
+                  searchPlaceholder="Сотрудник…"
                 />
               </div>
 

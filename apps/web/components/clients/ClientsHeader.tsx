@@ -7,12 +7,19 @@ import { ModulePageHeader } from '../ui/ModulePageHeader';
 import { MODULE_ACCENTS } from '../ui/moduleAccent';
 import { ModuleSelectDropdown } from '../ui/ModuleSelectDropdown';
 
+type ClientsAreaTab = 'clients' | 'contracts' | 'receivables';
+
 interface ClientsHeaderProps {
   salesFunnels?: SalesFunnel[];
   selectedFunnelId: string;
   onFunnelChange: (funnelId: string) => void;
   showFunnelFilter?: boolean;
-  activeTab: 'clients' | 'contracts' | 'finance' | 'receivables';
+  activeTab: ClientsAreaTab;
+  /** Если задано — показывается блок заголовка (например, внутри хаба CRM без локальных вкладок). */
+  headerTitle?: string;
+  headerDescription?: string;
+  /** Поле поиска слева в панели (страница ClientsPage). */
+  embedSearch?: { value: string; onChange: (v: string) => void; placeholder?: string };
   onCreateClient: () => void;
   onCreateContract: () => void;
   onCreateSale: () => void;
@@ -22,7 +29,6 @@ interface ClientsHeaderProps {
   hasActiveFilters?: boolean;
   activeFiltersCount?: number;
   tabs?: React.ReactNode;
-  /** Скрыть только кнопки «Создать» (воронка и фильтры по договорам остаются) */
   hideCreateActions?: boolean;
 }
 
@@ -32,6 +38,9 @@ export const ClientsHeader: React.FC<ClientsHeaderProps> = ({
   onFunnelChange,
   showFunnelFilter = false,
   activeTab,
+  headerTitle,
+  headerDescription,
+  embedSearch,
   onCreateClient,
   onCreateContract,
   onCreateSale,
@@ -44,18 +53,28 @@ export const ClientsHeader: React.FC<ClientsHeaderProps> = ({
   hideCreateActions = false,
 }) => {
   const filterActiveClass = MODULE_ACCENTS.violet.filterActive;
+  const showTitleBlock = Boolean(headerTitle);
 
   return (
     <div className="mb-3">
       <ModulePageHeader
         accent="violet"
         icon={<Users size={24} strokeWidth={2} />}
-        title="Клиенты и договора"
-        description="Управление клиентами и контрактами"
-        hideTitleBlock
+        title={headerTitle || 'Клиенты и договора'}
+        description={headerDescription || 'Управление клиентами и контрактами'}
+        hideTitleBlock={!showTitleBlock}
         tabs={tabs}
         controls={
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
+            {embedSearch && (
+              <input
+                type="search"
+                value={embedSearch.value}
+                onChange={(e) => embedSearch.onChange(e.target.value)}
+                placeholder={embedSearch.placeholder || 'Поиск…'}
+                className="min-w-[10rem] max-w-[16rem] flex-1 rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-[#252525] px-2.5 py-1.5 text-sm text-gray-900 dark:text-gray-100"
+              />
+            )}
             {showFunnelFilter && salesFunnels.length > 0 && (
               <ModuleSelectDropdown
                 accent="violet"
@@ -80,7 +99,7 @@ export const ClientsHeader: React.FC<ClientsHeaderProps> = ({
                 ]}
               />
             )}
-            {activeTab === 'contracts' && onFiltersClick && (
+            {onFiltersClick && (
               <Button
                 variant="secondary"
                 size="sm"

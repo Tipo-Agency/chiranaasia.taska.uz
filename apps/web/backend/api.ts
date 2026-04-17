@@ -17,6 +17,7 @@ import {
   notificationEventsEndpoint,
   notificationsEndpoint,
   clientsEndpoint,
+  crmContactsEndpoint,
   contractsEndpoint,
   employeesEndpoint,
   dealsEndpoint,
@@ -61,6 +62,7 @@ export const api = {
   notifications: notificationsEndpoint,
 
   clients: clientsEndpoint,
+  crmContacts: crmContactsEndpoint,
   contracts: contractsEndpoint,
   oneTimeDeals: oneTimeDealsEndpoint,
   accountsReceivable: accountsReceivableEndpoint,

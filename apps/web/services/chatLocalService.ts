@@ -42,6 +42,7 @@ function readAll(): ChatMessageLocal[] {
 function writeAll(messages: ChatMessageLocal[]): void {
   if (typeof window === 'undefined') return;
   localStorage.setItem(STORAGE_KEY, JSON.stringify(messages));
+  window.dispatchEvent(new CustomEvent('taska:chat-messages-changed'));
 }
 
 export const chatLocalService = {

@@ -1,16 +1,21 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { ChevronDown, Search } from 'lucide-react';
 
-export type TaskSelectOption = { value: string; label: string; /** Для searchable: доп. поля (компания, телефон и т.д.) */ searchText?: string };
+export type AppSelectOption = {
+  value: string;
+  label: string;
+  /** Для searchable: доп. поля (компания, телефон и т.д.) */
+  searchText?: string;
+};
 
-interface TaskSelectProps {
+export interface AppSelectProps {
   value: string;
   onChange: (value: string) => void;
-  options: TaskSelectOption[];
+  options: AppSelectOption[];
   placeholder?: string;
   className?: string;
   disabled?: boolean;
-  /** Компактная высота — для плотных форм (модалка задачи и т.п.) */
+  /** Компактная высота — для плотных форм (модалки и т.п.) */
   size?: 'default' | 'compact';
   /** Поле поиска в выпадающем списке (фильтр по label и searchText) */
   searchable?: boolean;
@@ -19,10 +24,9 @@ interface TaskSelectProps {
 }
 
 /**
- * Универсальный компонент select в стиле TaskModal
- * Стрелка ChevronDown справа, вертикально по центру
+ * Универсальный выпадающий список в стиле приложения (формы, фильтры, сущности — не только задачи).
  */
-export const TaskSelect: React.FC<TaskSelectProps> = ({
+export const AppSelect: React.FC<AppSelectProps> = ({
   value,
   onChange,
   options,
@@ -183,4 +187,3 @@ export const TaskSelect: React.FC<TaskSelectProps> = ({
     </div>
   );
 };
-

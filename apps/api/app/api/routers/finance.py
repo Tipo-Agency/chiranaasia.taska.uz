@@ -528,7 +528,7 @@ async def create_finance_request_endpoint(
         entity_id=new_id,
         source="finance-router",
         actor_id=body.requester_id or body.requested_by,
-        payload={"title": row.title, "amount": str(row.amount), "status": row.status},
+        payload={"title": row.title, "amount": str(row.amount), "status": row.status, "requesterId": row.requested_by or body.requester_id},
     )
     await log_mutation(
         db,
@@ -600,7 +600,7 @@ async def patch_finance_request_endpoint(
             entity_id=finance_request_id,
             source="finance-router",
             actor_id=current_user.id,
-            payload={"fromStatus": prev_status, "toStatus": row.status, "title": row.title},
+            payload={"fromStatus": prev_status, "toStatus": row.status, "title": row.title, "requesterId": row.requested_by},
         )
     audit_payload: dict = {
         "status": row.status,

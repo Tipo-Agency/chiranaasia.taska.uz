@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Deal, Client } from '../../types';
 import { X } from 'lucide-react';
-import { TaskSelect } from '../TaskSelect';
+import { EntitySearchSelect } from '../ui/EntitySearchSelect';
 import { normalizeDateForInput } from '../../utils/dateUtils';
 import { DateInput } from '../ui/DateInput';
 
@@ -167,14 +167,15 @@ export const ContractModal: React.FC<ContractModalProps> = ({
             </div>
             <div>
               <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 mb-1">Статус</label>
-              <TaskSelect
+              <EntitySearchSelect
                 value={contractStatus}
                 onChange={(val) => setContractStatus(val as any)}
                 options={[
-                  { value: 'active', label: 'Активен' },
-                  { value: 'pending', label: 'Ожидание' },
-                  { value: 'completed', label: 'Закрыт' }
+                  { value: 'active', label: 'Активен', searchText: 'активен active' },
+                  { value: 'pending', label: 'Ожидание', searchText: 'ожидание pending' },
+                  { value: 'completed', label: 'Закрыт', searchText: 'закрыт completed' },
                 ]}
+                searchPlaceholder="Статус…"
               />
             </div>
           </div>

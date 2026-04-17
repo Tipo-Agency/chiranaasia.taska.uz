@@ -10,20 +10,18 @@ import {
   AccountsReceivable,
   Meeting,
   SalesFunnel,
+  type CrmHubTab,
 } from '../../types';
 import type { AppActions } from '../../frontend/hooks/useAppLogic';
 import { hasPermission } from '../../utils/permissions';
 import { CRMModule } from './CRMModule';
-import { ClientChatsPage } from '../pages/ClientChatsPage';
 import { useAppToolbar } from '../../contexts/AppToolbarContext';
 import { MODULE_ACCENTS, MODULE_TOOLBAR_TAB_IDLE } from '../ui/moduleAccent';
-
-export type CrmHubTab = 'funnel' | 'chats' | 'clients' | 'rejected';
 
 interface CRMHubModuleProps {
   tab: CrmHubTab;
   onTabChange: (tab: CrmHubTab) => void;
-  /** Строка поиска в шапке — фильтр сделок на вкладках воронки / отказы */
+  /** Строка поиска в шапке — фильтр сделок на вкладке «Воронка». */
   headerSearchQuery?: string;
   currentUser: User;
   deals: Deal[];
@@ -58,17 +56,18 @@ export const CRMHubModule: React.FC<CRMHubModuleProps> = ({
 }) => {
   const { setLeading } = useAppToolbar();
   const canFunnel = hasPermission(currentUser, 'crm.sales_funnel');
-  const canChats = hasPermission(currentUser, 'crm.client_chats');
   const canClients = hasPermission(currentUser, 'crm.clients');
 
   const options = useMemo(() => {
     const o: { value: CrmHubTab; label: string }[] = [];
     if (canFunnel) o.push({ value: 'funnel', label: 'Воронка' });
-    if (canChats) o.push({ value: 'chats', label: 'Диалоги' });
-    if (canClients) o.push({ value: 'clients', label: 'Клиенты и договора' });
-    if (canFunnel) o.push({ value: 'rejected', label: 'Отказы' });
+    if (canClients) {
+      o.push({ value: 'clients', label: 'Клиенты' });
+      o.push({ value: 'contracts', label: 'Договоры и продажи' });
+      o.push({ value: 'receivables', label: 'Задолженности' });
+    }
     return o;
-  }, [canFunnel, canChats, canClients]);
+  }, [canFunnel, canClients]);
 
   const effectiveTab: CrmHubTab = useMemo(() => {
     if (options.some((x) => x.value === tab)) return tab;
@@ -80,12 +79,20 @@ export const CRMHubModule: React.FC<CRMHubModuleProps> = ({
     if (tab !== effectiveTab) onTabChange(effectiveTab);
   }, [options.length, tab, effectiveTab, onTabChange]);
 
-  /** Создание сущностей из шапки воронки — переключаем на «Клиенты» и открываем нужную модалку */
+  /** Создание из шапки воронки — переключаем вкладку CRM и открываем модалку. */
   useEffect(() => {
     const onHubCreate = (event: Event) => {
       const t = (event as CustomEvent<{ type?: string }>).detail?.type;
       if (!t || t === 'deal') return;
-      onTabChange('clients');
+      if (t === 'client') {
+        onTabChange('clients');
+      } else if (t === 'contract' || t === 'sale') {
+        onTabChange('contracts');
+      } else if (t === 'receivable') {
+        onTabChange('receivables');
+      } else {
+        onTabChange('clients');
+      }
       window.setTimeout(() => {
         window.dispatchEvent(new CustomEvent('clients:openModal', { detail: { kind: t } }));
       }, 100);
@@ -153,25 +160,15 @@ export const CRMHubModule: React.FC<CRMHubModuleProps> = ({
     <div className="h-full min-h-0 flex flex-col bg-white dark:bg-[#191919]">
       <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
         {effectiveTab === 'funnel' && canFunnel && <CRMModule view="sales-funnel" {...sharedCrm} />}
-        {effectiveTab === 'chats' && canChats && (
-          <ClientChatsPage
-            layout="embedded"
-            deals={deals}
-            clients={clients}
-            users={users}
-            currentUser={currentUser}
-            salesFunnels={salesFunnels}
-            onSaveDeal={actions.saveDeal}
-            onOpenInFunnel={(deal) => {
-              onTabChange('funnel');
-              window.setTimeout(() => {
-                window.dispatchEvent(new CustomEvent('openDealFromChat', { detail: { dealId: deal.id } }));
-              }, 0);
-            }}
-          />
+        {effectiveTab === 'clients' && canClients && (
+          <CRMModule view="crm-clients" embedInCrmHub crmClientsSection="clients" {...sharedCrm} />
         )}
-        {effectiveTab === 'clients' && canClients && <CRMModule view="clients" embedInCrmHub {...sharedCrm} />}
-        {effectiveTab === 'rejected' && canFunnel && <CRMModule view="sales-funnel" forcedFunnelViewMode="rejected" {...sharedCrm} />}
+        {effectiveTab === 'contracts' && canClients && (
+          <CRMModule view="crm-clients" embedInCrmHub crmClientsSection="contracts" {...sharedCrm} />
+        )}
+        {effectiveTab === 'receivables' && canClients && (
+          <CRMModule view="crm-clients" embedInCrmHub crmClientsSection="receivables" {...sharedCrm} />
+        )}
       </div>
     </div>
   );

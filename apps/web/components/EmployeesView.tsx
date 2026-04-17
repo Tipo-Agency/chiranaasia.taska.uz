@@ -12,7 +12,7 @@ import {
   MODULE_TOOLBAR_TAB_IDLE,
 } from './ui';
 import { useAppToolbar } from '../contexts/AppToolbarContext';
-import { TaskSelect } from './TaskSelect';
+import { EntitySearchSelect } from './ui/EntitySearchSelect';
 import { getDefaultAvatarForId } from '../constants/avatars';
 import { formatDate, normalizeDateForInput } from '../utils/dateUtils';
 import { DateInput } from './ui/DateInput';
@@ -782,19 +782,20 @@ const EmployeesView: React.FC<EmployeesViewProps> = ({
                 <form onSubmit={handleSubmit} className="p-5 space-y-4">
                     <div>
                         <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 mb-1">Сотрудник (из пользователей)</label>
-                        <TaskSelect
+                        <EntitySearchSelect
                             value={userId}
                             onChange={setUserId}
                             options={[
                                 { value: '', label: 'Не назначен' },
-                                ...users.map(u => ({ value: u.id, label: u.name }))
+                                ...users.map((u) => ({ value: u.id, label: u.name, searchText: u.name })),
                             ]}
+                            searchPlaceholder="Пользователь…"
                         />
                     </div>
 
                     <div>
                         <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 mb-1">Пост в оргструктуре</label>
-                        <TaskSelect
+                        <EntitySearchSelect
                             value={orgPositionId}
                             onChange={(value) => {
                                 setOrgPositionId(value);
@@ -804,8 +805,9 @@ const EmployeesView: React.FC<EmployeesViewProps> = ({
                             }}
                             options={[
                                 { value: '', label: 'Не выбран' },
-                                ...activeOrgPositions.map((p) => ({ value: p.id, label: p.title }))
+                                ...activeOrgPositions.map((p) => ({ value: p.id, label: p.title, searchText: p.title })),
                             ]}
+                            searchPlaceholder="Должность…"
                         />
                         <p className="text-[11px] text-gray-500 dark:text-gray-400 mt-1">
                           На одну должность можно завести несколько карточек сотрудников. Задачи по должности: по очереди или всем — настраивается в карточке должности.
@@ -814,13 +816,14 @@ const EmployeesView: React.FC<EmployeesViewProps> = ({
 
                     <div>
                         <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 mb-1">Подразделение</label>
-                        <TaskSelect
+                        <EntitySearchSelect
                             value={departmentId}
                             onChange={setDepartmentId}
                             options={[
                                 { value: '', label: 'Не выбрано' },
-                                ...departments.map((d) => ({ value: d.id, label: d.name })),
+                                ...departments.map((d) => ({ value: d.id, label: d.name, searchText: d.name })),
                             ]}
+                            searchPlaceholder="Подразделение…"
                         />
                     </div>
 
@@ -837,7 +840,8 @@ const EmployeesView: React.FC<EmployeesViewProps> = ({
 
                     <div>
                         <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 mb-1">Статус</label>
-                        <TaskSelect
+                        <EntitySearchSelect
+                            searchable={false}
                             value={empStatus}
                             onChange={setEmpStatus}
                             options={[
@@ -887,37 +891,50 @@ const EmployeesView: React.FC<EmployeesViewProps> = ({
 
                     <div>
                         <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 mb-1">Подразделение</label>
-                        <TaskSelect
+                        <EntitySearchSelect
                             value={posDep}
                             onChange={setPosDep}
                             options={[
                                 { value: '', label: 'Без отдела' },
-                                ...departments.map(d => ({ value: d.id, label: d.name }))
+                                ...departments.map((d) => ({ value: d.id, label: d.name, searchText: d.name })),
                             ]}
+                            searchPlaceholder="Подразделение…"
                         />
                     </div>
 
                     <div>
                         <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 mb-1">Прямой руководитель</label>
-                        <TaskSelect
+                        <EntitySearchSelect
                             value={posManager}
                             onChange={setPosManager}
                             options={[
                                 { value: '', label: 'Нет (Верхний уровень)' },
-                                ...activeOrgPositions.filter(p => p.id !== editingPos?.id).map(p => ({ value: p.id, label: p.title }))
+                                ...activeOrgPositions
+                                    .filter((p) => p.id !== editingPos?.id)
+                                    .map((p) => ({ value: p.id, label: p.title, searchText: p.title })),
                             ]}
+                            searchPlaceholder="Руководитель…"
                         />
                     </div>
 
                     <div>
                         <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 mb-1">Задачи BPM на эту должность</label>
-                        <TaskSelect
+                        <EntitySearchSelect
                             value={posTaskMode}
                             onChange={(v) => setPosTaskMode(v as 'round_robin' | 'all')}
                             options={[
-                                { value: 'round_robin', label: 'По очереди (один исполнитель на задачу)' },
-                                { value: 'all', label: 'Все сотрудники на должности (одна задача, несколько ответственных)' },
+                                {
+                                    value: 'round_robin',
+                                    label: 'По очереди (один исполнитель на задачу)',
+                                    searchText: 'по очереди round robin один исполнитель',
+                                },
+                                {
+                                    value: 'all',
+                                    label: 'Все сотрудники на должности (одна задача, несколько ответственных)',
+                                    searchText: 'все сотрудники несколько ответственных all',
+                                },
                             ]}
+                            searchPlaceholder="Режим задач…"
                         />
                         <p className="text-[11px] text-gray-500 dark:text-gray-400 mt-1">
                           «По очереди» — исполнитель ротируется между людьми на посту. «Все» — в задаче указываются все ответственные.
@@ -926,13 +943,14 @@ const EmployeesView: React.FC<EmployeesViewProps> = ({
 
                     <div>
                         <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 mb-1">Основной сотрудник (для отображения)</label>
-                        <TaskSelect
+                        <EntitySearchSelect
                             value={posHolder}
                             onChange={setPosHolder}
                             options={[
                                 { value: '', label: 'Вакансия' },
-                                ...users.map(u => ({ value: u.id, label: u.name }))
+                                ...users.map((u) => ({ value: u.id, label: u.name, searchText: u.name })),
                             ]}
+                            searchPlaceholder="Сотрудник…"
                         />
                         <p className="text-[11px] text-gray-500 dark:text-gray-400 mt-1">
                           Дополнительно привяжите людей через карточки сотрудников — тот же пост у нескольких карточек.

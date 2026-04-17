@@ -579,7 +579,7 @@ const DocumentsView: React.FC<DocumentsViewProps> = ({
         <div className={scrollAreaClass}>
           {docSection === 'docs' ? (
             <>
-              {renderBreadcrumbs()}
+              {currentFolderId != null ? renderBreadcrumbs() : null}
               {viewMode === 'grid' ? (
                <div className="space-y-8">
                    {/* FOLDERS GRID + системные разделы в той же сетке */}

@@ -8,7 +8,14 @@ import { Trash2, Plus, User as UserIcon, Briefcase, Bot, Save, Archive, KeyRound
 import { ModulePageHeader } from './ui/ModulePageHeader';
 import { storageService } from '../services/storageService';
 import { getDefaultAvatarForId, getRandomDefaultAvatar } from '../constants/avatars';
-import { LABEL_COLORS, PRIORITY_COLORS, ICON_OPTIONS, COLOR_OPTIONS, DEFAULT_NOTIFICATION_PREFS } from '../constants';
+import {
+  LABEL_COLORS,
+  PRIORITY_COLORS,
+  ICON_OPTIONS,
+  COLOR_OPTIONS,
+  DEFAULT_NOTIFICATION_PREFS,
+  swatchHexForTableColorToken,
+} from '../constants';
 import { DynamicIcon } from './AppIcons';
 import { SystemAlertDialog, SystemConfirmDialog } from './ui';
 
@@ -496,11 +503,24 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                                 </div>
                                 <div>
                                     <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 mb-2 uppercase">Цвет</label>
-                                    <div className="grid grid-cols-5 gap-2">
-                                        {COLOR_OPTIONS.map(c => (
-                                            <div key={c} onClick={() => setNewProjectColor(c)} className={`w-6 h-6 rounded-full cursor-pointer border-2 ${newProjectColor === c ? 'border-gray-900 dark:border-white scale-110' : 'border-transparent hover:scale-105'}`}>
-                                                <div className={`w-full h-full rounded-full ${c.replace('text-', 'bg-').replace('500', '400')}`}></div>
-                                            </div>
+                                    <div className="grid grid-cols-5 gap-2 p-2 rounded-lg border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-[#1a1a1a]">
+                                        {COLOR_OPTIONS.map((c) => (
+                                            <button
+                                                key={c}
+                                                type="button"
+                                                title={c}
+                                                onClick={() => setNewProjectColor(c)}
+                                                className={`mx-auto flex h-9 w-9 shrink-0 items-center justify-center rounded-full border-2 transition-transform ${
+                                                    newProjectColor === c
+                                                        ? 'border-gray-900 dark:border-white ring-2 ring-offset-1 ring-offset-gray-50 dark:ring-offset-[#1a1a1a] ring-blue-500/40 scale-105'
+                                                        : 'border-gray-200 dark:border-gray-600 hover:border-gray-400'
+                                                }`}
+                                            >
+                                                <span
+                                                    className="block h-6 w-6 rounded-full shadow-inner ring-1 ring-black/10 dark:ring-white/15"
+                                                    style={{ backgroundColor: swatchHexForTableColorToken(c) }}
+                                                />
+                                            </button>
                                         ))}
                                     </div>
                                 </div>
@@ -597,9 +617,24 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
 
                                     <div>
                                         <label className="block text-xs font-bold text-gray-500 mb-2">Цвет</label>
-                                        <div className="grid grid-cols-9 gap-2">
-                                            {COLOR_OPTIONS.map(c => (
-                                                <div key={c} onClick={() => setNewPageColor(c)} className={`w-6 h-6 rounded-full cursor-pointer border-2 ${newPageColor === c ? 'border-gray-900 dark:border-white' : 'border-transparent'}`}><div className={`w-full h-full rounded-full ${c.replace('text-', 'bg-').replace('500', '400')}`}></div></div>
+                                        <div className="grid grid-cols-5 gap-2 p-2 rounded-lg border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-[#1a1a1a]">
+                                            {COLOR_OPTIONS.map((c) => (
+                                                <button
+                                                    key={c}
+                                                    type="button"
+                                                    title={c}
+                                                    onClick={() => setNewPageColor(c)}
+                                                    className={`mx-auto flex h-9 w-9 shrink-0 items-center justify-center rounded-full border-2 transition-transform ${
+                                                        newPageColor === c
+                                                            ? 'border-gray-900 dark:border-white ring-2 ring-offset-1 ring-offset-gray-50 dark:ring-offset-[#1a1a1a] ring-blue-500/40 scale-105'
+                                                            : 'border-gray-200 dark:border-gray-600 hover:border-gray-400'
+                                                    }`}
+                                                >
+                                                    <span
+                                                        className="block h-6 w-6 rounded-full shadow-inner ring-1 ring-black/10 dark:ring-white/15"
+                                                        style={{ backgroundColor: swatchHexForTableColorToken(c) }}
+                                                    />
+                                                </button>
                                             ))}
                                         </div>
                                     </div>

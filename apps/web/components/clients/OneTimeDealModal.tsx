@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Deal, Client } from '../../types';
 import { X } from 'lucide-react';
-import { TaskSelect } from '../TaskSelect';
+import { EntitySearchSelect } from '../ui/EntitySearchSelect';
 import { normalizeDateForInput } from '../../utils/dateUtils';
 import { DateInput } from '../ui/DateInput';
 import { SystemAlertDialog, SystemConfirmDialog } from '../ui';
@@ -132,10 +132,15 @@ export const OneTimeDealModal: React.FC<OneTimeDealModalProps> = ({
         <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto custom-scrollbar p-6 space-y-4">
           <div>
             <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 mb-1">Клиент *</label>
-            <TaskSelect
+            <EntitySearchSelect
               value={oneTimeDealClientId}
               onChange={setOneTimeDealClientId}
-              options={clients.map(c => ({ value: c.id, label: c.name }))}
+              options={clients.map((c) => ({
+                value: c.id,
+                label: c.name,
+                searchText: [c.name, c.companyName, c.phone, c.email].filter(Boolean).join(' '),
+              }))}
+              searchPlaceholder="Клиент, компания…"
             />
           </div>
           <div className="grid grid-cols-2 gap-4">
@@ -182,14 +187,15 @@ export const OneTimeDealModal: React.FC<OneTimeDealModalProps> = ({
             </div>
             <div>
               <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 mb-1">Статус</label>
-              <TaskSelect
+              <EntitySearchSelect
                 value={oneTimeDealStatus}
                 onChange={(val) => setOneTimeDealStatus(val as any)}
                 options={[
-                  { value: 'pending', label: 'Ожидает оплаты' },
-                  { value: 'paid', label: 'Оплачено' },
-                  { value: 'overdue', label: 'Просрочено' }
+                  { value: 'pending', label: 'Ожидает оплаты', searchText: 'ожидает оплаты pending' },
+                  { value: 'paid', label: 'Оплачено', searchText: 'оплачено paid' },
+                  { value: 'overdue', label: 'Просрочено', searchText: 'просрочено overdue' },
                 ]}
+                searchPlaceholder="Статус…"
               />
             </div>
           </div>

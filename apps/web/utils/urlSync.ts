@@ -3,6 +3,8 @@
  * Пути без кириллицы — меньше проблем с кодированием и прокси.
  */
 
+import type { CrmHubTab } from '../types/crmHub';
+
 export const VIEW_PATHS: Record<string, string> = {
   home: '/',
   tasks: '/tasks',
@@ -52,7 +54,7 @@ export interface UrlStateSlice {
   activeSpaceTab?: 'content-plan' | 'backlog' | 'functionality';
   settingsTab?: string;
   workdeskTab?: 'dashboard' | 'weekly' | 'tasks' | 'deals' | 'meetings' | 'documents';
-  crmHubTab?: 'funnel' | 'chats' | 'clients';
+  crmHubTab?: CrmHubTab;
   employeesHubTab?: 'team' | 'payroll';
 }
 
@@ -63,7 +65,7 @@ export function buildLocation(opts: {
   activeSpaceTab?: 'content-plan' | 'backlog' | 'functionality' | undefined;
   settingsActiveTab?: string;
   workdeskTab?: 'dashboard' | 'weekly' | 'tasks' | 'deals' | 'meetings' | 'documents';
-  crmHubTab?: 'funnel' | 'chats' | 'clients';
+  crmHubTab?: CrmHubTab;
   employeesHubTab?: 'team' | 'payroll';
 }): string {
   const {
@@ -106,8 +108,9 @@ export function buildLocation(opts: {
 
   if (currentView === 'sales-funnel') {
     let path = VIEW_PATHS['sales-funnel'];
-    if (crmHubTab === 'chats') path += '?crm=chats';
-    else if (crmHubTab === 'clients') path += '?crm=clients';
+    if (crmHubTab === 'clients') path += '?crm=clients';
+    else if (crmHubTab === 'contracts') path += '?crm=contracts';
+    else if (crmHubTab === 'receivables') path += '?crm=receivables';
     return path;
   }
 
@@ -214,8 +217,10 @@ export function parseLocation(pathname: string, search: string): UrlStateSlice |
 
   if (out.view === 'sales-funnel') {
     const crm = q.get('crm');
-    if (crm === 'chats') out.crmHubTab = 'chats';
-    else if (crm === 'clients') out.crmHubTab = 'clients';
+    if (crm === 'clients') out.crmHubTab = 'clients';
+    else if (crm === 'contracts') out.crmHubTab = 'contracts';
+    else if (crm === 'receivables') out.crmHubTab = 'receivables';
+    else if (crm === 'chats' || crm === 'rejected') out.crmHubTab = 'funnel';
     else if (!out.crmHubTab) out.crmHubTab = 'funnel';
   }
 

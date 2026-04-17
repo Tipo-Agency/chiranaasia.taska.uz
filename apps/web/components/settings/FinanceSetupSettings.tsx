@@ -2,7 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { FinanceCategory, Fund } from '../../types';
 import { Button, Input, StandardModal } from '../ui';
 import { Edit2, Trash2 } from 'lucide-react';
-import { TaskSelect } from '../TaskSelect';
+import { EntitySearchSelect } from '../ui/EntitySearchSelect';
 import { SystemConfirmDialog } from '../ui/SystemDialogs';
 
 type CreateKind = 'category' | 'fund';
@@ -256,13 +256,14 @@ export const FinanceSetupSettings: React.FC<{
           <Input label="Название" value={catName} onChange={(e) => setCatName(e.target.value)} />
           <div>
             <div className="text-xs font-bold text-gray-500 dark:text-gray-400 mb-1 uppercase">Тип</div>
-            <TaskSelect
+            <EntitySearchSelect
               value={catType}
               onChange={(v) => setCatType(v as any)}
               options={[
-                { value: 'fixed', label: 'Фиксированная сумма' },
-                { value: 'percent', label: 'Процент от дохода' },
+                { value: 'fixed', label: 'Фиксированная сумма', searchText: 'фиксированная сумма fixed' },
+                { value: 'percent', label: 'Процент от дохода', searchText: 'процент доход percent' },
               ]}
+              searchPlaceholder="Тип…"
             />
           </div>
         </div>

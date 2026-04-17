@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Client, Deal } from '../../types';
 import { X, Edit2, Receipt, FileText } from 'lucide-react';
-import { TaskSelect } from '../TaskSelect';
 import { SystemConfirmDialog } from '../ui';
 
 interface ClientModalProps {

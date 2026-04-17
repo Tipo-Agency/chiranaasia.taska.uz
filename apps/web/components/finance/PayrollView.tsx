@@ -1,5 +1,6 @@
 import React, { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useState } from 'react';
 import type { Department, User } from '../../types';
+import { roundMoney, subtractMoney, sumMoney } from '../../utils/uzsMoney';
 import { ModuleSegmentedControl } from '../ui';
 
 type PayrollSubTab = 'timesheet' | 'conditions' | 'calc' | 'departments';
@@ -160,12 +161,13 @@ export const PayrollView = forwardRef<PayrollViewHandle, PayrollViewProps>(funct
     const t = getTimesheet(userId);
     const a = getAdjustments(userId);
     const ratio = c.planDays > 0 ? Math.min(1, t.workedDays / c.planDays) : 0;
-    const baseAccrued = Math.round(c.baseSalary * ratio);
-    const kpiAccrued = c.kpiRules
+    const baseAccrued = roundMoney(c.baseSalary * ratio);
+    const kpiParts = c.kpiRules
       .filter((r) => a.kpiAppliedIds.includes(r.id))
-      .reduce((s, r) => s + numberOr0(r.amount), 0);
-    const gross = baseAccrued + numberOr0(a.bonus) + kpiAccrued;
-    const net = gross - numberOr0(a.deduction) - numberOr0(a.advance);
+      .map((r) => numberOr0(r.amount));
+    const kpiAccrued = sumMoney(kpiParts);
+    const gross = sumMoney([baseAccrued, numberOr0(a.bonus), kpiAccrued]);
+    const net = subtractMoney(gross, numberOr0(a.deduction), numberOr0(a.advance));
     return { baseAccrued, kpiAccrued, gross, net };
   };
 
@@ -214,12 +216,12 @@ export const PayrollView = forwardRef<PayrollViewHandle, PayrollViewProps>(funct
         const t = getTimesheet(u.id);
         const a = getAdjustments(u.id);
         const r = compute(u.id);
-        acc.baseSalary += c.baseSalary;
+        acc.baseSalary = sumMoney([acc.baseSalary, c.baseSalary]);
         acc.workedDays += t.workedDays;
-        acc.bonus += a.bonus;
-        acc.deduction += a.deduction;
-        acc.advance += a.advance;
-        acc.net += r.net;
+        acc.bonus = sumMoney([acc.bonus, a.bonus]);
+        acc.deduction = sumMoney([acc.deduction, a.deduction]);
+        acc.advance = sumMoney([acc.advance, a.advance]);
+        acc.net = sumMoney([acc.net, r.net]);
         return acc;
       },
       { baseSalary: 0, workedDays: 0, bonus: 0, deduction: 0, advance: 0, net: 0 }
@@ -234,7 +236,7 @@ export const PayrollView = forwardRef<PayrollViewHandle, PayrollViewProps>(funct
       const name = depId === '__none__' ? 'Без подразделения' : deptById.get(depId)?.name || 'Подразделение';
       const row = map.get(depId) || { name, net: 0, users: 0 };
       const r = compute(u.id);
-      row.net += r.net;
+      row.net = sumMoney([row.net, r.net]);
       row.users += 1;
       map.set(depId, row);
     });
@@ -514,7 +516,7 @@ export const PayrollView = forwardRef<PayrollViewHandle, PayrollViewProps>(funct
               <div key={d.id} className="rounded-2xl border border-gray-200 dark:border-[#333] bg-gray-50 dark:bg-[#1a1a1a] p-4">
                 <div className="text-xs text-gray-500 dark:text-gray-400">{d.users} чел.</div>
                 <div className="text-sm font-semibold text-gray-900 dark:text-white truncate">{d.name}</div>
-                <div className="mt-2 text-lg font-bold text-gray-900 dark:text-white">{Math.round(d.net).toLocaleString('ru-RU')} UZS</div>
+                <div className="mt-2 text-lg font-bold text-gray-900 dark:text-white">{roundMoney(d.net).toLocaleString('ru-RU')} UZS</div>
               </div>
             ))}
           </div>

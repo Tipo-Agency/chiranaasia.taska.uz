@@ -5,6 +5,7 @@
  */
 
 import type { FinancialPlanWeekSlice } from '../types/finance';
+import { moneyToTiyin, splitTiyinProportionally, tiyinToMoney } from './uzsMoney';
 
 function addDays(d: Date, n: number): Date {
   const x = new Date(d.getFullYear(), d.getMonth(), d.getDate() + n);
@@ -90,17 +91,14 @@ export function splitMonthIntoWeekSegments(ym: string): MonthWeekSegment[] {
     }
     if (anchorMonth !== ym) continue;
 
-    const overlapStart = first > monday ? first : monday;
-    const overlapEnd = last < sunday ? last : sunday;
-    if (overlapStart > overlapEnd) continue;
-
-    idx += 1;
-    const start = dateKey(overlapStart);
-    const end = dateKey(overlapEnd);
+    /** Полная календарная неделя пн–вс (не обрезать по 1–му/последнему дню месяца). */
+    const start = dateKey(monday);
+    const end = dateKey(sunday);
     let daysInTarget = 0;
-    for (let d = new Date(overlapStart); d <= overlapEnd; d = addDays(d, 1)) {
+    for (let d = new Date(monday); d <= sunday; d = addDays(d, 1)) {
       if (monthKeyFromDate(d) === ym) daysInTarget += 1;
     }
+    idx += 1;
     segments.push({
       start,
       end,
@@ -114,8 +112,18 @@ export function splitMonthIntoWeekSegments(ym: string): MonthWeekSegment[] {
 }
 
 /**
+ * Границы «месяца по большинству дней в неделе»: от понедельника первой такой недели
+ * до воскресенья последней (например апрель 2026: 2026-03-30 … 2026-05-03).
+ */
+export function getMajorityBasedMonthBounds(ym: string): { start: string; end: string } | null {
+  const segs = splitMonthIntoWeekSegments(ym);
+  if (!segs.length) return null;
+  return { start: segs[0].start, end: segs[segs.length - 1].end };
+}
+
+/**
  * Распределить итоги месяца по неделям пропорционально числу дней недели в этом месяце.
- * Итоги по неделям сводятся к месячным суммам (подгонка округления на последней неделе).
+ * Суммы в целых тийинах: сумма по неделям по доходу и по каждой статье совпадает с месячными полями.
  */
 export function allocateMonthPlanToWeekSlices(
   ym: string,
@@ -125,40 +133,30 @@ export function allocateMonthPlanToWeekSlices(
 ): FinancialPlanWeekSlice[] {
   const segs = splitMonthIntoWeekSegments(ym);
   if (!segs.length) return [];
-  const totalDays = segs.reduce((a, s) => a + s.daysInTargetMonth, 0) || 1;
-  const slices: FinancialPlanWeekSlice[] = segs.map((seg) => {
-    const w = seg.daysInTargetMonth / totalDays;
+  const dayWeights = segs.map((s) => s.daysInTargetMonth);
+
+  const incomeTiyin = splitTiyinProportionally(moneyToTiyin(monthIncome), dayWeights);
+
+  const expenseTiyinByCat = new Map<string, number[]>();
+  for (const catId of categoryIds) {
+    expenseTiyinByCat.set(
+      catId,
+      splitTiyinProportionally(moneyToTiyin(Number(monthExpenses[catId]) || 0), dayWeights)
+    );
+  }
+
+  return segs.map((seg, i) => {
     const expenses: Record<string, number> = {};
     for (const catId of categoryIds) {
-      const v = Number(monthExpenses[catId]) || 0;
-      expenses[catId] = Math.round(v * w * 100) / 100;
+      const parts = expenseTiyinByCat.get(catId);
+      expenses[catId] = tiyinToMoney(parts?.[i] ?? 0);
     }
     return {
       start: seg.start,
       end: seg.end,
       label: seg.label,
-      income: Math.round(monthIncome * w * 100) / 100,
+      income: tiyinToMoney(incomeTiyin[i] ?? 0),
       expenses,
     };
   });
-
-  const sumInc = slices.reduce((a, s) => a + s.income, 0);
-  const incDiff = Math.round((monthIncome - sumInc) * 100) / 100;
-  if (slices.length && incDiff !== 0) {
-    const last = slices[slices.length - 1];
-    last.income = Math.round((last.income + incDiff) * 100) / 100;
-  }
-
-  for (const catId of categoryIds) {
-    const target = Number(monthExpenses[catId]) || 0;
-    let sumCat = 0;
-    for (const s of slices) sumCat += Number(s.expenses[catId]) || 0;
-    const diff = Math.round((target - sumCat) * 100) / 100;
-    if (slices.length && diff !== 0) {
-      const last = slices[slices.length - 1];
-      last.expenses[catId] = Math.round(((Number(last.expenses[catId]) || 0) + diff) * 100) / 100;
-    }
-  }
-
-  return slices;
 }

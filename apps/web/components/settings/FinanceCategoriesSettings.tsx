@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import { FinanceCategory } from '../../types';
 import { X, Edit2, Trash2 } from 'lucide-react';
 import { ModuleCreateIconButton } from '../ui/ModuleCreateIconButton';
-import { TaskSelect } from '../TaskSelect';
+import { EntitySearchSelect } from '../ui/EntitySearchSelect';
 import { SystemConfirmDialog } from '../ui';
 
 interface FinanceCategoriesSettingsProps {
@@ -125,13 +125,14 @@ const FinanceCategoriesSettings: React.FC<FinanceCategoriesSettingsProps> = ({ c
                             </div>
                             <div>
                                 <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 mb-1">Тип распределения</label>
-                                <TaskSelect
+                                <EntitySearchSelect
                                     value={catType}
                                     onChange={(val) => setCatType(val as 'fixed' | 'percent')}
                                     options={[
-                                        { value: 'fixed', label: 'Фиксированная сумма' },
-                                        { value: 'percent', label: 'Процент от дохода' }
+                                        { value: 'fixed', label: 'Фиксированная сумма', searchText: 'фиксированная сумма fixed' },
+                                        { value: 'percent', label: 'Процент от дохода', searchText: 'процент доход percent' },
                                     ]}
+                                    searchPlaceholder="Тип…"
                                 />
                             </div>
                             <div className="flex justify-end gap-2 pt-2">

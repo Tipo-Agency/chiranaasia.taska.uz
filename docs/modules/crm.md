@@ -14,12 +14,14 @@ CRM — единый модуль продаж. Покрывает весь пу
 
 ## Пользователи и права
 
-| Роль | Права | Что может |
-|------|-------|-----------|
-| Менеджер по продажам | `crm.sales_funnel` | Создавать сделки, редактировать, двигать по воронке |
-| РОП / Руководитель | `crm.deals.edit` | Всё что выше + разблокировать won/lost + bulk PUT |
-| Администратор | `system.full_access` | Полный доступ без ограничений |
-| Сотрудник (просмотр) | auth only | Просматривать список сделок и клиентов |
+
+| Роль                 | Права                | Что может                                           |
+| -------------------- | -------------------- | --------------------------------------------------- |
+| Менеджер по продажам | `crm.sales_funnel`   | Создавать сделки, редактировать, двигать по воронке |
+| РОП / Руководитель   | `crm.deals.edit`     | Всё что выше + разблокировать won/lost + bulk PUT   |
+| Администратор        | `system.full_access` | Полный доступ без ограничений                       |
+| Сотрудник (просмотр) | auth only            | Просматривать список сделок и клиентов              |
+
 
 **Разграничение:** `crm.sales_funnel` и `crm.deals.edit` — альтернативы для создания/редактирования сделок.
 `crm.deals.edit` дополнительно разблокирует терминальные стадии (won/lost) и разрешает bulk PUT.
@@ -32,59 +34,63 @@ CRM — единый модуль продаж. Покрывает весь пу
 
 ### Deal (таблица `deals`)
 
-| Колонка | Тип БД | Nullable | Дефолт | Описание |
-|---------|--------|----------|--------|----------|
-| `id` | String(36) | NO | auto UUID | Первичный ключ |
-| `version` | Integer | NO | 1 | Optimistic locking |
-| `title` | String(500) | NO | — | Название сделки |
-| `stage` | String(100) | NO | — | Текущая стадия |
-| `funnel_id` | String(36) | YES | — | Воронка |
-| `client_id` | String(36) | YES | — | FK→clients (SET NULL) |
-| `contact_id` | String(36) | YES | — | FK→crm_contacts (SET NULL) |
-| `assignee_id` | String(36) | YES | — | Ответственный (user id) |
-| `amount` | Numeric(18,2) | NO | 0 | Сумма |
-| `currency` | String(10) | NO | 'UZS' | Валюта |
-| `source` | String(50) | YES | — | Источник (site/telegram/instagram/...) |
-| `source_chat_id` | String(255) | YES | — | ID чата источника |
-| `tags` | ARRAY(Text) | NO | [] | Теги |
-| `custom_fields` | JSONB | NO | {} | Произвольные поля |
-| `lost_reason` | Text | YES | — | Причина проигрыша |
-| `is_archived` | Boolean | YES | false | Мягкое удаление |
-| `contact_name` | String(255) | YES | — | Legacy: имя контакта |
-| `created_at` | String(50) | NO | — | Дата создания (ISO 8601) |
-| `notes` | Text | YES | — | Заметки |
-| `project_id` | String(36) | YES | — | Связанный проект |
-| `comments` | JSONB | YES | [] | Список комментариев |
-| `recurring` | Boolean | YES | false | Повторяющаяся |
-| `number` | String(100) | YES | — | Номер договора/сделки |
-| `status` | String(30) | YES | — | Legacy статус (не путать со stage) |
-| `description` | Text | YES | — | Описание |
-| `date` | String(50) | YES | — | Дата сделки |
-| `due_date` | String(50) | YES | — | Срок |
-| `paid_amount` | String(50) | YES | — | Оплачено |
-| `paid_date` | String(50) | YES | — | Дата оплаты |
-| `start_date` | String(50) | YES | — | Дата начала |
-| `end_date` | String(50) | YES | — | Дата окончания |
-| `payment_day` | String(10) | YES | — | День оплаты |
-| `updated_at` | String(50) | YES | — | Дата обновления |
+
+| Колонка          | Тип БД        | Nullable | Дефолт    | Описание                               |
+| ---------------- | ------------- | -------- | --------- | -------------------------------------- |
+| `id`             | String(36)    | NO       | auto UUID | Первичный ключ                         |
+| `version`        | Integer       | NO       | 1         | Optimistic locking                     |
+| `title`          | String(500)   | NO       | —         | Название сделки                        |
+| `stage`          | String(100)   | NO       | —         | Текущая стадия                         |
+| `funnel_id`      | String(36)    | YES      | —         | Воронка                                |
+| `client_id`      | String(36)    | YES      | —         | FK→clients (SET NULL)                  |
+| `contact_id`     | String(36)    | YES      | —         | FK→crm_contacts (SET NULL)             |
+| `assignee_id`    | String(36)    | YES      | —         | Ответственный (user id)                |
+| `amount`         | Numeric(18,2) | NO       | 0         | Сумма                                  |
+| `currency`       | String(10)    | NO       | 'UZS'     | Валюта                                 |
+| `source`         | String(50)    | YES      | —         | Источник (site/telegram/instagram/...) |
+| `source_chat_id` | String(255)   | YES      | —         | ID чата источника                      |
+| `tags`           | ARRAY(Text)   | NO       | []        | Теги                                   |
+| `custom_fields`  | JSONB         | NO       | {}        | Произвольные поля                      |
+| `lost_reason`    | Text          | YES      | —         | Причина проигрыша                      |
+| `is_archived`    | Boolean       | YES      | false     | Мягкое удаление                        |
+| `contact_name`   | String(255)   | YES      | —         | Legacy: имя контакта                   |
+| `created_at`     | String(50)    | NO       | —         | Дата создания (ISO 8601)               |
+| `notes`          | Text          | YES      | —         | Заметки                                |
+| `project_id`     | String(36)    | YES      | —         | Связанный проект                       |
+| `comments`       | JSONB         | YES      | []        | Список комментариев                    |
+| `recurring`      | Boolean       | YES      | false     | Повторяющаяся                          |
+| `number`         | String(100)   | YES      | —         | Номер договора/сделки                  |
+| `status`         | String(30)    | YES      | —         | Legacy статус (не путать со stage)     |
+| `description`    | Text          | YES      | —         | Описание                               |
+| `date`           | String(50)    | YES      | —         | Дата сделки                            |
+| `due_date`       | String(50)    | YES      | —         | Срок                                   |
+| `paid_amount`    | String(50)    | YES      | —         | Оплачено                               |
+| `paid_date`      | String(50)    | YES      | —         | Дата оплаты                            |
+| `start_date`     | String(50)    | YES      | —         | Дата начала                            |
+| `end_date`       | String(50)    | YES      | —         | Дата окончания                         |
+| `payment_day`    | String(10)    | YES      | —         | День оплаты                            |
+| `updated_at`     | String(50)    | YES      | —         | Дата обновления                        |
+
 
 **Индекс:** нет дополнительных составных индексов (основной — PK).
 
 ### Client (таблица `clients`)
 
-| Колонка | Тип БД | Nullable | Дефолт | Описание |
-|---------|--------|----------|--------|----------|
-| `id` | String(36) | NO | auto UUID | Первичный ключ |
-| `version` | Integer | NO | 1 | Optimistic locking |
-| `name` | String(255) | NO | — | Имя/название клиента |
-| `phone` | String(50) | YES | — | Нормализованный телефон |
-| `email` | String(255) | YES | — | Email (lowercase) |
-| `telegram` | String(100) | YES | — | Telegram handle |
-| `instagram` | String(255) | YES | — | Instagram handle |
-| `company_name` | String(255) | YES | — | Название компании |
-| `notes` | Text | YES | — | Заметки |
-| `tags` | ARRAY(Text) | NO | [] | Теги (уникальные) |
-| `is_archived` | Boolean | YES | false | Мягкое удаление |
+
+| Колонка        | Тип БД      | Nullable | Дефолт    | Описание                |
+| -------------- | ----------- | -------- | --------- | ----------------------- |
+| `id`           | String(36)  | NO       | auto UUID | Первичный ключ          |
+| `version`      | Integer     | NO       | 1         | Optimistic locking      |
+| `name`         | String(255) | NO       | —         | Имя/название клиента    |
+| `phone`        | String(50)  | YES      | —         | Нормализованный телефон |
+| `email`        | String(255) | YES      | —         | Email (lowercase)       |
+| `telegram`     | String(100) | YES      | —         | Telegram handle         |
+| `instagram`    | String(255) | YES      | —         | Instagram handle        |
+| `company_name` | String(255) | YES      | —         | Название компании       |
+| `notes`        | Text        | YES      | —         | Заметки                 |
+| `tags`         | ARRAY(Text) | NO       | []        | Теги (уникальные)       |
+| `is_archived`  | Boolean     | YES      | false     | Мягкое удаление         |
+
 
 **Связи:** `deals` (1:N), `crm_contacts` (1:N)
 
@@ -93,35 +99,39 @@ CRM — единый модуль продаж. Покрывает весь пу
 Контакт — физическое лицо внутри компании-клиента. Создаётся автоматически при наличии
 сигналов в сделке (телефон, Telegram, Instagram).
 
-| Колонка | Тип БД | Nullable | Описание |
-|---------|--------|----------|----------|
-| `id` | String(36) | NO | PK |
-| `version` | Integer | NO | Optimistic locking |
-| `client_id` | String(36) | YES | FK→clients (SET NULL) |
-| `name` | String(255) | NO | ФИО контакта |
-| `phone` | String(50) | YES | Телефон |
-| `email` | String(255) | YES | Email |
-| `telegram` | String(100) | YES | Telegram |
-| `instagram` | String(255) | YES | Instagram |
-| `job_title` | String(255) | YES | Должность |
-| `notes` | Text | YES | Заметки |
-| `tags` | ARRAY(Text) | NO | [] | Теги (из сделки) |
-| `is_archived` | Boolean | YES | false | Мягкое удаление |
+
+| Колонка       | Тип БД      | Nullable | Описание              |
+| ------------- | ----------- | -------- | --------------------- |
+| `id`          | String(36)  | NO       | PK                    |
+| `version`     | Integer     | NO       | Optimistic locking    |
+| `client_id`   | String(36)  | YES      | FK→clients (SET NULL) |
+| `name`        | String(255) | NO       | ФИО контакта          |
+| `phone`       | String(50)  | YES      | Телефон               |
+| `email`       | String(255) | YES      | Email                 |
+| `telegram`    | String(100) | YES      | Telegram              |
+| `instagram`   | String(255) | YES      | Instagram             |
+| `job_title`   | String(255) | YES      | Должность             |
+| `notes`       | Text        | YES      | Заметки               |
+| `tags`        | ARRAY(Text) | NO       | []                    |
+| `is_archived` | Boolean     | YES      | false                 |
+
 
 ### SalesFunnel (таблица `sales_funnels`)
 
-| Колонка | Тип БД | Nullable | Дефолт | Описание |
-|---------|--------|----------|--------|----------|
-| `id` | String(36) | NO | auto UUID | PK |
-| `name` | String(255) | NO | — | Название воронки |
-| `color` | String(100) | YES | — | Цвет |
-| `owner_user_id` | String(36) | YES | — | Владелец / дефолтный исполнитель |
-| `stages` | JSONB | YES | [] | Список стадий |
-| `sources` | JSONB | YES | {} | Источники лидов (зашифрованные секреты) |
-| `notification_templates` | JSONB | YES | {} | Шаблоны уведомлений |
-| `created_at` | String(50) | YES | — | Дата создания |
-| `updated_at` | String(50) | YES | — | Дата обновления |
-| `is_archived` | String(10) | YES | "false" | ⚠️ Хранится как STRING, не boolean |
+
+| Колонка                  | Тип БД      | Nullable | Дефолт    | Описание                                |
+| ------------------------ | ----------- | -------- | --------- | --------------------------------------- |
+| `id`                     | String(36)  | NO       | auto UUID | PK                                      |
+| `name`                   | String(255) | NO       | —         | Название воронки                        |
+| `color`                  | String(100) | YES      | —         | Цвет                                    |
+| `owner_user_id`          | String(36)  | YES      | —         | Владелец / дефолтный исполнитель        |
+| `stages`                 | JSONB       | YES      | []        | Список стадий                           |
+| `sources`                | JSONB       | YES      | {}        | Источники лидов (зашифрованные секреты) |
+| `notification_templates` | JSONB       | YES      | {}        | Шаблоны уведомлений                     |
+| `created_at`             | String(50)  | YES      | —         | Дата создания                           |
+| `updated_at`             | String(50)  | YES      | —         | Дата обновления                         |
+| `is_archived`            | String(10)  | YES      | "false"   | ⚠️ Хранится как STRING, не boolean      |
+
 
 ---
 
@@ -130,11 +140,13 @@ CRM — единый модуль продаж. Покрывает весь пу
 ### Правила сделок
 
 #### Стадии (Stage)
+
 1. Стадии произвольные — определяются пользователем в воронке
 2. **Три системных значения** с особым поведением: `new`, `won`, `lost`
 3. Нормализация: стадии хранятся как есть (case-sensitive), при проверках — lowercase
 
 #### Терминальные стадии (won/lost)
+
 ```
 Сделка в won:
   → попытка перевести в любую другую стадию
@@ -148,6 +160,7 @@ CRM — единый модуль продаж. Покрывает весь пу
 ```
 
 #### Обязательные условия для won
+
 ```
 Попытка перевести сделку в stage="won":
   → client_id обязателен
@@ -155,6 +168,7 @@ CRM — единый модуль продаж. Покрывает весь пу
 ```
 
 #### Обязательные условия для lost
+
 ```
 Попытка перевести сделку в stage="lost":
   → lost_reason обязателен (непустая строка после strip)
@@ -162,6 +176,7 @@ CRM — единый модуль продаж. Покрывает весь пу
 ```
 
 #### Авто-назначение исполнителя
+
 ```
 При создании сделки (POST /deals):
   → если assignee_id не указан
@@ -171,6 +186,7 @@ CRM — единый модуль продаж. Покрывает весь пу
 ```
 
 #### Авто-создание контакта (Contact Signals)
+
 ```
 При создании/обновлении сделки:
   → сервис deal_contact_sync.maybe_ensure_contact_for_deal() срабатывает
@@ -188,6 +204,7 @@ CRM — единый модуль продаж. Покрывает весь пу
 ```
 
 #### Оптимистичная блокировка (PATCH)
+
 ```
 PATCH /deals/{id}
   → Клиент может передать версию двумя способами:
@@ -199,6 +216,7 @@ PATCH /deals/{id}
 ```
 
 #### Нормализация полей при записи
+
 ```
 title:         strip(), max 500 chars; default "Новая сделка"
 client_id:     strip(), max 36; пустая строка → null
@@ -221,6 +239,7 @@ created_by_user_id: max 36
 ```
 
 #### Мягкое удаление
+
 ```
 DELETE /deals/{id}:
   → is_archived = True
@@ -452,65 +471,74 @@ PUT /api/clients: bulk, body=list[ClientBulkItem]
 
 ## Коды ошибок CRM
 
-| Код HTTP | Ключ ошибки | Когда |
-|----------|-------------|-------|
-| 400 | `won_requires_client_id` | Перевод в won без client_id |
-| 400 | `client_not_found` | client_id не существует в БД |
-| 400 | `contact_client_mismatch` | contact_id принадлежит другому клиенту |
-| 403 | `deal_stage_won_locked` | Попытка изменить стадию сделки в won без crm.deals.edit |
-| 403 | `deal_stage_lost_locked` | Попытка изменить стадию сделки в lost без crm.deals.edit |
-| 404 | `contact_not_found` | contact_id не существует |
-| 409 | `stale_version` | Версия в запросе != версии в БД |
-| 409 | Conflict | Дубликат client id при POST /clients |
-| 422 | `deal_lost_reason_required` | Перевод в lost без lost_reason |
-| 400 | `invalid_cursor` | Смена фильтров при активном cursor |
+
+| Код HTTP | Ключ ошибки                 | Когда                                                    |
+| -------- | --------------------------- | -------------------------------------------------------- |
+| 400      | `won_requires_client_id`    | Перевод в won без client_id                              |
+| 400      | `client_not_found`          | client_id не существует в БД                             |
+| 400      | `contact_client_mismatch`   | contact_id принадлежит другому клиенту                   |
+| 403      | `deal_stage_won_locked`     | Попытка изменить стадию сделки в won без crm.deals.edit  |
+| 403      | `deal_stage_lost_locked`    | Попытка изменить стадию сделки в lost без crm.deals.edit |
+| 404      | `contact_not_found`         | contact_id не существует                                 |
+| 409      | `stale_version`             | Версия в запросе != версии в БД                          |
+| 409      | Conflict                    | Дубликат client id при POST /clients                     |
+| 422      | `deal_lost_reason_required` | Перевод в lost без lost_reason                           |
+| 400      | `invalid_cursor`            | Смена фильтров при активном cursor                       |
+
 
 ---
 
 ## Домейн-события (Redis Streams)
 
-| Событие | Когда эмитируется | Payload |
-|---------|-------------------|---------|
-| `deal.created` | POST /deals, PUT bulk (новая) | title, stage |
-| `deal.updated` | PUT bulk (существующая) | title, stage |
-| `deal.stage.changed` | PATCH/POST при смене stage | from_stage, to_stage, lost_reason |
-| `deal.assigned` | Назначение/переназначение assignee | dealId, title, assigneeId, funnel |
-| `deal.patched` | PATCH | список изменённых полей |
-| `deal.archived` | DELETE | — |
-| `client.created` | POST /clients, PUT bulk (новый) | name, is_archived |
-| `client.updated` | PATCH /clients, PUT bulk (существующий) | name, is_archived |
-| `sales_funnel.created` | POST /funnels, PUT bulk (новая) | name |
-| `sales_funnel.updated` | PUT bulk (существующая) | name |
-| `sales_funnel.patched` | PATCH /funnels | список изменений |
-| `sales_funnel.archived` | DELETE /funnels | — |
+
+| Событие                 | Когда эмитируется                       | Payload                           |
+| ----------------------- | --------------------------------------- | --------------------------------- |
+| `deal.created`          | POST /deals, PUT bulk (новая)           | title, stage                      |
+| `deal.updated`          | PUT bulk (существующая)                 | title, stage                      |
+| `deal.stage.changed`    | PATCH/POST при смене stage              | from_stage, to_stage, lost_reason |
+| `deal.assigned`         | Назначение/переназначение assignee      | dealId, title, assigneeId, funnel |
+| `deal.patched`          | PATCH                                   | список изменённых полей           |
+| `deal.archived`         | DELETE                                  | —                                 |
+| `client.created`        | POST /clients, PUT bulk (новый)         | name, is_archived                 |
+| `client.updated`        | PATCH /clients, PUT bulk (существующий) | name, is_archived                 |
+| `sales_funnel.created`  | POST /funnels, PUT bulk (новая)         | name                              |
+| `sales_funnel.updated`  | PUT bulk (существующая)                 | name                              |
+| `sales_funnel.patched`  | PATCH /funnels                          | список изменений                  |
+| `sales_funnel.archived` | DELETE /funnels                         | —                                 |
+
 
 ---
 
 ## Связи с другими модулями
 
-| Модуль | Как связан |
-|--------|-----------|
-| **Finance** | Stage=won → создаётся Finance Request (через UI или автоматизацию) |
-| **Tasks** | Task.deal_id → задача привязана к сделке; видна в карточке сделки |
-| **Meetings** | Meeting.deal_id → встреча привязана к сделке |
-| **BPM** | BpInstance.context.dealId → процесс запущен для сделки |
-| **Messages** | InboxMessage.deal_id → переписка лида привязана к сделке |
-| **Notifications** | deal.created, deal.stage.changed → уведомления ответственному |
-| **AR** | AccountsReceivable.deal_id → дебиторка по сделке |
+
+| Модуль            | Как связан                                                         |
+| ----------------- | ------------------------------------------------------------------ |
+| **Finance**       | Stage=won → создаётся Finance Request (через UI или автоматизацию) |
+| **Tasks**         | Task.deal_id → задача привязана к сделке; видна в карточке сделки  |
+| **Meetings**      | Meeting.deal_id → встреча привязана к сделке                       |
+| **BPM**           | BpInstance.context.dealId → процесс запущен для сделки             |
+| **Messages**      | InboxMessage.deal_id → переписка лида привязана к сделке           |
+| **Notifications** | deal.created, deal.stage.changed → уведомления ответственному      |
+| **AR**            | AccountsReceivable.deal_id → дебиторка по сделке                   |
+
 
 ---
 
 ## Edge Cases
 
-| Ситуация | Поведение системы |
-|----------|-------------------|
-| Воронка удалена, сделки в ней остаются | Сделки сохраняются с `funnel_id`; воронка не CASCADE-удаляет |
-| Клиент удалён, сделки в нём | FK SET NULL: `client_id` = null, сделка сохраняется |
-| Контакт удалён | FK SET NULL: `contact_id` = null |
-| Bulk PUT с id не существующей сделки | Создаётся (upsert) |
-| Bulk PUT с id существующей сделки | Обновляется |
-| POST с невалидным UUID в id | Игнорируется, генерируется новый UUID |
-| POST без title | title = "Новая сделка" |
-| PATCH won → same won | No-op переход разрешён (from_stage == to_stage) |
-| Два одновременных PATCH без version | Последний write wins (race condition) |
-| S3 media в comments | GET /deals/{id}/media/signed?key=... возвращает presigned URL; key должен существовать в deal.comments |
+
+| Ситуация                               | Поведение системы                                                                                      |
+| -------------------------------------- | ------------------------------------------------------------------------------------------------------ |
+| Воронка удалена, сделки в ней остаются | Сделки сохраняются с `funnel_id`; воронка не CASCADE-удаляет                                           |
+| Клиент удалён, сделки в нём            | FK SET NULL: `client_id` = null, сделка сохраняется                                                    |
+| Контакт удалён                         | FK SET NULL: `contact_id` = null                                                                       |
+| Bulk PUT с id не существующей сделки   | Создаётся (upsert)                                                                                     |
+| Bulk PUT с id существующей сделки      | Обновляется                                                                                            |
+| POST с невалидным UUID в id            | Игнорируется, генерируется новый UUID                                                                  |
+| POST без title                         | title = "Новая сделка"                                                                                 |
+| PATCH won → same won                   | No-op переход разрешён (from_stage == to_stage)                                                        |
+| Два одновременных PATCH без version    | Последний write wins (race condition)                                                                  |
+| S3 media в comments                    | GET /deals/{id}/media/signed?key=... возвращает presigned URL; key должен существовать в deal.comments |
+
+

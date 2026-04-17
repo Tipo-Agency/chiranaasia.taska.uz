@@ -2,8 +2,8 @@ import React from 'react';
 import { ModuleSegmentedControl } from '../ui/ModuleSegmentedControl';
 
 interface ClientsTabsProps {
-  activeTab: 'clients' | 'contracts' | 'finance' | 'receivables';
-  onTabChange: (tab: 'clients' | 'contracts' | 'finance' | 'receivables') => void;
+  activeTab: 'clients' | 'contracts' | 'receivables';
+  onTabChange: (tab: 'clients' | 'contracts' | 'receivables') => void;
 }
 
 export const ClientsTabs: React.FC<ClientsTabsProps> = ({ activeTab, onTabChange }) => {
@@ -13,12 +13,11 @@ export const ClientsTabs: React.FC<ClientsTabsProps> = ({ activeTab, onTabChange
       accent="violet"
       size="sm"
       value={activeTab}
-      onChange={(v) => onTabChange(v as 'clients' | 'contracts' | 'finance' | 'receivables')}
+      onChange={(v) => onTabChange(v as 'clients' | 'contracts' | 'receivables')}
       className="flex-nowrap whitespace-nowrap"
       options={[
-        { value: 'clients', label: 'База клиентов' },
+        { value: 'clients', label: 'Клиенты' },
         { value: 'contracts', label: 'Договоры и продажи' },
-        { value: 'finance', label: 'Финансы / оплаты' },
         { value: 'receivables', label: 'Задолженности' },
       ]}
     />

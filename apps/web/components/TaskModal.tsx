@@ -6,11 +6,16 @@ import { Project, Task, User, StatusOption, PriorityOption, TableCollection, Tas
 import { X, Calendar as CalendarIcon, Users, Tag, Plus, CheckCircle2, Archive, AlignLeft, Paperclip, Send, File as FileIcon, Image as ImageIcon, MessageSquare, Download, Flag, Link as LinkIcon, Check, ChevronDown, Folder, ExternalLink, FileText, User as UserIcon, ListTree, History } from 'lucide-react';
 import { DynamicIcon } from './AppIcons';
 import { STANDARD_CATEGORIES } from './FunctionalityView';
-import { TaskSelect } from './TaskSelect';
+import { EntitySearchSelect } from './ui/EntitySearchSelect';
 import { FilePreviewModal } from './FilePreviewModal';
 import { getTodayLocalDate, getDateDaysFromNow, normalizeDateForInput, clampDateRangeNotBeforeFloor } from '../utils/dateUtils';
 import { DateRangeInput } from './ui/DateInput';
 import { Button, SystemAlertDialog } from './ui';
+import {
+  isProjectLegacyFullTailwindClass,
+  moduleProjectPillStyle,
+  resolveProjectAccentHex,
+} from '../utils/moduleProjectColor';
 
 interface TaskModalProps {
   users: User[];
@@ -595,25 +600,11 @@ const TaskModal: React.FC<TaskModalProps> = ({
     const moduleMenuRef = useRef<HTMLDivElement>(null);
     const [moduleMenuPos, setModuleMenuPos] = useState({ top: 0, left: 0, minWidth: 0, maxHeight: 256 });
     const selectedProject = options.find(p => p.id === value);
-
-    // Функция для получения цвета модуля (как в TableView)
-    const resolveProjectColor = (colorInput: string | undefined): string => {
-        if (!colorInput) return 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-700';
-        if (colorInput.includes('bg-') && colorInput.includes('text-')) return colorInput;
-        
-        // Fallback для старых форматов
-        let baseColor = 'gray';
-        if (colorInput.includes('blue')) baseColor = 'blue';
-        else if (colorInput.includes('green') || colorInput.includes('emerald')) baseColor = 'emerald';
-        else if (colorInput.includes('red') || colorInput.includes('rose')) baseColor = 'rose';
-        else if (colorInput.includes('yellow') || colorInput.includes('amber')) baseColor = 'amber';
-        else if (colorInput.includes('orange')) baseColor = 'orange';
-        else if (colorInput.includes('purple') || colorInput.includes('violet')) baseColor = 'violet';
-        else if (colorInput.includes('pink')) baseColor = 'pink';
-        else if (colorInput.includes('indigo')) baseColor = 'indigo';
-        
-        return `text-${baseColor}-600 dark:text-${baseColor}-400 bg-${baseColor}-50 dark:bg-${baseColor}-900/20 border border-${baseColor}-100 dark:border-${baseColor}-800`;
-    };
+    const selectedPillStyle = selectedProject ? moduleProjectPillStyle(selectedProject.color) : null;
+    const selectedLegacyClass =
+      selectedProject && isProjectLegacyFullTailwindClass(selectedProject.color)
+        ? selectedProject.color
+        : null;
 
     const updateModuleMenuPos = () => {
         if (!moduleTriggerRef.current) return;
@@ -685,7 +676,9 @@ const TaskModal: React.FC<TaskModalProps> = ({
                 Без модуля
             </div>
             {options.map(project => {
-                const projectColor = resolveProjectColor(project.color);
+                const rowStyle = moduleProjectPillStyle(project.color);
+                const rowLegacy =
+                  isProjectLegacyFullTailwindClass(project.color) ? project.color : null;
                 return (
                     <div 
                         key={project.id}
@@ -699,11 +692,26 @@ const TaskModal: React.FC<TaskModalProps> = ({
                         {project.icon && (
                             <DynamicIcon 
                                 name={project.icon} 
-                                className={project.color || 'text-gray-500'} 
+                                className={resolveProjectAccentHex(project.color)} 
                                 size={14} 
                             />
                         )}
-                        <span className={`text-xs font-medium ${projectColor} px-1.5 py-0.5 rounded inline-block flex-1`}>{project.name}</span>
+                        {rowStyle ? (
+                          <span
+                            style={rowStyle}
+                            className="text-xs font-medium px-1.5 py-0.5 rounded inline-block flex-1 min-w-0 truncate border border-solid"
+                          >
+                            {project.name}
+                          </span>
+                        ) : rowLegacy ? (
+                          <span className={`text-xs font-medium px-1.5 py-0.5 rounded inline-block flex-1 min-w-0 truncate ${rowLegacy}`}>
+                            {project.name}
+                          </span>
+                        ) : (
+                          <span className="text-xs font-medium px-1.5 py-0.5 rounded inline-block flex-1 min-w-0 truncate text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
+                            {project.name}
+                          </span>
+                        )}
                         {project.id === value && <Check size={14} className="text-blue-500 dark:text-blue-400 flex-shrink-0"/>}
                     </div>
                 );
@@ -716,18 +724,31 @@ const TaskModal: React.FC<TaskModalProps> = ({
             <div 
                 ref={moduleTriggerRef}
                 onClick={() => setIsOpen(!isOpen)}
-                className="flex-1 min-w-0 h-8 min-h-8 max-h-8 px-2.5 py-0 rounded-md text-xs font-medium cursor-pointer transition-all flex items-center gap-1.5 bg-gray-50 dark:bg-[#252525] border border-gray-200 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-[#303030]"
+                className={`flex-1 min-w-0 h-8 min-h-8 max-h-8 px-2.5 py-0 rounded-md text-xs font-medium cursor-pointer transition-all flex items-center gap-1.5 hover:bg-gray-100 dark:hover:bg-[#303030] ${
+                  selectedPillStyle
+                    ? 'border border-solid bg-transparent dark:bg-transparent'
+                    : selectedLegacyClass
+                      ? `${selectedLegacyClass} border-0`
+                      : 'bg-gray-50 dark:bg-[#252525] border border-gray-200 dark:border-gray-700'
+                }`}
+                style={selectedPillStyle ?? undefined}
             >
                 {selectedProject ? (
                     <>
                         {selectedProject.icon && (
                             <DynamicIcon 
                                 name={selectedProject.icon} 
-                                className={selectedProject.color || 'text-gray-500'} 
+                                className={resolveProjectAccentHex(selectedProject.color)} 
                                 size={14} 
                             />
                         )}
-                        <span className={`truncate flex-1 ${resolveProjectColor(selectedProject.color)} px-1.5 py-0.5 rounded text-xs`}>
+                        <span
+                          className={
+                            selectedPillStyle || selectedLegacyClass
+                              ? 'truncate flex-1 px-0.5 text-xs'
+                              : 'truncate flex-1 text-xs text-gray-700 dark:text-gray-200'
+                          }
+                        >
                             {selectedProject.name}
                         </span>
                     </>
@@ -961,13 +982,18 @@ const TaskModal: React.FC<TaskModalProps> = ({
                         <div className="flex items-center gap-3 md:gap-4 min-h-8">
                             <div className="w-28 min-w-[7rem] shrink-0 pr-2 text-[10px] font-semibold text-gray-500 dark:text-gray-400 uppercase flex items-center gap-2"><Folder size={14} className="shrink-0 text-gray-400" strokeWidth={2} /> Категория</div>
                             <div className="flex-1 min-w-0">
-                              <TaskSelect
+                              <EntitySearchSelect
                                 value={category || ''}
                                 onChange={setCategory}
                                 options={[
                                   { value: '', label: 'Не выбрана' },
-                                  ...STANDARD_CATEGORIES.map((cat) => ({ value: cat.id, label: cat.name })),
+                                  ...STANDARD_CATEGORIES.map((cat) => ({
+                                    value: cat.id,
+                                    label: cat.name,
+                                    searchText: `${cat.name} ${cat.id}`,
+                                  })),
                                 ]}
+                                searchPlaceholder="Категория…"
                               />
                             </div>
                         </div>

@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Task, User, Project } from '../types';
 import { X, Save, Users, Tag } from 'lucide-react';
-import { TaskSelect } from './TaskSelect';
+import { EntitySearchSelect } from './ui/EntitySearchSelect';
 
 interface IdeaModalProps {
   idea: Partial<Task> | null;
@@ -192,13 +192,14 @@ const IdeaModal: React.FC<IdeaModalProps> = ({
               <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 uppercase mb-2">
                 Проект
               </label>
-              <TaskSelect
+              <EntitySearchSelect
                 value={projectId}
                 onChange={setProjectId}
                 options={[
                   { value: '', label: 'Без проекта' },
-                  ...projects.map(p => ({ value: p.id, label: p.name }))
+                  ...projects.map((p) => ({ value: p.id, label: p.name, searchText: p.name })),
                 ]}
+                searchPlaceholder="Проект…"
               />
             </div>
 
@@ -213,15 +214,16 @@ const IdeaModal: React.FC<IdeaModalProps> = ({
                   const user = users.find(u => u.id === userId);
                   return (
                     <div key={idx} className="flex items-center gap-2">
-                      <TaskSelect
+                      <EntitySearchSelect
                         value={userId}
                         onChange={(val) => {
                           const newIds = [...assigneeIds];
                           newIds[idx] = val;
                           setAssigneeIds(newIds);
                         }}
-                        options={users.map(u => ({ value: u.id, label: u.name }))}
+                        options={users.map((u) => ({ value: u.id, label: u.name, searchText: u.name }))}
                         className="flex-1"
+                        searchPlaceholder="Сотрудник…"
                       />
                       {assigneeIds.length > 1 && (
                         <button

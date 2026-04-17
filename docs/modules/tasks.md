@@ -15,41 +15,44 @@ Tasks — универсальный трекер работы. Задача (`T
 
 ### Task (таблица `tasks`)
 
-| Колонка | Тип БД | Nullable | Дефолт | Описание |
-|---------|--------|----------|--------|----------|
-| `id` | String(36) | NO | auto UUID | PK |
-| `version` | Integer | NO | 1 | Версия строки (optimistic locking) |
-| `table_id` | String(36) | YES | — | FK→tables.id |
-| `entity_type` | String(30) | YES | "task" | Тип: `task`, `idea`, `feature`, `purchase_request` |
-| `title` | String(500) | NO | — | Заголовок задачи |
-| `status` | String(100) | NO | — | Статус (произвольная строка, def: "todo") |
-| `priority` | String(100) | NO | — | Приоритет (произвольная строка) |
-| `assignee_id` | String(36) | YES | — | Основной исполнитель → users.id |
-| `assignee_ids` | JSONB | YES | [] | Множество исполнителей (list[string]) |
-| `project_id` | String(36) | YES | — | Проект |
-| `start_date` | String(10) | YES | — | Дата начала YYYY-MM-DD |
-| `end_date` | String(10) | YES | — | Дедлайн YYYY-MM-DD (API: `due_date`) |
-| `description` | Text | YES | — | Описание (HTML/Markdown) |
-| `is_archived` | Boolean | YES | false | Архив |
-| `comments` | JSONB | YES | [] | Комментарии (встроенные, см. ниже) |
-| `attachments` | JSONB | YES | [] | Вложения (встроенные, см. ниже) |
-| `content_post_id` | String(36) | YES | — | Контент-пост |
-| `process_id` | String(36) | YES | — | Бизнес-процесс |
-| `process_instance_id` | String(36) | YES | — | Экземпляр процесса |
-| `step_id` | String(36) | YES | — | Шаг процесса |
-| `deal_id` | String(36) | YES | — | Сделка CRM |
-| `source` | String(100) | YES | — | Источник (site, import и т.д.) |
-| `category` | String(100) | YES | — | Категория |
-| `task_id` | String(36) | YES | — | Родительская задача (sub-task) |
-| `created_by_user_id` | String(36) | YES | — | Создатель → users.id |
-| `created_at` | String(50) | YES | — | ISO 8601 дата создания |
-| `requester_id` | String(36) | YES | — | Инициатор (для purchase_request) |
-| `department_id` | String(36) | YES | — | Отдел (для purchase_request) |
-| `category_id` | String(36) | YES | — | Категория (для purchase_request) |
-| `amount` | String(50) | YES | — | Сумма (для purchase_request; строка для гибкости) |
-| `decision_date` | String(50) | YES | — | Дата решения (для purchase_request) |
+
+| Колонка               | Тип БД      | Nullable | Дефолт    | Описание                                           |
+| --------------------- | ----------- | -------- | --------- | -------------------------------------------------- |
+| `id`                  | String(36)  | NO       | auto UUID | PK                                                 |
+| `version`             | Integer     | NO       | 1         | Версия строки (optimistic locking)                 |
+| `table_id`            | String(36)  | YES      | —         | FK→tables.id                                       |
+| `entity_type`         | String(30)  | YES      | "task"    | Тип: `task`, `idea`, `feature`, `purchase_request` |
+| `title`               | String(500) | NO       | —         | Заголовок задачи                                   |
+| `status`              | String(100) | NO       | —         | Статус (произвольная строка, def: "todo")          |
+| `priority`            | String(100) | NO       | —         | Приоритет (произвольная строка)                    |
+| `assignee_id`         | String(36)  | YES      | —         | Основной исполнитель → users.id                    |
+| `assignee_ids`        | JSONB       | YES      | []        | Множество исполнителей (list[string])              |
+| `project_id`          | String(36)  | YES      | —         | Проект                                             |
+| `start_date`          | String(10)  | YES      | —         | Дата начала YYYY-MM-DD                             |
+| `end_date`            | String(10)  | YES      | —         | Дедлайн YYYY-MM-DD (API: `due_date`)               |
+| `description`         | Text        | YES      | —         | Описание (HTML/Markdown)                           |
+| `is_archived`         | Boolean     | YES      | false     | Архив                                              |
+| `comments`            | JSONB       | YES      | []        | Комментарии (встроенные, см. ниже)                 |
+| `attachments`         | JSONB       | YES      | []        | Вложения (встроенные, см. ниже)                    |
+| `content_post_id`     | String(36)  | YES      | —         | Контент-пост                                       |
+| `process_id`          | String(36)  | YES      | —         | Бизнес-процесс                                     |
+| `process_instance_id` | String(36)  | YES      | —         | Экземпляр процесса                                 |
+| `step_id`             | String(36)  | YES      | —         | Шаг процесса                                       |
+| `deal_id`             | String(36)  | YES      | —         | Сделка CRM                                         |
+| `source`              | String(100) | YES      | —         | Источник (site, import и т.д.)                     |
+| `category`            | String(100) | YES      | —         | Категория                                          |
+| `task_id`             | String(36)  | YES      | —         | Родительская задача (sub-task)                     |
+| `created_by_user_id`  | String(36)  | YES      | —         | Создатель → users.id                               |
+| `created_at`          | String(50)  | YES      | —         | ISO 8601 дата создания                             |
+| `requester_id`        | String(36)  | YES      | —         | Инициатор (для purchase_request)                   |
+| `department_id`       | String(36)  | YES      | —         | Отдел (для purchase_request)                       |
+| `category_id`         | String(36)  | YES      | —         | Категория (для purchase_request)                   |
+| `amount`              | String(50)  | YES      | —         | Сумма (для purchase_request; строка для гибкости)  |
+| `decision_date`       | String(50)  | YES      | —         | Дата решения (для purchase_request)                |
+
 
 **Индексы:**
+
 - `idx_tasks_table_archived_created_id` — composite on (`table_id`, `is_archived`, `created_at`, `id`) — покрывает типичный список задач таблицы
 - `version_id_col` — SQLAlchemy optimistic lock (StaleDataError при коллизии)
 
@@ -91,8 +94,8 @@ Legacy поле `type` принимается как `mime_type` (AliasChoices).
 
 ## Бизнес-правила
 
-1. **`title` обязателен для POST** — минимум 1 символ, максимум 500
-2. **`table_id` обязателен для POST** — задача всегда принадлежит таблице
+1. `**title` обязателен для POST** — минимум 1 символ, максимум 500
+2. `**table_id` обязателен для POST** — задача всегда принадлежит таблице
 3. **Дефолтный статус** — при создании: `status = "todo"` если не передан
 4. **Дефолтный priority** — пустая строка `""` если не передан (не NULL)
 5. **Архив вместо DELETE** — `DELETE /tasks/{id}` выполняет hard delete (не soft!); архив делается через `PATCH {is_archived: true}`
@@ -242,14 +245,16 @@ Legacy поле `type` принимается как `mime_type` (AliasChoices).
 
 ## API-эндпоинты
 
-| Метод | Путь | Описание | Право |
-|-------|------|----------|-------|
-| GET | /api/tasks | Список задач (keyset cursor) | auth |
-| POST | /api/tasks | Создать задачу | `tasks.edit` |
-| GET | /api/tasks/{id} | Одна задача | auth |
-| PATCH | /api/tasks/{id} | Обновить поля | `tasks.edit` |
-| DELETE | /api/tasks/{id} | Hard delete | `tasks.edit` |
-| PUT | /api/tasks/batch | Batch upsert ≤100 | `tasks.edit` |
+
+| Метод  | Путь             | Описание                     | Право        |
+| ------ | ---------------- | ---------------------------- | ------------ |
+| GET    | /api/tasks       | Список задач (keyset cursor) | auth         |
+| POST   | /api/tasks       | Создать задачу               | `tasks.edit` |
+| GET    | /api/tasks/{id}  | Одна задача                  | auth         |
+| PATCH  | /api/tasks/{id}  | Обновить поля                | `tasks.edit` |
+| DELETE | /api/tasks/{id}  | Hard delete                  | `tasks.edit` |
+| PUT    | /api/tasks/batch | Batch upsert ≤100            | `tasks.edit` |
+
 
 ---
 
@@ -282,12 +287,15 @@ Legacy поле `type` принимается как `mime_type` (AliasChoices).
 
 ## Домейн-события
 
-| Событие | Когда эмитируется |
-|---------|-------------------|
-| `task.assigned` | При создании задачи с `assignee_id` **ИЛИ** при смене `assignee_id` через PATCH/batch |
-| `task.status.changed` | Только при PATCH если `status` изменился (сравнивается с before) |
+
+| Событие               | Когда эмитируется                                                                     |
+| --------------------- | ------------------------------------------------------------------------------------- |
+| `task.assigned`       | При создании задачи с `assignee_id` **ИЛИ** при смене `assignee_id` через PATCH/batch |
+| `task.status.changed` | Только при PATCH если `status` изменился (сравнивается с before)                      |
+
 
 Payload `task.assigned`:
+
 ```json
 {
   "taskId": "uuid",
@@ -299,6 +307,7 @@ Payload `task.assigned`:
 ```
 
 Payload `task.status.changed`:
+
 ```json
 {
   "taskId": "uuid",
@@ -316,41 +325,48 @@ Payload `task.status.changed`:
 
 ## Связи с другими модулями
 
-| Поле | Связь |
-|------|-------|
-| `deal_id` | CRM → задача прикреплена к сделке; показывается в карточке сделки |
-| `process_id` + `process_instance_id` + `step_id` | BPM → задача создана как шаг процесса |
-| `content_post_id` | Spaces → задача создана из контент-поста |
-| `table_id` | Spaces → задача живёт в конкретной таблице |
-| `assignee_id` | Auth → исполнитель (users.id) |
-| `requester_id` + `department_id` + `amount` | Finance → entity_type="purchase_request" |
+
+| Поле                                             | Связь                                                             |
+| ------------------------------------------------ | ----------------------------------------------------------------- |
+| `deal_id`                                        | CRM → задача прикреплена к сделке; показывается в карточке сделки |
+| `process_id` + `process_instance_id` + `step_id` | BPM → задача создана как шаг процесса                             |
+| `content_post_id`                                | Spaces → задача создана из контент-поста                          |
+| `table_id`                                       | Spaces → задача живёт в конкретной таблице                        |
+| `assignee_id`                                    | Auth → исполнитель (users.id)                                     |
+| `requester_id` + `department_id` + `amount`      | Finance → entity_type="purchase_request"                          |
+
 
 ---
 
 ## Коды ошибок
 
-| HTTP | Ключ | Когда |
-|------|------|-------|
-| 404 | — | Задача не найдена (GET/PATCH/DELETE) |
-| 409 | `stale_version` | Optimistic lock: If-Match или version не совпадает |
-| 422 | — | Batch > 100; невалидное поле сортировки; нарушение Pydantic |
-| 400 | `invalid_cursor` | Курсор невалиден или фильтры изменились |
+
+| HTTP | Ключ             | Когда                                                       |
+| ---- | ---------------- | ----------------------------------------------------------- |
+| 404  | —                | Задача не найдена (GET/PATCH/DELETE)                        |
+| 409  | `stale_version`  | Optimistic lock: If-Match или version не совпадает          |
+| 422  | —                | Batch > 100; невалидное поле сортировки; нарушение Pydantic |
+| 400  | `invalid_cursor` | Курсор невалиден или фильтры изменились                     |
+
 
 ---
 
 ## Edge Cases
 
-| Ситуация | Поведение |
-|----------|-----------|
-| PATCH без version / If-Match | Без optimistic lock; last-write-wins |
-| PATCH с устаревшей version | 409 `stale_version`; клиент перечитывает и повторяет |
-| Batch > 100 элементов | 422 с сообщением "Не более 100 задач за запрос" |
-| Batch с несуществующим id | Задача создаётся (`new_task_shell`) с дефолтами |
-| Batch: comments/attachments | Каждый элемент валидируется через TaskCommentRead/TaskAttachmentRead; невалидные пропускаются |
-| GET is_archived не передан | Возвращаются только `is_archived=false` задачи |
-| GET с cursor от другого набора фильтров | 400 invalid_cursor |
-| Поиск по `search` | ILIKE %q% по title; case-insensitive |
-| DELETE задачи из BPM | Hard delete; процесс не откатывается |
-| `assignee_ids` vs `assignee_id` | Оба хранятся независимо; `assignee_id` = основной исполнитель |
-| `amount` = null | Хранится как NULL в БД (not empty string) |
-| Сортировка по `updated_at` | Идентична `created_at` (нет отдельного столбца) |
+
+| Ситуация                                | Поведение                                                                                     |
+| --------------------------------------- | --------------------------------------------------------------------------------------------- |
+| PATCH без version / If-Match            | Без optimistic lock; last-write-wins                                                          |
+| PATCH с устаревшей version              | 409 `stale_version`; клиент перечитывает и повторяет                                          |
+| Batch > 100 элементов                   | 422 с сообщением "Не более 100 задач за запрос"                                               |
+| Batch с несуществующим id               | Задача создаётся (`new_task_shell`) с дефолтами                                               |
+| Batch: comments/attachments             | Каждый элемент валидируется через TaskCommentRead/TaskAttachmentRead; невалидные пропускаются |
+| GET is_archived не передан              | Возвращаются только `is_archived=false` задачи                                                |
+| GET с cursor от другого набора фильтров | 400 invalid_cursor                                                                            |
+| Поиск по `search`                       | ILIKE %q% по title; case-insensitive                                                          |
+| DELETE задачи из BPM                    | Hard delete; процесс не откатывается                                                          |
+| `assignee_ids` vs `assignee_id`         | Оба хранятся независимо; `assignee_id` = основной исполнитель                                 |
+| `amount` = null                         | Хранится как NULL в БД (not empty string)                                                     |
+| Сортировка по `updated_at`              | Идентична `created_at` (нет отдельного столбца)                                               |
+
+

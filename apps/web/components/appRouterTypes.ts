@@ -39,6 +39,7 @@ import type {
   Bdr,
   IncomeReport,
   NotificationPreferences,
+  CrmHubTab,
 } from '../types';
 import type { AppActions } from '../frontend/hooks/useAppLogic';
 
@@ -94,7 +95,7 @@ export interface AppRouterProps {
   settingsActiveTab?: string;
   activeSpaceTab?: 'content-plan' | 'backlog' | 'functionality';
   workdeskTab?: 'dashboard' | 'weekly' | 'tasks' | 'deals' | 'meetings' | 'documents';
-  crmHubTab?: 'funnel' | 'chats' | 'clients';
+  crmHubTab?: CrmHubTab;
   employeesHubTab?: 'team' | 'payroll';
   notificationPrefs?: NotificationPreferences;
   actions: AppActions;

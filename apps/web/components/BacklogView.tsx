@@ -1,7 +1,7 @@
 import React, { useMemo, useState, useLayoutEffect } from 'react';
 import { Task, User, StatusOption, TableCollection } from '../types';
 import { Archive, Trash2, Edit2, Play } from 'lucide-react';
-import { TaskSelect } from './TaskSelect';
+import { EntitySearchSelect } from './ui/EntitySearchSelect';
 import {
   ModulePageShell,
   MODULE_PAGE_GUTTER,
@@ -262,38 +262,43 @@ const BacklogView: React.FC<BacklogViewProps> = ({
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
               <div>
                 <label className="block text-xs font-semibold text-gray-600 dark:text-gray-400 mb-1">Список</label>
-                <TaskSelect
+                <EntitySearchSelect
                   value={listMode}
                   onChange={(v) => setListMode(v as 'ideas' | 'in_work' | 'done')}
                   options={[
-                    { value: 'ideas', label: 'Идеи' },
-                    { value: 'in_work', label: 'В работе' },
-                    { value: 'done', label: 'Выполнено' },
+                    { value: 'ideas', label: 'Идеи', searchText: 'идеи ideas' },
+                    { value: 'in_work', label: 'В работе', searchText: 'работа in_work' },
+                    { value: 'done', label: 'Выполнено', searchText: 'выполнено done готово' },
                   ]}
+                  searchPlaceholder="Список…"
                 />
               </div>
               <div>
                 <label className="block text-xs font-semibold text-gray-600 dark:text-gray-400 mb-1">Исполнитель</label>
-                <TaskSelect
+                <EntitySearchSelect
                   value={scope}
                   onChange={(v) => setScope(v as 'all' | 'assigned' | 'unassigned')}
                   options={[
-                    { value: 'all', label: 'Все' },
-                    { value: 'assigned', label: 'С исполнителем' },
-                    { value: 'unassigned', label: 'Без исполнителя' },
+                    { value: 'all', label: 'Все', searchText: 'все all' },
+                    { value: 'assigned', label: 'С исполнителем', searchText: 'исполнитель assigned' },
+                    { value: 'unassigned', label: 'Без исполнителя', searchText: 'без unassigned' },
                   ]}
+                  searchPlaceholder="Исполнитель…"
                 />
               </div>
               {listMode !== 'ideas' && (
                 <div>
                   <label className="block text-xs font-semibold text-gray-600 dark:text-gray-400 mb-1">Статус задачи</label>
-                  <TaskSelect
+                  <EntitySearchSelect
                     value={statusFilter}
                     onChange={setStatusFilter}
                     options={[
-                      { value: 'all', label: 'Все статусы' },
-                      ...statuses.filter((s) => !s.isArchived).map((s) => ({ value: s.name, label: s.name })),
+                      { value: 'all', label: 'Все статусы', searchText: 'все статусы' },
+                      ...statuses
+                        .filter((s) => !s.isArchived)
+                        .map((s) => ({ value: s.name, label: s.name, searchText: s.name })),
                     ]}
+                    searchPlaceholder="Статус…"
                   />
                 </div>
               )}

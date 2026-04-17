@@ -42,5 +42,8 @@ export { Toast } from './Toast';
 export { Touchable } from './Touchable';
 export { DateInput } from './DateInput';
 export { SystemAlertDialog, SystemConfirmDialog } from './SystemDialogs';
-export { TaskSelect } from '../TaskSelect';
+export { AppSelect } from '../AppSelect';
+export type { AppSelectOption, AppSelectProps } from '../AppSelect';
+export { EntitySearchSelect } from './EntitySearchSelect';
+export type { EntitySearchSelectProps } from './EntitySearchSelect';
 

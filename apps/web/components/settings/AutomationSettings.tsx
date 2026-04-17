@@ -2,7 +2,7 @@
 import React, { useMemo, useState } from 'react';
 import { AutomationRule, NotificationPreferences, StatusOption } from '../../types';
 import { MessageSquare, Trash2, Zap } from 'lucide-react';
-import { TaskSelect } from '../TaskSelect';
+import { EntitySearchSelect } from '../ui/EntitySearchSelect';
 import { Button } from '../ui';
 
 interface AutomationSettingsProps {
@@ -270,19 +270,20 @@ export const AutomationSettings: React.FC<AutomationSettingsProps> = ({
                             <div className="text-[11px] font-bold text-gray-500 dark:text-gray-400 mb-1">
                                 Модуль
                             </div>
-                            <TaskSelect
+                            <EntitySearchSelect
                                 value={automationModule}
                                 onChange={(val) => setAutomationModule(val as AutomationRule['module'])}
                                 options={[
-                                    { value: 'tasks', label: 'Задачи' },
-                                    { value: 'docs', label: 'Документы' },
-                                    { value: 'meetings', label: 'Встречи' },
-                                    { value: 'content', label: 'Контент-план' },
-                                    { value: 'finance', label: 'Финансы' },
-                                    { value: 'crm', label: 'CRM' },
-                                    { value: 'employees', label: 'Сотрудники' },
-                                    { value: 'bpm', label: 'Бизнес-процессы' },
+                                    { value: 'tasks', label: 'Задачи', searchText: 'задачи tasks' },
+                                    { value: 'docs', label: 'Документы', searchText: 'документы docs' },
+                                    { value: 'meetings', label: 'Встречи', searchText: 'встречи meetings' },
+                                    { value: 'content', label: 'Контент-план', searchText: 'контент content' },
+                                    { value: 'finance', label: 'Финансы', searchText: 'финансы finance' },
+                                    { value: 'crm', label: 'CRM', searchText: 'crm сделки' },
+                                    { value: 'employees', label: 'Сотрудники', searchText: 'сотрудники employees hr' },
+                                    { value: 'bpm', label: 'Бизнес-процессы', searchText: 'bpm процессы' },
                                 ]}
+                                searchPlaceholder="Модуль…"
                             />
                         </div>
                     </div>
@@ -480,13 +481,15 @@ export const AutomationSettings: React.FC<AutomationSettingsProps> = ({
                                     <div className="text-[11px] font-bold text-gray-500 dark:text-gray-400 mb-1">
                                         Событие
                                     </div>
-                                    <TaskSelect
+                                    <EntitySearchSelect
                                         value={autoTrigger}
                                         onChange={(val) => setAutoTrigger(val as AutomationRule['trigger'])}
                                         options={getModuleTriggers(automationModule).map((t) => ({
                                             value: t.value,
                                             label: t.label,
+                                            searchText: `${t.label} ${t.value}`,
                                         }))}
+                                        searchPlaceholder="Событие…"
                                     />
                                 </div>
 
@@ -495,10 +498,13 @@ export const AutomationSettings: React.FC<AutomationSettingsProps> = ({
                                         <div className="text-[11px] font-bold text-gray-500 dark:text-gray-400 mb-1">
                                             Условие: статус стал
                                         </div>
-                                        <TaskSelect
+                                        <EntitySearchSelect
                                             value={autoStatusTo}
                                             onChange={setAutoStatusTo}
-                                            options={statuses.filter((s) => !s.isArchived).map((s) => ({ value: s.name, label: s.name }))}
+                                            options={statuses
+                                                .filter((s) => !s.isArchived)
+                                                .map((s) => ({ value: s.name, label: s.name, searchText: s.name }))}
+                                            searchPlaceholder="Статус…"
                                         />
                                     </div>
                                 )}
@@ -508,15 +514,16 @@ export const AutomationSettings: React.FC<AutomationSettingsProps> = ({
                                         <div className="text-[11px] font-bold text-gray-500 dark:text-gray-400 mb-1">
                                             Действие
                                         </div>
-                                        <TaskSelect
+                                        <EntitySearchSelect
                                             value={autoActionType}
                                             onChange={(val) =>
                                                 setAutoActionType(val as 'telegram_message' | 'approval_request')
                                             }
                                             options={[
-                                                { value: 'telegram_message', label: 'Сообщение' },
-                                                { value: 'approval_request', label: 'Согласование' },
+                                                { value: 'telegram_message', label: 'Сообщение', searchText: 'сообщение telegram' },
+                                                { value: 'approval_request', label: 'Согласование', searchText: 'согласование approval' },
                                             ]}
+                                            searchPlaceholder="Действие…"
                                         />
                                     </div>
 
@@ -524,16 +531,17 @@ export const AutomationSettings: React.FC<AutomationSettingsProps> = ({
                                         <div className="text-[11px] font-bold text-gray-500 dark:text-gray-400 mb-1">
                                             Получатель
                                         </div>
-                                        <TaskSelect
+                                        <EntitySearchSelect
                                             value={autoTarget}
                                             onChange={(val) => setAutoTarget(val as any)}
                                             options={[
-                                                { value: 'assignee', label: 'Исполнитель' },
-                                                { value: 'creator', label: 'Создатель' },
-                                                { value: 'manager', label: 'Руководитель' },
-                                                { value: 'admin', label: 'Администратор' },
-                                                { value: 'specific', label: 'Пользователь' },
+                                                { value: 'assignee', label: 'Исполнитель', searchText: 'исполнитель assignee' },
+                                                { value: 'creator', label: 'Создатель', searchText: 'создатель creator' },
+                                                { value: 'manager', label: 'Руководитель', searchText: 'руководитель manager' },
+                                                { value: 'admin', label: 'Администратор', searchText: 'администратор admin' },
+                                                { value: 'specific', label: 'Пользователь', searchText: 'пользователь specific' },
                                             ]}
+                                            searchPlaceholder="Получатель…"
                                         />
                                     </div>
                                 </div>
@@ -543,15 +551,16 @@ export const AutomationSettings: React.FC<AutomationSettingsProps> = ({
                                         <div className="text-[11px] font-bold text-gray-500 dark:text-gray-400 mb-1">
                                             Тип согласования
                                         </div>
-                                        <TaskSelect
+                                        <EntitySearchSelect
                                             value={autoApprovalType}
                                             onChange={(val) => setAutoApprovalType(val as any)}
                                             options={[
-                                                { value: 'purchase_request', label: 'Заявка на приобретение' },
-                                                { value: 'process_step', label: 'Этап бизнес‑процесса' },
-                                                { value: 'document', label: 'Документ' },
-                                                { value: 'deal', label: 'Сделка' },
+                                                { value: 'purchase_request', label: 'Заявка на приобретение', searchText: 'заявка приобретение purchase' },
+                                                { value: 'process_step', label: 'Этап бизнес‑процесса', searchText: 'этап bpm процесс process_step' },
+                                                { value: 'document', label: 'Документ', searchText: 'документ document' },
+                                                { value: 'deal', label: 'Сделка', searchText: 'сделка deal crm' },
                                             ]}
+                                            searchPlaceholder="Тип…"
                                         />
                                     </div>
                                 )}

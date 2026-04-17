@@ -1,12 +1,17 @@
 import React from 'react';
 import { AccountsReceivable, Client } from '../../types';
-import { Trash2 } from 'lucide-react';
+import { Trash2, X } from 'lucide-react';
+import { FilterConfig } from '../FiltersPanel';
+import { EntitySearchSelect } from '../ui/EntitySearchSelect';
 
 interface ReceivablesTabProps {
   receivables: AccountsReceivable[];
   clients: Client[];
   onOpenReceivable?: (receivable: AccountsReceivable) => void;
   onDeleteReceivable?: (id: string) => void;
+  filters?: FilterConfig[];
+  showFilters?: boolean;
+  onClearFilters?: () => void;
 }
 
 export const ReceivablesTab: React.FC<ReceivablesTabProps> = ({
@@ -14,8 +19,48 @@ export const ReceivablesTab: React.FC<ReceivablesTabProps> = ({
   clients,
   onOpenReceivable,
   onDeleteReceivable,
+  filters = [],
+  showFilters = false,
+  onClearFilters,
 }) => {
   return (
+    <>
+      {showFilters && filters.length > 0 && (
+        <div className="mb-4 p-4 bg-gray-50 dark:bg-[#252525] rounded-lg border border-gray-200 dark:border-[#333]">
+          <div
+            className="grid gap-3"
+            style={{
+              gridTemplateColumns: `repeat(auto-fit, minmax(150px, 1fr))`,
+              maxWidth: '100%',
+            }}
+          >
+            {filters.map((filter, index) => (
+              <div key={index}>
+                <label className="block text-xs font-semibold text-gray-600 dark:text-gray-400 mb-1">
+                  {filter.label}
+                </label>
+                <EntitySearchSelect
+                  value={filter.value}
+                  onChange={filter.onChange}
+                  options={filter.options.map((o) => ({ ...o, searchText: o.label }))}
+                />
+              </div>
+            ))}
+          </div>
+          {onClearFilters && (
+            <div className="mt-3 flex justify-end">
+              <button
+                type="button"
+                onClick={onClearFilters}
+                className="text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200 flex items-center gap-1"
+              >
+                <X size={14} />
+                Очистить фильтры
+              </button>
+            </div>
+          )}
+        </div>
+      )}
     <div className="bg-white dark:bg-[#252525] border border-gray-200 dark:border-[#333] rounded-xl shadow-sm overflow-hidden">
       <table className="w-full text-left text-sm">
         <thead className="bg-gray-50 dark:bg-[#202020] border-b border-gray-200 dark:border-[#333]">
@@ -90,6 +135,7 @@ export const ReceivablesTab: React.FC<ReceivablesTabProps> = ({
         </tbody>
       </table>
     </div>
+    </>
   );
 };
 

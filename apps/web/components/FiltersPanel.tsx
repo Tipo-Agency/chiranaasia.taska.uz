@@ -1,7 +1,7 @@
 
 import React, { useMemo } from 'react';
 import { Filter, X } from 'lucide-react';
-import { TaskSelect } from './TaskSelect';
+import { EntitySearchSelect } from './ui/EntitySearchSelect';
 
 export interface FilterOption {
   value: string;
@@ -76,10 +76,10 @@ export const FiltersPanel: React.FC<FiltersPanelProps> = ({
                 <label className="block text-xs font-semibold text-gray-600 dark:text-gray-400 mb-1">
                   {filter.label}
                 </label>
-                <TaskSelect
+                <EntitySearchSelect
                   value={filter.value}
                   onChange={filter.onChange}
-                  options={filter.options}
+                  options={filter.options.map((o) => ({ ...o, searchText: o.label }))}
                 />
               </div>
             ))}

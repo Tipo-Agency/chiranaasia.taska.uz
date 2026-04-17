@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { SalesFunnel, FunnelStage, FunnelSourceConfig, User, NotificationPreferences } from '../../types';
 import { Plus, Edit2, Trash2, GripVertical, Settings, Instagram, MessageSquare, Star, Globe, Bell, ArrowLeft } from 'lucide-react';
-import { TaskSelect } from '../TaskSelect';
+import { EntitySearchSelect } from '../ui/EntitySearchSelect';
 import { api } from '../../backend/api';
 
 interface SalesFunnelsSettingsProps {
@@ -497,11 +497,16 @@ const SalesFunnelsSettings: React.FC<SalesFunnelsSettingsProps> = ({ funnels, us
                                 <div className="flex items-center gap-3">
                                     <div className={`w-8 h-8 rounded border-2 border-gray-300 dark:border-gray-600 shrink-0 ${funnelColor}`} />
                                     <div className="flex-1 min-w-0">
-                                        <TaskSelect
+                                        <EntitySearchSelect
                                             value={funnelColor}
                                             onChange={setFunnelColor}
-                                            options={FUNNEL_COLOR_OPTIONS.map((c) => ({ value: c.class, label: c.name }))}
+                                            options={FUNNEL_COLOR_OPTIONS.map((c) => ({
+                                                value: c.class,
+                                                label: c.name,
+                                                searchText: `${c.name} ${c.class}`,
+                                            }))}
                                             placeholder="Цвет"
+                                            searchPlaceholder="Цвет…"
                                         />
                                     </div>
                                 </div>
