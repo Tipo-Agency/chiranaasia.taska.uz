@@ -477,49 +477,62 @@ const ClientsView: React.FC<ClientsViewProps> = ({
     setModule,
   ]);
 
-  const hubTitle =
-    displayTab === 'contracts'
-      ? 'Договоры и продажи'
-      : displayTab === 'receivables'
-        ? 'Задолженности'
-        : 'Клиенты';
-  const hubDescription =
-    displayTab === 'contracts'
-      ? 'Договоры и разовые продажи'
-      : displayTab === 'receivables'
-        ? 'Дебиторка и должники'
-        : 'Справочник клиентов и компаний';
-
   return (
     <ModulePageShell className="flex-1 min-h-0 flex flex-col overflow-hidden">
-      <div className={`${MODULE_PAGE_GUTTER} pt-6 md:pt-8 flex-shrink-0 space-y-5`}>
-        <ClientsHeader
-          salesFunnels={salesFunnels}
-          selectedFunnelId={selectedFunnelId}
-          onFunnelChange={setSelectedFunnelId}
-          showFunnelFilter={!embedInCrmHub && (displayTab === 'clients' || displayTab === 'contracts')}
-          hideCreateActions={embedInCrmHub}
-          activeTab={displayTab}
-          headerTitle={embedInCrmHub ? hubTitle : undefined}
-          headerDescription={embedInCrmHub ? hubDescription : undefined}
-          onCreateClient={handleOpenClientCreate}
-          onCreateContract={() => handleOpenContractCreate('')}
-          onCreateSale={() => handleOpenOneTimeDealCreate('')}
-          onCreateReceivable={() => handleOpenReceivableCreate('')}
-          onFiltersClick={
-            !embedInCrmHub && displayTab === 'contracts'
-              ? () => setContractsFiltersOpen((v) => !v)
-              : undefined
-          }
-          showFilters={!embedInCrmHub && displayTab === 'contracts' && contractsFiltersOpen}
-          hasActiveFilters={hasActiveContractFilters}
-          activeFiltersCount={activeContractFiltersCount}
-          tabs={crmHubSection ? undefined : <ClientsTabs activeTab={displayTab} onTabChange={setActiveTab} />}
-        />
-      </div>
+      {!embedInCrmHub && (
+        <div className={`${MODULE_PAGE_GUTTER} pt-6 md:pt-8 flex-shrink-0 space-y-5`}>
+          <ClientsHeader
+            salesFunnels={salesFunnels}
+            selectedFunnelId={selectedFunnelId}
+            onFunnelChange={setSelectedFunnelId}
+            showFunnelFilter={false}
+            hideCreateActions={false}
+            activeTab={displayTab}
+            onCreateClient={handleOpenClientCreate}
+            onCreateContract={() => handleOpenContractCreate('')}
+            onCreateSale={() => handleOpenOneTimeDealCreate('')}
+            onCreateReceivable={() => handleOpenReceivableCreate('')}
+            onFiltersClick={
+              displayTab === 'clients'
+                ? () => setClientsFiltersOpen((v) => !v)
+                : displayTab === 'contracts'
+                  ? () => setContractsFiltersOpen((v) => !v)
+                  : displayTab === 'receivables'
+                    ? () => setReceivablesFiltersOpen((v) => !v)
+                    : undefined
+            }
+            showFilters={
+              (displayTab === 'clients' && clientsFiltersOpen) ||
+              (displayTab === 'contracts' && contractsFiltersOpen) ||
+              (displayTab === 'receivables' && receivablesFiltersOpen)
+            }
+            hasActiveFilters={
+              displayTab === 'clients'
+                ? hasActiveClientFilters
+                : displayTab === 'contracts'
+                  ? hasActiveContractFilters
+                  : displayTab === 'receivables'
+                    ? hasActiveReceivableFilters
+                    : false
+            }
+            activeFiltersCount={
+              displayTab === 'clients'
+                ? activeClientFiltersCount
+                : displayTab === 'contracts'
+                  ? activeContractFiltersCount
+                  : displayTab === 'receivables'
+                    ? activeReceivableFiltersCount
+                    : 0
+            }
+            tabs={crmHubSection ? undefined : <ClientsTabs activeTab={displayTab} onTabChange={setActiveTab} />}
+          />
+        </div>
+      )}
 
       <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
-        <div className={`${MODULE_PAGE_GUTTER} mt-3 flex-1 min-h-0 flex flex-col overflow-hidden pb-4`}>
+        <div
+          className={`${MODULE_PAGE_GUTTER} ${embedInCrmHub ? 'pt-4 md:pt-6' : 'mt-3'} flex-1 min-h-0 flex flex-col overflow-hidden pb-4`}
+        >
           <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden custom-scrollbar">
             {displayTab === 'clients' && (
               <>

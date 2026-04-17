@@ -4,8 +4,8 @@
  * в разбиение месяца YYYY-MM попадают только недели, «приписанные» к этому месяцу.
  */
 
-import type { FinancialPlanWeekSlice } from '../types/finance';
-import { moneyToTiyin, splitTiyinProportionally, tiyinToMoney } from './uzsMoney';
+import type { FinanceCategory, FinancialPlanWeekSlice } from '../types/finance';
+import { mulPercentMoney, roundMoney, roundToWholeSumUz, splitMoneyIntoWholeSumsProportionally } from './uzsMoney';
 
 function addDays(d: Date, n: number): Date {
   const x = new Date(d.getFullYear(), d.getMonth(), d.getDate() + n);
@@ -121,41 +121,62 @@ export function getMajorityBasedMonthBounds(ym: string): { start: string; end: s
   return { start: segs[0].start, end: segs[segs.length - 1].end };
 }
 
+/** Месячные сумы по статьям в UZS: для процентных — от дохода, в полях плана хранится %, не сумма. */
+export function resolveMonthPlanExpenseTotalsUzs(
+  monthIncome: number,
+  monthExpenses: Record<string, number>,
+  categoryIds: string[],
+  categories: Pick<FinanceCategory, 'id' | 'type'>[]
+): Record<string, number> {
+  const inc = roundMoney(monthIncome);
+  const out: Record<string, number> = {};
+  for (const catId of categoryIds) {
+    const cat = categories.find((c) => c.id === catId);
+    const raw = Number(monthExpenses[catId]) || 0;
+    if (cat?.type === 'percent') {
+      out[catId] = roundToWholeSumUz(mulPercentMoney(inc, raw));
+    } else {
+      out[catId] = roundToWholeSumUz(raw);
+    }
+  }
+  return out;
+}
+
 /**
- * Распределить итоги месяца по неделям пропорционально числу дней недели в этом месяце.
- * Суммы в целых тийинах: сумма по неделям по доходу и по каждой статье совпадает с месячными полями.
+ * Распределить итоги месяца по неделям **поровну** по числу недель (каждая календарная неделя плана — одна доля).
+ * Суммы только в **целых сумах**; сумма по неделям по доходу и по каждой статье совпадает с округлёнными месячными итогами
+ * (остаток от округления к целым сумам уходит в последнюю неделю внутри каждой суммы).
  */
 export function allocateMonthPlanToWeekSlices(
   ym: string,
   monthIncome: number,
   monthExpenses: Record<string, number>,
-  categoryIds: string[]
+  categoryIds: string[],
+  categories: Pick<FinanceCategory, 'id' | 'type'>[]
 ): FinancialPlanWeekSlice[] {
   const segs = splitMonthIntoWeekSegments(ym);
   if (!segs.length) return [];
-  const dayWeights = segs.map((s) => s.daysInTargetMonth);
+  const equalWeights = segs.map(() => 1);
+  const monthTotalsUzs = resolveMonthPlanExpenseTotalsUzs(monthIncome, monthExpenses, categoryIds, categories);
+  const incomeRounded = roundToWholeSumUz(monthIncome);
+  const incomeParts = splitMoneyIntoWholeSumsProportionally(incomeRounded, equalWeights);
 
-  const incomeTiyin = splitTiyinProportionally(moneyToTiyin(monthIncome), dayWeights);
-
-  const expenseTiyinByCat = new Map<string, number[]>();
+  const expensePartsByCat = new Map<string, number[]>();
   for (const catId of categoryIds) {
-    expenseTiyinByCat.set(
-      catId,
-      splitTiyinProportionally(moneyToTiyin(Number(monthExpenses[catId]) || 0), dayWeights)
-    );
+    expensePartsByCat.set(catId, splitMoneyIntoWholeSumsProportionally(monthTotalsUzs[catId] || 0, equalWeights));
   }
 
   return segs.map((seg, i) => {
     const expenses: Record<string, number> = {};
     for (const catId of categoryIds) {
-      const parts = expenseTiyinByCat.get(catId);
-      expenses[catId] = tiyinToMoney(parts?.[i] ?? 0);
+      const parts = expensePartsByCat.get(catId);
+      expenses[catId] = parts?.[i] ?? 0;
     }
     return {
       start: seg.start,
       end: seg.end,
       label: seg.label,
-      income: tiyinToMoney(incomeTiyin[i] ?? 0),
+      income: incomeParts[i] ?? 0,
       expenses,
     };
   });

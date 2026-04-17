@@ -24,6 +24,7 @@ import {
   ModuleCreateDropdown,
   ModuleFilterIconButton,
   DateInput,
+  FormattedMoneyInput,
   ModuleSegmentedControl,
   SystemAlertDialog,
   APP_TOOLBAR_MODULE_CLUSTER,
@@ -36,7 +37,11 @@ import { BankStatementsView, type BankStatementsViewHandle } from './finance/Ban
 import { BdrView } from './finance/BdrView';
 import { FilterConfig } from './FiltersPanel';
 import { uploadFile } from '../services/localStorageService';
-import { allocateMonthPlanToWeekSlices, getMajorityBasedMonthBounds } from '../utils/financeMonthWeeks';
+import {
+  allocateMonthPlanToWeekSlices,
+  getMajorityBasedMonthBounds,
+  resolveMonthPlanExpenseTotalsUzs,
+} from '../utils/financeMonthWeeks';
 import {
   sumIncomeReportInRange,
   sumIncomeReportsInRange,
@@ -44,8 +49,11 @@ import {
   approvedAmountByFund,
   parseRequestAmountUzs,
   fundAvailableBalances,
+  filterRequestsForPlanningWindow,
+  fundAllocationsAfterMovements,
+  purchaseRequestDayKey,
 } from '../utils/financePlanningUtils';
-import { moneyToTiyin, mulPercentMoney, subtractMoney, sumMoney } from '../utils/uzsMoney';
+import { formatWholeSumUzGrouped, moneyToTiyin, mulPercentMoney, subtractMoney, sumMoney } from '../utils/uzsMoney';
 
 function requestAmountLabel(amount: PurchaseRequest['amount']): string {
   const raw = (
@@ -87,18 +95,6 @@ function canonicalFinancialMonthYm(
   return String(fallbackYm ?? '').trim();
 }
 
-function sumRequestAmountsUzs(list: PurchaseRequest[]): string {
-  let sum = BigInt(0);
-  for (const r of list) {
-    const s = String(r.amount ?? '0').replace(/\s/g, '').replace(/,/g, '.');
-    const neg = s.startsWith('-');
-    const [intPart] = (neg ? s.slice(1) : s).split('.');
-    const digits = intPart.replace(/\D/g, '') || '0';
-    sum += BigInt(digits);
-  }
-  return sum.toLocaleString('ru-RU');
-}
-
 interface FinanceViewProps {
   categories: FinanceCategory[];
   funds: Fund[];
@@ -121,6 +117,19 @@ interface FinanceViewProps {
   onDeleteFinancialPlanning?: (id: string) => void;
   onRefreshPurchaseRequests?: () => void | Promise<void>;
   onRefreshIncomeReports?: () => void | Promise<void>;
+}
+
+function activeDepartmentsList(departments: Department[]): Department[] {
+  return departments.filter((d) => !d.isArchived);
+}
+
+/** Только активные; если уже выбрано архивное подразделение — добавляем его в конец (старые документы). */
+function departmentsForSelect(departments: Department[], selectedId: string | undefined): Department[] {
+  const active = activeDepartmentsList(departments);
+  const sid = (selectedId || '').trim();
+  if (!sid || active.some((d) => d.id === sid)) return active;
+  const extra = departments.find((d) => d.id === sid);
+  return extra ? [...active, extra] : active;
 }
 
 const FinanceView: React.FC<FinanceViewProps> = ({ 
@@ -350,7 +359,59 @@ const FinanceView: React.FC<FinanceViewProps> = ({
       setPlanningDetailFundMovements([]);
     }
   }, [selectedPlanning]);
-  
+
+  /** Заявки в окне бюджета: синхронизация id при смене периода / подразделения / списка заявок. */
+  useEffect(() => {
+    if (!selectedPlanning || planningSubView !== 'detail') return;
+    const fallback = getDefaultRangeForMonth(selectedPlanning.period || currentPeriod);
+    const start = (planningDetailPeriodStart || selectedPlanning.periodStart || fallback.start).slice(0, 10);
+    const end = (planningDetailPeriodEnd || selectedPlanning.periodEnd || fallback.end).slice(0, 10);
+    const departmentId = planningDetailDepartmentId || selectedPlanning.departmentId || '';
+    if (!departmentId) return;
+    const matched = filterRequestsForPlanningWindow(requests, start, end, departmentId);
+    setPlanningDetailRequestIds(matched.map((r) => r.id));
+  }, [
+    selectedPlanning?.id,
+    planningSubView,
+    planningDetailPeriodStart,
+    planningDetailPeriodEnd,
+    planningDetailDepartmentId,
+    requests,
+    currentPeriod,
+    getDefaultRangeForMonth,
+    selectedPlanning?.period,
+    selectedPlanning?.periodStart,
+    selectedPlanning?.periodEnd,
+    selectedPlanning?.departmentId,
+  ]);
+
+  /** Распределение по статьям из выбранных планов — без отдельной кнопки. */
+  useEffect(() => {
+    if (!selectedPlanning || planningSubView !== 'detail') return;
+    const docs = financialPlanDocuments.filter((d) => planningDetailPlanDocumentIds.includes(d.id));
+    setPlanningDetailExpenseDistribution(distributeIncomeFromPlanDocuments(planningDetailIncome, docs, categories));
+  }, [
+    selectedPlanning?.id,
+    planningSubView,
+    planningDetailPlanDocumentIds,
+    planningDetailIncome,
+    financialPlanDocuments,
+    categories,
+  ]);
+
+  /** Доход по фондам: равные доли, затем переносы между фондами из блока ниже. */
+  useEffect(() => {
+    if (!selectedPlanning || planningSubView !== 'detail') return;
+    const fundIds = funds.filter((f) => !f.isArchived).map((f) => f.id);
+    if (!fundIds.length) {
+      setPlanningDetailFundAllocations({});
+      return;
+    }
+    setPlanningDetailFundAllocations(
+      fundAllocationsAfterMovements(planningDetailIncome, fundIds, planningDetailFundMovements)
+    );
+  }, [selectedPlanning?.id, planningSubView, planningDetailIncome, funds, planningDetailFundMovements]);
+
   useEffect(() => {
     if (selectedPlanDoc) {
       const fallback = getDefaultRangeForMonth(selectedPlanDoc.period || currentPeriod);
@@ -489,7 +550,7 @@ const FinanceView: React.FC<FinanceViewProps> = ({
       onChange: setPlanningDepartmentFilter,
       options: [
         { value: 'all', label: 'Все подразделения' },
-        ...departments.map(d => ({ value: d.id, label: d.name }))
+        ...activeDepartmentsList(departments).map((d) => ({ value: d.id, label: d.name }))
       ]
     },
     {
@@ -564,7 +625,7 @@ const FinanceView: React.FC<FinanceViewProps> = ({
       onChange: setPlanDepartmentFilter,
       options: [
         { value: 'all', label: 'Все подразделения' },
-        ...departments.map(d => ({ value: d.id, label: d.name }))
+        ...activeDepartmentsList(departments).map((d) => ({ value: d.id, label: d.name }))
       ]
     },
     {
@@ -610,7 +671,7 @@ const FinanceView: React.FC<FinanceViewProps> = ({
       onChange: setRequestDepartmentFilter,
       options: [
         { value: 'all', label: 'Все подразделения' },
-        ...departments.map(d => ({ value: d.id, label: d.name }))
+        ...activeDepartmentsList(departments).map((d) => ({ value: d.id, label: d.name }))
       ]
     },
     {
@@ -656,7 +717,7 @@ const FinanceView: React.FC<FinanceViewProps> = ({
       setReqAmount('');
       setReqTitle('');
       setReqDesc('');
-      setReqDep(departments[0]?.id || '');
+      setReqDep(activeDepartmentsList(departments)[0]?.id || '');
       setReqCat(categories[0]?.id || '');
       setReqPaymentDate('');
       setReqInn('');
@@ -962,7 +1023,14 @@ const FinanceView: React.FC<FinanceViewProps> = ({
     
     const dep = departments.find(d => d.id === planningDetailDepartmentId);
     const periodLabel = formatRangeLabel(planningDetailPeriodStart, planningDetailPeriodEnd, selectedPlanning.period);
-    const planningRequests = requests.filter(r => selectedPlanning.requestIds.includes(r.id));
+    const planningRequests = requests
+      .filter((r) => planningDetailRequestIds.includes(r.id) && !r.isArchived)
+      .sort((a, b) => {
+        const da = purchaseRequestDayKey(a) || '';
+        const db = purchaseRequestDayKey(b) || '';
+        if (da !== db) return da.localeCompare(db);
+        return String(a.id).localeCompare(String(b.id));
+      });
     
     const hasChanges = (): boolean => {
       if (!planningDetailInitialValuesRef.current) return false;
@@ -1041,29 +1109,15 @@ const FinanceView: React.FC<FinanceViewProps> = ({
     };
     
     const handleRefreshRequests = () => {
+      void onRefreshPurchaseRequests?.();
       if (!selectedPlanning) return;
-      const startIso = planningDetailPeriodStart || selectedPlanning.periodStart;
-      const endIso = planningDetailPeriodEnd || selectedPlanning.periodEnd;
       const fallback = getDefaultRangeForMonth(selectedPlanning.period || currentPeriod);
-      const periodStart = new Date(`${(startIso || fallback.start)}T00:00:00`);
-      const periodEnd = new Date(`${(endIso || fallback.end)}T23:59:59`);
-      
-      // Находим заявки, которые подходят под период и подразделение
-      const matchingRequests = requests.filter(req => {
-        if (!req.date) return false;
-        const reqDate = new Date(req.date);
-        // Проверяем, что дата заявки попадает в период планирования
-        const isInPeriod = reqDate >= periodStart && reqDate <= periodEnd;
-        // Проверяем подразделение
-        const isSameDepartment = req.departmentId === (planningDetailDepartmentId || selectedPlanning.departmentId);
-        // Проверяем статус (берем все, кроме отклоненных)
-        const isValidStatus = req.status !== 'rejected' && req.status !== 'paid';
-        
-        return isInPeriod && isSameDepartment && isValidStatus && !req.isArchived;
-      });
-      
-      const newRequestIds = Array.from(new Set([...planningDetailRequestIds, ...matchingRequests.map(r => r.id)]));
-      setPlanningDetailRequestIds(newRequestIds);
+      const start = (planningDetailPeriodStart || selectedPlanning.periodStart || fallback.start).slice(0, 10);
+      const end = (planningDetailPeriodEnd || selectedPlanning.periodEnd || fallback.end).slice(0, 10);
+      const departmentId = planningDetailDepartmentId || selectedPlanning.departmentId || '';
+      if (!departmentId) return;
+      const matched = filterRequestsForPlanningWindow(requests, start, end, departmentId);
+      setPlanningDetailRequestIds(matched.map((r) => r.id));
     };
     
     const handleApprove = () => {
@@ -1210,7 +1264,10 @@ const FinanceView: React.FC<FinanceViewProps> = ({
               <EntitySearchSelect
                 value={planningDetailDepartmentId}
                 onChange={setPlanningDetailDepartmentId}
-                options={departments.map((d) => ({ value: d.id, label: d.name, searchText: d.name }))}
+                options={departmentsForSelect(
+                  departments,
+                  planningDetailDepartmentId || selectedPlanning.departmentId
+                ).map((d) => ({ value: d.id, label: d.name, searchText: d.name }))}
                 searchPlaceholder="Подразделение…"
               />
             </div>
@@ -1309,21 +1366,14 @@ const FinanceView: React.FC<FinanceViewProps> = ({
                         }}
                       />
                       <span className="truncate text-gray-800 dark:text-gray-100">
-                        {planDocRowPeriodLabel(d)} · {(d.income || 0).toLocaleString('ru-RU')} UZS
+                        {planDocRowPeriodLabel(d)} · {formatWholeSumUzGrouped(Number(d.income) || 0)} UZS
                       </span>
                     </label>
                   ))}
               </div>
-              <button
-                type="button"
-                className="mt-2 px-3 py-1.5 rounded-lg bg-indigo-600 text-white text-xs print:hidden"
-                onClick={() => {
-                  const docs = financialPlanDocuments.filter((d) => planningDetailPlanDocumentIds.includes(d.id));
-                  setPlanningDetailExpenseDistribution(distributeIncomeFromPlanDocuments(planningDetailIncome, docs, categories));
-                }}
-              >
-                Распределить доход по статьям из планов
-              </button>
+              <p className="mt-2 text-[11px] text-gray-500 dark:text-gray-400 print:hidden">
+                Распределение по статьям ниже пересчитывается автоматически при выборе планов и изменении дохода за период.
+              </p>
             </div>
           </div>
           {Object.keys(planningDetailExpenseDistribution).length > 0 && (
@@ -1335,7 +1385,7 @@ const FinanceView: React.FC<FinanceViewProps> = ({
                   return (
                     <li key={cid} className="flex justify-between gap-2">
                       <span className="text-gray-600 dark:text-gray-400">{cn}</span>
-                      <span className="font-mono tabular-nums">{Number(amt).toLocaleString('ru-RU')} UZS</span>
+                      <span className="font-mono tabular-nums">{formatWholeSumUzGrouped(Number(amt))} UZS</span>
                     </li>
                   );
                 })}
@@ -1349,55 +1399,26 @@ const FinanceView: React.FC<FinanceViewProps> = ({
           <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 uppercase mb-2">
             Доход за период (UZS), кассовый метод
           </label>
-          <input
-            type="number"
-            value={planningDetailIncome || ''}
-            onChange={(e) => setPlanningDetailIncome(parseFloat(e.target.value) || 0)}
-            className="w-full bg-white dark:bg-[#333] border border-gray-300 dark:border-[#555] rounded-lg px-4 py-3 text-lg font-bold text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none [-moz-appearance:textfield]"
+          <FormattedMoneyInput
+            value={planningDetailIncome}
+            onChange={setPlanningDetailIncome}
+            className="w-full bg-white dark:bg-[#333] border border-gray-300 dark:border-[#555] rounded-lg px-4 py-3 text-lg font-bold text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
             placeholder="0"
           />
         </div>
 
-        {/* Распределение по фондам */}
-        {funds.filter(f => !f.isArchived).length > 0 && (
-          <div className="bg-white dark:bg-[#252525] border border-gray-200 dark:border-[#333] rounded-xl p-6">
-            <h3 className="text-sm font-bold text-gray-800 dark:text-white uppercase mb-3">Распределение дохода по фондам</h3>
-            <p className="text-xs text-gray-500 dark:text-gray-400 mb-4">Сумма по фондам не должна превышать доход за период.</p>
-            <div className="space-y-3">
-              {funds.filter(f => !f.isArchived).map(fund => (
-                <div key={fund.id} className="flex items-center gap-4">
-                  <label className="w-40 text-sm font-medium text-gray-700 dark:text-gray-300 shrink-0">{fund.name}</label>
-                  <input
-                    type="number"
-                    min={0}
-                    value={planningDetailFundAllocations[fund.id] ?? ''}
-                    onChange={(e) => setPlanningDetailFundAllocations(prev => ({ ...prev, [fund.id]: parseFloat(e.target.value) || 0 }))}
-                    className="flex-1 bg-white dark:bg-[#333] border border-gray-300 dark:border-[#555] rounded-lg px-3 py-2 text-sm text-gray-900 dark:text-gray-100 [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                    placeholder="0"
-                  />
-                  <span className="text-xs text-gray-500 dark:text-gray-400">UZS</span>
-                </div>
-              ))}
-            </div>
-            {planningDetailIncome > 0 && (() => {
-              const allocated = sumMoney(Object.values(planningDetailFundAllocations) as number[]);
-              const rest = subtractMoney(planningDetailIncome, allocated);
-              return (
-                <div className="mt-3 text-xs text-gray-500 dark:text-gray-400">
-                  Распределено: {allocated.toLocaleString()} UZS · Остаток: {rest.toLocaleString()} UZS
-                  {rest < 0 && <span className="text-red-600 dark:text-red-400 ml-2">(превышение)</span>}
-                </div>
-              );
-            })()}
-          </div>
-        )}
-
+        {/* Доход по фондам (авто: равные доли; переносы — кнопка ниже) */}
         {funds.filter((f) => !f.isArchived).length > 0 && (
           <div className="bg-white dark:bg-[#252525] border border-gray-200 dark:border-[#333] rounded-xl p-6 print:break-inside-avoid">
-            <h3 className="text-sm font-bold text-gray-800 dark:text-white uppercase mb-2">Остатки на фондах</h3>
-            <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
-              После одобрения заявок остаток уменьшается. Перераспределение фиксируется в бюджете (движения).
+            <h3 className="text-sm font-bold text-gray-800 dark:text-white uppercase mb-1">Доход по фондам</h3>
+            <p className="text-xs text-gray-500 dark:text-gray-400 mb-4">
+              План по фондам считается автоматически поровну между фондами; ниже можно перенести суммы между фондами. После одобрения заявок остаток уменьшается.
             </p>
+            <div className="grid grid-cols-[1fr_auto_auto] gap-x-3 gap-y-2 text-xs font-bold uppercase tracking-wide text-gray-500 dark:text-gray-400 border-b border-gray-200 dark:border-[#333] pb-2 mb-2">
+              <span>Фонд</span>
+              <span className="text-right tabular-nums">План</span>
+              <span className="text-right tabular-nums">Остаток</span>
+            </div>
             <div className="space-y-2 text-sm">
               {funds
                 .filter((f) => !f.isArchived)
@@ -1409,16 +1430,32 @@ const FinanceView: React.FC<FinanceViewProps> = ({
                     requestIds: planningDetailRequestIds,
                   };
                   const bal = fundAvailableBalances(synthetic, requests)[fund.id] ?? 0;
+                  const planAmt = Number(planningDetailFundAllocations[fund.id]) || 0;
                   return (
-                    <div key={fund.id} className="flex justify-between gap-2">
-                      <span className="text-gray-700 dark:text-gray-300">{fund.name}</span>
-                      <span className={`tabular-nums font-medium ${bal < 0 ? 'text-red-600 dark:text-red-400' : 'text-gray-900 dark:text-white'}`}>
-                        {bal.toLocaleString('ru-RU')} UZS
+                    <div key={fund.id} className="grid grid-cols-[1fr_auto_auto] gap-x-3 gap-y-1 items-center">
+                      <span className="text-gray-700 dark:text-gray-300 font-medium">{fund.name}</span>
+                      <span className="tabular-nums text-right text-gray-900 dark:text-gray-100">
+                        {formatWholeSumUzGrouped(planAmt)} UZS
+                      </span>
+                      <span
+                        className={`tabular-nums text-right font-medium ${bal < 0 ? 'text-red-600 dark:text-red-400' : 'text-gray-900 dark:text-white'}`}
+                      >
+                        {formatWholeSumUzGrouped(bal)} UZS
                       </span>
                     </div>
                   );
                 })}
             </div>
+            {planningDetailIncome > 0 && (() => {
+              const allocated = sumMoney(Object.values(planningDetailFundAllocations) as number[]);
+              const rest = subtractMoney(planningDetailIncome, allocated);
+              return (
+                <div className="mt-3 text-xs text-gray-500 dark:text-gray-400">
+                  Всего по фондам: {formatWholeSumUzGrouped(allocated)} UZS · Нераспределённо: {formatWholeSumUzGrouped(rest)} UZS
+                  {rest < 0 && <span className="text-red-600 dark:text-red-400 ml-2">(превышение)</span>}
+                </div>
+              );
+            })()}
             {planningDetailFundMovements && planningDetailFundMovements.length > 0 && (
               <div className="mt-4 border-t border-gray-100 dark:border-[#333] pt-3 text-xs text-gray-500 dark:text-gray-400">
                 <div className="font-bold text-gray-600 dark:text-gray-300 mb-1">Движения между фондами</div>
@@ -1428,7 +1465,7 @@ const FinanceView: React.FC<FinanceViewProps> = ({
                     const toN = funds.find((f) => f.id === m.toFundId)?.name || m.toFundId;
                     return (
                       <li key={m.id}>
-                        {fromN} → {toN}: {m.amount.toLocaleString('ru-RU')} UZS
+                        {fromN} → {toN}: {formatWholeSumUzGrouped(Number(m.amount) || 0)} UZS
                       </li>
                     );
                   })}
@@ -1447,29 +1484,13 @@ const FinanceView: React.FC<FinanceViewProps> = ({
           </div>
         )}
 
-        {/* Info */}
-        <div className="bg-white dark:bg-[#252525] border border-gray-200 dark:border-[#333] rounded-xl p-6">
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <div className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase mb-1">Статус</div>
-              <span className={`px-2.5 py-1 rounded-full text-xs font-bold uppercase ${getStatusColor(selectedPlanning.status)}`}>
-                {getStatusLabel(selectedPlanning.status)}
-              </span>
-            </div>
-            <div>
-              <div className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase mb-1">Заявок</div>
-              <div className="text-lg font-bold text-gray-900 dark:text-white">{planningRequests.length}</div>
-            </div>
-          </div>
-        </div>
-        
         {/* Заявки */}
         <div className="bg-white dark:bg-[#252525] border border-gray-200 dark:border-[#333] rounded-xl overflow-hidden">
           <div className="p-4 border-b border-gray-200 dark:border-[#333] flex items-center justify-between flex-wrap gap-2">
             <h3 className="font-bold text-gray-800 dark:text-white">Заявки в бюджете ({planningRequests.length})</h3>
             <div className="flex items-center gap-4">
               <div className="text-xs text-gray-500 dark:text-gray-400">
-                Сумма: {sumRequestAmountsUzs(planningRequests)} UZS
+                Сумма: {formatWholeSumUzGrouped(sumMoney(planningRequests.map((r) => parseRequestAmountUzs(r))))} UZS
               </div>
               <button
                 onClick={handleRefreshRequests}
@@ -1567,6 +1588,21 @@ const FinanceView: React.FC<FinanceViewProps> = ({
             placeholder="Добавьте примечания..."
           />
         </div>
+
+        <div className="bg-white dark:bg-[#252525] border border-gray-200 dark:border-[#333] rounded-xl p-6 print:break-inside-avoid">
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <div className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase mb-1">Статус бюджета</div>
+              <span className={`px-2.5 py-1 rounded-full text-xs font-bold uppercase ${getStatusColor(selectedPlanning.status)}`}>
+                {getStatusLabel(selectedPlanning.status)}
+              </span>
+            </div>
+            <div>
+              <div className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase mb-1">Заявок в периоде</div>
+              <div className="text-lg font-bold text-gray-900 dark:text-white">{planningRequests.length}</div>
+            </div>
+          </div>
+        </div>
         </fieldset>
         </div>
         {planningFundTransferOpen && (
@@ -1635,11 +1671,6 @@ const FinanceView: React.FC<FinanceViewProps> = ({
                         at: new Date().toISOString(),
                       },
                     ]);
-                    setPlanningDetailFundAllocations((prev) => ({
-                      ...prev,
-                      [fundTransferFrom]: (Number(prev[fundTransferFrom]) || 0) - amt,
-                      [fundTransferTo]: (Number(prev[fundTransferTo]) || 0) + amt,
-                    }));
                     setPlanningFundTransferOpen(false);
                     setFundTransferAmount('');
                   }}
@@ -1681,7 +1712,12 @@ const FinanceView: React.FC<FinanceViewProps> = ({
                   <th className="px-4 py-3 text-gray-600 dark:text-gray-400">Период</th>
                   <th className="px-4 py-3 text-gray-600 dark:text-gray-400">Подразделение</th>
                   <th className="px-4 py-3 text-gray-600 dark:text-gray-400">Доход</th>
-                  <th className="px-4 py-3 text-gray-600 dark:text-gray-400">Расход</th>
+                  <th
+                    className="px-4 py-3 text-gray-600 dark:text-gray-400"
+                    title="Сумма выбранных статей в сумах UZS (процентные пересчитываются от дохода плана)"
+                  >
+                    Итого расходов
+                  </th>
                   <th className="px-4 py-3 text-gray-600 dark:text-gray-400">Статус</th>
                   <th className="px-4 py-3" />
                 </tr>
@@ -1689,7 +1725,14 @@ const FinanceView: React.FC<FinanceViewProps> = ({
               <tbody className="divide-y divide-gray-100 dark:divide-[#333]">
                 {sorted.map((planDoc) => {
                   const periodLabel = planDocRowPeriodLabel(planDoc);
-                  const totalExpenses = sumMoney(Object.values(planDoc.expenses || {}) as number[]);
+                  const expenseCatIds = Object.keys(planDoc.expenses || {});
+                  const expenseTotalsUzs = resolveMonthPlanExpenseTotalsUzs(
+                    Number(planDoc.income) || 0,
+                    planDoc.expenses || {},
+                    expenseCatIds,
+                    categories
+                  );
+                  const totalExpenses = sumMoney(Object.values(expenseTotalsUzs));
                   const dep = departments.find((d) => d.id === planDoc.departmentId);
                   return (
                     <tr
@@ -1703,9 +1746,11 @@ const FinanceView: React.FC<FinanceViewProps> = ({
                       <td className="px-4 py-3 font-medium text-gray-900 dark:text-gray-100">{periodLabel}</td>
                       <td className="px-4 py-3 text-gray-600 dark:text-gray-400 text-xs">{dep?.name || '—'}</td>
                       <td className="px-4 py-3 font-bold text-gray-900 dark:text-gray-100">
-                        {(planDoc.income || 0).toLocaleString()} UZS
+                        {formatWholeSumUzGrouped(Number(planDoc.income) || 0)} UZS
                       </td>
-                      <td className="px-4 py-3 text-gray-700 dark:text-gray-300">{totalExpenses.toLocaleString()} UZS</td>
+                      <td className="px-4 py-3 text-gray-700 dark:text-gray-300">
+                        {formatWholeSumUzGrouped(totalExpenses)} UZS
+                      </td>
                       <td className="px-4 py-3">
                         <span className={`px-2 py-1 rounded text-[10px] font-bold uppercase ${getStatusColor(planDoc.status)}`}>
                           {getStatusLabel(planDoc.status)}
@@ -1898,7 +1943,8 @@ const FinanceView: React.FC<FinanceViewProps> = ({
         ym,
         Number(planDetailIncome) || 0,
         buildFilteredPlanExpenses(),
-        planDetailSelectedCategories
+        planDetailSelectedCategories,
+        categories
       );
       if (slices.length <= 1) {
         setAlertText('Для этого месяца недельное разбиение не требуется или получается одна неделя.');
@@ -1928,7 +1974,8 @@ const FinanceView: React.FC<FinanceViewProps> = ({
         ym,
         Number(planDetailIncome) || 0,
         buildFilteredPlanExpenses(),
-        planDetailSelectedCategories
+        planDetailSelectedCategories,
+        categories
       );
       if (!slices.length) {
         setAlertText('Не удалось пересчитать недели для выбранного месяца.');
@@ -1973,10 +2020,12 @@ const FinanceView: React.FC<FinanceViewProps> = ({
                     <td className="border border-black p-1">
                       {row.start} — {row.end}
                     </td>
-                    <td className="border border-black p-1 text-right">{Number(row.income || 0).toLocaleString('ru-RU')}</td>
+                    <td className="border border-black p-1 text-right">
+                      {formatWholeSumUzGrouped(Number(row.income || 0))} UZS
+                    </td>
                     {planDetailSelectedCategories.map((cid) => (
                       <td key={cid} className="border border-black p-1 text-right">
-                        {Number(row.expenses?.[cid] || 0).toLocaleString('ru-RU')}
+                        {formatWholeSumUzGrouped(Number(row.expenses?.[cid] || 0))} UZS
                       </td>
                     ))}
                   </tr>
@@ -2091,7 +2140,10 @@ const FinanceView: React.FC<FinanceViewProps> = ({
               <EntitySearchSelect
                 value={planDetailDepartmentId}
                 onChange={setPlanDetailDepartmentId}
-                options={departments.map((d) => ({ value: d.id, label: d.name, searchText: d.name }))}
+                options={departmentsForSelect(
+                  departments,
+                  planDetailDepartmentId || selectedPlanDoc.departmentId
+                ).map((d) => ({ value: d.id, label: d.name, searchText: d.name }))}
                 searchPlaceholder="Подразделение…"
               />
             </div>
@@ -2112,11 +2164,10 @@ const FinanceView: React.FC<FinanceViewProps> = ({
           <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 uppercase mb-2">
             Доход (UZS)
           </label>
-          <input
-            type="number"
-            value={planDetailIncome || ''}
-            onChange={(e) => setPlanDetailIncome(parseFloat(e.target.value) || 0)}
-            className="w-full bg-white dark:bg-[#333] border border-gray-300 dark:border-[#555] rounded-lg px-4 py-3 text-lg font-bold text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none [-moz-appearance:textfield]"
+          <FormattedMoneyInput
+            value={planDetailIncome}
+            onChange={setPlanDetailIncome}
+            className="w-full bg-white dark:bg-[#333] border border-gray-300 dark:border-[#555] rounded-lg px-4 py-3 text-lg font-bold text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
             placeholder="0"
           />
         </div>
@@ -2190,7 +2241,9 @@ const FinanceView: React.FC<FinanceViewProps> = ({
                               {planDetailIncome > 0 && (
                                 <>
                                   <span className="text-xs text-gray-400">=</span>
-                                  <span className="text-xs font-medium text-gray-700 dark:text-gray-300">{percentAmount.toLocaleString()} UZS</span>
+                                  <span className="text-xs font-medium text-gray-700 dark:text-gray-300">
+                                    {formatWholeSumUzGrouped(percentAmount)} UZS
+                                  </span>
                                 </>
                               )}
                             </div>
@@ -2235,19 +2288,16 @@ const FinanceView: React.FC<FinanceViewProps> = ({
                           <div key={catId} className="flex items-center gap-3 p-3 rounded-lg border bg-gray-50 dark:bg-[#303030] border-gray-200 dark:border-[#444]">
                             <div className="flex-1 flex items-center gap-3">
                               <span className="font-medium text-gray-900 dark:text-white flex-shrink-0">{cat.name}</span>
-                              <input
-                                type="number"
-                                value={planDetailExpenses[catId] || ''}
-                                onChange={(e) => {
-                                  const value = parseFloat(e.target.value) || 0;
-                                  if (moneyToTiyin(value) <= moneyToTiyin(fixedCap)) {
-                                    setPlanDetailExpenses({ ...planDetailExpenses, [catId]: value });
+                              <FormattedMoneyInput
+                                value={planDetailExpenses[catId] || 0}
+                                max={fixedCap}
+                                onChange={(n) => {
+                                  if (moneyToTiyin(n) <= moneyToTiyin(fixedCap)) {
+                                    setPlanDetailExpenses({ ...planDetailExpenses, [catId]: n });
                                   }
                                 }}
-                                className="w-32 bg-white dark:bg-[#333] border border-gray-300 dark:border-[#555] rounded px-2 py-1 text-xs text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none text-right [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none [-moz-appearance:textfield]"
+                                className="min-w-[7.5rem] max-w-[11rem] flex-1 bg-white dark:bg-[#333] border border-gray-300 dark:border-[#555] rounded px-2 py-1 text-xs text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none text-right"
                                 placeholder="0"
-                                min="0"
-                                max={fixedCap}
                               />
                               <span className="text-xs text-gray-500 dark:text-gray-400">UZS</span>
                             </div>
@@ -2286,7 +2336,7 @@ const FinanceView: React.FC<FinanceViewProps> = ({
               <div>
                 <h3 className="font-bold text-gray-800 dark:text-white">Разбиение по неделям</h3>
                 <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                  Один документ плана: ниже — доли по календарным неделям месяца. Итог месяца задаётся полями «Доход» и статьи выше.
+                  Один документ плана: ниже — разбивка по календарным неделям месяца поровну по неделям, суммы в целых сумах UZS (остаток от деления на число недель попадает в последнюю неделю). Процентные статьи в таблице показаны в сумах, не в процентах. Итог месяца — поля «Доход» и статьи выше.
                 </p>
               </div>
               <div className="flex flex-wrap gap-2 print:hidden">
@@ -2327,10 +2377,12 @@ const FinanceView: React.FC<FinanceViewProps> = ({
                       <td className="px-3 py-2 text-gray-600 dark:text-gray-400 text-xs whitespace-nowrap">
                         {row.start} — {row.end}
                       </td>
-                      <td className="px-3 py-2 text-right font-mono tabular-nums">{Number(row.income || 0).toLocaleString('ru-RU')}</td>
+                      <td className="px-3 py-2 text-right font-mono tabular-nums">
+                        {formatWholeSumUzGrouped(Number(row.income || 0))} UZS
+                      </td>
                       {planDetailSelectedCategories.map((cid) => (
                         <td key={cid} className="px-3 py-2 text-right font-mono tabular-nums text-xs">
-                          {Number(row.expenses?.[cid] || 0).toLocaleString('ru-RU')}
+                          {formatWholeSumUzGrouped(Number(row.expenses?.[cid] || 0))} UZS
                         </td>
                       ))}
                     </tr>
@@ -2340,13 +2392,14 @@ const FinanceView: React.FC<FinanceViewProps> = ({
                       Σ по неделям
                     </td>
                     <td className="px-3 py-2 text-right font-mono tabular-nums">
-                      {sumMoney(planDetailWeekBreakdown.map((w) => Number(w.income) || 0)).toLocaleString('ru-RU')}
+                      {formatWholeSumUzGrouped(sumMoney(planDetailWeekBreakdown.map((w) => Number(w.income) || 0)))} UZS
                     </td>
                     {planDetailSelectedCategories.map((cid) => (
                       <td key={cid} className="px-3 py-2 text-right font-mono tabular-nums text-xs">
-                        {sumMoney(
-                          planDetailWeekBreakdown.map((w) => Number(w.expenses?.[cid]) || 0)
-                        ).toLocaleString('ru-RU')}
+                        {formatWholeSumUzGrouped(
+                          sumMoney(planDetailWeekBreakdown.map((w) => Number(w.expenses?.[cid]) || 0))
+                        )}{' '}
+                        UZS
                       </td>
                     ))}
                   </tr>
@@ -2496,14 +2549,15 @@ const FinanceView: React.FC<FinanceViewProps> = ({
       setAlertText('Функция сохранения недоступна');
       return;
     }
-    if (departments.length === 0) {
+    const depsForPlan = activeDepartmentsList(departments);
+    if (depsForPlan.length === 0) {
       setAlertText('Сначала создайте подразделение в настройках');
       return;
     }
     const { start, end } = getDefaultRangeForMonth(currentPeriod);
     const planDoc: FinancialPlanDocument = {
       id: `fpd-${Date.now()}`,
-      departmentId: departments[0].id,
+      departmentId: depsForPlan[0].id,
       period: currentPeriod,
       periodStart: start,
       periodEnd: end,
@@ -2524,14 +2578,15 @@ const FinanceView: React.FC<FinanceViewProps> = ({
       setAlertText('Функция сохранения недоступна');
       return;
     }
-    if (departments.length === 0) {
+    const depsForPlanning = activeDepartmentsList(departments);
+    if (depsForPlanning.length === 0) {
       setAlertText('Сначала создайте подразделение в настройках');
       return;
     }
     const { start, end } = getDefaultRangeForMonth(currentPeriod);
     const planning: FinancialPlanning = {
       id: `fp-${Date.now()}`,
-      departmentId: departments[0].id,
+      departmentId: depsForPlanning[0].id,
       period: currentPeriod,
       periodStart: start,
       periodEnd: end,
@@ -2913,7 +2968,11 @@ const FinanceView: React.FC<FinanceViewProps> = ({
                                 disabled={reqLocked}
                                 options={[
                                     { value: '', label: 'Выберите подразделение' },
-                                    ...departments.map((d) => ({ value: d.id, label: d.name, searchText: d.name })),
+                                    ...departmentsForSelect(departments, reqDep).map((d) => ({
+                                      value: d.id,
+                                      label: d.name,
+                                      searchText: d.name,
+                                    })),
                                 ]}
                                 searchPlaceholder="Подразделение…"
                             />

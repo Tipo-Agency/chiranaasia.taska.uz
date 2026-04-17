@@ -41,6 +41,7 @@ export { Select } from './Select';
 export { Toast } from './Toast';
 export { Touchable } from './Touchable';
 export { DateInput } from './DateInput';
+export { FormattedMoneyInput } from './FormattedMoneyInput';
 export { SystemAlertDialog, SystemConfirmDialog } from './SystemDialogs';
 export { AppSelect } from '../AppSelect';
 export type { AppSelectOption, AppSelectProps } from '../AppSelect';

@@ -1,5 +1,20 @@
-import type { FinancialPlanDocument, FinancialPlanning, IncomeReport, PurchaseRequest, FinanceCategory } from '../types';
-import { moneyToTiyin, roundMoney, splitTiyinProportionally, subtractMoney, sumMoney, tiyinToMoney } from './uzsMoney';
+import type {
+  FinancialPlanDocument,
+  FinancialPlanning,
+  FinancialPlanningFundMovement,
+  IncomeReport,
+  PurchaseRequest,
+  FinanceCategory,
+} from '../types';
+import {
+  moneyToTiyin,
+  roundMoney,
+  splitMoneyIntoWholeSumsProportionally,
+  splitTiyinProportionally,
+  subtractMoney,
+  sumMoney,
+  tiyinToMoney,
+} from './uzsMoney';
 
 export function sumIncomeReportInRange(report: IncomeReport | undefined, start: string, end: string): number {
   if (!report?.data) return 0;
@@ -94,4 +109,72 @@ export function fundAvailableBalances(planning: FinancialPlanning, requests: Pur
     out[fid] = subtractMoney(a, u);
   }
   return out;
+}
+
+/** Дата заявки YYYY-MM-DD для сравнения с периодом (без сдвига по часовому поясу). */
+export function purchaseRequestDayKey(req: PurchaseRequest): string | null {
+  const raw = req.date ?? (req as { createdAt?: string }).createdAt;
+  if (!raw) return null;
+  const m = /^(\d{4}-\d{2}-\d{2})/.exec(String(raw).trim());
+  return m ? m[1] : null;
+}
+
+/**
+ * Заявки, попадающие в окно бюджета: дата в [start,end], то же подразделение, не архив,
+ * статусы кроме отклонённых и оплаченных (как при ручном «Обновить заявки»).
+ */
+export function filterRequestsForPlanningWindow(
+  requests: readonly PurchaseRequest[],
+  windowStart: string,
+  windowEnd: string,
+  departmentId: string
+): PurchaseRequest[] {
+  const ds = windowStart.slice(0, 10);
+  const de = windowEnd.slice(0, 10);
+  return requests.filter((req) => {
+    const dk = purchaseRequestDayKey(req);
+    if (!dk || dk < ds || dk > de) return false;
+    if (!departmentId || req.departmentId !== departmentId) return false;
+    if (req.isArchived) return false;
+    if (req.status === 'rejected' || req.status === 'paid') return false;
+    return true;
+  });
+}
+
+/** Равные доли дохода по списку фондов (целые сумы UZS, остаток на последний фонд). */
+export function computeEqualFundAllocationsByIncome(income: number, fundIds: string[]): Record<string, number> {
+  const ids = fundIds.filter(Boolean);
+  if (!ids.length) return {};
+  const inc = Number(income) || 0;
+  if (inc <= 0) {
+    const z: Record<string, number> = {};
+    for (const id of ids) z[id] = 0;
+    return z;
+  }
+  const weights = ids.map(() => 1);
+  const parts = splitMoneyIntoWholeSumsProportionally(inc, weights);
+  const out: Record<string, number> = {};
+  ids.forEach((id, i) => {
+    out[id] = parts[i] ?? 0;
+  });
+  return out;
+}
+
+/** База — равные доли по фондам, затем последовательное применение переносов между фондами. */
+export function fundAllocationsAfterMovements(
+  income: number,
+  fundIds: string[],
+  movements: readonly FinancialPlanningFundMovement[]
+): Record<string, number> {
+  let alloc = computeEqualFundAllocationsByIncome(income, fundIds);
+  for (const m of movements) {
+    const amt = roundMoney(Number(m.amount) || 0);
+    if (amt <= 0) continue;
+    alloc = {
+      ...alloc,
+      [m.fromFundId]: subtractMoney(alloc[m.fromFundId] || 0, amt),
+      [m.toFundId]: sumMoney([alloc[m.toFundId] || 0, amt]),
+    };
+  }
+  return alloc;
 }

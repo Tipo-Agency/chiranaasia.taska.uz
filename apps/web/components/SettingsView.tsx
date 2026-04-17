@@ -362,8 +362,14 @@ const SettingsView: React.FC<SettingsViewProps> = ({
 
   return (
     <ModulePageShell>
-      <div className="flex-1 min-h-0 overflow-hidden">
-        <div className={`${MODULE_PAGE_GUTTER} ${MODULE_PAGE_TOP_PAD} pb-24 md:pb-32 h-full overflow-y-auto overflow-x-hidden custom-scrollbar`}>
+      <div className="flex flex-1 min-h-0 flex-col overflow-hidden">
+        <div
+          className={
+            activeTab === 'users' && currentUser
+              ? `${MODULE_PAGE_GUTTER} ${MODULE_PAGE_TOP_PAD} flex flex-1 min-h-0 flex-col overflow-x-hidden pb-4 md:pb-6`
+              : `${MODULE_PAGE_GUTTER} ${MODULE_PAGE_TOP_PAD} pb-24 md:pb-32 h-full overflow-y-auto overflow-x-hidden custom-scrollbar`
+          }
+        >
           {showArchiveScreen ? (
             <div className="space-y-3">
               {archiveShowFilters && (

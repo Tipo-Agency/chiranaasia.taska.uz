@@ -345,11 +345,11 @@ export const AccessSettings: React.FC<AccessSettingsProps> = ({
   }
 
   const listColumn = (
-    <div className="flex flex-col min-h-0 md:w-[min(100%,22rem)] shrink-0 border border-gray-200 dark:border-[#333] rounded-2xl bg-white dark:bg-[#252525] overflow-hidden">
-      <div className="px-3 py-2.5 border-b border-gray-200 dark:border-[#333] bg-gray-50 dark:bg-[#202020]">
-        <span className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wide">Пользователи</span>
+    <div className="flex h-full min-h-0 flex-col md:w-[min(100%,22rem)] shrink-0 overflow-hidden rounded-2xl border border-gray-200 bg-white dark:border-[#333] dark:bg-[#252525]">
+      <div className="shrink-0 border-b border-gray-200 bg-gray-50 px-3 py-2.5 dark:border-[#333] dark:bg-[#202020]">
+        <span className="text-xs font-bold uppercase tracking-wide text-gray-500 dark:text-gray-400">Пользователи</span>
       </div>
-      <div className="overflow-y-auto custom-scrollbar max-h-[70vh] md:max-h-[calc(100vh-16rem)]">
+      <div className="min-h-0 flex-1 overflow-y-auto custom-scrollbar">
         <table className="w-full text-left text-sm">
           <tbody className="divide-y divide-gray-100 dark:divide-[#333]">
             {canRoles && (
@@ -402,7 +402,7 @@ export const AccessSettings: React.FC<AccessSettingsProps> = ({
 
   const detailColumn = (
     <div
-      className={`flex-1 min-w-0 border border-gray-200 dark:border-[#333] rounded-2xl bg-white dark:bg-[#252525] overflow-hidden flex flex-col ${
+      className={`flex min-h-0 h-full min-w-0 flex-1 flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white dark:border-[#333] dark:bg-[#252525] ${
         panel ? 'flex' : 'hidden md:flex'
       }`}
     >
@@ -413,11 +413,11 @@ export const AccessSettings: React.FC<AccessSettingsProps> = ({
       )}
 
       {panel === 'roles' && canRoles && (
-        <div className="p-4 md:p-6 overflow-y-auto custom-scrollbar max-h-[70vh] md:max-h-none">{rolesBlock}</div>
+        <div className="min-h-0 flex-1 overflow-y-auto p-4 custom-scrollbar md:p-6">{rolesBlock}</div>
       )}
 
       {panel === 'new' && canUsers && (
-        <div className="p-4 md:p-6 space-y-4 overflow-y-auto custom-scrollbar">
+        <div className="flex min-h-0 flex-1 flex-col space-y-4 overflow-y-auto p-4 custom-scrollbar md:p-6">
           <div className="md:hidden flex items-center gap-2 mb-2">
             <button
               type="button"
@@ -466,7 +466,7 @@ export const AccessSettings: React.FC<AccessSettingsProps> = ({
       )}
 
       {selectedUser && panel !== 'roles' && panel !== 'new' && (
-        <div className="p-4 md:p-6 space-y-6 overflow-y-auto custom-scrollbar max-h-[70vh] md:max-h-none">
+        <div className="min-h-0 flex-1 space-y-6 overflow-y-auto p-4 custom-scrollbar md:p-6">
           <div className="flex items-start gap-3">
             <button
               type="button"
@@ -567,8 +567,12 @@ export const AccessSettings: React.FC<AccessSettingsProps> = ({
   );
 
   return (
-    <div className="flex flex-col md:flex-row gap-4 items-stretch">
-      <div className={`${panel ? 'hidden md:flex' : 'flex'} flex-col min-h-0`}>{listColumn}</div>
+    <div className="flex min-h-0 flex-1 flex-col items-stretch gap-4 md:flex-row">
+      <div
+        className={`${panel ? 'hidden md:flex' : 'flex'} h-full min-h-0 flex-1 flex-col md:h-full md:flex-none`}
+      >
+        {listColumn}
+      </div>
       {detailColumn}
     </div>
   );

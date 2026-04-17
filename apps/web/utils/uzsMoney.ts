@@ -74,3 +74,56 @@ export function splitTiyinProportionally(totalTiyin: number, weights: readonly n
   }
   return out;
 }
+
+/** Округление к целому числу сумов (без тийинов в остатке). */
+export function roundToWholeSumUz(amount: number): number {
+  const t = moneyToTiyin(roundMoney(amount));
+  const units = Math.round(t / TIYIN_PER_SUM);
+  return tiyinToMoney(units * TIYIN_PER_SUM);
+}
+
+/**
+ * Разбить целое число «целых сумов» пропорционально весам; сумма частей строго равна totalUnits
+ * (остаток от деления уходит в последнюю долю — как в splitTiyinProportionally).
+ */
+export function splitWholeSumUnitsProportionally(totalUnits: number, weights: readonly number[]): number[] {
+  const n = weights.length;
+  if (n === 0) return [];
+  const w = weights.map((x) => Math.max(0, Number(x) || 0));
+  const target = Math.trunc(Number(totalUnits)) || 0;
+  let remainingW = w.reduce((a, b) => a + b, 0);
+  if (remainingW <= 0) {
+    const out = new Array<number>(n).fill(0);
+    if (n > 0) out[n - 1] = target;
+    return out;
+  }
+  let remainingT = target;
+  const out: number[] = [];
+  for (let i = 0; i < n; i++) {
+    if (i === n - 1) {
+      out.push(remainingT);
+      break;
+    }
+    const wi = w[i];
+    const part = Math.floor((remainingT * wi) / remainingW);
+    out.push(part);
+    remainingT -= part;
+    remainingW -= wi;
+  }
+  return out;
+}
+
+/** Распределить сумму по целым сумам UZS; сумма частей в точности равна roundToWholeSumUz(totalMoney). */
+export function splitMoneyIntoWholeSumsProportionally(totalMoney: number, weights: readonly number[]): number[] {
+  const rounded = roundToWholeSumUz(totalMoney);
+  const totalUnits = Math.round(moneyToTiyin(rounded) / TIYIN_PER_SUM);
+  const partsUnits = splitWholeSumUnitsProportionally(totalUnits, weights);
+  return partsUnits.map((u) => tiyinToMoney(u * TIYIN_PER_SUM));
+}
+
+/** Отображение целой сумы с группировкой разрядов (узкий пробел). */
+export function formatWholeSumUzGrouped(n: number): string {
+  const v = Math.trunc(Math.abs(Number(n) || 0));
+  if (v === 0) return '0';
+  return String(v).replace(/\B(?=(\d{3})+(?!\d))/g, '\u202f');
+}
