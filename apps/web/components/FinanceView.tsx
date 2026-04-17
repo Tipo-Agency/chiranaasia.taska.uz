@@ -360,7 +360,7 @@ const FinanceView: React.FC<FinanceViewProps> = ({
     }
   }, [selectedPlanning]);
 
-  /** Заявки в окне бюджета: синхронизация id при смене периода / подразделения / списка заявок. */
+  /** Заявки бюджета: по датам в периоде + уже привязанные к бюджету id (не теряем при смене окна). */
   useEffect(() => {
     if (!selectedPlanning || planningSubView !== 'detail') return;
     const fallback = getDefaultRangeForMonth(selectedPlanning.period || currentPeriod);
@@ -369,7 +369,14 @@ const FinanceView: React.FC<FinanceViewProps> = ({
     const departmentId = planningDetailDepartmentId || selectedPlanning.departmentId || '';
     if (!departmentId) return;
     const matched = filterRequestsForPlanningWindow(requests, start, end, departmentId);
-    setPlanningDetailRequestIds(matched.map((r) => r.id));
+    const idSet = new Set(matched.map((r) => r.id));
+    for (const id of selectedPlanning.requestIds ?? []) {
+      const r = requests.find((x) => x.id === id);
+      if (!r || r.isArchived || r.status === 'rejected') continue;
+      if (r.departmentId !== departmentId) continue;
+      idSet.add(id);
+    }
+    setPlanningDetailRequestIds(Array.from(idSet));
   }, [
     selectedPlanning?.id,
     planningSubView,
@@ -383,6 +390,7 @@ const FinanceView: React.FC<FinanceViewProps> = ({
     selectedPlanning?.periodStart,
     selectedPlanning?.periodEnd,
     selectedPlanning?.departmentId,
+    JSON.stringify(selectedPlanning?.requestIds ?? []),
   ]);
 
   /** Распределение по статьям из выбранных планов — без отдельной кнопки. */
@@ -1117,7 +1125,14 @@ const FinanceView: React.FC<FinanceViewProps> = ({
       const departmentId = planningDetailDepartmentId || selectedPlanning.departmentId || '';
       if (!departmentId) return;
       const matched = filterRequestsForPlanningWindow(requests, start, end, departmentId);
-      setPlanningDetailRequestIds(matched.map((r) => r.id));
+      const idSet = new Set(matched.map((r) => r.id));
+      for (const id of selectedPlanning.requestIds ?? []) {
+        const r = requests.find((x) => x.id === id);
+        if (!r || r.isArchived || r.status === 'rejected') continue;
+        if (r.departmentId !== departmentId) continue;
+        idSet.add(id);
+      }
+      setPlanningDetailRequestIds(Array.from(idSet));
     };
     
     const handleApprove = () => {
@@ -1372,117 +1387,129 @@ const FinanceView: React.FC<FinanceViewProps> = ({
                   ))}
               </div>
               <p className="mt-2 text-[11px] text-gray-500 dark:text-gray-400 print:hidden">
-                Распределение по статьям ниже пересчитывается автоматически при выборе планов и изменении дохода за период.
+                Расчёт по статьям и фондам — в блоке «Доход и распределение» ниже; обновляется при выборе планов и сумме дохода.
               </p>
             </div>
           </div>
-          {Object.keys(planningDetailExpenseDistribution).length > 0 && (
-            <div className="border-t border-gray-100 dark:border-[#333] pt-3">
-              <div className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase mb-2">Распределение по статьям (расчёт)</div>
-              <ul className="text-sm space-y-1">
-                {(Object.entries(planningDetailExpenseDistribution) as [string, number][]).map(([cid, amt]) => {
-                  const cn = categories.find((c) => c.id === cid)?.name || cid;
-                  return (
-                    <li key={cid} className="flex justify-between gap-2">
-                      <span className="text-gray-600 dark:text-gray-400">{cn}</span>
-                      <span className="font-mono tabular-nums">{formatWholeSumUzGrouped(Number(amt))} UZS</span>
-                    </li>
-                  );
-                })}
-              </ul>
-            </div>
-          )}
-        </div>
-        
-        {/* Доход */}
-        <div className="bg-white dark:bg-[#252525] border border-gray-200 dark:border-[#333] rounded-xl p-6">
-          <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 uppercase mb-2">
-            Доход за период (UZS), кассовый метод
-          </label>
-          <FormattedMoneyInput
-            value={planningDetailIncome}
-            onChange={setPlanningDetailIncome}
-            className="w-full bg-white dark:bg-[#333] border border-gray-300 dark:border-[#555] rounded-lg px-4 py-3 text-lg font-bold text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
-            placeholder="0"
-          />
         </div>
 
-        {/* Доход по фондам (авто: равные доли; переносы — кнопка ниже) */}
-        {funds.filter((f) => !f.isArchived).length > 0 && (
-          <div className="bg-white dark:bg-[#252525] border border-gray-200 dark:border-[#333] rounded-xl p-6 print:break-inside-avoid">
-            <h3 className="text-sm font-bold text-gray-800 dark:text-white uppercase mb-1">Доход по фондам</h3>
-            <p className="text-xs text-gray-500 dark:text-gray-400 mb-4">
-              План по фондам считается автоматически поровну между фондами; ниже можно перенести суммы между фондами. После одобрения заявок остаток уменьшается.
+        {/* Доход, статьи из планов и фонды (план / остаток после одобренных заявок) */}
+        <div className="bg-white dark:bg-[#252525] border border-gray-200 dark:border-[#333] rounded-xl p-6 print:break-inside-avoid space-y-4">
+          <div>
+            <h3 className="text-sm font-bold text-gray-800 dark:text-white uppercase mb-1">Доход и распределение</h3>
+            <p className="text-xs text-gray-500 dark:text-gray-400">
+              Доход за период; ниже — суммы по статьям из отмеченных планов; затем фонды: план (как лежит деньги до оплат) и остаток — уменьшается после одобрения заявок, назначенных на фонд.
             </p>
-            <div className="grid grid-cols-[1fr_auto_auto] gap-x-3 gap-y-2 text-xs font-bold uppercase tracking-wide text-gray-500 dark:text-gray-400 border-b border-gray-200 dark:border-[#333] pb-2 mb-2">
-              <span>Фонд</span>
-              <span className="text-right tabular-nums">План</span>
-              <span className="text-right tabular-nums">Остаток</span>
-            </div>
-            <div className="space-y-2 text-sm">
-              {funds
-                .filter((f) => !f.isArchived)
-                .map((fund) => {
-                  const synthetic: FinancialPlanning = {
-                    ...selectedPlanning,
-                    fundAllocations: planningDetailFundAllocations,
-                    requestFundIds: planningDetailRequestFundIds,
-                    requestIds: planningDetailRequestIds,
-                  };
-                  const bal = fundAvailableBalances(synthetic, requests)[fund.id] ?? 0;
-                  const planAmt = Number(planningDetailFundAllocations[fund.id]) || 0;
-                  return (
-                    <div key={fund.id} className="grid grid-cols-[1fr_auto_auto] gap-x-3 gap-y-1 items-center">
-                      <span className="text-gray-700 dark:text-gray-300 font-medium">{fund.name}</span>
-                      <span className="tabular-nums text-right text-gray-900 dark:text-gray-100">
-                        {formatWholeSumUzGrouped(planAmt)} UZS
-                      </span>
-                      <span
-                        className={`tabular-nums text-right font-medium ${bal < 0 ? 'text-red-600 dark:text-red-400' : 'text-gray-900 dark:text-white'}`}
-                      >
-                        {formatWholeSumUzGrouped(bal)} UZS
-                      </span>
-                    </div>
-                  );
-                })}
-            </div>
-            {planningDetailIncome > 0 && (() => {
-              const allocated = sumMoney(Object.values(planningDetailFundAllocations) as number[]);
-              const rest = subtractMoney(planningDetailIncome, allocated);
-              return (
-                <div className="mt-3 text-xs text-gray-500 dark:text-gray-400">
-                  Всего по фондам: {formatWholeSumUzGrouped(allocated)} UZS · Нераспределённо: {formatWholeSumUzGrouped(rest)} UZS
-                  {rest < 0 && <span className="text-red-600 dark:text-red-400 ml-2">(превышение)</span>}
-                </div>
-              );
-            })()}
-            {planningDetailFundMovements && planningDetailFundMovements.length > 0 && (
-              <div className="mt-4 border-t border-gray-100 dark:border-[#333] pt-3 text-xs text-gray-500 dark:text-gray-400">
-                <div className="font-bold text-gray-600 dark:text-gray-300 mb-1">Движения между фондами</div>
-                <ul className="space-y-1">
-                  {planningDetailFundMovements.map((m) => {
-                    const fromN = funds.find((f) => f.id === m.fromFundId)?.name || m.fromFundId;
-                    const toN = funds.find((f) => f.id === m.toFundId)?.name || m.toFundId;
+          </div>
+          <div>
+            <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 uppercase mb-2">
+              Доход за период (UZS), кассовый метод
+            </label>
+            <FormattedMoneyInput
+              value={planningDetailIncome}
+              onChange={setPlanningDetailIncome}
+              className="w-full bg-white dark:bg-[#333] border border-gray-300 dark:border-[#555] rounded-lg px-4 py-3 text-lg font-bold text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+              placeholder="0"
+            />
+          </div>
+
+          {Object.keys(planningDetailExpenseDistribution).length > 0 && (
+            <div className="border-t border-gray-100 dark:border-[#333] pt-4">
+              <div className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase mb-2">По статьям (из планов)</div>
+              <ul className="text-sm space-y-1">
+                {(Object.entries(planningDetailExpenseDistribution) as [string, number][])
+                  .filter(([, amt]) => Math.abs(Number(amt) || 0) >= 1)
+                  .map(([cid, amt]) => {
+                    const cn = categories.find((c) => c.id === cid)?.name || cid;
                     return (
-                      <li key={m.id}>
-                        {fromN} → {toN}: {formatWholeSumUzGrouped(Number(m.amount) || 0)} UZS
+                      <li key={cid} className="flex justify-between gap-2">
+                        <span className="text-gray-600 dark:text-gray-400">{cn}</span>
+                        <span className="font-mono tabular-nums">{formatWholeSumUzGrouped(Number(amt))} UZS</span>
                       </li>
                     );
                   })}
-                </ul>
+              </ul>
+            </div>
+          )}
+
+          {funds.filter((f) => !f.isArchived).length > 0 && (
+            <>
+              <div className="border-t border-gray-100 dark:border-[#333] pt-4">
+                <div className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase mb-2">По фондам</div>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
+                  План по фондам — поровну между фондами; переносы — ссылка внизу. В колонке «Остаток» учитываются одобренные заявки с выбранным фондом.
+                </p>
+                <div className="grid grid-cols-[1fr_auto_auto] gap-x-3 gap-y-2 text-xs font-bold uppercase tracking-wide text-gray-500 dark:text-gray-400 border-b border-gray-200 dark:border-[#333] pb-2 mb-2">
+                  <span>Фонд</span>
+                  <span className="text-right tabular-nums">План</span>
+                  <span className="text-right tabular-nums">Остаток</span>
+                </div>
+                <div className="space-y-2 text-sm">
+                  {funds
+                    .filter((f) => !f.isArchived)
+                    .map((fund) => {
+                      const synthetic: FinancialPlanning = {
+                        ...selectedPlanning,
+                        fundAllocations: planningDetailFundAllocations,
+                        requestFundIds: planningDetailRequestFundIds,
+                        requestIds: planningDetailRequestIds,
+                      };
+                      const bal = fundAvailableBalances(synthetic, requests)[fund.id] ?? 0;
+                      const planAmt = Number(planningDetailFundAllocations[fund.id]) || 0;
+                      return (
+                        <div key={fund.id} className="grid grid-cols-[1fr_auto_auto] gap-x-3 gap-y-1 items-center">
+                          <span className="text-gray-700 dark:text-gray-300 font-medium">{fund.name}</span>
+                          <span className="tabular-nums text-right text-gray-900 dark:text-gray-100">
+                            {formatWholeSumUzGrouped(planAmt)} UZS
+                          </span>
+                          <span
+                            className={`tabular-nums text-right font-medium ${bal < 0 ? 'text-red-600 dark:text-red-400' : 'text-gray-900 dark:text-white'}`}
+                          >
+                            {formatWholeSumUzGrouped(bal)} UZS
+                          </span>
+                        </div>
+                      );
+                    })}
+                </div>
+                {planningDetailIncome > 0 && (() => {
+                  const allocated = sumMoney(Object.values(planningDetailFundAllocations) as number[]);
+                  const rest = subtractMoney(planningDetailIncome, allocated);
+                  return (
+                    <div className="mt-3 text-xs text-gray-500 dark:text-gray-400">
+                      Всего по фондам: {formatWholeSumUzGrouped(allocated)} UZS · Нераспределённо: {formatWholeSumUzGrouped(rest)} UZS
+                      {rest < 0 && <span className="text-red-600 dark:text-red-400 ml-2">(превышение)</span>}
+                    </div>
+                  );
+                })()}
               </div>
-            )}
-            {!isPlanningArchived && (
-              <button
-                type="button"
-                className="mt-3 text-sm text-[#3337AD] hover:underline print:hidden"
-                onClick={() => setPlanningFundTransferOpen(true)}
-              >
-                Перераспределить между фондами
-              </button>
-            )}
-          </div>
-        )}
+              {planningDetailFundMovements && planningDetailFundMovements.length > 0 && (
+                <div className="border-t border-gray-100 dark:border-[#333] pt-3 text-xs text-gray-500 dark:text-gray-400">
+                  <div className="font-bold text-gray-600 dark:text-gray-300 mb-1">Движения между фондами</div>
+                  <ul className="space-y-1">
+                    {planningDetailFundMovements.map((m) => {
+                      const fromN = funds.find((f) => f.id === m.fromFundId)?.name || m.fromFundId;
+                      const toN = funds.find((f) => f.id === m.toFundId)?.name || m.toFundId;
+                      return (
+                        <li key={m.id}>
+                          {fromN} → {toN}: {formatWholeSumUzGrouped(Number(m.amount) || 0)} UZS
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </div>
+              )}
+              {!isPlanningArchived && (
+                <button
+                  type="button"
+                  className="text-sm text-[#3337AD] hover:underline print:hidden"
+                  onClick={() => setPlanningFundTransferOpen(true)}
+                >
+                  Перераспределить между фондами
+                </button>
+              )}
+            </>
+          )}
+        </div>
 
         {/* Заявки */}
         <div className="bg-white dark:bg-[#252525] border border-gray-200 dark:border-[#333] rounded-xl overflow-hidden">

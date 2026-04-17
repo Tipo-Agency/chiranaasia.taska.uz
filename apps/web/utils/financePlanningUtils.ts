@@ -120,8 +120,8 @@ export function purchaseRequestDayKey(req: PurchaseRequest): string | null {
 }
 
 /**
- * Заявки, попадающие в окно бюджета: дата в [start,end], то же подразделение, не архив,
- * статусы кроме отклонённых и оплаченных (как при ручном «Обновить заявки»).
+ * Заявки в окне дат бюджета: дата (или createdAt) в [start,end], то же подразделение, не архив.
+ * Отклонённые не показываем; оплаченные показываем (остаток по фондам их не списывает как «одобренные»).
  */
 export function filterRequestsForPlanningWindow(
   requests: readonly PurchaseRequest[],
@@ -133,10 +133,11 @@ export function filterRequestsForPlanningWindow(
   const de = windowEnd.slice(0, 10);
   return requests.filter((req) => {
     const dk = purchaseRequestDayKey(req);
-    if (!dk || dk < ds || dk > de) return false;
+    if (dk && (dk < ds || dk > de)) return false;
+    if (!dk) return false;
     if (!departmentId || req.departmentId !== departmentId) return false;
     if (req.isArchived) return false;
-    if (req.status === 'rejected' || req.status === 'paid') return false;
+    if (req.status === 'rejected') return false;
     return true;
   });
 }
