@@ -90,37 +90,44 @@ export const useAppLogic = () => {
       }
   };
 
-  // Уровень 1: Загрузка основных данных верхнего уровня (после аутентификации)
-  const loadMainData = async () => {
-      // Загружаем параллельно для скорости
-      const [tables, activityLogs, notificationPrefs, automationRules, statuses, priorities, funnels, prodPipes, prodOrders] =
-          await Promise.all([
+  // Уровень 1a: минимум для первого кадра UI (без тяжёлых логов и производства)
+  const loadMainDataCore = async () => {
+      const [tables, notificationPrefs, automationRules, statuses, priorities, funnels] = await Promise.all([
           api.tables.getAll(),
-          api.activity.getAll(),
           api.notificationPrefs.get(),
           api.automation.getRules(),
           api.statuses.getAll(),
           api.priorities.getAll(),
           api.funnels.getAll(),
-          api.production.getPipelines().catch(() => []),
-          api.production.getOrders().catch(() => []),
       ]);
-      
       settingsSlice.setters.setTables(tables);
-      settingsSlice.setters.setActivityLogs(activityLogs);
       settingsSlice.setters.setNotificationPrefs(notificationPrefs);
       settingsSlice.setters.setAutomationRules(automationRules);
       taskSlice.setters.setStatuses(statuses);
       taskSlice.setters.setPriorities(priorities);
       setSalesFunnels(funnels);
-      const pipes = (Array.isArray(prodPipes) ? prodPipes : [])
-          .map(normalizeProductionPipeline)
-          .filter((x): x is ProductionRoutePipeline => x != null && !x.isArchived);
-      setProductionPipelines(pipes);
-      const ords = (Array.isArray(prodOrders) ? prodOrders : [])
-          .map(normalizeProductionOrder)
-          .filter((x): x is ProductionRouteOrder => x != null && !x.isArchived);
-      setProductionBoardOrders(ords);
+  };
+
+  // Уровень 1b: тяжёлое — не блокируем снятие лоадера; догружается сразу после core
+  const loadMainDataHeavy = async () => {
+      try {
+          const [activityLogs, prodPipes, prodOrders] = await Promise.all([
+              api.activity.getAll(),
+              api.production.getPipelines().catch(() => []),
+              api.production.getOrders().catch(() => []),
+          ]);
+          settingsSlice.setters.setActivityLogs(activityLogs);
+          const pipes = (Array.isArray(prodPipes) ? prodPipes : [])
+              .map(normalizeProductionPipeline)
+              .filter((x): x is ProductionRoutePipeline => x != null && !x.isArchived);
+          setProductionPipelines(pipes);
+          const ords = (Array.isArray(prodOrders) ? prodOrders : [])
+              .map(normalizeProductionOrder)
+              .filter((x): x is ProductionRouteOrder => x != null && !x.isArchived);
+          setProductionBoardOrders(ords);
+      } catch (e) {
+          devWarn('[loadMainDataHeavy]', e);
+      }
   };
 
   // Уровень 2: Загрузка данных модуля Tasks (lazy loading)
@@ -278,12 +285,14 @@ export const useAppLogic = () => {
       try {
         // Уровень 0: Загружаем только данные для аутентификации
         const isAuthenticated = await loadAuthData();
+        if (!isAuthenticated) {
+          setIsLoading(false);
+          return;
+        }
+        // Сначала лёгкий пакет — быстрее снимаем лоадер; лог активности и производство — сразу после
+        await loadMainDataCore();
         setIsLoading(false);
-        if (!isAuthenticated) return;
-        
-        // Уровень 1: После загрузки auth данных, загружаем основные данные
-        // Загружаем всегда, так как основные данные нужны для работы приложения
-        await loadMainData();
+        void loadMainDataHeavy();
       } catch (err) {
         console.error('Ошибка загрузки данных:', err);
         showNotification('Ошибка загрузки данных.');

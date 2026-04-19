@@ -3,6 +3,19 @@ import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 
 export default defineConfig({
+      build: {
+        rollupOptions: {
+          output: {
+            manualChunks(id) {
+              if (!id.includes('node_modules')) return;
+              if (id.includes('lucide-react')) return 'lucide';
+              if (id.includes('exceljs')) return 'exceljs';
+              return undefined; // react и остальное — дефолтный сплит Vite без циклов
+            },
+          },
+        },
+        chunkSizeWarningLimit: 900,
+      },
       server: {
         port: 3000,
         host: 'localhost',

@@ -1,4 +1,4 @@
-import React, { useCallback } from 'react';
+import React, { useCallback, lazy, Suspense } from 'react';
 import {
   createEntityFromChat as createEntityFromChatBridge,
   updateEntityFromChat as updateEntityFromChatBridge,
@@ -6,17 +6,27 @@ import {
 } from '../utils/miniMessengerBridge';
 import type { AppRouterProps } from './appRouterTypes';
 export type { AppRouterProps } from './appRouterTypes';
-import { DashboardRoutesView } from '../routes/DashboardRoutes';
-import { TaskRoutesView } from '../routes/TaskRoutes';
-import { ChatRoutesView } from '../routes/ChatRoutes';
-import { InboxRoutesView } from '../routes/InboxRoutes';
-import { AdminRoutesView } from '../routes/AdminRoutes';
-import { DocumentsRoutesView } from '../routes/DocumentsRoutes';
-import { CrmRoutesView } from '../routes/CrmRoutes';
-import { FinanceRoutesView } from '../routes/FinanceRoutes';
-import { HrRoutesView } from '../routes/HrRoutes';
-import { ProductionRoutesView } from '../routes/ProductionRoutes';
-import { InventoryRoutesView } from '../routes/InventoryRoutes';
+import { RouteFallback } from './ui/RouteFallback';
+
+const DashboardRoutesView = lazy(() =>
+  import('../routes/DashboardRoutes').then((m) => ({ default: m.DashboardRoutesView }))
+);
+const TaskRoutesView = lazy(() => import('../routes/TaskRoutes').then((m) => ({ default: m.TaskRoutesView })));
+const ChatRoutesView = lazy(() => import('../routes/ChatRoutes').then((m) => ({ default: m.ChatRoutesView })));
+const InboxRoutesView = lazy(() => import('../routes/InboxRoutes').then((m) => ({ default: m.InboxRoutesView })));
+const AdminRoutesView = lazy(() => import('../routes/AdminRoutes').then((m) => ({ default: m.AdminRoutesView })));
+const DocumentsRoutesView = lazy(() =>
+  import('../routes/DocumentsRoutes').then((m) => ({ default: m.DocumentsRoutesView }))
+);
+const CrmRoutesView = lazy(() => import('../routes/CrmRoutes').then((m) => ({ default: m.CrmRoutesView })));
+const FinanceRoutesView = lazy(() => import('../routes/FinanceRoutes').then((m) => ({ default: m.FinanceRoutesView })));
+const HrRoutesView = lazy(() => import('../routes/HrRoutes').then((m) => ({ default: m.HrRoutesView })));
+const ProductionRoutesView = lazy(() =>
+  import('../routes/ProductionRoutes').then((m) => ({ default: m.ProductionRoutesView }))
+);
+const InventoryRoutesView = lazy(() =>
+  import('../routes/InventoryRoutes').then((m) => ({ default: m.InventoryRoutesView }))
+);
 
 export const AppRouter: React.FC<AppRouterProps> = (props) => {
   const { currentView, actions } = props;
@@ -128,53 +138,55 @@ export const AppRouter: React.FC<AppRouterProps> = (props) => {
     startBusinessProcessFromTemplate,
   };
 
+  const suspense = (node: React.ReactNode) => <Suspense fallback={<RouteFallback />}>{node}</Suspense>;
+
   if (view === 'home') {
-    return <DashboardRoutesView {...props} {...dashboardExtra} />;
+    return suspense(<DashboardRoutesView {...props} {...dashboardExtra} />);
   }
 
   if (view === 'tasks' || view === 'spaces' || view === 'search' || view === 'table') {
-    return <TaskRoutesView {...props} view={view} />;
+    return suspense(<TaskRoutesView {...props} view={view} />);
   }
 
   if (view === 'chat') {
-    return <ChatRoutesView {...props} {...chatExtra} />;
+    return suspense(<ChatRoutesView {...props} {...chatExtra} />);
   }
 
   if (view === 'inbox') {
-    return <InboxRoutesView {...props} />;
+    return suspense(<InboxRoutesView {...props} />);
   }
 
   if (view === 'settings') {
-    return <AdminRoutesView {...props} />;
+    return suspense(<AdminRoutesView {...props} />);
   }
 
   if (view === 'doc-editor' && props.activeDoc) {
-    return <DocumentsRoutesView {...props} />;
+    return suspense(<DocumentsRoutesView {...props} />);
   }
 
   if (view === 'sales-funnel') {
-    return <CrmRoutesView {...props} />;
+    return suspense(<CrmRoutesView {...props} />);
   }
 
   if (view === 'finance') {
-    return <FinanceRoutesView {...props} />;
+    return suspense(<FinanceRoutesView {...props} />);
   }
 
   if (view === 'employees') {
-    return <HrRoutesView {...props} hrView="employees" />;
+    return suspense(<HrRoutesView {...props} hrView="employees" />);
   }
 
   if (view === 'business-processes') {
-    return <HrRoutesView {...props} hrView="business-processes" />;
+    return suspense(<HrRoutesView {...props} hrView="business-processes" />);
   }
 
   if (view === 'production') {
-    return <ProductionRoutesView {...props} />;
+    return suspense(<ProductionRoutesView {...props} />);
   }
 
   if (view === 'inventory') {
-    return <InventoryRoutesView {...props} />;
+    return suspense(<InventoryRoutesView {...props} />);
   }
 
-  return <DashboardRoutesView {...props} {...dashboardExtra} />;
+  return suspense(<DashboardRoutesView {...props} {...dashboardExtra} />);
 };
