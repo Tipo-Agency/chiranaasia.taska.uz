@@ -72,12 +72,15 @@ jobs:
             cd "$SERVER_PATH" || { echo "❌ cd SERVER_PATH failed"; exit 1; }
             git config --global --add safe.directory "$SERVER_PATH" 2>/dev/null || true
             # Пока на сервере старый deploy.sh без stash: незакоммиченные правки в ops/nginx/nginx.conf ломают merge.
-            # Разовый fetch+stash здесь подтягивает свежий deploy.sh; дальше сработает stash внутри скрипта.
+            # Ниже — checkout deploy.sh с origin/main, затем stash внутри самого deploy.sh при необходимости.
             git fetch origin || { echo "❌ git fetch failed"; exit 1; }
             git update-index -q --refresh 2>/dev/null || true
             if ! git diff --quiet HEAD 2>/dev/null; then
               echo "📦 CI: stash локальных правок перед deploy (часто ops/nginx/nginx.conf)..."
               git stash push -m "ci: autostash before deploy $(date -Is)" || { echo "❌ git stash failed"; exit 1; }
             fi
+            # fetch не трогает рабочее дерево: без этого при расхождении main и origin/main
+            # на диске остаётся СТАРЫЙ deploy.sh — merge внутри скрипта падает, а fallback ещё не в файле.
+            git checkout origin/main -- ops/scripts/deploy.sh || { echo "❌ не удалось взять ops/scripts/deploy.sh с origin/main"; exit 1; }
             chmod +x ops/scripts/deploy.sh
             ./ops/scripts/deploy.sh

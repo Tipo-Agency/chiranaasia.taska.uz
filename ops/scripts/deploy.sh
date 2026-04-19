@@ -46,7 +46,7 @@ echo "✅ Ownership fixed"
 
 # 2. Обновляем код только по изменениям (merge, без жёсткой очистки)
 echo ""
-echo "📥 Step 2: Updating code (git fetch + merge, no reset/clean)..."
+echo "📥 Step 2: Updating code (git fetch + merge --ff-only или reset --hard к origin/main)..."
 git fetch origin || { echo "❌ git fetch failed"; exit 1; }
 
 # Локальные правки отслеживаемых файлов (часто ops/nginx/nginx.conf на сервере) ломают merge.
