@@ -1,4 +1,5 @@
 """FastAPI application entry point."""
+import asyncio
 import logging
 import os
 import sys
@@ -94,8 +95,14 @@ async def lifespan(app: FastAPI):
 
     server_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     alembic_cfg = Config(os.path.join(server_dir, "alembic.ini"))
-    try:
+
+    def _alembic_upgrade_sync() -> None:
+        # Нельзя вызывать command.upgrade из async lifespan напрямую: env.py делает asyncio.run(),
+        # что падает с «cannot be called from a running event loop». Отдельный поток — свой loop.
         command.upgrade(alembic_cfg, "head")
+
+    try:
+        await asyncio.to_thread(_alembic_upgrade_sync)
     except Exception as e:
         env = (settings.ENVIRONMENT or "").strip().lower()
         if env in ("production", "prod", "staging"):
