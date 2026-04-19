@@ -43,6 +43,7 @@ from app.api.routers import (
     notification_events,
     notification_prefs,
     notifications,
+    org,
     priorities,
     production,
     projects,
@@ -256,6 +257,7 @@ app.include_router(integrations_telegram_personal.router, prefix=settings.API_PR
 # Routers (prefix already in router)
 app.include_router(admin.router, prefix=settings.API_PREFIX)
 app.include_router(auth.router, prefix=settings.API_PREFIX)
+app.include_router(org.router, prefix=settings.API_PREFIX)
 app.include_router(system.public_router, prefix=settings.API_PREFIX)
 app.include_router(system.router, prefix=settings.API_PREFIX)
 app.include_router(tasks.router, prefix=settings.API_PREFIX)

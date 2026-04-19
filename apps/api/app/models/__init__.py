@@ -36,6 +36,7 @@ from app.models.notification import (
     NotificationEvent,
     NotificationPreferences,
 )
+from app.models.org_system_prefs import OrgSystemPrefs
 from app.models.production import ProductionHandoff, ProductionOrder, ProductionPipeline
 from app.models.refresh_token import RefreshToken
 from app.models.role import Role
@@ -65,6 +66,7 @@ __all__ = [
     "Notification",
     "NotificationDelivery",
     "NotificationArchive",
+    "OrgSystemPrefs",
     "Client",
     "CrmContact",
     "Deal",

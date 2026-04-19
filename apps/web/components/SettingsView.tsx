@@ -1,7 +1,26 @@
 
 import React, { useState, useEffect, useMemo, useLayoutEffect, lazy, Suspense } from 'react';
 import { Project, Task, User, StatusOption, PriorityOption, NotificationPreferences, AutomationRule, TableCollection, Deal, Department, FinanceCategory, SalesFunnel, Doc, ContentPost, EmployeeInfo, Client, Contract, BusinessProcess, Meeting, Warehouse, OrgPosition, ProductionRoutePipeline } from '../types';
-import { User as UserIcon, Briefcase, Archive, Users, Building2, Wallet, TrendingUp, ShieldAlert, Settings, BellRing, Zap, Package, ArrowLeft, ShieldCheck, Receipt, Link2, Factory } from 'lucide-react';
+import {
+  User as UserIcon,
+  Briefcase,
+  Archive,
+  Users,
+  Building2,
+  Wallet,
+  TrendingUp,
+  ShieldAlert,
+  Settings,
+  BellRing,
+  Zap,
+  Package,
+  ArrowLeft,
+  ShieldCheck,
+  Receipt,
+  Link2,
+  Factory,
+  Palette,
+} from 'lucide-react';
 import {
   Input,
   ModuleCreateDropdown,
@@ -27,6 +46,7 @@ import { DEFAULT_NOTIFICATION_PREFS } from '../constants';
 import { ArchiveView, ARCHIVE_TAB_OPTIONS, type ArchiveTabId } from './settings/ArchiveView';
 import { FinanceSetupSettings } from './settings/FinanceSetupSettings';
 import { IntegrationsRoadmapSettings } from './settings/IntegrationsRoadmapSettings';
+import { BrandingSettings } from './settings/BrandingSettings';
 import { TasksSetupSettings } from './settings/TasksSetupSettings';
 import { hasPermission } from '../utils/permissions';
 import { RouteFallback } from './ui/RouteFallback';
@@ -153,6 +173,10 @@ const SettingsView: React.FC<SettingsViewProps> = ({
       });
     }
     if (currentUser && hasPermission(currentUser, 'admin.system')) {
+      const profIdx = t.findIndex((x) => x.id === 'profile');
+      if (profIdx >= 0) {
+        t.splice(profIdx + 1, 0, { id: 'branding', label: 'Компания', icon: <Palette size={14} /> });
+      }
       t.push({ id: 'integrations-roadmap', label: 'Интеграции (план)', icon: <Link2 size={14} /> });
       t.push({ id: 'admin', label: 'Админ-панель', icon: <ShieldCheck size={14} /> });
     }
@@ -164,7 +188,7 @@ const SettingsView: React.FC<SettingsViewProps> = ({
     if (t === 'finance-categories' || t === 'funds') return 'finance-setup';
     if (t === 'integrations' || t === 'system') return 'notifications';
     if (
-      (t === 'admin' || t === 'integrations-roadmap') &&
+      (t === 'admin' || t === 'integrations-roadmap' || t === 'branding') &&
       (!currentUser || !hasPermission(currentUser, 'admin.system'))
     ) {
       return 'users';
@@ -422,6 +446,11 @@ const SettingsView: React.FC<SettingsViewProps> = ({
           ) : (
             <>
               {activeTab === 'profile' && currentUser && <ProfileSettings activeTab="profile" currentUser={currentUser} users={users} onUpdateProfile={onUpdateProfile!} onUpdateUsers={onUpdateUsers} />}
+              {activeTab === 'branding' && currentUser && hasPermission(currentUser, 'admin.system') && (
+                <div className="bg-white dark:bg-[#252525] border border-gray-200 dark:border-[#333] rounded-2xl p-4 md:p-6 max-w-2xl">
+                  <BrandingSettings />
+                </div>
+              )}
               {activeTab === 'users' && currentUser && (
                 <AccessSettings
                   currentUser={currentUser}

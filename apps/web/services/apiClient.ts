@@ -142,7 +142,8 @@ async function fetchJson<T>(url: string, options?: FetchJsonOpts): Promise<T> {
     !options?.skipAuthRefresh &&
     res.status === 401 &&
     !url.startsWith('/auth/refresh') &&
-    !url.startsWith('/auth/login');
+    !url.startsWith('/auth/login') &&
+    !url.startsWith('/org/branding');
   if (canRefresh) {
     const ok = await tryRefreshAccessToken();
     if (ok) res = await doFetch();
@@ -176,7 +177,8 @@ async function fetchJson<T>(url: string, options?: FetchJsonOpts): Promise<T> {
       !url.startsWith('/auth/login') &&
       !url.startsWith('/auth/refresh') &&
       !url.startsWith('/auth/csrf') &&
-      !url.startsWith('/auth/logout')
+      !url.startsWith('/auth/logout') &&
+      !url.startsWith('/org/branding')
     ) {
       try {
         unauthorizedHandler();
@@ -260,6 +262,13 @@ async function patch<T>(path: string, body: unknown, init?: Omit<FetchJsonOpts, 
 async function del<T>(path: string, init?: Omit<FetchJsonOpts, 'method' | 'body'>): Promise<T> {
   return fetchJson<T>(path, { method: 'DELETE', ...init });
 }
+
+/** Публичный GET + PATCH с admin.system (CSRF на PATCH). */
+export const orgEndpoint = {
+  getBranding: () => get<{ primaryColor: string; logoSvg: string | null }>('/org/branding'),
+  patchBranding: (body: { primaryColor?: string | null; logoSvg?: string | null }) =>
+    patch<{ primaryColor: string; logoSvg: string | null }>('/org/branding', body),
+};
 
 // Системные логи: GET /admin/logs — JWT (cookie) + RBAC admin.system (не путать с публичным /health)
 export const systemEndpoint = {

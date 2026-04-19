@@ -41,11 +41,13 @@ import {
   integrationsTelegramEndpoint,
   integrationsTelegramPersonalEndpoint,
   integrationsRoadmapEndpoint,
+  orgEndpoint,
   publicContentPlanEndpoint,
 } from "../services/apiClient";
 
 export const api = {
   users: authEndpoint,
+  org: orgEndpoint,
 
   tasks: tasksEndpoint,
   projects: projectsEndpoint,

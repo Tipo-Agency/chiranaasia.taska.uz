@@ -37,3 +37,4 @@ async def test_openapi_http_route_returns_json() -> None:
     data = r.json()
     assert data["info"]["title"] == "Taska API"
     assert "/api/auth/login" in data.get("paths", {})
+    assert "/api/org/branding" in data.get("paths", {})
