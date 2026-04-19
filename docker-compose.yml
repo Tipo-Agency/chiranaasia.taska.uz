@@ -1,5 +1,6 @@
 services:
   db:
+    restart: unless-stopped
     image: postgres:16-alpine
     environment:
       POSTGRES_USER: taska
@@ -16,6 +17,7 @@ services:
       retries: 5
 
   redis:
+    restart: unless-stopped
     image: redis:7-alpine
     command: ["redis-server", "--appendonly", "yes"]
     volumes:
@@ -27,6 +29,7 @@ services:
       retries: 10
 
   backend:
+    restart: unless-stopped
     build: ./apps/api
     ports:
       - "8003:8000"   # хост 8003 (из списка свободных портов проекта)
@@ -64,6 +67,7 @@ services:
 
   # Telegram getUpdates для воронок без webhook; offset в Redis (см. workers/integrations_worker.py)
   integrations-worker:
+    restart: unless-stopped
     build: ./apps/api
     command: ["python", "-m", "workers.integrations_worker"]
     environment:
@@ -85,6 +89,7 @@ services:
 
   # Доменные события → уведомления (при DOMAIN_EVENTS_HUB_ASYNC=true)
   domain-events-worker:
+    restart: unless-stopped
     build: ./apps/api
     command: ["python", "-m", "workers.domain_events_worker"]
     environment:
@@ -103,6 +108,7 @@ services:
 
   # Retention таблицы уведомлений (раньше был цикл в lifespan API)
   retention-worker:
+    restart: unless-stopped
     build: ./apps/api
     command: ["python", "-m", "workers.retention_worker"]
     environment:
@@ -116,6 +122,7 @@ services:
 
   # Очередь queue.notifications.v1: telegram / e-mail доставки по notification_id
   notifications-worker:
+    restart: unless-stopped
     build: ./apps/api
     command: ["python", "-m", "workers.notifications_worker"]
     environment:
