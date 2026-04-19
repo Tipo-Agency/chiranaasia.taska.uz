@@ -64,8 +64,13 @@ if ! git diff --quiet HEAD 2>/dev/null || ! git diff-index --quiet HEAD -- 2>/de
   fi
 fi
 HEAD_BEFORE_MERGE="$(git rev-parse HEAD)"
-if ! git merge origin/main --ff-only; then
-  echo "❌ git merge --ff-only failed (не fast-forward? сделайте pull/merge на сервере или перезапустите деплой)"
+if git merge origin/main --ff-only; then
+  :
+elif git reset --hard origin/main; then
+  # На деплой-клоне не должно быть уникальных коммитов на main; расхождение часто после force-push в origin.
+  echo "   ⚠️ fast-forward невозможен — выполнен git reset --hard origin/main (main = удалённый main)"
+else
+  echo "❌ git merge --ff-only и git reset --hard origin/main не удались"
   if [ "$DEPLOY_STASHED" = 1 ]; then
     echo "   ↩️ Восстанавливаем рабочее дерево из stash..."
     git stash pop || true
@@ -84,7 +89,7 @@ if [ "$HEAD_BEFORE_MERGE" != "$HEAD_AFTER_MERGE" ] && git diff --name-only "$HEA
   exec bash "$SERVER_PATH/ops/scripts/deploy.sh"
 fi
 sudo chown -R "$USER:$USER" "$SERVER_PATH" || true
-echo "✅ Code updated (merge only, DB and untracked files unchanged)"
+echo "✅ Code updated (merge --ff-only или reset --hard к origin/main; .env и неотслеживаемые файлы не трогались)"
 
 # 2a. Файл .env в корне репо (для docker compose: backend нужен TELEGRAM_BOT_TOKEN для админки «Тестовая отправка»)
 echo ""
