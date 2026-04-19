@@ -206,6 +206,19 @@ else
   exit 1
 fi
 echo "   Using: $DOCKER_CMD"
+# Часто у SSH-пользователя деплоя нет группы docker → permission denied на сокет.
+# chown/nginx в скрипте уже через sudo — повторяем для compose, если без sudo демон недоступен.
+if ! docker info >/dev/null 2>&1; then
+  if sudo docker info >/dev/null 2>&1; then
+    DOCKER_CMD="sudo $DOCKER_CMD"
+    echo "   ℹ️ Нет доступа к Docker-сокету от $USER — запускаем $DOCKER_CMD (через sudo)."
+    echo "   Рекомендация на сервере: sudo usermod -aG docker $USER, затем новая SSH-сессия — sudo для compose не понадобится."
+  else
+    echo "❌ Docker демон недоступен: docker info и sudo docker info не удались."
+    echo "   Проверьте: systemctl status docker, права на /var/run/docker.sock, NOPASSWD для sudo если деплой неинтерактивный."
+    exit 1
+  fi
+fi
 # Все сервисы приложения из корневого compose (без profile tools): Redis, API, воркеры очередей.
 # См. docs/QUEUES.md и docs/OPERATIONS.md §3.
 OPS_COMPOSE_SERVICES="db redis backend integrations-worker domain-events-worker retention-worker notifications-worker"
