@@ -99,7 +99,6 @@ export const BrandingSettings: React.FC = () => {
           <div className="mt-3 flex justify-center p-4 border border-dashed border-gray-200 dark:border-[#444] rounded-xl bg-gray-50 dark:bg-[#1a1a1a]">
             <div
               className="max-h-28 max-w-[200px] [&_svg]:max-h-28 [&_svg]:w-auto"
-              // eslint-disable-next-line react/no-danger
               dangerouslySetInnerHTML={{ __html: previewSvg()! }}
             />
           </div>

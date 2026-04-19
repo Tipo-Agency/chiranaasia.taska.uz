@@ -60,7 +60,6 @@ export const LoginView: React.FC<LoginViewProps> = ({ users: _users, onLogin }) 
         <div className="text-center mb-8">
           <div className="inline-flex items-center justify-center mb-4 [&_svg]:max-h-[120px] [&_svg]:w-auto">
             {safeLogo ? (
-              // eslint-disable-next-line react/no-danger
               <span dangerouslySetInnerHTML={{ __html: safeLogo }} />
             ) : (
               <svg width="120" height="113" viewBox="0 0 591 556" fill="none" xmlns="http://www.w3.org/2000/svg">
