@@ -1,7 +1,6 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { api } from '../../backend/api';
-import { FAVICON_SVG_DATA_URI } from '../../components/AppIcons';
 import { 
   notifyDealCreated, 
   notifyDealStatusChanged, 
@@ -274,11 +273,8 @@ export const useAppLogic = () => {
       }
   };
 
-  // Инициализация приложения - поэтапная загрузка
+  // Инициализация приложения - поэтапная загрузка (фавикон задаётся из `primaryColor` в applyOrgBrandingToDocument)
   useEffect(() => {
-    const faviconLink = document.getElementById('dynamic-favicon') as HTMLLinkElement;
-    if (faviconLink) faviconLink.href = FAVICON_SVG_DATA_URI;
-    
     const initApp = async () => { 
       setIsLoading(true); 
       
@@ -454,27 +450,13 @@ export const useAppLogic = () => {
               const tab = settingsSlice.state.workdeskTab;
               const loads: Promise<void>[] = [];
               switch (tab) {
-                case 'dashboard':
-                  loads.push(
-                    loadTasksData(),
-                    loadContentData(),
-                    loadFinanceData(),
-                    loadCRMData(),
-                  );
-                  break;
-                case 'weekly':
-                case 'tasks':
-                  loads.push(loadTasksData());
-                  break;
-                case 'deals':
-                  loads.push(loadTasksData(), loadCRMData());
-                  break;
                 case 'meetings':
                   loads.push(loadContentData(), loadTasksData(), loadCRMData());
                   break;
                 case 'documents':
                   loads.push(loadContentData(), loadTasksData());
                   break;
+                case 'dashboard':
                 default:
                   loads.push(
                     loadTasksData(),

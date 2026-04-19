@@ -69,9 +69,9 @@ export function DashboardRoutesView(props: AppRouterProps & DashboardRoutesExtra
         actions.setCurrentView('home');
       }}
       onNavigateToDeals={() => actions.setCurrentView('sales-funnel')}
+      onNavigateToInbox={() => actions.setCurrentView('inbox')}
       onOpenDocument={actions.handleDocClick}
       onCreateEntity={props.createEntityFromChat}
-      onUpdateEntity={props.updateEntityFromChat}
       onOpenDocModal={props.onOpenDocModalFromWorkdesk}
       onQuickCreateTask={props.onQuickCreateTask}
       onQuickCreateDeal={props.onQuickCreateDeal}

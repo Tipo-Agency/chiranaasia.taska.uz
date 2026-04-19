@@ -1,0 +1,22 @@
+---
+description: Порты, nginx, docker-compose, статика и миграции taska — не ломать прод-маппинги
+globs: docker-compose.yml,ops/**,.env.example,apps/api/alembic/versions/*.py
+alwaysApply: false
+---
+
+# Ops: порты, nginx, compose, Alembic
+
+Полная шпаргалка: **`ops/PORTS.md`**. При правках в зоне globs — перечитай его; при конфликте с закреплёнными маппингами — **остановись и спроси пользователя**.
+
+## Обязательно сохранять
+
+- **Порты (прод, taska-ряд):** `tipa.taska.uz` → `127.0.0.1:8051`, `chiranaasia.taska.uz` → `8052`, `unique` / `api-unique` → `8053`; следующий стек — **+1** (8054, …). Не занимать зарезервированные порты без ОК: `3020`, `3021`, `8004`, `3027`, `3010`, `5011`.
+- **Compose:** в `docker-compose.yml` публикация API только `"${BACKEND_PUBLISH_PORT:-8003}:8000"` — не возвращать жёсткие 8003/8008 вместо env. Верхний уровень `name: tipa` в этом репо; у chiranaasia — `name: chiranaasia`. Не удалять `name:` без бэкапа volumes.
+- **Nginx:** синхронно `ops/nginx/nginx.conf` и боевой `/etc/nginx/sites-available/<домен>`; после правок `nginx -t` и **`nginx -s reload`**. `proxy_pass` = тот же порт, что `BACKEND_PUBLISH_PORT` у этого клона.
+- **Статика:** `root` → **`apps/web/dist` этого репозитория/клона**; не общий «чужой» root на все проекты.
+- **Alembic:** один head; не дублировать создание одной таблицы в параллельных ревизиях; при риске — идемпотентность (`get_table_names()` перед `create_table`).
+- **БД:** не хардкодить пароль в URL; `docker compose run` + env из `.env`.
+
+## prince-club (другой репо)
+
+Compose `"<порт>:4000"`, nginx `upstream` → `127.0.0.1:<тот же порт>`.

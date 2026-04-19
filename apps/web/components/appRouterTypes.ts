@@ -92,7 +92,7 @@ export interface AppRouterProps {
   productionBoardOrders?: ProductionRouteOrder[];
   settingsActiveTab?: string;
   activeSpaceTab?: 'content-plan' | 'backlog' | 'functionality';
-  workdeskTab?: 'dashboard' | 'weekly' | 'tasks' | 'deals' | 'meetings' | 'documents';
+  workdeskTab?: 'dashboard' | 'meetings' | 'documents';
   crmHubTab?: CrmHubTab;
   employeesHubTab?: 'team' | 'payroll';
   notificationPrefs?: NotificationPreferences;

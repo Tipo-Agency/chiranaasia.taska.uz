@@ -1,5 +1,4 @@
-import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { WeeklyPlansView, type WeeklyPlansViewHandle } from '../documents/WeeklyPlansView';
+import React, { useLayoutEffect, useMemo, useState } from 'react';
 import { StatsCards } from '../features/home/StatsCards';
 import {
   Calendar,
@@ -8,12 +7,12 @@ import {
   FileText,
   Network,
   X,
-  Save,
   AlertCircle,
   CalendarClock,
   Layers,
   Megaphone,
   Zap,
+  Mail,
 } from 'lucide-react';
 import { Deal, FinancePlan, Meeting, Task, User, Doc, type BusinessProcess, SalesFunnel } from '../../types';
 import { getDealDisplayTitle, isFunnelDeal } from '../../utils/dealModel';
@@ -27,10 +26,9 @@ import {
   MODULE_TOOLBAR_TAB_IDLE,
 } from '../ui';
 import { useAppToolbar } from '../../contexts/AppToolbarContext';
-import { DateInput } from '../ui/DateInput';
 import { getTodayLocalDate, normalizeDateForInput, parseLocalDate } from '../../utils/dateUtils';
 
-type WorkdeskTab = 'dashboard' | 'weekly' | 'tasks' | 'deals' | 'meetings' | 'documents';
+type WorkdeskTab = 'dashboard' | 'meetings' | 'documents';
 
 const TASK_DONE_STATUSES = ['Выполнено', 'Done', 'Завершено'];
 
@@ -90,6 +88,8 @@ interface WorkdeskViewProps {
   onNavigateToDeals: () => void;
   onNavigateToMeetings: () => void;
   onNavigateToDocuments?: () => void;
+  /** Раздел «Входящие» / почта (отдельный экран, не desk= в URL) */
+  onNavigateToInbox?: () => void;
   workdeskTab: WorkdeskTab;
   onWorkdeskTabChange: (tab: WorkdeskTab) => void;
   meetingsSlot?: React.ReactNode;
@@ -98,11 +98,6 @@ interface WorkdeskViewProps {
   processTemplates?: BusinessProcess[];
   onStartProcessTemplate?: (processId: string) => Promise<{ id: string; label: string } | null> | { id: string; label: string } | null;
   onCreateEntity?: (type: 'task' | 'deal' | 'meeting' | 'doc', title: string) => Promise<{ id: string; label: string } | null> | { id: string; label: string } | null;
-  onUpdateEntity?: (
-    type: 'task' | 'deal' | 'meeting' | 'doc',
-    id: string,
-    patch: Record<string, unknown>
-  ) => Promise<boolean> | boolean;
   /** Открыть модалку документа (ссылка / файл) без мгновенного создания */
   onOpenDocModal?: () => void;
   /** Создать задачу из шапки, не уходя со страницы */
@@ -126,6 +121,7 @@ export const WorkdeskView: React.FC<WorkdeskViewProps> = ({
   onNavigateToDeals,
   onNavigateToMeetings,
   onNavigateToDocuments,
+  onNavigateToInbox,
   workdeskTab,
   onWorkdeskTabChange,
   meetingsSlot,
@@ -134,7 +130,6 @@ export const WorkdeskView: React.FC<WorkdeskViewProps> = ({
   processTemplates = [],
   onStartProcessTemplate,
   onCreateEntity,
-  onUpdateEntity,
   onOpenDocModal,
   onQuickCreateTask,
   onQuickCreateDeal,
@@ -142,29 +137,7 @@ export const WorkdeskView: React.FC<WorkdeskViewProps> = ({
   const { setLeading, setModule } = useAppToolbar();
   const activeTab = workdeskTab;
   const setActiveTab = onWorkdeskTabChange;
-  const weeklyPlansRef = useRef<WeeklyPlansViewHandle>(null);
-  const [editingDeal, setEditingDeal] = useState<Deal | null>(null);
-  const [editingMeeting, setEditingMeeting] = useState<Meeting | null>(null);
   const [processPickerOpen, setProcessPickerOpen] = useState(false);
-
-  const myTasks = useMemo(
-    () =>
-      tasks
-        .filter(
-          (t) =>
-            !t.isArchived &&
-            t.entityType !== 'idea' &&
-            t.entityType !== 'feature' &&
-            (t.assigneeId === currentUser.id || t.assigneeIds?.includes(currentUser.id))
-        )
-        .slice(0, 30),
-    [tasks, currentUser.id]
-  );
-
-  const myDeals = useMemo(
-    () => deals.filter((d) => !d.isArchived && d.assigneeId === currentUser.id).slice(0, 30),
-    [deals, currentUser.id]
-  );
 
   const myMeetings = useMemo(
     () => meetings.filter((m) => !m.isArchived && (m.participantIds || []).includes(currentUser.id)).slice(0, 30),
@@ -193,13 +166,6 @@ export const WorkdeskView: React.FC<WorkdeskViewProps> = ({
       ).length,
     [tasks, currentUser.id]
   );
-  const wonDealsAmount = useMemo(
-    () =>
-      deals
-        .filter((d) => d.assigneeId === currentUser.id && d.stage === 'won')
-        .reduce((sum, d) => sum + (d.amount || 0), 0),
-    [deals, currentUser.id]
-  );
   const meetingsThisWeek = useMemo(() => {
     const now = new Date();
     const start = new Date(now);
@@ -214,18 +180,6 @@ export const WorkdeskView: React.FC<WorkdeskViewProps> = ({
       return d >= start && d < end;
     }).length;
   }, [myMeetings]);
-  const tasksByDealId = useMemo(() => {
-    const map = new Map<string, Task[]>();
-    tasks
-      .filter((t) => !t.isArchived && !!t.dealId)
-      .forEach((t) => {
-        const key = String(t.dealId);
-        const arr = map.get(key) || [];
-        arr.push(t);
-        map.set(key, arr);
-      });
-    return map;
-  }, [tasks]);
   /** Дедуп по id, последняя версия; системные шаблоны тоже можно запускать */
   const availableProcessTemplates = useMemo(() => {
     const latestById = new Map<string, BusinessProcess>();
@@ -349,6 +303,19 @@ export const WorkdeskView: React.FC<WorkdeskViewProps> = ({
             </button>
           );
         })}
+        {onNavigateToInbox ? (
+          <button
+            type="button"
+            role="tab"
+            aria-selected={false}
+            onClick={() => onNavigateToInbox()}
+            className={`inline-flex items-center gap-1 px-2 sm:px-2.5 py-1 rounded-lg text-[11px] sm:text-xs font-medium whitespace-nowrap transition-colors shrink-0 ${idleBox}`}
+            title="Входящие и уведомления"
+          >
+            <Mail className="w-3.5 h-3.5 opacity-80 shrink-0" aria-hidden />
+            Почта
+          </button>
+        ) : null}
       </div>
     );
     setModule(
@@ -387,14 +354,6 @@ export const WorkdeskView: React.FC<WorkdeskViewProps> = ({
               window.setTimeout(() => {
                 window.dispatchEvent(new CustomEvent('openCreateDealModal'));
               }, 150);
-            },
-          },
-          {
-            id: 'create-weekly-plan',
-            label: 'Недельный план',
-            icon: Calendar,
-            onClick: () => {
-              window.setTimeout(() => weeklyPlansRef.current?.openCreateModal(), 0);
             },
           },
           {
@@ -448,6 +407,7 @@ export const WorkdeskView: React.FC<WorkdeskViewProps> = ({
     onNavigateToTasks,
     onNavigateToDeals,
     onNavigateToMeetings,
+    onNavigateToInbox,
   ]);
 
   return (
@@ -678,131 +638,6 @@ export const WorkdeskView: React.FC<WorkdeskViewProps> = ({
             </div>
           )}
 
-          {/* Всегда в DOM, чтобы ref работал при создании плана с дашборда без переключения вкладки */}
-          <div className={activeTab === 'weekly' ? 'block' : 'hidden'} aria-hidden={activeTab !== 'weekly'}>
-            <div className="bg-white dark:bg-[#252525] rounded-2xl border border-gray-200 dark:border-[#333] p-4">
-              <WeeklyPlansView
-                ref={weeklyPlansRef}
-                currentUser={currentUser}
-                tasks={tasks}
-                onOpenTask={onOpenTask}
-                onCreateTask={(title) => (onCreateEntity ? onCreateEntity('task', title) : null)}
-                onUpdateTask={(taskId, updates) => {
-                  void onUpdateEntity?.('task', taskId, updates as unknown as Record<string, unknown>);
-                }}
-                layout="embedded"
-                hideEmbeddedToolbar
-              />
-            </div>
-          </div>
-
-          {activeTab === 'tasks' && (
-            <div className="bg-white dark:bg-[#252525] rounded-2xl border border-gray-200 dark:border-[#333] p-4 space-y-3">
-              <div className="flex items-center justify-between">
-                <h3 className="font-semibold text-gray-900 dark:text-white">Мои активные задачи</h3>
-                <button type="button" onClick={onNavigateToTasks} className="text-sm text-[#3337AD] hover:underline">
-                  Открыть модуль
-                </button>
-              </div>
-              {myTasks.length === 0 ? (
-                <p className="text-sm text-gray-500 dark:text-gray-400">Нет задач.</p>
-              ) : (
-                <div className="space-y-3">
-                  {myTasks.map((t) => (
-                    <button
-                      key={t.id}
-                      type="button"
-                      onClick={() => onOpenTask(t)}
-                      className="w-full text-left rounded-xl border border-gray-200 dark:border-[#333] p-4 bg-white dark:bg-[#252525] hover:shadow-md hover:border-indigo-300 dark:hover:border-indigo-700 transition-all"
-                    >
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="min-w-0 flex-1">
-                          <div className="font-semibold text-sm text-gray-900 dark:text-white">{t.title || 'Без названия'}</div>
-                          <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                            {(t.priority || 'Средний')} · {(t.status || 'Без статуса')}
-                          </div>
-                          {t.description ? <div className="text-xs text-gray-500 dark:text-gray-400 mt-2 line-clamp-2">{t.description}</div> : null}
-                        </div>
-                        <div className="shrink-0 text-right">
-                          <span className="inline-flex px-2 py-0.5 rounded-full text-[10px] font-semibold bg-gray-100 dark:bg-[#333] text-gray-700 dark:text-gray-300">
-                            {t.status || 'Без статуса'}
-                          </span>
-                        </div>
-                      </div>
-                      <div className="mt-3 pt-2 border-t border-gray-100 dark:border-[#333] text-[11px] text-gray-500 dark:text-gray-400 flex items-center justify-between">
-                        <span>{t.startDate || '—'} — {t.endDate || '—'}</span>
-                        <span>{(t.assigneeIds && t.assigneeIds.length) || (t.assigneeId ? 1 : 0)} исп.</span>
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
-
-          {activeTab === 'deals' && (
-            <div className="bg-white dark:bg-[#252525] rounded-2xl border border-gray-200 dark:border-[#333] p-4 space-y-3">
-              <div className="flex items-center justify-between">
-                <h3 className="font-semibold text-gray-900 dark:text-white">Сделки</h3>
-                <button type="button" onClick={onNavigateToDeals} className="text-sm text-[#3337AD] hover:underline">
-                  Открыть модуль
-                </button>
-              </div>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs">
-                <div className="rounded-xl border border-gray-200 dark:border-[#333] p-2">
-                  <p className="text-gray-500">Активные</p>
-                  <p className="font-semibold text-gray-900 dark:text-white">{myDeals.filter((d) => d.stage !== 'won' && d.stage !== 'lost').length}</p>
-                </div>
-                <div className="rounded-xl border border-gray-200 dark:border-[#333] p-2">
-                  <p className="text-gray-500">Won</p>
-                  <p className="font-semibold text-gray-900 dark:text-white">{myDeals.filter((d) => d.stage === 'won').length}</p>
-                </div>
-                <div className="rounded-xl border border-gray-200 dark:border-[#333] p-2 col-span-2">
-                  <p className="text-gray-500">Сумма выигранных</p>
-                  <p className="font-semibold text-gray-900 dark:text-white">{wonDealsAmount.toLocaleString('ru-RU')} UZS</p>
-                </div>
-              </div>
-              {myDeals.length === 0 ? (
-                <p className="text-sm text-gray-500 dark:text-gray-400">Нет сделок.</p>
-              ) : (
-                <div className="space-y-3">
-                  {myDeals.map((d) => (
-                    <div key={d.id} className="rounded-xl border border-gray-200 dark:border-[#333] p-4">
-                      <div className="font-semibold text-sm text-gray-900 dark:text-white">{d.title || 'Сделка'}</div>
-                      <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                        {d.stage || 'Без этапа'} · {(d.amount || 0).toLocaleString('ru-RU')} {d.currency || ''}
-                      </div>
-                      <div className="mt-2">
-                        <button
-                          type="button"
-                          onClick={() => setEditingDeal(d)}
-                          className="text-xs text-[#3337AD] hover:underline"
-                        >
-                          Открыть карточку сделки
-                        </button>
-                      </div>
-                      <div className="mt-3">
-                        <div className="text-[11px] font-semibold uppercase text-gray-500 dark:text-gray-400 mb-1">Задачи по сделке</div>
-                        {(tasksByDealId.get(d.id) || []).length === 0 ? (
-                          <div className="text-xs text-gray-400">Нет задач по сделке</div>
-                        ) : (
-                          <div className="space-y-1">
-                            {(tasksByDealId.get(d.id) || []).slice(0, 5).map((t) => (
-                              <button key={t.id} type="button" onClick={() => onOpenTask(t)} className="w-full text-left text-xs rounded-lg border border-gray-100 dark:border-[#333] px-2 py-1.5 hover:bg-gray-50 dark:hover:bg-[#2a2a2a]">
-                                <span className="text-gray-800 dark:text-gray-200">{t.title || 'Без названия'}</span>
-                                <span className="text-gray-500 dark:text-gray-400"> · {t.status || 'Без статуса'}</span>
-                              </button>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
-
           {activeTab === 'meetings' && (
             <div className="min-h-[min(70vh,720px)] flex flex-col">
               {meetingsSlot ?? (
@@ -820,108 +655,6 @@ export const WorkdeskView: React.FC<WorkdeskViewProps> = ({
           )}
         </div>
       </div>
-      {editingDeal && (
-        <div className="fixed inset-0 z-[130] flex items-center justify-center bg-black/50 dark:bg-black/70 p-4">
-          <div className="w-full max-w-xl rounded-2xl border border-gray-200 dark:border-[#333] bg-white dark:bg-[#1f1f1f] shadow-2xl">
-            <div className="p-4 border-b border-gray-200 dark:border-[#333] flex items-center justify-between">
-              <h3 className="font-semibold text-gray-900 dark:text-white">Сделка</h3>
-              <button type="button" onClick={() => setEditingDeal(null)} className="p-1 rounded hover:bg-gray-100 dark:hover:bg-[#333]"><X size={18} /></button>
-            </div>
-            <div className="p-4 space-y-3">
-              <input
-                value={editingDeal.title || ''}
-                onChange={(e) => setEditingDeal({ ...editingDeal, title: e.target.value })}
-                className="w-full px-3 py-2 rounded-lg border border-gray-200 dark:border-[#333] bg-white dark:bg-[#252525]"
-                placeholder="Название сделки"
-              />
-              <div className="grid grid-cols-2 gap-2">
-                <input
-                  value={String(editingDeal.amount || 0)}
-                  onChange={(e) => setEditingDeal({ ...editingDeal, amount: Number(e.target.value || 0) })}
-                  className="w-full px-3 py-2 rounded-lg border border-gray-200 dark:border-[#333] bg-white dark:bg-[#252525]"
-                  placeholder="Сумма"
-                />
-                <input
-                  value={editingDeal.currency || 'UZS'}
-                  onChange={(e) => setEditingDeal({ ...editingDeal, currency: e.target.value })}
-                  className="w-full px-3 py-2 rounded-lg border border-gray-200 dark:border-[#333] bg-white dark:bg-[#252525]"
-                  placeholder="Валюта"
-                />
-              </div>
-              <input
-                value={editingDeal.stage || ''}
-                onChange={(e) => setEditingDeal({ ...editingDeal, stage: e.target.value })}
-                className="w-full px-3 py-2 rounded-lg border border-gray-200 dark:border-[#333] bg-white dark:bg-[#252525]"
-                placeholder="Этап"
-              />
-            </div>
-            <div className="p-4 border-t border-gray-200 dark:border-[#333] flex justify-end gap-2">
-              <button type="button" onClick={() => setEditingDeal(null)} className="px-4 py-2 rounded-lg border border-gray-200 dark:border-[#333] text-sm">Отмена</button>
-              <button
-                type="button"
-                onClick={async () => {
-                  const id = editingDeal.id;
-                  const next = editingDeal;
-                  setEditingDeal(null);
-                  await onUpdateEntity?.('deal', id, next as unknown as Record<string, unknown>);
-                }}
-                className="px-4 py-2 rounded-lg bg-[#3337AD] text-white text-sm inline-flex items-center gap-2"
-              >
-                <Save size={14} /> Сохранить
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-      {editingMeeting && (
-        <div className="fixed inset-0 z-[130] flex items-center justify-center bg-black/50 dark:bg-black/70 p-4">
-          <div className="w-full max-w-xl rounded-2xl border border-gray-200 dark:border-[#333] bg-white dark:bg-[#1f1f1f] shadow-2xl">
-            <div className="p-4 border-b border-gray-200 dark:border-[#333] flex items-center justify-between">
-              <h3 className="font-semibold text-gray-900 dark:text-white">Встреча</h3>
-              <button type="button" onClick={() => setEditingMeeting(null)} className="p-1 rounded hover:bg-gray-100 dark:hover:bg-[#333]"><X size={18} /></button>
-            </div>
-            <div className="p-4 space-y-3">
-              <input
-                value={editingMeeting.title || ''}
-                onChange={(e) => setEditingMeeting({ ...editingMeeting, title: e.target.value })}
-                className="w-full px-3 py-2 rounded-lg border border-gray-200 dark:border-[#333] bg-white dark:bg-[#252525]"
-                placeholder="Название встречи"
-              />
-              <div className="grid grid-cols-2 gap-2">
-                <DateInput value={editingMeeting.date || ''} onChange={(v) => setEditingMeeting({ ...editingMeeting, date: v })} />
-                <input
-                  value={editingMeeting.time || ''}
-                  onChange={(e) => setEditingMeeting({ ...editingMeeting, time: e.target.value })}
-                  className="w-full px-3 py-2 rounded-lg border border-gray-200 dark:border-[#333] bg-white dark:bg-[#252525]"
-                  placeholder="10:00"
-                />
-              </div>
-              <textarea
-                value={editingMeeting.summary || ''}
-                onChange={(e) => setEditingMeeting({ ...editingMeeting, summary: e.target.value })}
-                className="w-full px-3 py-2 rounded-lg border border-gray-200 dark:border-[#333] bg-white dark:bg-[#252525]"
-                rows={3}
-                placeholder="Описание"
-              />
-            </div>
-            <div className="p-4 border-t border-gray-200 dark:border-[#333] flex justify-end gap-2">
-              <button type="button" onClick={() => setEditingMeeting(null)} className="px-4 py-2 rounded-lg border border-gray-200 dark:border-[#333] text-sm">Отмена</button>
-              <button
-                type="button"
-                onClick={async () => {
-                  const id = editingMeeting.id;
-                  const next = editingMeeting;
-                  setEditingMeeting(null);
-                  await onUpdateEntity?.('meeting', id, next as unknown as Record<string, unknown>);
-                }}
-                className="px-4 py-2 rounded-lg bg-[#3337AD] text-white text-sm inline-flex items-center gap-2"
-              >
-                <Save size={14} /> Сохранить
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
       {processPickerOpen && (
         <div className="fixed inset-0 z-[140] flex items-center justify-center bg-black/50 dark:bg-black/70 p-4">
           <div className="w-full max-w-lg rounded-2xl border border-gray-200 dark:border-[#333] bg-white dark:bg-[#1f1f1f] shadow-2xl">

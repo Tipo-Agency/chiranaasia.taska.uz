@@ -12,29 +12,15 @@ import { api } from '../../../backend/api';
 import { DEFAULT_NOTIFICATION_PREFS } from '../../../constants';
 import { parseLocation } from '../../../utils/urlSync';
 
-type WorkdeskTabState =
-  | 'dashboard'
-  | 'weekly'
-  | 'tasks'
-  | 'deals'
-  | 'meetings'
-  | 'documents';
+type WorkdeskTabState = 'dashboard' | 'meetings' | 'documents';
 
 function readWorkdeskTabFromUrl(): WorkdeskTabState {
   if (typeof window === 'undefined') return 'dashboard';
   try {
     const parsed = parseLocation(window.location.pathname, window.location.search);
     const w = parsed?.workdeskTab;
-    if (
-      w === 'weekly' ||
-      w === 'tasks' ||
-      w === 'deals' ||
-      w === 'meetings' ||
-      w === 'documents' ||
-      w === 'dashboard'
-    ) {
-      return w;
-    }
+    if (w === 'meetings' || w === 'documents') return w;
+    if (w === 'dashboard' || w === 'weekly' || w === 'tasks' || w === 'deals') return 'dashboard';
   } catch {
     /* ignore */
   }

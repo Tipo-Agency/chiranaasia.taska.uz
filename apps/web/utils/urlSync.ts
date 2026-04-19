@@ -53,7 +53,7 @@ export interface UrlStateSlice {
   activeTableId?: string;
   activeSpaceTab?: 'content-plan' | 'backlog' | 'functionality';
   settingsTab?: string;
-  workdeskTab?: 'dashboard' | 'weekly' | 'tasks' | 'deals' | 'meetings' | 'documents';
+  workdeskTab?: 'dashboard' | 'meetings' | 'documents';
   crmHubTab?: CrmHubTab;
   employeesHubTab?: 'team' | 'payroll';
 }
@@ -64,7 +64,7 @@ export function buildLocation(opts: {
   activeTableId?: string;
   activeSpaceTab?: 'content-plan' | 'backlog' | 'functionality' | undefined;
   settingsActiveTab?: string;
-  workdeskTab?: 'dashboard' | 'weekly' | 'tasks' | 'deals' | 'meetings' | 'documents';
+  workdeskTab?: 'dashboard' | 'meetings' | 'documents';
   crmHubTab?: CrmHubTab;
   employeesHubTab?: 'team' | 'payroll';
 }): string {
@@ -138,15 +138,9 @@ export function parseLocation(pathname: string, search: string): UrlStateSlice |
     const q = new URLSearchParams(search);
     const desk = q.get('desk');
     const out: UrlStateSlice = { view: 'home' };
-    if (
-      desk === 'weekly' ||
-      desk === 'tasks' ||
-      desk === 'deals' ||
-      desk === 'meetings' ||
-      desk === 'documents'
-    ) {
+    if (desk === 'meetings' || desk === 'documents') {
       out.workdeskTab = desk;
-    } else if (desk === 'dashboard') {
+    } else if (desk === 'dashboard' || desk === 'weekly' || desk === 'tasks' || desk === 'deals') {
       out.workdeskTab = 'dashboard';
     }
     return out;
