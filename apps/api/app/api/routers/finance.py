@@ -90,6 +90,12 @@ from app.services.past_entity_edit_guard import (
 router = APIRouter(prefix="/finance", tags=["finance"], dependencies=[Depends(get_current_user)])
 
 require_finance_approve = require_permission(PERM_FINANCE_APPROVE, detail="finance_approve_required")
+
+
+@router.get("/funds")
+async def finance_funds_legacy_empty() -> list[dict[str, object]]:
+    """Совместимость со старым фронтом: `funds` смержены в `finance_categories` (alembic 060)."""
+    return []
 require_finance_approve_mark_paid = require_permission(PERM_FINANCE_APPROVE, detail="finance_mark_paid_required")
 
 
