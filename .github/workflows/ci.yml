@@ -24,6 +24,15 @@ jobs:
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
     steps:
+      # Секреты не наследуются между репозиториями GitHub: у tipa / chiranaasia / unique — свои Actions Secrets.
+      - name: Проверка секретов деплоя
+        run: |
+          set -e
+          err() { echo "::error::$1"; exit 1; }
+          [ -n "${{ secrets.SERVER_HOST }}" ] || err "Задайте SERVER_HOST (Settings → Secrets → Actions). Без него ssh-action: missing server host."
+          [ -n "${{ secrets.SERVER_USER }}" ] || err "Задайте SERVER_USER."
+          [ -n "${{ secrets.SERVER_SSH_KEY }}" ] || err "Задайте SERVER_SSH_KEY."
+          [ -n "${{ secrets.SERVER_PATH }}" ] || err "Задайте SERVER_PATH — абсолютный путь к клону ЭТОГО репо на сервере (напр. /var/www/chiranaasia.taska.uz). У каждого репозитория свой путь."
       - name: Deploy to server via SSH
         uses: appleboy/ssh-action@v1.0.3
         with:
@@ -46,6 +55,8 @@ jobs:
             # MTProto (личный Telegram в CRM): my.telegram.org → api_id / api_hash
             export TELEGRAM_API_ID="${{ secrets.TELEGRAM_API_ID }}"
             export TELEGRAM_API_HASH="${{ secrets.TELEGRAM_API_HASH }}"
+            if [ -z "$SERVER_PATH" ]; then echo "❌ SERVER_PATH пуст"; exit 1; fi
+            if [ ! -d "$SERVER_PATH" ]; then echo "❌ SERVER_PATH не каталог на сервере: $SERVER_PATH — проверьте Secret и что клон существует (git clone)."; exit 1; fi
             cd "$SERVER_PATH" || { echo "❌ cd SERVER_PATH failed"; exit 1; }
             git config --global --add safe.directory "$SERVER_PATH" 2>/dev/null || true
             # Пока на сервере старый deploy.sh без stash: незакоммиченные правки в ops/nginx/nginx.conf ломают merge.
