@@ -53,7 +53,8 @@ git fetch origin || { echo "❌ git fetch failed"; exit 1; }
 # В шаге 5 nginx всё равно копируется из репозитория — stash только чтобы пройти ff-only; stash не pop-аем автоматически.
 DEPLOY_STASHED=0
 git update-index -q --refresh 2>/dev/null || true
-if ! git diff-index --quiet HEAD -- 2>/dev/null; then
+# diff-index иногда ведёт себя иначе с правами/индексом; diff к HEAD надёжнее ловит правки nginx на сервере
+if ! git diff --quiet HEAD 2>/dev/null || ! git diff-index --quiet HEAD -- 2>/dev/null; then
   echo "   📦 Обнаружены локальные изменения в отслеживаемых файлах — git stash перед merge..."
   if git stash push -m "deploy: autostash before merge origin/main ($(date -Is))"; then
     DEPLOY_STASHED=1

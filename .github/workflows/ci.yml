@@ -46,6 +46,15 @@ jobs:
             # MTProto (личный Telegram в CRM): my.telegram.org → api_id / api_hash
             export TELEGRAM_API_ID="${{ secrets.TELEGRAM_API_ID }}"
             export TELEGRAM_API_HASH="${{ secrets.TELEGRAM_API_HASH }}"
-            cd "$SERVER_PATH"
+            cd "$SERVER_PATH" || { echo "❌ cd SERVER_PATH failed"; exit 1; }
+            git config --global --add safe.directory "$SERVER_PATH" 2>/dev/null || true
+            # Пока на сервере старый deploy.sh без stash: незакоммиченные правки в ops/nginx/nginx.conf ломают merge.
+            # Разовый fetch+stash здесь подтягивает свежий deploy.sh; дальше сработает stash внутри скрипта.
+            git fetch origin || { echo "❌ git fetch failed"; exit 1; }
+            git update-index -q --refresh 2>/dev/null || true
+            if ! git diff --quiet HEAD 2>/dev/null; then
+              echo "📦 CI: stash локальных правок перед deploy (часто ops/nginx/nginx.conf)..."
+              git stash push -m "ci: autostash before deploy $(date -Is)" || { echo "❌ git stash failed"; exit 1; }
+            fi
             chmod +x ops/scripts/deploy.sh
             ./ops/scripts/deploy.sh
