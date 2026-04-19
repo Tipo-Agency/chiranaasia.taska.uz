@@ -26,8 +26,6 @@ import {
 } from '../utils/miniMessengerBridge';
 import { takeMustChangePasswordPromptSlot } from '../utils/authUiOnce';
 import { canShowAppBackButton } from '../utils/inAppNavigationBack';
-import { api } from '../backend/api';
-import { applyOrgBrandingToDocument } from '../utils/applyOrgBranding';
 
 function SidebarWithUnread(props: Omit<SidebarProps, 'unreadCount'>) {
   const { unreadCount } = useNotificationCenter();
@@ -39,13 +37,6 @@ function SidebarWithUnread(props: Omit<SidebarProps, 'unreadCount'>) {
  */
 export function MainApp() {
   const { state, actions } = useAppLogic();
-  useEffect(() => {
-    if (!state.currentUser) return;
-    api.org
-      .getBranding()
-      .then((d) => applyOrgBrandingToDocument(d))
-      .catch(() => {});
-  }, [state.currentUser?.id]);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [chatPanelOpen, setChatPanelOpen] = useState(false);
   const [chatOpenToSystemFeed, setChatOpenToSystemFeed] = useState(false);

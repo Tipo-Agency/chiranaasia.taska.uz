@@ -21,7 +21,10 @@ import {
   Factory,
 } from 'lucide-react';
 import { TableCollection, User } from '../types';
-import { LogoIcon, DynamicIcon } from './AppIcons';
+import { DynamicIcon } from './AppIcons';
+import { OrgBrandedLogo } from './OrgBrandedLogo';
+import { orgHasCustomLogo } from '../utils/orgBrandingDisplay';
+import { useOrgBranding } from '../contexts/OrgBrandingContext';
 import { hasPermission } from '../utils/permissions';
 import { MODULE_ACCENTS, type ModuleAccentKey } from './ui/moduleAccent';
 
@@ -81,6 +84,9 @@ const Sidebar: React.FC<SidebarProps> = ({
   onNavigateToType,
   activeSpaceTab
 }) => {
+  const { branding } = useOrgBranding();
+  const hasCustomLogo = orgHasCustomLogo(branding);
+
   // Загружаем состояние из localStorage
   const [isCollapsed, setIsCollapsed] = useState(() => {
     const saved = localStorage.getItem('sidebarCollapsed');
@@ -140,10 +146,10 @@ const Sidebar: React.FC<SidebarProps> = ({
                   isCollapsed ? 'w-full' : 'flex-1'
                 }`}
             >
-                <span className="flex shrink-0 items-center justify-center w-8 h-8 rounded-xl text-indigo-600 dark:text-indigo-300">
-                    <LogoIcon className="w-6 h-6 shrink-0" />
-                </span>
-                {!isCollapsed && <span className="font-semibold text-sm leading-none">Типа задачи</span>}
+                <OrgBrandedLogo variant={isCollapsed ? 'sidebar-collapsed' : 'sidebar-expanded'} />
+                {!isCollapsed && !hasCustomLogo ? (
+                  <span className="font-semibold text-sm leading-none shrink-0">Типа задачи</span>
+                ) : null}
             </div>
             {!isCollapsed && (
               <div className="flex items-center gap-1 shrink-0">

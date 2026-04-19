@@ -264,10 +264,21 @@ async function del<T>(path: string, init?: Omit<FetchJsonOpts, 'method' | 'body'
 }
 
 /** Публичный GET + PATCH с admin.system (CSRF на PATCH). */
+export type OrgBrandingApiDto = {
+  primaryColor: string;
+  logoSvgLight: string | null;
+  logoSvgDark: string | null;
+};
+
 export const orgEndpoint = {
-  getBranding: () => get<{ primaryColor: string; logoSvg: string | null }>('/org/branding'),
-  patchBranding: (body: { primaryColor?: string | null; logoSvg?: string | null }) =>
-    patch<{ primaryColor: string; logoSvg: string | null }>('/org/branding', body),
+  getBranding: () => get<OrgBrandingApiDto>('/org/branding'),
+  patchBranding: (body: {
+    primaryColor?: string | null;
+    logoSvgLight?: string | null;
+    logoSvgDark?: string | null;
+    /** @deprecated используйте logoSvgLight */
+    logoSvg?: string | null;
+  }) => patch<OrgBrandingApiDto>('/org/branding', body),
 };
 
 // Системные логи: GET /admin/logs — JWT (cookie) + RBAC admin.system (не путать с публичным /health)

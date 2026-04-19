@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import PublicContentPlanView from './components/PublicContentPlanView';
 import { AppAuthenticatedRoot } from './routes';
 import { AppProviders } from './providers/AppProviders';
+import { OrgBrandingProvider } from './contexts/OrgBrandingContext';
 import { getPublicContentPlanIdFromPath } from './utils/publicRoutes';
 
 export default function App() {
@@ -21,7 +22,9 @@ export default function App() {
 
   return (
     <AppProviders>
-      <AppAuthenticatedRoot />
+      <OrgBrandingProvider>
+        <AppAuthenticatedRoot />
+      </OrgBrandingProvider>
     </AppProviders>
   );
 }

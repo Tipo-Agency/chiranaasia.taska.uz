@@ -11,3 +11,4 @@ class OrgSystemPrefs(Base):
     id = Column(String(32), primary_key=True)
     primary_color = Column(String(16), nullable=False, server_default="#F97316")
     logo_svg = Column(Text, nullable=True)
+    logo_svg_dark = Column(Text, nullable=True)
