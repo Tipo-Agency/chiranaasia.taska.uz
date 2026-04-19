@@ -28,6 +28,7 @@
 | [INTEGRATIONS.md](./INTEGRATIONS.md) | Backend            | Meta, Telegram Bot, MTProto, сайт, объектное хранилище — протоколы, безопасность, примеры |
 | [TESTING.md](./TESTING.md)           | Вся команда        | Стратегия, покрытие, конфигурация pytest/Vitest/Playwright, примеры тестов                |
 | [OPERATIONS.md](./OPERATIONS.md)     | DevOps, Backend    | Docker Compose, nginx, CI/CD, миграции, бэкапы, мониторинг, troubleshooting, runbook      |
+| [../ops/PORTS.md](../ops/PORTS.md)   | DevOps             | Порты backend vs nginx, symlink фронта, диагностика 502                                   |
 | [DECISIONS.md](./DECISIONS.md)       | Вся команда        | ADR: почему приняты ключевые решения + фреймворк velocity vs architecture                 |
 
 

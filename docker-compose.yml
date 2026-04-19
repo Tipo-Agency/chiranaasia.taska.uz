@@ -34,7 +34,7 @@ services:
     restart: unless-stopped
     build: ./apps/api
     ports:
-      - "${BACKEND_PUBLISH_PORT:-8003}:8000"   # второй стек на том же хосте: BACKEND_PUBLISH_PORT в .env
+      - "${BACKEND_PUBLISH_PORT:-8003}:8000"   # см. ops/PORTS.md — nginx proxy_pass на этот же порт
     environment:
       DATABASE_URL: postgresql+asyncpg://taska:${DB_PASSWORD:-taska}@db:5432/taska
       # Минимум 32 символа, без placeholder-подстрок (см. app.core.config). Задайте в корневом .env.

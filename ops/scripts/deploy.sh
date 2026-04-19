@@ -5,6 +5,14 @@
 set +e  # Не падаем на ошибках, обрабатываем их вручную
 
 SERVER_PATH="${SERVER_PATH:-/var/www/chiranaasia.taska.uz}"
+# Симлинк, который должен совпадать с nginx `root` (см. ops/PORTS.md).
+FRONTEND_SYMLINK="${FRONTEND_SYMLINK:-/var/www/frontend}"
+# Порт backend на хосте = BACKEND_PUBLISH_PORT в корневом .env (docker-compose). Иначе 502 на /api/.
+if [ -z "${BACKEND_PUBLISH_PORT:-}" ] && [ -f "${SERVER_PATH}/.env" ]; then
+  BACKEND_PUBLISH_PORT="$(grep -E '^[[:space:]]*BACKEND_PUBLISH_PORT=' "${SERVER_PATH}/.env" 2>/dev/null | tail -1 | cut -d= -f2- | tr -d ' "\r' || true)"
+fi
+BACKEND_PUBLISH_PORT="${BACKEND_PUBLISH_PORT:-8003}"
+BACKEND_HEALTH_URL="http://127.0.0.1:${BACKEND_PUBLISH_PORT}/health"
 TELEGRAM_BOT_TOKEN="${TELEGRAM_BOT_TOKEN:-}"
 META_MARKER="${META_MARKER:-}"
 META_TASKA="${META_TASKA:-}"
@@ -13,11 +21,13 @@ META_UCHETGRAM="${META_UCHETGRAM:-}"
 TELEGRAM_API_ID="${TELEGRAM_API_ID:-}"
 TELEGRAM_API_HASH="${TELEGRAM_API_HASH:-}"
 SECRET_KEY="${SECRET_KEY:-}"
-BACKEND_URL="${BACKEND_URL:-http://127.0.0.1:8003}"
+BACKEND_URL="${BACKEND_URL:-http://127.0.0.1:${BACKEND_PUBLISH_PORT}}"
 
 echo "🚀 Starting deployment..."
 echo "👤 Deploy user: $USER"
 echo "📁 Server path: $SERVER_PATH"
+echo "🔌 Backend publish port: $BACKEND_PUBLISH_PORT (health: $BACKEND_HEALTH_URL)"
+echo "🔗 Frontend symlink: $FRONTEND_SYMLINK → ${SERVER_PATH}/apps/web/dist"
 
 # Переходим в директорию проекта
 cd "$SERVER_PATH" || { echo "❌ Failed to cd to $SERVER_PATH"; exit 1; }
@@ -167,13 +177,13 @@ if ! $DOCKER_CMD up -d --build $OPS_COMPOSE_SERVICES; then
 fi
 # Пересоздать backend, чтобы подхватить актуальный .env (TELEGRAM_BOT_TOKEN для админки)
 $DOCKER_CMD up -d --force-recreate backend 2>/dev/null || true
-echo "   Waiting for backend to be ready (port 8003)..."
+echo "   Waiting for backend to be ready ($BACKEND_HEALTH_URL)..."
 for i in 1 2 3 4 5 6 7 8 9 10; do
-  curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:8003/health 2>/dev/null | grep -q 200 && break
+  curl -s -o /dev/null -w "%{http_code}" "$BACKEND_HEALTH_URL" 2>/dev/null | grep -q 200 && break
   sleep 2
 done
 if $DOCKER_CMD ps --services --filter "status=running" 2>/dev/null | grep -qx "backend"; then
-  if curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:8003/health 2>/dev/null | grep -q 200; then
+  if curl -s -o /dev/null -w "%{http_code}" "$BACKEND_HEALTH_URL" 2>/dev/null | grep -q 200; then
     echo "✅ Backend container running and /health is 200"
   else
     echo "❌ Backend container запущен, но /health != 200"
@@ -189,9 +199,9 @@ else
 fi
 cd "$SERVER_PATH" || exit 1
 
-# 3. Деплой фронтенда (чистая сборка и затирание старого фронта в /var/www/frontend)
+# 3. Фронтенд: сборка в apps/web/dist + symlink для nginx root (без rsync-копии)
 echo ""
-echo "🚀 Step 3: Deploying frontend..."
+echo "🚀 Step 3: Building frontend and updating symlink..."
 cd "$SERVER_PATH" || exit 1
 rm -rf node_modules apps/web/node_modules 2>/dev/null || true
 npm ci || { echo "❌ npm ci failed"; exit 1; }
@@ -200,9 +210,14 @@ if [ ! -d "apps/web/dist" ]; then
   echo "❌ apps/web/dist not found after build"
   exit 1
 fi
-sudo mkdir -p /var/www/frontend
-sudo rsync -a --delete apps/web/dist/ /var/www/frontend/ || { sudo cp -r apps/web/dist/. /var/www/frontend/ || { echo "❌ Copy to /var/www/frontend failed"; exit 1; }; }
-echo "✅ Frontend deployed to /var/www/frontend (old content wiped)"
+sudo mkdir -p "$(dirname "$FRONTEND_SYMLINK")"
+if [ -e "$FRONTEND_SYMLINK" ] && [ ! -L "$FRONTEND_SYMLINK" ]; then
+  echo "❌ $FRONTEND_SYMLINK существует и это не symlink (nginx root не должен быть обычной папкой с копией)."
+  echo "   Один раз: sudo mv \"$FRONTEND_SYMLINK\" \"${FRONTEND_SYMLINK}.bak\" && перезапустите деплой."
+  exit 1
+fi
+sudo ln -sfn "$SERVER_PATH/apps/web/dist" "$FRONTEND_SYMLINK"
+echo "✅ Symlink: $FRONTEND_SYMLINK → $SERVER_PATH/apps/web/dist (nginx root = $FRONTEND_SYMLINK; см. ops/PORTS.md)"
 
 # 4. Деплой Telegram бота
 echo ""
@@ -290,7 +305,7 @@ else
   echo "⚠️ apps/bot directory not found, skipping..."
 fi
 
-# 5. Деплой конфига nginx и перезагрузка (статика + /api/ на 8003)
+# 5. Деплой конфига nginx и перезагрузка (статика + /api/ → порт из ops/PORTS.md)
 echo ""
 echo "🌐 Step 5: Deploying nginx config and reloading..."
 NGINX_SITE_NAME="${NGINX_SITE_NAME:-chiranaasia.taska.uz}"
@@ -300,7 +315,7 @@ if [ -f "ops/nginx/nginx.conf" ]; then
   echo "   Config: ops/nginx/nginx.conf → /etc/nginx/sites-available/$NGINX_SITE_NAME"
 fi
 if sudo nginx -t 2>/dev/null; then
-  sudo systemctl reload nginx && echo "✅ Nginx reloaded (root=/var/www/frontend, /api/ → 8003)"
+  sudo systemctl reload nginx && echo "✅ Nginx reloaded (root=$FRONTEND_SYMLINK, /api/ → $BACKEND_PUBLISH_PORT — проверьте совпадение с .env и proxy_pass)"
 else
   echo "⚠️ nginx -t failed, reload skipped"
 fi
