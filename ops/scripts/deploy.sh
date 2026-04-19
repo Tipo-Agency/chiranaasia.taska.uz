@@ -238,9 +238,18 @@ if [ ! -d "apps/web/dist" ]; then
 fi
 sudo mkdir -p "$(dirname "$FRONTEND_SYMLINK")"
 if [ -e "$FRONTEND_SYMLINK" ] && [ ! -L "$FRONTEND_SYMLINK" ]; then
-  echo "❌ $FRONTEND_SYMLINK существует и это не symlink (nginx root не должен быть обычной папкой с копией)."
-  echo "   Один раз: sudo mv \"$FRONTEND_SYMLINK\" \"${FRONTEND_SYMLINK}.bak\" && перезапустите деплой."
-  exit 1
+  if [ -d "$FRONTEND_SYMLINK" ]; then
+    _bak="${FRONTEND_SYMLINK}.bak.deploy-$(date +%Y%m%d%H%M%S)"
+    echo "   ⚠️ $FRONTEND_SYMLINK — каталог, не symlink (часто старая копия фронта). Переносим в $_bak …"
+    sudo mv "$FRONTEND_SYMLINK" "$_bak" || {
+      echo "❌ sudo mv не удался; вручную: sudo mv \"$FRONTEND_SYMLINK\" \"${FRONTEND_SYMLINK}.bak\""
+      exit 1
+    }
+    echo "   ✅ Старую папку убрали; при необходимости данные в $_bak"
+  else
+    echo "❌ $FRONTEND_SYMLINK существует и это не symlink и не каталог (nginx root — только symlink на dist)."
+    exit 1
+  fi
 fi
 sudo ln -sfn "$SERVER_PATH/apps/web/dist" "$FRONTEND_SYMLINK"
 echo "✅ Symlink: $FRONTEND_SYMLINK → $SERVER_PATH/apps/web/dist (nginx root = $FRONTEND_SYMLINK; см. ops/PORTS.md)"
