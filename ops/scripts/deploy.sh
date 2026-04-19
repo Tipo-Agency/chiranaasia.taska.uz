@@ -63,6 +63,7 @@ if ! git diff --quiet HEAD 2>/dev/null || ! git diff-index --quiet HEAD -- 2>/de
     exit 1
   fi
 fi
+HEAD_BEFORE_MERGE="$(git rev-parse HEAD)"
 if ! git merge origin/main --ff-only; then
   echo "❌ git merge --ff-only failed (не fast-forward? сделайте pull/merge на сервере или перезапустите деплой)"
   if [ "$DEPLOY_STASHED" = 1 ]; then
@@ -71,9 +72,16 @@ if ! git merge origin/main --ff-only; then
   fi
   exit 1
 fi
+HEAD_AFTER_MERGE="$(git rev-parse HEAD)"
 if [ "$DEPLOY_STASHED" = 1 ]; then
   echo "   ℹ️ Локальные правки до merge лежат в stash (не применялись обратно): git stash list"
   echo "   Nginx для сайта копируется из репозитория на шаге 5. Нужны старые правки — перенесите в git или: git stash show -p"
+fi
+# Bash загрузил этот скрипт в память при старте: после merge на диске новый deploy.sh, дальше шёл бы старый байткод.
+if [ "$HEAD_BEFORE_MERGE" != "$HEAD_AFTER_MERGE" ] && git diff --name-only "$HEAD_BEFORE_MERGE" "$HEAD_AFTER_MERGE" 2>/dev/null | grep -qx 'ops/scripts/deploy.sh'; then
+  echo "   🔄 В merge обновился ops/scripts/deploy.sh — перезапуск скрипта с диска…"
+  cd "$SERVER_PATH" || exit 1
+  exec bash "$SERVER_PATH/ops/scripts/deploy.sh"
 fi
 sudo chown -R "$USER:$USER" "$SERVER_PATH" || true
 echo "✅ Code updated (merge only, DB and untracked files unchanged)"
