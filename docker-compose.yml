@@ -11,8 +11,7 @@ services:
       POSTGRES_DB: taska
     volumes:
       - pgdata:/var/lib/postgresql/data
-    ports:
-      - "5433:5432"   # хост 5433 — если на сервере уже занят 5432 (локальный Postgres)
+    # Не публикуем 5432 на хост: доступ из контейнеров по имени db; иначе конфликт порта при втором compose на том же сервере.
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U taska -d taska"]
       interval: 5s
@@ -35,7 +34,7 @@ services:
     restart: unless-stopped
     build: ./apps/api
     ports:
-      - "8003:8000"   # хост 8003 (из списка свободных портов проекта)
+      - "${BACKEND_PUBLISH_PORT:-8003}:8000"   # второй стек на том же хосте: BACKEND_PUBLISH_PORT в .env
     environment:
       DATABASE_URL: postgresql+asyncpg://taska:${DB_PASSWORD:-taska}@db:5432/taska
       # Минимум 32 символа, без placeholder-подстрок (см. app.core.config). Задайте в корневом .env.
