@@ -40,7 +40,10 @@ jobs:
           username: ${{ secrets.SERVER_USER }}
           key: ${{ secrets.SERVER_SSH_KEY }}
           script: |
-            export SERVER_PATH="${{ secrets.SERVER_PATH }}"
+            # GitHub Secrets часто дают перевод строки или CRLF в конце — без trim путь «не существует»
+            _sp_raw="${{ secrets.SERVER_PATH }}"
+            SERVER_PATH="$(printf '%s' "$_sp_raw" | tr -d '\r' | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')"
+            export SERVER_PATH
             export TELEGRAM_BOT_TOKEN="${{ secrets.TELEGRAM_BOT_TOKEN }}"
             # Секрет «Подтверждение маркера»: в GitHub — Meta_marker (приоритет) или META_MARKER
             export META_MARKER="${{ secrets.Meta_marker }}"
@@ -55,8 +58,17 @@ jobs:
             # MTProto (личный Telegram в CRM): my.telegram.org → api_id / api_hash
             export TELEGRAM_API_ID="${{ secrets.TELEGRAM_API_ID }}"
             export TELEGRAM_API_HASH="${{ secrets.TELEGRAM_API_HASH }}"
-            if [ -z "$SERVER_PATH" ]; then echo "❌ SERVER_PATH пуст"; exit 1; fi
-            if [ ! -d "$SERVER_PATH" ]; then echo "❌ SERVER_PATH не каталог на сервере: $SERVER_PATH — проверьте Secret и что клон существует (git clone)."; exit 1; fi
+            if [ -z "$SERVER_PATH" ]; then echo "❌ SERVER_PATH пуст после нормализации"; exit 1; fi
+            if [ ! -d "$SERVER_PATH" ]; then
+              echo "❌ SERVER_PATH не каталог или нет прав зайти в путь (длина после trim: ${#SERVER_PATH})"
+              _pdir="$(dirname "$SERVER_PATH")"
+              echo "   Родитель (ls -la, до 25 строк):"
+              ls -la "$_pdir" 2>&1 | head -25 || true
+              if [ -L "$SERVER_PATH" ]; then echo "   Это symlink, readlink: $(readlink "$SERVER_PATH" 2>&1)"; fi
+              echo "   На сервере под этим SSH-пользователем: whoami=$(whoami) pwd=$(pwd)"
+              echo "   Проверьте: клон реально на ЭТОМ хосте (SERVER_HOST), путь без лишнего переноса в Secret, права на каталог (chmod o+x /var/www при необходимости)."
+              exit 1
+            fi
             cd "$SERVER_PATH" || { echo "❌ cd SERVER_PATH failed"; exit 1; }
             git config --global --add safe.directory "$SERVER_PATH" 2>/dev/null || true
             # Пока на сервере старый deploy.sh без stash: незакоммиченные правки в ops/nginx/nginx.conf ломают merge.
