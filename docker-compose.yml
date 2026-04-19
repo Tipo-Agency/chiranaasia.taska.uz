@@ -1,3 +1,6 @@
+# Стабильное имя проекта Docker Compose (иначе берётся имя каталога → tipataskauz и т.п.)
+name: tipa
+
 services:
   db:
     restart: unless-stopped
@@ -114,10 +117,13 @@ services:
     environment:
       DATABASE_URL: postgresql+asyncpg://taska:${DB_PASSWORD:-taska}@db:5432/taska
       SECRET_KEY: ${SECRET_KEY:?Set SECRET_KEY in .env (see .env.example)}
+      REDIS_URL: redis://redis:6379/0
       NOTIFICATIONS_RETENTION_DAYS: ${NOTIFICATIONS_RETENTION_DAYS:-90}
       NOTIFICATIONS_RETENTION_INTERVAL_SECONDS: ${NOTIFICATIONS_RETENTION_INTERVAL_SECONDS:-3600}
     depends_on:
       db:
+        condition: service_healthy
+      redis:
         condition: service_healthy
 
   # Очередь queue.notifications.v1: telegram / e-mail доставки по notification_id
