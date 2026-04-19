@@ -48,7 +48,32 @@ echo "✅ Ownership fixed"
 echo ""
 echo "📥 Step 2: Updating code (git fetch + merge, no reset/clean)..."
 git fetch origin || { echo "❌ git fetch failed"; exit 1; }
-git merge origin/main --ff-only || { echo "❌ git merge --ff-only failed (не fast-forward? сделайте pull/merge на сервере или перезапустите деплой)"; exit 1; }
+
+# Локальные правки отслеживаемых файлов (часто ops/nginx/nginx.conf на сервере) ломают merge.
+# В шаге 5 nginx всё равно копируется из репозитория — stash только чтобы пройти ff-only; stash не pop-аем автоматически.
+DEPLOY_STASHED=0
+git update-index -q --refresh 2>/dev/null || true
+if ! git diff-index --quiet HEAD -- 2>/dev/null; then
+  echo "   📦 Обнаружены локальные изменения в отслеживаемых файлах — git stash перед merge..."
+  if git stash push -m "deploy: autostash before merge origin/main ($(date -Is))"; then
+    DEPLOY_STASHED=1
+  else
+    echo "❌ git stash failed (нельзя сохранить локальные правки перед merge)"
+    exit 1
+  fi
+fi
+if ! git merge origin/main --ff-only; then
+  echo "❌ git merge --ff-only failed (не fast-forward? сделайте pull/merge на сервере или перезапустите деплой)"
+  if [ "$DEPLOY_STASHED" = 1 ]; then
+    echo "   ↩️ Восстанавливаем рабочее дерево из stash..."
+    git stash pop || true
+  fi
+  exit 1
+fi
+if [ "$DEPLOY_STASHED" = 1 ]; then
+  echo "   ℹ️ Локальные правки до merge лежат в stash (не применялись обратно): git stash list"
+  echo "   Nginx для сайта копируется из репозитория на шаге 5. Нужны старые правки — перенесите в git или: git stash show -p"
+fi
 sudo chown -R "$USER:$USER" "$SERVER_PATH" || true
 echo "✅ Code updated (merge only, DB and untracked files unchanged)"
 
