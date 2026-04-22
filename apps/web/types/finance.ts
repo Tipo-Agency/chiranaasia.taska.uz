@@ -1,3 +1,11 @@
+/** Узкая форма для устаревшего UI «Фонды»; в бэкенде соответствует `finance_categories`. */
+export interface Fund {
+  id: string;
+  name: string;
+  order?: number;
+  isArchived?: boolean;
+}
+
 export interface FinanceCategory {
   id: string;
   name: string;

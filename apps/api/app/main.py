@@ -44,7 +44,6 @@ from app.api.routers import (
     notification_events,
     notification_prefs,
     notifications,
-    telegram_bot,
     org,
     priorities,
     production,
@@ -54,6 +53,7 @@ from app.api.routers import (
     system,
     tables,
     tasks,
+    telegram_bot,
     weekly_plans,
 )
 from app.core.api_errors import (

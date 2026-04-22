@@ -11,13 +11,12 @@ Endpoints:
 """
 from __future__ import annotations
 
-import json
 from typing import Any
 
 import httpx
 from fastapi import APIRouter, Body, Depends, HTTPException, Path
 from pydantic import BaseModel, Field
-from sqlalchemy import func, select, update
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.auth import get_current_user_admin
@@ -154,7 +153,7 @@ async def get_telegram_users(db: AsyncSession = Depends(get_db)):
     """Пользователи с их Telegram ID и chat_id из префов."""
     users = (
         await db.execute(
-            select(User).where(User.is_archived == False).order_by(User.name)
+            select(User).where(User.is_archived.is_(False)).order_by(User.name)
         )
     ).scalars().all()
 
