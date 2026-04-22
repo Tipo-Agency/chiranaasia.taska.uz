@@ -177,9 +177,9 @@ export const TelegramBotSettings: React.FC = () => {
           </button>
         </div>
 
-        <div className="mt-4 grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {loading ? (
-            <div className="col-span-3 text-sm text-gray-400 dark:text-gray-500">Загрузка…</div>
+            <div className="col-span-full text-sm text-gray-400 dark:text-gray-500">Загрузка…</div>
           ) : botInfo ? (
             <>
               <div>
@@ -218,8 +218,18 @@ export const TelegramBotSettings: React.FC = () => {
                   {botInfo.first_name || <span className="text-gray-400">—</span>}
                 </span>
               </div>
+              <div>
+                <div className="text-[11px] font-bold text-gray-500 dark:text-gray-400 mb-1">Группы</div>
+                <span className="text-sm text-gray-800 dark:text-gray-200">
+                  {botInfo.can_join_groups === true
+                    ? 'бот может быть добавлен в группы'
+                    : botInfo.can_join_groups === false
+                      ? 'только личные чаты (политика BotFather)'
+                      : '—'}
+                </span>
+              </div>
               {botInfo.error && (
-                <div className="col-span-3 flex items-center gap-2 text-xs text-red-500 dark:text-red-400 bg-red-50 dark:bg-red-900/10 border border-red-200 dark:border-red-800/40 rounded-xl px-3 py-2">
+                <div className="col-span-full flex items-center gap-2 text-xs text-red-500 dark:text-red-400 bg-red-50 dark:bg-red-900/10 border border-red-200 dark:border-red-800/40 rounded-xl px-3 py-2">
                   <AlertCircle size={13} className="shrink-0" />
                   {botInfo.error}
                 </div>
@@ -283,9 +293,26 @@ export const TelegramBotSettings: React.FC = () => {
       {/* ── Test Message ───────────────────────────────────────── */}
       <div className="bg-white dark:bg-[#252525] border border-gray-200 dark:border-[#333] rounded-2xl p-4 sm:p-6">
         <div className="text-sm font-bold text-gray-900 dark:text-white mb-1">Тестовое сообщение</div>
-        <div className="text-xs text-gray-500 dark:text-gray-400 mb-4">
-          Проверьте, что бот работает — отправьте сообщение в любой чат.
-          Чтобы узнать chat_id, перешлите боту любое сообщение или отправьте <code className="font-mono bg-gray-100 dark:bg-[#333] px-1 rounded">/start</code>.
+        <div className="text-xs text-gray-500 dark:text-gray-400 mb-4 space-y-3 leading-relaxed">
+          <p>
+            Проверьте, что бот работает: укажите <strong>chat_id</strong> и нажмите «Отправить». В личке с ботом ваш id —
+            положительное число; чтобы его увидеть, отправьте боту{' '}
+            <code className="font-mono bg-gray-100 dark:bg-[#333] px-1 rounded">/start</code>.
+          </p>
+          <div className="rounded-xl border border-sky-200/80 dark:border-sky-800/50 bg-sky-50/60 dark:bg-sky-950/30 px-3 py-2.5">
+            <div className="text-[11px] font-bold text-sky-800 dark:text-sky-300 uppercase tracking-wide mb-1">Группы и супергруппы</div>
+            <p className="text-gray-600 dark:text-gray-300">
+              ID группы/супергруппы/канала обычно <strong>отрицательный</strong>, у супергрупп часто формат{' '}
+              <code className="font-mono bg-white/80 dark:bg-[#252525] px-1 rounded">-100…</code> (как в подсказке поля).
+              Добавьте бота в группу и при необходимости выдайте право отправлять сообщения, затем вставьте сюда{' '}
+              <strong>chat_id группы</strong> — так проверяют рассылку в командный чат.
+            </p>
+            <p className="mt-2 text-gray-500 dark:text-gray-400">
+              Таблица «Пользователи» ниже — это <strong>личные</strong> Telegram ID сотрудников для пуш-уведомлений в личку, а не
+              настройка «одной группы компании». Отдельного поля «группа организации» в системе пока нет; группу можно
+              проверять только через тест сюда по chat_id.
+            </p>
+          </div>
         </div>
         <form onSubmit={handleTest} className="space-y-3">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">

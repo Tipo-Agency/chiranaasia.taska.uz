@@ -306,7 +306,6 @@ export function MainApp() {
             }}
             onLogout={actions.logout}
             onMobileMenuToggle={() => setIsMobileMenuOpen(true)}
-            onOpenInbox={() => actions.setCurrentView('inbox')}
           />
 
           {state.notification && (

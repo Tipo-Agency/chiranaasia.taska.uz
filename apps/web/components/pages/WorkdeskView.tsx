@@ -12,7 +12,6 @@ import {
   Layers,
   Megaphone,
   Zap,
-  Mail,
 } from 'lucide-react';
 import { Deal, FinancePlan, Meeting, Task, User, Doc, type BusinessProcess, SalesFunnel } from '../../types';
 import { getDealDisplayTitle, isFunnelDeal } from '../../utils/dealModel';
@@ -309,10 +308,9 @@ export const WorkdeskView: React.FC<WorkdeskViewProps> = ({
             role="tab"
             aria-selected={false}
             onClick={() => onNavigateToInbox()}
-            className={`inline-flex items-center gap-1 px-2 sm:px-2.5 py-1 rounded-lg text-[11px] sm:text-xs font-medium whitespace-nowrap transition-colors shrink-0 ${idleBox}`}
+            className={`px-2 sm:px-2.5 py-1 rounded-lg text-[11px] sm:text-xs font-medium whitespace-nowrap transition-colors shrink-0 ${idleBox}`}
             title="Входящие и уведомления"
           >
-            <Mail className="w-3.5 h-3.5 opacity-80 shrink-0" aria-hidden />
             Почта
           </button>
         ) : null}
