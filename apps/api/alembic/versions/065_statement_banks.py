@@ -7,7 +7,7 @@ from alembic import op
 from sqlalchemy.dialects.postgresql import JSONB
 
 revision = "065_statement_banks"
-down_revision = "064_finance_request_department_id"
+down_revision = "064_finreq_department_id"
 branch_labels = None
 depends_on = None
 

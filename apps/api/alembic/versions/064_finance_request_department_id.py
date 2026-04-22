@@ -11,7 +11,8 @@ import re
 import sqlalchemy as sa
 from alembic import op
 
-revision = "064_finance_request_department_id"
+# ≤32 chars: alembic_version.version_num is VARCHAR(32)
+revision = "064_finreq_department_id"
 down_revision = "063_org_branding_logo_dark"
 branch_labels = None
 depends_on = None

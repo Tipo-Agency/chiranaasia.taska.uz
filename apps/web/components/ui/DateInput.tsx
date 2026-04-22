@@ -153,7 +153,6 @@ export const DateInput: React.FC<DateInputProps> = ({
       setViewYear(t.getFullYear());
       setViewMonth0(t.getMonth());
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- намеренно только при open
   }, [open]);
 
   useEffect(() => {
@@ -490,7 +489,6 @@ export const DateRangeInput: React.FC<DateRangeInputProps> = ({
       setViewYear(t.getFullYear());
       setViewMonth0(t.getMonth());
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- только при открытии панели
   }, [open]);
 
   useEffect(() => {

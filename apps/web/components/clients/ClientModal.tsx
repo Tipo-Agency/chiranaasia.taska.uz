@@ -181,7 +181,7 @@ export const ClientModal: React.FC<ClientModalProps> = ({
                       onChange={(e) => {
                         const v = e.target.value;
                         if (v === '') { setClientPhone(''); return; }
-                        const t = v.replace(/[^\d+()\s\-]/g, '');
+                        const t = v.replace(/[^\d+()\s-]/g, '');
                         setClientPhone(t.slice(0, 20));
                       }} 
                       inputMode="tel"
