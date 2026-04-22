@@ -18,6 +18,7 @@ class NotificationPrefsPut(BaseModel):
     id: str | None = Field(default=None, max_length=100)
     defaultFunnelId: str | None = Field(default=None, max_length=100)
     telegramGroupChatId: str | None = Field(default=None, max_length=255)
+    telegramChatId: str | None = Field(default=None, max_length=255)
     channels: dict[str, Any] | None = None
     quietHours: dict[str, Any] | None = None
     types: dict[str, Any] | None = None

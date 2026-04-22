@@ -64,7 +64,7 @@ export const StandardModal: React.FC<StandardModalProps> = ({
 
   return (
     <div 
-      className="fixed inset-0 z-[110] flex min-h-[100dvh] items-end md:items-center justify-center bg-black/50 dark:bg-black/70 backdrop-blur-sm"
+      className="fixed inset-0 z-[110] flex min-h-[100dvh] w-full min-w-full items-end md:items-center justify-center bg-black/50 dark:bg-black/70 backdrop-blur-sm"
       onClick={handleBackdropClick}
     >
       <div 

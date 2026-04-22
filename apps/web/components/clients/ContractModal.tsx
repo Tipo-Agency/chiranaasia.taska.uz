@@ -81,14 +81,14 @@ export const ContractModal: React.FC<ContractModalProps> = ({
 
   return (
     <div 
-      className="fixed inset-0 bg-black/35 backdrop-blur-sm flex items-end md:items-center justify-center z-[210] animate-in fade-in duration-200" 
+      className="fixed inset-0 min-h-[100dvh] w-full bg-black/35 backdrop-blur-sm flex items-end md:items-center justify-center z-[210] animate-in fade-in duration-200" 
       onClick={handleBackdrop}
     >
       <div 
-        className="bg-white dark:bg-[#252525] rounded-t-2xl md:rounded-xl shadow-2xl w-full max-w-md max-h-[95vh] md:max-h-[90vh] overflow-hidden border border-gray-200 dark:border-[#333]" 
+        className="bg-white dark:bg-[#252525] rounded-t-2xl md:rounded-xl shadow-2xl w-full max-w-md max-h-[95vh] md:max-h-[90vh] flex flex-col border border-gray-200 dark:border-[#333]" 
         onClick={e => e.stopPropagation()}
       >
-        <div className="p-4 border-b border-gray-100 dark:border-[#333] flex justify-between items-center bg-white dark:bg-[#252525]">
+        <div className="p-4 border-b border-gray-100 dark:border-[#333] flex justify-between items-center bg-white dark:bg-[#252525] shrink-0">
           <h3 className="font-bold text-gray-800 dark:text-white">
             {editingContract ? 'Редактировать договор' : 'Новый договор'}
           </h3>
@@ -99,7 +99,7 @@ export const ContractModal: React.FC<ContractModalProps> = ({
             <X size={18} />
           </button>
         </div>
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+        <form onSubmit={handleSubmit} className="p-6 space-y-4 overflow-y-auto min-h-0 flex-1">
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 mb-1">Номер договора</label>
@@ -164,8 +164,11 @@ export const ContractModal: React.FC<ContractModalProps> = ({
                 className="w-full border border-gray-300 dark:border-gray-600 rounded px-3 py-2 text-sm bg-white dark:bg-[#333] text-gray-900 dark:text-gray-100" 
                 placeholder="5"
               />
+              <p className="text-[10px] text-gray-500 dark:text-gray-400 mt-1">
+                Число календарного месяца (1–31), в этот день каждого месяца ожидается оплата по договору.
+              </p>
             </div>
-            <div>
+            <div className="relative z-20">
               <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 mb-1">Статус</label>
               <EntitySearchSelect
                 value={contractStatus}

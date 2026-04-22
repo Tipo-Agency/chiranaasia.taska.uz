@@ -1,9 +1,17 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { FinanceCategory } from '../../types';
 import { Button, Input, StandardModal } from '../ui';
 import { Edit2, Trash2 } from 'lucide-react';
 import { EntitySearchSelect } from '../ui/EntitySearchSelect';
 import { SystemConfirmDialog } from '../ui/SystemDialogs';
+import { financeEndpoint } from '../../services/apiClient';
+import {
+  DEFAULT_ENABLED_STATEMENT_BANKS,
+  STATEMENT_BANK_IDS,
+  STATEMENT_BANK_LABELS,
+  isStatementBankId,
+  type StatementBankId,
+} from '../../constants/statementBanks';
 
 export const FinanceSetupSettings: React.FC<{
   categories: FinanceCategory[];
@@ -27,6 +35,37 @@ export const FinanceSetupSettings: React.FC<{
   const [catType, setCatType] = useState<'fixed' | 'percent'>('fixed');
   const [catOrder, setCatOrder] = useState(0);
   const [deleteCategoryId, setDeleteCategoryId] = useState<string | null>(null);
+  const [enabledStatementBanks, setEnabledStatementBanks] =
+    useState<StatementBankId[]>(DEFAULT_ENABLED_STATEMENT_BANKS);
+  const [statementBanksLoading, setStatementBanksLoading] = useState(true);
+
+  useEffect(() => {
+    void financeEndpoint
+      .getStatementBankSettings()
+      .then((s) => {
+        const list = (s.enabledBanks || []).filter(isStatementBankId);
+        setEnabledStatementBanks(list.length ? list : DEFAULT_ENABLED_STATEMENT_BANKS);
+      })
+      .catch(() => setEnabledStatementBanks(DEFAULT_ENABLED_STATEMENT_BANKS))
+      .finally(() => setStatementBanksLoading(false));
+  }, []);
+
+  const toggleStatementBank = (id: StatementBankId) => {
+    if (statementBanksLoading) return;
+    setEnabledStatementBanks((prev) => {
+      const has = prev.includes(id);
+      let next: StatementBankId[];
+      if (has) {
+        const filtered = prev.filter((x) => x !== id);
+        if (filtered.length === 0) return prev;
+        next = filtered;
+      } else {
+        next = [...prev, id].sort((a, b) => a.localeCompare(b));
+      }
+      void financeEndpoint.putStatementBankSettings({ enabledBanks: next }).catch(() => {});
+      return next;
+    });
+  };
 
   React.useEffect(() => {
     if (createKind !== 'category') return;
@@ -59,6 +98,31 @@ export const FinanceSetupSettings: React.FC<{
 
   return (
     <div className="space-y-8 w-full">
+      <div className="bg-white dark:bg-[#252525] border border-gray-200 dark:border-[#333] rounded-2xl p-4 md:p-5">
+        <div className="text-sm font-bold text-gray-900 dark:text-white mb-1">Выписки: подключённые банки</div>
+        <p className="text-xs text-gray-500 dark:text-gray-400 leading-relaxed mb-4">
+          Отметьте банки, с которыми вы работаете. При загрузке выписки в модуле «Финансы» вы сможете выбрать только эти
+          варианты, чтобы не перепутать формат файла (например, Капиталбанк / АПП и TENGE bank).
+        </p>
+        <div className="flex flex-col gap-3">
+          {STATEMENT_BANK_IDS.map((id) => (
+            <label
+              key={id}
+              className="flex items-start gap-2.5 cursor-pointer text-sm text-gray-800 dark:text-gray-200"
+            >
+              <input
+                type="checkbox"
+                className="mt-0.5 rounded border-gray-300 dark:border-[#444] text-indigo-600 focus:ring-indigo-500/30"
+                checked={enabledStatementBanks.includes(id)}
+                disabled={statementBanksLoading}
+                onChange={() => toggleStatementBank(id)}
+              />
+              <span>{STATEMENT_BANK_LABELS[id]}</span>
+            </label>
+          ))}
+        </div>
+      </div>
+
       <div>
         <div className="mb-3">
           <div className="text-sm font-bold text-gray-900 dark:text-white">Фонды</div>

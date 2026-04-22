@@ -54,7 +54,8 @@ export const UserAvatar: React.FC<UserAvatarProps> = ({
       <div
         className={`
           ${sizeClasses[size]}
-          rounded-full ${showInitials ? `${bgColor} text-white` : ''}
+          rounded-full overflow-hidden
+          ${showInitials ? `${bgColor} text-white` : ''}
           flex items-center justify-center
           font-semibold shrink-0
         `}
@@ -63,7 +64,7 @@ export const UserAvatar: React.FC<UserAvatarProps> = ({
           <img
             src={avatarUrl}
             alt={user.name}
-            className="w-full h-full rounded-full object-cover"
+            className="w-full h-full object-cover object-center"
             onError={() => setImgFailed(true)}
           />
         ) : (

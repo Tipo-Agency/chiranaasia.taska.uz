@@ -331,7 +331,6 @@ async def update_positions(positions: list[OrgPositionItem], db: AsyncSession = 
             source="bpm-router",
             payload={"title": p.title},
         )
-    await db.commit()
     return OkResponse()
 
 

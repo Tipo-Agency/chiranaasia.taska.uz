@@ -43,6 +43,7 @@ import {
   integrationsRoadmapEndpoint,
   orgEndpoint,
   publicContentPlanEndpoint,
+  telegramBotEndpoint,
 } from "../services/apiClient";
 
 export const api = {
@@ -93,4 +94,6 @@ export const api = {
   integrationsRoadmap: integrationsRoadmapEndpoint,
 
   publicContentPlan: publicContentPlanEndpoint,
+
+  telegramBot: telegramBotEndpoint,
 };

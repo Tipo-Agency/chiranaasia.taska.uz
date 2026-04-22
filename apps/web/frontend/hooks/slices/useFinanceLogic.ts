@@ -161,7 +161,7 @@ export const useFinanceLogic = (showNotification: (msg: string) => void) => {
             ? ({
                 ...item,
                 status: 'approved' as const,
-                budgetApprovedAmount: opts.budgetApprovedUzs,
+                budgetApprovedAmount: String(opts.budgetApprovedUzs),
               } satisfies PurchaseRequest)
             : item;
       const updated = saveItem(prevItems, optimistic);
@@ -181,10 +181,7 @@ export const useFinanceLogic = (showNotification: (msg: string) => void) => {
                   prevRow
                 )
               );
-              await refreshPurchaseRequests();
-              return;
-            }
-            if (opts?.statusPatch === 'reject' && opts.rejectComment) {
+            } else if (opts?.statusPatch === 'reject' && opts.rejectComment) {
               const body: Record<string, unknown> = {
                 status: 'rejected',
                 comment: opts.rejectComment.trim(),
@@ -216,11 +213,12 @@ export const useFinanceLogic = (showNotification: (msg: string) => void) => {
           } else {
             await api.finance.postRequest(financeRequestPostBody(item));
           }
+          await refreshPurchaseRequests();
+          showNotification(NOTIFICATION_MESSAGES.PURCHASE_REQUEST_SAVED);
         } catch {
           showNotification('Ошибка сохранения. Проверьте подключение и повторите.');
         }
       })();
-      showNotification(NOTIFICATION_MESSAGES.PURCHASE_REQUEST_SAVED);
       return updated;
     });
   };

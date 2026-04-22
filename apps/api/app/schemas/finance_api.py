@@ -93,7 +93,14 @@ class BankStatementRead(BaseModel):
     name: str | None = None
     period: str | None = None
     createdAt: str = ""
+    bankCode: str | None = None
     lines: list[BankStatementLineRead] = Field(default_factory=list)
+
+
+class StatementBankSettingsRead(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    enabledBanks: list[str] = Field(default_factory=list)
 
 
 class IncomeReportRead(BaseModel):

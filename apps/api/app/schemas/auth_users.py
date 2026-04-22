@@ -30,6 +30,20 @@ class AuthUserOut(BaseModel):
     calendarExportUrl: str | None = None
 
 
+class UserSelfPatchBody(BaseModel):
+    """PATCH /auth/me — правка своего профиля без права access.users."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    name: str | None = Field(default=None, max_length=255)
+    login: str | None = Field(default=None, max_length=100)
+    email: str | None = Field(default=None, max_length=255)
+    phone: str | None = Field(default=None, max_length=50)
+    telegram: str | None = Field(default=None, max_length=100)
+    avatar: str | None = None
+    password: str | None = None
+
+
 class UserBulkItem(BaseModel):
     """Тело PUT /auth/users: допускаем поля ответа GET (roleSlug, permissions, …) — игнорируем лишнее."""
     model_config = ConfigDict(extra="ignore")

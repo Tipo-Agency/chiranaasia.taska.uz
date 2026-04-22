@@ -133,15 +133,34 @@ export const useAuthLogic = (showNotification: (msg: string) => void) => {
   };
 
   const updateProfile = (updatedUser: User) => {
-    const updatedUsers = users.map(u => u.id === updatedUser.id ? updatedUser : u);
-    setUsers(updatedUsers.map(withAvatarFallback));
-    void api.users.updateAll(updatedUsers).catch((error) => {
-      console.error('[Auth] Error updating profile:', error);
-      showNotification('Ошибка сохранения профиля');
-    });
-    setCurrentUser(withAvatarFallback(updatedUser));
-    setIsProfileOpen(false);
-    showNotification('Профиль обновлен');
+    const withoutPwd: Record<string, unknown> = {
+      name: updatedUser.name,
+      login: updatedUser.login ?? '',
+      email: updatedUser.email,
+      phone: updatedUser.phone,
+      telegram: updatedUser.telegram,
+      avatar: updatedUser.avatar,
+    };
+    if (updatedUser.password) {
+      withoutPwd.password = updatedUser.password;
+    }
+    void (async () => {
+      try {
+        const me = (await api.users.patchMe(withoutPwd)) as User;
+        const merged: User = {
+          ...me,
+          password: undefined,
+          mustChangePassword: me.mustChangePassword,
+        };
+        const nextUsers = users.map((u) => (u.id === merged.id ? { ...u, ...merged } : u));
+        setUsers(nextUsers.map(withAvatarFallback));
+        setCurrentUser(withAvatarFallback(merged));
+        showNotification('Профиль обновлён');
+      } catch (error) {
+        console.error('[Auth] Error updating profile:', error);
+        showNotification('Ошибка сохранения профиля. Проверьте логин и сеть.');
+      }
+    })();
   };
 
   return {

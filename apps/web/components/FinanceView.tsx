@@ -3196,7 +3196,10 @@ const FinanceView: React.FC<FinanceViewProps> = ({
                             required={!reqLocked}
                             readOnly={reqLocked}
                             value={reqAmount} 
-                            onChange={e => setReqAmount(e.target.value)} 
+                            onChange={(e) => {
+                              const t = e.target.value.replace(/[^\d.,\s]/g, '');
+                              setReqAmount(t);
+                            }} 
                             className="w-full border border-gray-300 dark:border-gray-600 rounded px-3 py-2 text-sm bg-white dark:bg-[#333] text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 disabled:opacity-60"
                             placeholder="Например 1500000.50"
                         />
@@ -3246,7 +3249,13 @@ const FinanceView: React.FC<FinanceViewProps> = ({
                       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                         <div>
                           <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">ИНН контрагента</label>
-                          <input value={reqInn} onChange={(e) => setReqInn(e.target.value)} className="w-full border border-gray-300 dark:border-gray-600 rounded px-3 py-2 text-sm bg-white dark:bg-[#333]" placeholder="Необязательно" />
+                          <input
+                            value={reqInn}
+                            onChange={(e) => setReqInn(e.target.value.replace(/\D/g, '').slice(0, 14))}
+                            inputMode="numeric"
+                            className="w-full border border-gray-300 dark:border-gray-600 rounded px-3 py-2 text-sm bg-white dark:bg-[#333]"
+                            placeholder="Только цифры"
+                          />
                         </div>
                         <div>
                           <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">№ счёта</label>
@@ -3259,7 +3268,13 @@ const FinanceView: React.FC<FinanceViewProps> = ({
                       </div>
                       <div>
                         <input ref={reqAttachInputRef} type="file" multiple accept="application/pdf,image/*" className="hidden" onChange={handleRequestAttachmentFiles} />
-                        <Button type="button" variant="secondary" size="sm" onClick={() => reqAttachInputRef.current?.click()}>
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          size="sm"
+                          className="border border-gray-800 dark:border-gray-200"
+                          onClick={() => reqAttachInputRef.current?.click()}
+                        >
                           Прикрепить PDF / изображение
                         </Button>
                         {reqAttachments.length > 0 && (

@@ -1,15 +1,14 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { ActivityLog, User, Task, Deal, PurchaseRequest } from '../../types';
 import { hasPermission } from '../../utils/permissions';
 import { PageLayout } from '../ui/PageLayout';
 import { Container } from '../ui/Container';
 import { Button } from '../ui/Button';
-import { CheckCircle2, Bell, Inbox, Send, MessageCircle, Users as UsersIcon, Paperclip } from 'lucide-react';
-import { chatLocalService, ChatMessageLocal } from '../../services/chatLocalService';
+import { CheckCircle2, Bell, Inbox, Send, MessageCircle } from 'lucide-react';
 import { useNotificationCenter } from '../../frontend/contexts/NotificationCenterContext';
 import { getDealDisplayTitle, isFunnelDeal } from '../../utils/dealModel';
 
-type TabId = 'inbox' | 'outbox' | 'notifications' | 'chat';
+type TabId = 'inbox' | 'outbox' | 'notifications';
 
 interface InboxCard {
   id: string;
@@ -23,7 +22,6 @@ interface InboxCard {
 
 interface InboxPageProps {
   activities: ActivityLog[];
-  users: User[];
   currentUser: User;
   tasks: Task[];
   deals: Deal[];
@@ -33,7 +31,6 @@ interface InboxPageProps {
 
 export const InboxPage: React.FC<InboxPageProps> = ({
   activities,
-  users,
   currentUser,
   tasks,
   deals,
@@ -41,7 +38,12 @@ export const InboxPage: React.FC<InboxPageProps> = ({
   onMarkAllRead,
 }) => {
   const activityUnreadCount = activities.filter(a => !a.read).length;
-  const { notifications: systemNotifications, unreadCount: notificationUnreadCount, markOneRead } = useNotificationCenter();
+  const {
+    notifications: systemNotifications,
+    unreadCount: notificationUnreadCount,
+    markOneRead,
+    markAllRead: markAllNotificationsRead,
+  } = useNotificationCenter();
 
   const [activeTab, setActiveTab] = useState<TabId>('inbox');
 
@@ -144,44 +146,9 @@ export const InboxPage: React.FC<InboxPageProps> = ({
     return cards;
   }, [tasks, purchaseRequests, currentUser]);
 
-  // --- ЛОКАЛЬНЫЙ ЧАТ ---
-
-  const colleagues = useMemo(
-    () => users.filter(u => u.id !== currentUser.id),
-    [users, currentUser.id]
-  );
-
-  const [activeChatUserId, setActiveChatUserId] = useState<string | null>(
-    colleagues[0]?.id || null
-  );
-  const [chatMessages, setChatMessages] = useState<ChatMessageLocal[]>([]);
-  const [chatInput, setChatInput] = useState('');
-
-  // Загружаем историю чатов из localStorage
-  useEffect(() => {
-    setChatMessages(chatLocalService.getMessagesForUser(currentUser.id));
-  }, [currentUser.id]);
-
-  const currentChatMessages = useMemo(() => {
-    if (!activeChatUserId) return [];
-    return chatMessages
-      .filter(
-        m =>
-          (m.fromId === currentUser.id && m.toId === activeChatUserId) ||
-          (m.toId === currentUser.id && m.fromId === activeChatUserId)
-      )
-      .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
-  }, [chatMessages, activeChatUserId, currentUser.id]);
-
-  const handleSendMessage = () => {
-    if (!chatInput.trim() || !activeChatUserId) return;
-    chatLocalService.addMessage({
-      fromId: currentUser.id,
-      toId: activeChatUserId,
-      text: chatInput.trim(),
-    });
-    setChatMessages(chatLocalService.getMessagesForUser(currentUser.id));
-    setChatInput('');
+  const handleMarkEverythingRead = () => {
+    onMarkAllRead();
+    void markAllNotificationsRead();
   };
 
   return (
@@ -196,17 +163,23 @@ export const InboxPage: React.FC<InboxPageProps> = ({
                 <span>Центр коммуникаций</span>
               </div>
               <span className="text-xs text-gray-500 dark:text-gray-400">
-                Входящие, исходящие, уведомления и личные чаты в одном месте
+                Входящие и исходящие по задачам и заявкам; системные уведомления — ниже. Личные чаты — в кнопке чата внизу
+                экрана.
               </span>
             </div>
-            {activityUnreadCount > 0 && (
+            {(activityUnreadCount > 0 || notificationUnreadCount > 0) && (
               <Button
                 variant="ghost"
                 size="sm"
                 icon={CheckCircle2}
-                onClick={onMarkAllRead}
+                onClick={handleMarkEverythingRead}
               >
-                Отметить все прочитанными ({activityUnreadCount})
+                Отметить всё прочитанным
+                {(activityUnreadCount > 0 || notificationUnreadCount > 0) && (
+                  <span className="ml-1 text-[11px] opacity-80">
+                    ({activityUnreadCount}+{notificationUnreadCount})
+                  </span>
+                )}
               </Button>
             )}
           </div>
@@ -257,16 +230,6 @@ export const InboxPage: React.FC<InboxPageProps> = ({
                   {notificationUnreadCount}
                 </span>
               )}
-            </button>
-            <button
-              onClick={() => setActiveTab('chat')}
-              className={`flex items-center gap-1 px-3 py-2 text-xs font-medium border-b-2 -mb-px ${
-                activeTab === 'chat'
-                  ? 'border-blue-600 text-blue-600 dark:text-blue-400'
-                  : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
-              }`}
-            >
-              <UsersIcon size={14} /> Чаты
             </button>
           </div>
 
@@ -416,149 +379,6 @@ export const InboxPage: React.FC<InboxPageProps> = ({
             </div>
           )}
 
-          {activeTab === 'chat' && (
-            <div className="bg-white dark:bg-[#252525] border border-gray-200 dark:border-[#333] rounded-xl shadow-sm overflow-hidden h-[480px] flex">
-              {/* Список собеседников */}
-              <div className="w-56 border-r border-gray-100 dark:border-[#333] bg-gray-50/70 dark:bg-[#202020] flex flex-col">
-                <div className="px-3 py-2 text-xs font-semibold text-gray-500 dark:text-gray-400 border-b border-gray-100 dark:border-[#333]">
-                  Коллеги
-                </div>
-                <div className="flex-1 overflow-y-auto custom-scrollbar">
-                  {colleagues.length === 0 ? (
-                    <div className="p-4 text-xs text-gray-500 dark:text-gray-400">
-                      Пока нет коллег для чата
-                    </div>
-                  ) : (
-                    colleagues.map(u => (
-                      <button
-                        key={u.id}
-                        onClick={() => setActiveChatUserId(u.id)}
-                        className={`w-full px-3 py-2 text-left text-xs flex items-center gap-2 border-b border-gray-100 dark:border-[#333] ${
-                          activeChatUserId === u.id
-                            ? 'bg-white dark:bg-[#252525] text-gray-900 dark:text-gray-100'
-                            : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-[#252525]'
-                        }`}
-                      >
-                        <div className="w-7 h-7 rounded-full bg-gray-200 dark:bg-[#444] flex items-center justify-center text-[11px] font-semibold">
-                          {u.name
-                            .split(' ')
-                            .map(p => p[0])
-                            .join('')
-                            .toUpperCase()}
-                        </div>
-                        <span className="truncate">{u.name}</span>
-                      </button>
-                    ))
-                  )}
-                </div>
-              </div>
-
-              {/* Окно чата */}
-              <div className="flex-1 flex flex-col">
-                <div className="px-4 py-2 border-b border-gray-100 dark:border-[#333] flex items-center justify-between">
-                  {activeChatUserId ? (
-                    <>
-                      <div className="flex items-center gap-2">
-                        <div className="w-7 h-7 rounded-full bg-gray-200 dark:bg-[#444] flex items-center justify-center text-[11px] font-semibold">
-                          {users
-                            .find(u => u.id === activeChatUserId)
-                            ?.name.split(' ')
-                            .map(p => p[0])
-                            .join('')
-                            .toUpperCase()}
-                        </div>
-                        <div className="flex flex-col">
-                          <span className="text-sm font-medium text-gray-900 dark:text-white">
-                            {users.find(u => u.id === activeChatUserId)?.name}
-                          </span>
-                          <span className="text-[11px] text-gray-400 dark:text-gray-500">
-                            Личный чат
-                          </span>
-                        </div>
-                      </div>
-                    </>
-                  ) : (
-                    <span className="text-xs text-gray-500 dark:text-gray-400">
-                      Выберите коллегу слева, чтобы начать диалог
-                    </span>
-                  )}
-                </div>
-
-                <div className="flex-1 overflow-y-auto custom-scrollbar px-4 py-3 space-y-2">
-                  {activeChatUserId && currentChatMessages.length === 0 && (
-                    <div className="text-center text-xs text-gray-500 dark:text-gray-400 mt-4">
-                      Нет сообщений. Напишите первым.
-                    </div>
-                  )}
-                  {currentChatMessages.map(msg => {
-                    const isMine = msg.fromId === currentUser.id;
-                    const time = new Date(msg.createdAt).toLocaleTimeString('ru-RU', {
-                      hour: '2-digit',
-                      minute: '2-digit',
-                    });
-                    return (
-                      <div
-                        key={msg.id}
-                        className={`flex ${isMine ? 'justify-end' : 'justify-start'}`}
-                      >
-                        <div
-                          className={`max-w-[70%] rounded-2xl px-3 py-2 text-xs shadow-sm ${
-                            isMine
-                              ? 'bg-blue-600 text-white rounded-br-sm'
-                              : 'bg-gray-100 dark:bg-[#333] text-gray-900 dark:text-gray-100 rounded-bl-sm'
-                          }`}
-                        >
-                          <div>{msg.text}</div>
-                          <div
-                            className={`mt-1 text-[10px] ${
-                              isMine ? 'text-blue-100/80' : 'text-gray-400 dark:text-gray-500'
-                            }`}
-                          >
-                            {time}
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-
-                <div className="border-t border-gray-100 dark:border-[#333] px-3 py-2 flex items-center gap-2">
-                  <button
-                    type="button"
-                    className="p-2 rounded-lg text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-[#333]"
-                    title="В будущем сюда можно прикреплять задачи, сделки и заявки"
-                  >
-                    <Paperclip size={16} />
-                  </button>
-                  <input
-                    type="text"
-                    value={chatInput}
-                    onChange={e => setChatInput(e.target.value)}
-                    onKeyDown={e => {
-                      if (e.key === 'Enter') {
-                        e.preventDefault();
-                        handleSendMessage();
-                      }
-                    }}
-                    className="flex-1 text-xs px-3 py-2 rounded-lg border border-gray-200 dark:border-[#333] bg-white dark:bg-[#252525] text-gray-900 dark:text-gray-100 outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                    placeholder={
-                      activeChatUserId
-                        ? 'Напишите сообщение...'
-                        : 'Сначала выберите коллегу слева'
-                    }
-                  />
-                  <Button
-                    type="button"
-                    size="sm"
-                    disabled={!chatInput.trim() || !activeChatUserId}
-                    onClick={handleSendMessage}
-                  >
-                    Отправить
-                  </Button>
-                </div>
-              </div>
-            </div>
-          )}
         </div>
       </Container>
     </PageLayout>

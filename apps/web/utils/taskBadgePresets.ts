@@ -46,51 +46,34 @@ function toHex(r: number, g: number, b: number): string {
   return `#${[r, g, b].map((x) => x.toString(16).padStart(2, '0')).join('')}`;
 }
 
+/** Название оттенка по углу hue (0–360), чтобы подпись совпадала с цветом кружка. */
+export function labelForHue(h: number): string {
+  const x = ((h % 360) + 360) % 360;
+  if (x < 11 || x >= 349) return 'Красный';
+  if (x < 25) return 'Алый';
+  if (x < 40) return 'Оранжево-красный';
+  if (x < 55) return 'Оранжевый';
+  if (x < 70) return 'Золотистый';
+  if (x < 85) return 'Жёлтый';
+  if (x < 100) return 'Лайм';
+  if (x < 120) return 'Салатовый';
+  if (x < 140) return 'Зелёный';
+  if (x < 160) return 'Мятный';
+  if (x < 175) return 'Бирюзовый';
+  if (x < 190) return 'Циан';
+  if (x < 210) return 'Светло-синий';
+  if (x < 230) return 'Синий';
+  if (x < 250) return 'Индиго';
+  if (x < 270) return 'Фиолетовый';
+  if (x < 290) return 'Пурпур';
+  if (x < 310) return 'Пурпурно-розовый';
+  if (x < 330) return 'Розовый';
+  if (x < 345) return 'Розово-красный';
+  return 'Красный';
+}
+
 /** 40 гармоничных оттенков (полный круг по hue). */
 export const TASK_BADGE_PRESETS: TaskBadgePalette[] = (() => {
-  const labels: string[] = [
-    'Серый',
-    'Сланцевый',
-    'Каменный',
-    'Нейтральный',
-    'Красный',
-    'Малиновый',
-    'Розовый',
-    'Фуксия',
-    'Пурпурный',
-    'Фиолетовый',
-    'Индиго',
-    'Синий',
-    'Небесный',
-    'Голубой',
-    'Бирюзовый',
-    'Мятный',
-    'Зелёный',
-    'Лайм',
-    'Жёлто-зелёный',
-    'Оливковый',
-    'Жёлтый',
-    'Янтарный',
-    'Оранжевый',
-    'Коралл',
-    'Терракота',
-    'Коричневый',
-    'Хаки',
-    'Морской',
-    'Аква',
-    'Лаванда',
-    'Сирень',
-    'Виноград',
-    'Персик',
-    'Песочный',
-    'Графит',
-    'Сталь',
-    'Изумруд',
-    'Сапфир',
-    'Рубин',
-    'Уголь',
-    'Пепел',
-  ];
   const out: TaskBadgePalette[] = [];
   for (let i = 0; i < 40; i++) {
     const hue = Math.round((i / 40) * 360);
@@ -103,7 +86,7 @@ export const TASK_BADGE_PRESETS: TaskBadgePalette[] = (() => {
     const [dotLr, dotLg, dotLb] = hslToRgb(hue, 0.55, 0.55);
     const [dotDr, dotDg, dotDb] = hslToRgb(hue, 0.45, 0.5);
     out.push({
-      label: labels[i] || `Цвет ${i + 1}`,
+      label: labelForHue(hue),
       light: {
         bg: toHex(lr, lg, lb),
         text: toHex(ltr, ltg, ltb),

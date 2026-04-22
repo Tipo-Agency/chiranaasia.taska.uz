@@ -30,7 +30,7 @@ export interface FinanceRequestAttachmentMeta {
 export interface PurchaseRequest {
   id: string;
   title?: string;
-  amount: string | number;
+  amount: string;
   currency?: string;
   category?: string;
   categoryId?: string;
@@ -47,7 +47,7 @@ export interface PurchaseRequest {
   decisionDate?: string;
   departmentId?: string;
   /** Сумма против лимита фонда при частичном одобрении (UZS); иначе вся ``amount``. */
-  budgetApprovedAmount?: string | number;
+  budgetApprovedAmount?: string | null;
   isArchived?: boolean;
   /** Optimistic locking для PATCH /finance/requests/{id}. */
   version?: number;

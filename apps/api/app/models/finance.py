@@ -73,6 +73,7 @@ class FinanceRequest(Base):
     budget_approved_amount = Column(Numeric(15, 2), nullable=True)
     currency = Column(String(10), nullable=False, server_default=text("'UZS'"))
     category = Column(String(100), nullable=True)
+    department_id = Column(String(36), nullable=True)
     counterparty = Column(String(255), nullable=True)
     requested_by = Column(String(36), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     approved_by = Column(String(36), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
@@ -150,6 +151,7 @@ class BankStatement(Base):
     id = Column(String(36), primary_key=True, default=gen_id)
     name = Column(String(255), nullable=True)  # имя файла или подпись
     period = Column(String(20), nullable=True)  # например YYYY-MM
+    bank_code = Column(String(32), nullable=True)  # kapital, tenge, …
     created_at = Column(String(50), nullable=False)
 
 

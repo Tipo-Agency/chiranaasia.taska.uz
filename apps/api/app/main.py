@@ -44,6 +44,7 @@ from app.api.routers import (
     notification_events,
     notification_prefs,
     notifications,
+    telegram_bot,
     org,
     priorities,
     production,
@@ -277,6 +278,7 @@ app.include_router(messages.router, prefix=settings.API_PREFIX, tags=["messages"
 app.include_router(statuses.router, prefix=settings.API_PREFIX, tags=["statuses"])
 app.include_router(priorities.router, prefix=settings.API_PREFIX, tags=["priorities"])
 app.include_router(notification_prefs.router, prefix=settings.API_PREFIX, tags=["notification-prefs"])
+app.include_router(telegram_bot.router, prefix=settings.API_PREFIX, tags=["telegram-bot"])
 app.include_router(notification_events.router, prefix=settings.API_PREFIX, tags=["notification-events"])
 app.include_router(notifications.router, prefix=settings.API_PREFIX, tags=["notifications"])
 app.include_router(automation.router, prefix=settings.API_PREFIX, tags=["automation"])

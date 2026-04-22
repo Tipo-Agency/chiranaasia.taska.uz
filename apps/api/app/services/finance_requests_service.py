@@ -13,28 +13,27 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.finance import FinanceRequest
 from app.schemas.finance_requests import FinanceRequestCreate, FinanceRequestPatch, FinanceRequestRead
 from app.services.finance_planning_funds import parse_request_amount_uzs
-from app.services.finance_request_meta import (
-    extract_department_id,
-    extract_payment_date_tag,
-    merge_comment_with_department_tag,
-    strip_embedded_tags,
-)
 from app.services.finance_request_workflow import assert_finance_request_status_transition, normalize_status
+
+
+def _format_decimal(v: Decimal | None) -> str | None:
+    if v is None:
+        return None
+    s = format(v, "f")
+    if "." in s:
+        s = s.rstrip("0").rstrip(".") or "0"
+    return s
 
 
 def finance_request_row_to_dict(row: FinanceRequest) -> dict:
     """Сериализация строки ORM в dict для ``FinanceRequestRead`` (camelCase)."""
-    comment = row.comment
-    stripped = strip_embedded_tags(comment or "")
-    dept = extract_department_id(comment)
-    pay_tag = extract_payment_date_tag(comment)
-    pay_col = row.payment_date.isoformat() if row.payment_date else None
-    payment_date_out = pay_col or pay_tag
+    comment = row.comment or None
+
+    payment_date_out = row.payment_date.isoformat() if row.payment_date else None
     created = row.created_at.isoformat() if row.created_at else None
+
     amt = row.amount if row.amount is not None else Decimal("0")
-    amount_str = format(amt, "f")
-    if "." in amount_str:
-        amount_str = amount_str.rstrip("0").rstrip(".") or "0"
+    amount_str = _format_decimal(amt) or "0"
 
     decision_date = None
     if row.status == "paid" and row.paid_at:
@@ -42,17 +41,11 @@ def finance_request_row_to_dict(row: FinanceRequest) -> dict:
     elif row.status in ("approved", "rejected") and row.updated_at:
         decision_date = row.updated_at.isoformat()
 
-    atts = getattr(row, "attachments", None)
-    if not isinstance(atts, list):
-        atts = []
-    inv = getattr(row, "invoice_date", None)
+    atts = row.attachments if isinstance(row.attachments, list) else []
     ba = getattr(row, "budget_approved_amount", None)
-    budget_approved_out = None
-    if ba is not None:
-        bdec = ba if isinstance(ba, Decimal) else Decimal(str(ba))
-        budget_approved_out = format(bdec, "f")
-        if "." in budget_approved_out:
-            budget_approved_out = budget_approved_out.rstrip("0").rstrip(".") or "0"
+    budget_approved_out = _format_decimal(ba if isinstance(ba, Decimal) else (Decimal(str(ba)) if ba is not None else None))
+    inv = getattr(row, "invoice_date", None)
+
     return {
         "id": row.id,
         "version": int(row.version) if row.version is not None else 1,
@@ -60,11 +53,13 @@ def finance_request_row_to_dict(row: FinanceRequest) -> dict:
         "amount": amount_str,
         "currency": row.currency or "UZS",
         "category": row.category,
+        "departmentId": getattr(row, "department_id", None),
         "counterparty": row.counterparty,
         "requestedBy": row.requested_by,
         "approvedBy": row.approved_by,
         "status": row.status,
         "comment": comment,
+        "description": comment,
         "paymentDate": payment_date_out,
         "paidAt": row.paid_at.isoformat() if row.paid_at else None,
         "createdAt": created,
@@ -72,8 +67,6 @@ def finance_request_row_to_dict(row: FinanceRequest) -> dict:
         "isArchived": row.is_archived or False,
         "requesterId": row.requested_by,
         "categoryId": row.category,
-        "departmentId": dept,
-        "description": stripped,
         "date": created,
         "decisionDate": decision_date,
         "attachments": atts,
@@ -176,10 +169,9 @@ def insert_finance_request_row(
         is_new_row=True,
     )
 
-    user_comment = data.comment if data.comment is not None else data.description
-    user_comment = (str(user_comment).strip() if user_comment is not None else "")
+    raw_comment = data.comment if data.comment is not None else data.description
+    comment = str(raw_comment).strip() if raw_comment is not None else ""
     dept = str(data.department_id).strip() if data.department_id else None
-    comment = merge_comment_with_department_tag(user_comment=user_comment, department_id=dept)
 
     cat_raw = data.category if data.category is not None else data.category_id
     category = (str(cat_raw).strip()[:100] if cat_raw is not None and str(cat_raw).strip() else None)
@@ -190,10 +182,7 @@ def insert_finance_request_row(
     req_by = data.requested_by if data.requested_by is not None else data.requester_id
     requested_by = str(req_by).strip()[:36] if req_by is not None and str(req_by).strip() else None
 
-    pay_raw = data.payment_date
-    payment_date = pay_raw
-    if payment_date is None:
-        payment_date = _parse_iso_date_from_str(extract_payment_date_tag(comment))
+    payment_date = data.payment_date
 
     currency = str(data.currency or "UZS").strip()[:10] or "UZS"
     title = data.title.strip()[:500]
@@ -218,6 +207,7 @@ def insert_finance_request_row(
         amount=data.amount,
         currency=currency,
         category=category,
+        department_id=dept,
         counterparty=counterparty,
         requested_by=requested_by,
         approved_by=approved_by,
@@ -233,15 +223,6 @@ def insert_finance_request_row(
         invoice_number=inv_num,
         invoice_date=inv_dt,
     )
-
-
-def _parse_iso_date_from_str(s: str | None) -> date | None:
-    if not s or not str(s).strip():
-        return None
-    try:
-        return date.fromisoformat(str(s).strip()[:10])
-    except ValueError:
-        return None
 
 
 def apply_finance_request_patch(
@@ -282,23 +263,16 @@ def apply_finance_request_patch(
         v = data.requested_by if "requested_by" in fs else data.requester_id
         row.requested_by = None if v is None else (str(v).strip()[:36] or None)
 
-    if "comment" in fs or "description" in fs or "department_id" in fs:
-        if "comment" in fs or "description" in fs:
-            raw = data.comment if data.comment is not None else data.description
-            uc = (str(raw).strip() if raw is not None else "")
-        else:
-            uc = strip_embedded_tags(row.comment or "")
-        if "department_id" in fs:
-            dept = str(data.department_id).strip() if data.department_id else None
-        else:
-            dept = extract_department_id(row.comment)
-        merged = merge_comment_with_department_tag(user_comment=uc, department_id=dept)
-        row.comment = merged or None
+    if "comment" in fs or "description" in fs:
+        raw = data.comment if data.comment is not None else data.description
+        uc = str(raw).strip() if raw is not None else ""
+        row.comment = uc or None
+
+    if "department_id" in fs:
+        row.department_id = str(data.department_id).strip() if data.department_id else None
 
     if "payment_date" in fs:
         row.payment_date = data.payment_date
-        if data.payment_date is None and row.comment:
-            pass
 
     if "is_archived" in fs and data.is_archived is not None:
         row.is_archived = bool(data.is_archived)

@@ -94,7 +94,14 @@ class BankStatementItem(BaseModel):
     name: str | None = Field(default=None, max_length=500)
     period: str | None = Field(default=None, max_length=50)
     createdAt: str = Field(default="", max_length=100)
+    bankCode: str | None = Field(default=None, max_length=32)
     lines: list[BankStatementLineItem] = Field(default_factory=list)
+
+
+class StatementBankSettingsPutBody(BaseModel):
+    model_config = ConfigDict(extra="forbid", populate_by_name=True)
+
+    enabledBanks: list[str] = Field(default_factory=list)
 
 
 class IncomeReportItem(BaseModel):

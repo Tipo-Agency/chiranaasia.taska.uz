@@ -1,12 +1,18 @@
-import React, { useEffect, useImperativeHandle, useMemo, useRef, useState, forwardRef } from 'react';
+import React, { useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState, forwardRef } from 'react';
 import { ChevronDown, ChevronRight, RefreshCw, Loader2, Plus } from 'lucide-react';
 import { financeEndpoint, type BankStatementApi, type IncomeReportApi } from '../../services/apiClient';
 import { subtractMoney, sumMoney } from '../../utils/uzsMoney';
-import { DateInput, ModuleSegmentedControl } from '../ui';
+import { Button, DateInput, ModuleSegmentedControl, StandardModal } from '../ui';
 import { EntitySearchSelect } from '../ui/EntitySearchSelect';
 import { dedupeBankStatementFlatLines, parseBankStatementFile } from '../../utils/bankStatementParser';
 import type { FinancialPlanning, PurchaseRequest } from '../../types';
 import { FpExpenseVerificationTab } from './FpExpenseVerificationTab';
+import {
+  DEFAULT_ENABLED_STATEMENT_BANKS,
+  STATEMENT_BANK_LABELS,
+  isStatementBankId,
+  type StatementBankId,
+} from '../../constants/statementBanks';
 
 export interface BankStatementsViewHandle {
   triggerUpload: () => void;
@@ -39,6 +45,28 @@ export const BankStatementsView = forwardRef<BankStatementsViewHandle, BankState
   const [reportPeriod, setReportPeriod] = useState(new Date().toISOString().slice(0, 7));
   const [filtersExpanded, setFiltersExpanded] = useState(true);
   const uploadRef = useRef<HTMLInputElement>(null);
+  const [uploadOpen, setUploadOpen] = useState(false);
+  const [uploadBank, setUploadBank] = useState<StatementBankId>('kapital');
+  const [uploadNote, setUploadNote] = useState<string | null>(null);
+  const [enabledStatementBanks, setEnabledStatementBanks] =
+    useState<StatementBankId[]>(DEFAULT_ENABLED_STATEMENT_BANKS);
+  const [uploadBusy, setUploadBusy] = useState(false);
+
+  const loadStatementBankSettings = useCallback(async () => {
+    try {
+      const s = await financeEndpoint.getStatementBankSettings();
+      const list = (s.enabledBanks || []).filter(isStatementBankId);
+      const eb = list.length ? list : DEFAULT_ENABLED_STATEMENT_BANKS;
+      setEnabledStatementBanks(eb);
+      setUploadBank((prev) => (eb.includes(prev) ? prev : eb[0]!));
+    } catch {
+      setEnabledStatementBanks(DEFAULT_ENABLED_STATEMENT_BANKS);
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadStatementBankSettings();
+  }, [loadStatementBankSettings]);
 
   const isSaldoLine = (desc?: string) => {
     const d = String(desc ?? '').toLowerCase();
@@ -66,7 +94,11 @@ export const BankStatementsView = forwardRef<BankStatementsViewHandle, BankState
   };
 
   useImperativeHandle(ref, () => ({
-    triggerUpload: () => uploadRef.current?.click(),
+    triggerUpload: () => {
+      setUploadNote(null);
+      setUploadOpen(true);
+      void loadStatementBankSettings();
+    },
     toggleFilters: () => setFiltersExpanded((v) => !v),
   }));
 
@@ -175,24 +207,43 @@ export const BankStatementsView = forwardRef<BankStatementsViewHandle, BankState
     [reconciliationRows]
   );
 
-  const handleUpload = async (file: File) => {
-    const parsed = await parseBankStatementFile(file);
-    const period = parsed.period || new Date().toISOString().slice(0, 7);
-    const statementKeyName = parsed.name || file.name;
-    const existing = statements.find((s) => s.period === period && (s.name === statementKeyName || s.period === period));
-    const nextId = existing?.id ?? `st-${period}`;
-    const createdAt = existing?.createdAt ?? new Date().toISOString();
-    const next: BankStatementApi = {
-      id: nextId,
-      name: parsed.name || file.name,
-      period,
-      createdAt,
-      lines: parsed.lines,
-    };
-    const rest = existing ? statements.filter((s) => s.id !== existing.id) : statements;
-    await financeEndpoint.updateBankStatements([...rest, next]);
-    await load();
-    await onRefreshPurchaseRequests?.();
+  const handleUpload = async (file: File, bankCode: StatementBankId) => {
+    setUploadBusy(true);
+    setUploadNote(null);
+    try {
+      const format = bankCode === 'tenge' ? 'tenge' : 'kapital';
+      const parsed = await parseBankStatementFile(file, { bankCode: format });
+      if (!parsed.lines.length) {
+        setUploadNote(
+          'В файле нет распознанных операций. Проверьте, что выбран нужный банк и что это не пустой файл/лист с данными.'
+        );
+        setUploadOpen(true);
+        return;
+      }
+      const period = parsed.period || new Date().toISOString().slice(0, 7);
+      const nextId = `st-${bankCode}-${period}`;
+      const existing = statements.find((s) => s.id === nextId);
+      const label = STATEMENT_BANK_LABELS[bankCode];
+      const createdAt = existing?.createdAt ?? new Date().toISOString();
+      const next: BankStatementApi = {
+        id: nextId,
+        name: [parsed.name || file.name, label].filter(Boolean).join(' · '),
+        period,
+        createdAt,
+        bankCode,
+        lines: parsed.lines,
+      };
+      const rest = existing ? statements.filter((s) => s.id !== existing.id) : statements;
+      await financeEndpoint.updateBankStatements([...rest, next]);
+      setUploadOpen(false);
+      await load();
+      await onRefreshPurchaseRequests?.();
+    } catch {
+      setUploadNote('Не удалось прочитать файл. Попробуйте другой формат или проверьте, что xlsx/csv не повреждён.');
+      setUploadOpen(true);
+    } finally {
+      setUploadBusy(false);
+    }
   };
 
   const saveIncomeReport = async () => {
@@ -310,6 +361,11 @@ export const BankStatementsView = forwardRef<BankStatementsViewHandle, BankState
                   >
                     {expandedId === st.id ? <ChevronDown size={18} /> : <ChevronRight size={18} />}
                     <span className="font-medium text-gray-800 dark:text-white">{st.name || st.period || st.id}</span>
+                    {st.bankCode && isStatementBankId(st.bankCode) && (
+                      <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-md bg-slate-100 dark:bg-[#333] text-slate-600 dark:text-slate-300">
+                        {STATEMENT_BANK_LABELS[st.bankCode]}
+                      </span>
+                    )}
                     <span className="text-sm text-gray-500">{st.createdAt}</span>
                     {st.lines?.length != null && (
                       <span className="text-xs text-gray-400">({st.lines.length} строк)</span>
@@ -563,6 +619,51 @@ export const BankStatementsView = forwardRef<BankStatementsViewHandle, BankState
         </div>
       )}
 
+      <StandardModal
+        isOpen={uploadOpen}
+        onClose={() => {
+          if (!uploadBusy) setUploadOpen(false);
+        }}
+        title="Загрузка выписки"
+        size="sm"
+        footer={
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            <Button variant="secondary" type="button" onClick={() => setUploadOpen(false)} disabled={uploadBusy}>
+              Отмена
+            </Button>
+            <Button
+              type="button"
+              onClick={() => uploadRef.current?.click()}
+              disabled={uploadBusy || enabledStatementBanks.length === 0}
+            >
+              Выбрать файл…
+            </Button>
+          </div>
+        }
+      >
+        <div className="space-y-3">
+          <p className="text-xs text-gray-500 dark:text-gray-400 leading-relaxed">
+            Укажите банк, в формате которого сохранён файл. Список доступных банков настраивается в разделе настроек «Финансы».
+          </p>
+          <div>
+            <div className="text-[11px] font-bold text-gray-500 dark:text-gray-400 uppercase mb-1">Выписка банка</div>
+            <EntitySearchSelect
+              value={uploadBank}
+              onChange={(v) => {
+                if (isStatementBankId(v)) setUploadBank(v);
+              }}
+              options={enabledStatementBanks.map((id) => ({
+                value: id,
+                label: STATEMENT_BANK_LABELS[id],
+                searchText: `${id} ${STATEMENT_BANK_LABELS[id]}`,
+              }))}
+              searchPlaceholder="Банк…"
+            />
+          </div>
+          {uploadNote && <p className="text-xs text-amber-600 dark:text-amber-400 leading-relaxed">{uploadNote}</p>}
+        </div>
+      </StandardModal>
+
       <input
         ref={uploadRef}
         type="file"
@@ -570,9 +671,9 @@ export const BankStatementsView = forwardRef<BankStatementsViewHandle, BankState
         className="hidden"
         onChange={async (e) => {
           const file = e.target.files?.[0];
-          if (!file) return;
-          await handleUpload(file);
           e.currentTarget.value = '';
+          if (!file) return;
+          await handleUpload(file, uploadBank);
         }}
       />
     </div>

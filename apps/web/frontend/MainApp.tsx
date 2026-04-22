@@ -306,10 +306,11 @@ export function MainApp() {
             }}
             onLogout={actions.logout}
             onMobileMenuToggle={() => setIsMobileMenuOpen(true)}
+            onOpenInbox={() => actions.setCurrentView('inbox')}
           />
 
           {state.notification && (
-            <div className="absolute top-20 right-4 z-50 bg-gray-800 text-white px-4 py-2 rounded-lg shadow-lg text-sm animate-in fade-in slide-in-from-top-2 duration-200">
+            <div className="fixed top-14 left-1/2 z-[200] max-w-[min(100%-2rem,28rem)] -translate-x-1/2 rounded-xl border border-gray-700/30 bg-gray-900 px-4 py-3 text-center text-sm text-white shadow-2xl dark:bg-gray-950 animate-in fade-in slide-in-from-top-2 duration-200">
               {state.notification}
             </div>
           )}

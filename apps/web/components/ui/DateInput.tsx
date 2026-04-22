@@ -52,12 +52,39 @@ function buildMonthCellsFixed(viewYear: number, viewMonth0: number): Date[] {
   return cells;
 }
 
-const YEARS_AROUND = 15;
+/** Годы в выпадашке: достаточно глубоко для даты рождения, без сотен строк */
+const YEARS_BACK = 100;
+const YEARS_FORWARD = 15;
 
-function buildYears(center: number): number[] {
+function buildYearsInRange(minY: number, maxY: number): number[] {
   const years: number[] = [];
-  for (let y = center - YEARS_AROUND; y <= center + YEARS_AROUND; y++) years.push(y);
+  for (let y = minY; y <= maxY; y += 1) years.push(y);
   return years;
+}
+
+/** Границы годов: из min/max поля, иначе «разумный» век + центр = текущий просмотр */
+function getYearListBounds(
+  viewYear: number,
+  valueIso: string,
+  minIso?: string,
+  maxIso?: string
+): { minY: number; maxY: number } {
+  const nowY = new Date().getFullYear();
+  const p = parseISODate(valueIso);
+  const center = p?.y ?? viewYear;
+  const fromMin = minIso ? parseISODate(minIso)?.y : undefined;
+  const fromMax = maxIso ? parseISODate(maxIso)?.y : undefined;
+  let minY = fromMin ?? Math.min(center, nowY) - YEARS_BACK;
+  let maxY = fromMax ?? Math.max(center, nowY) + YEARS_FORWARD;
+  if (fromMin != null) minY = fromMin;
+  if (fromMax != null) maxY = fromMax;
+  if (minY > maxY) [minY, maxY] = [maxY, minY];
+  if (viewYear < minY || viewYear > maxY) {
+    const pad = 5;
+    minY = Math.min(minY, viewYear - pad);
+    maxY = Math.max(maxY, viewYear + pad);
+  }
+  return { minY, maxY };
 }
 
 function getPopoverPosition(triggerEl: HTMLElement | null, width = 300) {
@@ -114,13 +141,20 @@ export const DateInput: React.FC<DateInputProps> = ({
     return p ? p.m - 1 : new Date().getMonth();
   });
 
+  /** Синхронизировать сетку только при открытии — иначе при смене value с родителя сбрасывается выбор года/месяца */
   useEffect(() => {
+    if (!open) return;
     const p = parseISODate(value);
     if (p) {
       setViewYear(p.y);
       setViewMonth0(p.m - 1);
+    } else {
+      const t = new Date();
+      setViewYear(t.getFullYear());
+      setViewMonth0(t.getMonth());
     }
-  }, [value]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- намеренно только при open
+  }, [open]);
 
   useEffect(() => {
     if (disabled) setOpen(false);
@@ -175,8 +209,14 @@ export const DateInput: React.FC<DateInputProps> = ({
   const isInViewMonth = (d: Date) => d.getMonth() === viewMonth0 && d.getFullYear() === viewYear;
 
   const goPrevMonth = () => {
-    setShowMonthPicker(false);
-    setShowYearPicker(false);
+    if (showYearPicker) {
+      setViewYear((y) => y - 12);
+      return;
+    }
+    if (showMonthPicker) {
+      setViewYear((y) => y - 1);
+      return;
+    }
     if (viewMonth0 === 0) {
       setViewMonth0(11);
       setViewYear((y) => y - 1);
@@ -186,8 +226,14 @@ export const DateInput: React.FC<DateInputProps> = ({
   };
 
   const goNextMonth = () => {
-    setShowMonthPicker(false);
-    setShowYearPicker(false);
+    if (showYearPicker) {
+      setViewYear((y) => y + 12);
+      return;
+    }
+    if (showMonthPicker) {
+      setViewYear((y) => y + 1);
+      return;
+    }
     if (viewMonth0 === 11) {
       setViewMonth0(0);
       setViewYear((y) => y + 1);
@@ -203,7 +249,14 @@ export const DateInput: React.FC<DateInputProps> = ({
   const iconSz = compact ? 14 : 16;
 
   const display = value ? formatDisplayRu(value) : 'Выберите дату';
-  const years = useMemo(() => buildYears(viewYear), [viewYear]);
+  const yearBounds = useMemo(
+    () => getYearListBounds(viewYear, value, min, max),
+    [viewYear, value, min, max]
+  );
+  const years = useMemo(
+    () => buildYearsInRange(yearBounds.minY, yearBounds.maxY),
+    [yearBounds.minY, yearBounds.maxY]
+  );
 
   const calendarPanel = (
     <div
@@ -218,7 +271,13 @@ export const DateInput: React.FC<DateInputProps> = ({
           type="button"
           onClick={goPrevMonth}
           className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-[#333] text-gray-600 dark:text-gray-300"
-          aria-label="Предыдущий месяц"
+          aria-label={
+            showYearPicker
+              ? 'Сдвинуть список лет на 12 назад'
+              : showMonthPicker
+                ? 'Предыдущий год'
+                : 'Предыдущий месяц'
+          }
         >
           <ChevronLeft size={18} />
         </button>
@@ -248,7 +307,13 @@ export const DateInput: React.FC<DateInputProps> = ({
           type="button"
           onClick={goNextMonth}
           className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-[#333] text-gray-600 dark:text-gray-300"
-          aria-label="Следующий месяц"
+          aria-label={
+            showYearPicker
+              ? 'Сдвинуть список лет на 12 вперёд'
+              : showMonthPicker
+                ? 'Следующий год'
+                : 'Следующий месяц'
+          }
         >
           <ChevronRight size={18} />
         </button>
@@ -271,7 +336,7 @@ export const DateInput: React.FC<DateInputProps> = ({
           ))}
         </div>
       ) : showYearPicker ? (
-        <div className="grid grid-cols-3 gap-1 mb-2 max-h-48 overflow-y-auto custom-scrollbar">
+        <div className="grid grid-cols-3 gap-1 mb-2 max-h-[min(50vh,20rem)] overflow-y-auto custom-scrollbar">
           {years.map((y) => (
             <button
               key={y}
@@ -416,6 +481,20 @@ export const DateRangeInput: React.FC<DateRangeInputProps> = ({
 
   useEffect(() => {
     if (!open) return;
+    const p = parseISODate(draftStart || startDate);
+    if (p) {
+      setViewYear(p.y);
+      setViewMonth0(p.m - 1);
+    } else {
+      const t = new Date();
+      setViewYear(t.getFullYear());
+      setViewMonth0(t.getMonth());
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- только при открытии панели
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) return;
     const onDoc = (e: MouseEvent) => {
       const t = e.target as Node;
       if (popRef.current?.contains(t)) return;
@@ -441,7 +520,14 @@ export const DateRangeInput: React.FC<DateRangeInputProps> = ({
   }, [open]);
 
   const cells = useMemo(() => buildMonthCellsFixed(viewYear, viewMonth0), [viewYear, viewMonth0]);
-  const years = useMemo(() => buildYears(viewYear), [viewYear]);
+  const yearBoundsRange = useMemo(
+    () => getYearListBounds(viewYear, draftStart || startDate, minDate, undefined),
+    [viewYear, draftStart, startDate, minDate]
+  );
+  const years = useMemo(
+    () => buildYearsInRange(yearBoundsRange.minY, yearBoundsRange.maxY),
+    [yearBoundsRange.minY, yearBoundsRange.maxY]
+  );
   const isInViewMonth = (d: Date) => d.getMonth() === viewMonth0 && d.getFullYear() === viewYear;
 
   const ordered = useMemo(() => {
@@ -506,8 +592,14 @@ export const DateRangeInput: React.FC<DateRangeInputProps> = ({
   };
 
   const goPrevMonth = () => {
-    setShowMonthPicker(false);
-    setShowYearPicker(false);
+    if (showYearPicker) {
+      setViewYear((y) => y - 12);
+      return;
+    }
+    if (showMonthPicker) {
+      setViewYear((y) => y - 1);
+      return;
+    }
     if (viewMonth0 === 0) {
       setViewMonth0(11);
       setViewYear((y) => y - 1);
@@ -517,8 +609,14 @@ export const DateRangeInput: React.FC<DateRangeInputProps> = ({
   };
 
   const goNextMonth = () => {
-    setShowMonthPicker(false);
-    setShowYearPicker(false);
+    if (showYearPicker) {
+      setViewYear((y) => y + 12);
+      return;
+    }
+    if (showMonthPicker) {
+      setViewYear((y) => y + 1);
+      return;
+    }
     if (viewMonth0 === 11) {
       setViewMonth0(0);
       setViewYear((y) => y + 1);
@@ -546,7 +644,18 @@ export const DateRangeInput: React.FC<DateRangeInputProps> = ({
       style={{ top: popoverPos.top, left: popoverPos.left }}
     >
       <div className="flex items-center justify-between mb-2">
-        <button type="button" onClick={goPrevMonth} className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-[#333]">
+        <button
+          type="button"
+          onClick={goPrevMonth}
+          className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-[#333]"
+          aria-label={
+            showYearPicker
+              ? 'Сдвинуть список лет на 12 назад'
+              : showMonthPicker
+                ? 'Предыдущий год'
+                : 'Предыдущий месяц'
+          }
+        >
           <ChevronLeft size={18} />
         </button>
         <div className="flex items-center gap-2">
@@ -557,7 +666,18 @@ export const DateRangeInput: React.FC<DateRangeInputProps> = ({
             {viewYear}
           </button>
         </div>
-        <button type="button" onClick={goNextMonth} className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-[#333]">
+        <button
+          type="button"
+          onClick={goNextMonth}
+          className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-[#333]"
+          aria-label={
+            showYearPicker
+              ? 'Сдвинуть список лет на 12 вперёд'
+              : showMonthPicker
+                ? 'Следующий год'
+                : 'Следующий месяц'
+          }
+        >
           <ChevronRight size={18} />
         </button>
       </div>
@@ -580,7 +700,7 @@ export const DateRangeInput: React.FC<DateRangeInputProps> = ({
           ))}
         </div>
       ) : showYearPicker ? (
-        <div className="grid grid-cols-3 gap-1 mb-2 max-h-48 overflow-y-auto custom-scrollbar">
+        <div className="grid grid-cols-3 gap-1 mb-2 max-h-[min(50vh,20rem)] overflow-y-auto custom-scrollbar">
           {years.map((y) => (
             <button key={y} type="button" onClick={() => { setViewYear(y); setShowYearPicker(false); }} className={`px-2 py-2 rounded-lg text-xs ${y === viewYear ? 'bg-[#3337AD] text-white' : 'hover:bg-gray-100 dark:hover:bg-[#333]'}`}>
               {y}

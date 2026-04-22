@@ -82,4 +82,5 @@ export interface NotificationPreferences {
   processStepRequiresApproval: NotificationSetting;
   defaultFunnelId?: string;
   telegramGroupChatId?: string;
+  telegramChatId?: string;
 }

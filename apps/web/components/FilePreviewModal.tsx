@@ -9,7 +9,20 @@ interface FilePreviewModalProps {
   onClose: () => void;
 }
 
+function resolveOpenUrl(u: string): string {
+  const s = (u || '').trim();
+  if (!s) return '';
+  if (s.startsWith('blob:') || s.startsWith('http://') || s.startsWith('https://') || s.startsWith('data:')) {
+    return s;
+  }
+  if (s.startsWith('/')) {
+    return typeof window !== 'undefined' ? `${window.location.origin}${s}` : s;
+  }
+  return typeof window !== 'undefined' ? `${window.location.origin}/${s}` : s;
+}
+
 export const FilePreviewModal: React.FC<FilePreviewModalProps> = ({ url, name, type, onClose }) => {
+  const openUrl = resolveOpenUrl(url);
   const isImage = isImageFile(url, type);
   const isPdf = isPdfFile(url, type);
 
@@ -35,22 +48,22 @@ export const FilePreviewModal: React.FC<FilePreviewModalProps> = ({ url, name, t
           </div>
           <div className="flex items-center gap-2 shrink-0">
             <a
-              href={url}
+              href={openUrl || url}
               download={name}
               className="p-2 text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-gray-100 dark:hover:bg-[#333] rounded-lg transition-colors"
               title="Скачать"
             >
               <Download size={18} />
             </a>
-            <a
-              href={url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="p-2 text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-gray-100 dark:hover:bg-[#333] rounded-lg transition-colors"
+            <button
+              type="button"
+              onClick={() => openUrl && window.open(openUrl, '_blank', 'noopener,noreferrer')}
+              disabled={!openUrl}
+              className="p-2 text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-gray-100 dark:hover:bg-[#333] rounded-lg transition-colors disabled:opacity-40"
               title="Открыть в новой вкладке"
             >
               <ExternalLink size={18} />
-            </a>
+            </button>
             <button
               onClick={onClose}
               className="p-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-[#333] rounded-lg transition-colors"
@@ -70,7 +83,7 @@ export const FilePreviewModal: React.FC<FilePreviewModalProps> = ({ url, name, t
             />
           ) : isPdf ? (
             <iframe
-              src={url}
+              src={openUrl || url}
               className="w-full h-full min-h-[600px] rounded-lg border border-gray-200 dark:border-[#333]"
               title={name}
             />
@@ -81,7 +94,7 @@ export const FilePreviewModal: React.FC<FilePreviewModalProps> = ({ url, name, t
               </div>
               <p className="text-gray-600 dark:text-gray-400 mb-4">Предпросмотр недоступен для этого типа файла</p>
               <a
-                href={url}
+                href={openUrl || url}
                 download={name}
                 className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
               >

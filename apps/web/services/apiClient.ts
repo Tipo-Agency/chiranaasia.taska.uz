@@ -384,6 +384,8 @@ export const authEndpoint = {
     post<{ user: unknown }>('/auth/login', { login, password }, { skipAuthRefresh: true }),
   logout: () => post<{ ok: boolean }>('/auth/logout', {}, { skipAuthRefresh: true }),
   getMe: () => get<unknown>('/auth/me'),
+  /** Самообновление профиля / пароля без права access.users. */
+  patchMe: (body: Record<string, unknown>) => patch<unknown>('/auth/me', body),
   getPermissionsCatalog: () =>
     get<{ groups: Array<{ id: string; label: string; items: Array<{ key: string; label: string }> }>; allKeys: string[] }>(
       '/auth/permissions/catalog'
@@ -689,6 +691,47 @@ export const notificationPrefsEndpoint = {
     get<unknown>(`/notification-prefs${userId ? `?user_id=${encodeURIComponent(userId)}` : ''}`),
   update: (prefs: unknown, userId?: string) =>
     put<{ ok: boolean }>(`/notification-prefs${userId ? `?user_id=${encodeURIComponent(userId)}` : ''}`, prefs),
+};
+
+export interface TelegramBotInfo {
+  configured: boolean;
+  ok: boolean;
+  bot_id: number | null;
+  username: string | null;
+  first_name: string | null;
+  can_join_groups: boolean | null;
+  error: string | null;
+}
+
+export interface TelegramDeliveryStats {
+  telegram_pending: number;
+  telegram_sending: number;
+  telegram_sent: number;
+  telegram_retry: number;
+  telegram_dead: number;
+  email_pending: number;
+  email_sent: number;
+  email_dead: number;
+}
+
+export interface TelegramBotUser {
+  id: string;
+  name: string;
+  login: string | null;
+  email: string | null;
+  telegram_username: string | null;
+  telegram_user_id: string | null;
+  telegram_chat_id: string | null;
+}
+
+export const telegramBotEndpoint = {
+  getInfo: () => get<TelegramBotInfo>('/telegram-bot/info'),
+  getStats: () => get<TelegramDeliveryStats>('/telegram-bot/stats'),
+  getUsers: () => get<TelegramBotUser[]>('/telegram-bot/users'),
+  sendTest: (chat_id: string, text?: string) =>
+    post<{ ok: boolean; error: string | null }>('/telegram-bot/test', { chat_id, text }),
+  setUserTelegramId: (userId: string, telegram_user_id: string | null) =>
+    patch<{ ok: boolean }>(`/telegram-bot/users/${userId}`, { telegram_user_id }),
 };
 
 // Automation
@@ -1506,8 +1549,14 @@ export interface BankStatementApi {
   name?: string;
   period?: string;
   createdAt: string;
+  /** kapital | tenge — выбран при загрузке (старые записи могут быть без кода) */
+  bankCode?: string | null;
   lines: BankStatementLineApi[];
 }
+
+export type StatementBankSettingsApi = {
+  enabledBanks: string[];
+};
 
 export interface IncomeReportApi {
   id: string;
@@ -1574,7 +1623,9 @@ export function purchaseRequestFromApi(r: Record<string, unknown>): PurchaseRequ
     paidAt: (r.paid_at ?? r.paidAt) as string | null | undefined,
     decisionDate: (r.decision_date ?? r.decisionDate) as string | undefined,
     departmentId: (r.department_id ?? r.departmentId) as string | undefined,
-    budgetApprovedAmount: (r.budget_approved_amount ?? r.budgetApprovedAmount) as string | number | undefined,
+    budgetApprovedAmount: (r.budget_approved_amount ?? r.budgetApprovedAmount) != null
+      ? String(r.budget_approved_amount ?? r.budgetApprovedAmount)
+      : undefined,
     isArchived: Boolean(r.is_archived ?? r.isArchived),
     version:
       typeof v === 'number' ? v : v != null && v !== '' ? Number(v) || undefined : undefined,
@@ -1633,6 +1684,9 @@ export const financeEndpoint = {
   getBankStatements: () => get<BankStatementApi[]>('/finance/bank-statements'),
   updateBankStatements: (statements: BankStatementApi[]) => put<{ ok: boolean }>('/finance/bank-statements', statements),
   deleteBankStatement: (id: string) => del<{ ok: boolean }>(`/finance/bank-statements/${id}`),
+  getStatementBankSettings: () => get<StatementBankSettingsApi>('/finance/statement-bank-settings'),
+  putStatementBankSettings: (body: StatementBankSettingsApi) =>
+    put<StatementBankSettingsApi>('/finance/statement-bank-settings', body),
   getExpenseReconciliationGroups: () =>
     get<Array<{ id: string; lineIds: string[]; requestId?: string | null; manualResolved?: boolean; updatedAt?: string }>>(
       '/finance/expense-reconciliation-groups'

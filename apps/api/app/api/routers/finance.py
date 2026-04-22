@@ -29,6 +29,7 @@ from app.models.finance import (
     FinancialPlanning,
     IncomeReport,
 )
+from app.models.org_system_prefs import OrgSystemPrefs
 from app.models.user import User
 from app.schemas.common_responses import OkResponse
 from app.schemas.finance_api import (
@@ -40,6 +41,7 @@ from app.schemas.finance_api import (
     FinancialPlanDocumentRead,
     FinancialPlanningRead,
     IncomeReportRead,
+    StatementBankSettingsRead,
 )
 from app.schemas.finance_bulk import (
     BankStatementItem,
@@ -50,6 +52,7 @@ from app.schemas.finance_bulk import (
     FinancialPlanDocItem,
     FinancialPlanningItem,
     IncomeReportItem,
+    StatementBankSettingsPutBody,
 )
 from app.schemas.finance_requests import (
     FinanceRequestCreate,
@@ -884,12 +887,66 @@ async def update_financial_plannings(
 
 # --- Bank statements (выписки) ---
 
+_ORG_PREFS_DEFAULT_ID = "default"
+_VALID_STATEMENT_BANK_CODES = frozenset({"kapital", "tenge"})
+_DEFAULT_STATEMENT_BANKS = ["kapital", "tenge"]
+
+
+async def _get_org_prefs_row(db: AsyncSession) -> OrgSystemPrefs:
+    res = await db.execute(select(OrgSystemPrefs).where(OrgSystemPrefs.id == _ORG_PREFS_DEFAULT_ID))
+    row = res.scalar_one_or_none()
+    if row is None:
+        row = OrgSystemPrefs(
+            id=_ORG_PREFS_DEFAULT_ID,
+            primary_color="#F97316",
+            logo_svg=None,
+            logo_svg_dark=None,
+        )
+        db.add(row)
+        await db.flush()
+    return row
+
+
+def _normalize_enabled_statement_banks(raw: object | None) -> list[str]:
+    if raw is None:
+        return list(_DEFAULT_STATEMENT_BANKS)
+    if not isinstance(raw, list):
+        return list(_DEFAULT_STATEMENT_BANKS)
+    out: list[str] = []
+    for x in raw:
+        s = str(x).strip().lower()
+        if s in _VALID_STATEMENT_BANK_CODES and s not in out:
+            out.append(s)
+    return out if out else list(_DEFAULT_STATEMENT_BANKS)
+
+
+@router.get("/statement-bank-settings", response_model=StatementBankSettingsRead)
+async def get_statement_bank_settings(db: AsyncSession = Depends(get_db)):
+    row = await _get_org_prefs_row(db)
+    return StatementBankSettingsRead(enabledBanks=_normalize_enabled_statement_banks(row.enabled_statement_banks))
+
+
+@router.put("/statement-bank-settings", response_model=StatementBankSettingsRead)
+async def put_statement_bank_settings(body: StatementBankSettingsPutBody, db: AsyncSession = Depends(get_db)):
+    row = await _get_org_prefs_row(db)
+    cleaned: list[str] = []
+    for x in body.enabledBanks or []:
+        s = str(x).strip().lower()
+        if s in _VALID_STATEMENT_BANK_CODES and s not in cleaned:
+            cleaned.append(s)
+    row.enabled_statement_banks = cleaned if cleaned else list(_DEFAULT_STATEMENT_BANKS)
+    await db.commit()
+    await db.refresh(row)
+    return StatementBankSettingsRead(enabledBanks=_normalize_enabled_statement_banks(row.enabled_statement_banks))
+
+
 def _row_to_statement(row, lines=None):
     return {
         "id": row.id,
         "name": row.name,
         "period": row.period,
         "createdAt": row.created_at,
+        "bankCode": row.bank_code,
         "lines": lines or [],
     }
 
@@ -929,12 +986,15 @@ async def update_bank_statements(payload: list[BankStatementItem], db: AsyncSess
             existing.name = s.name if s.name is not None else existing.name
             existing.period = s.period if s.period is not None else existing.period
             existing.created_at = s.createdAt or existing.created_at
+            if s.bankCode is not None:
+                existing.bank_code = s.bankCode
         else:
             db.add(BankStatement(
                 id=sid,
                 name=s.name,
                 period=s.period,
                 created_at=s.createdAt or "",
+                bank_code=s.bankCode,
             ))
         await db.flush()
         lines = s.lines

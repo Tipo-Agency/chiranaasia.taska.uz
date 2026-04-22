@@ -1,7 +1,7 @@
 
 import React, { useMemo, useState } from 'react';
 import { AutomationRule, NotificationPreferences, StatusOption } from '../../types';
-import { MessageSquare, Trash2, Zap } from 'lucide-react';
+import { MessageSquare, Send, Trash2, Zap } from 'lucide-react';
 import { EntitySearchSelect } from '../ui/EntitySearchSelect';
 import { Button } from '../ui';
 
@@ -370,6 +370,40 @@ export const AutomationSettings: React.FC<AutomationSettingsProps> = ({
                                     className="w-full border border-gray-300 dark:border-gray-600 rounded-xl px-3 py-2 text-sm bg-white dark:bg-[#252525] text-gray-900 dark:text-gray-100"
                                 />
                             </div>
+                        </div>
+
+                        <div className="lg:col-span-2 bg-white dark:bg-[#252525] border border-gray-200 dark:border-[#333] rounded-2xl p-4 sm:p-6">
+                            <div className="flex items-center gap-2 mb-1">
+                                <Send size={14} className="text-sky-500 shrink-0" />
+                                <div className="text-sm font-bold text-gray-900 dark:text-white">Мой Telegram</div>
+                            </div>
+                            <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 mb-4">
+                                Укажите ваш Telegram Chat ID, чтобы получать личные уведомления.
+                                Узнать ID можно у бота <span className="font-mono bg-gray-100 dark:bg-[#333] px-1 rounded">@userinfobot</span> или
+                                через команду <span className="font-mono bg-gray-100 dark:bg-[#333] px-1 rounded">/start</span> у бота Taska.
+                            </div>
+                            <div className="flex items-center gap-3">
+                                <input
+                                    type="text"
+                                    value={notificationPrefs?.telegramChatId ?? ''}
+                                    onChange={(e) =>
+                                        onUpdatePrefs({
+                                            ...(notificationPrefs || safePrefs),
+                                            telegramChatId: e.target.value || undefined,
+                                        })
+                                    }
+                                    placeholder="Например: 123456789"
+                                    className="flex-1 max-w-xs border border-gray-300 dark:border-gray-600 rounded-xl px-3 py-2 text-sm bg-white dark:bg-[#252525] text-gray-900 dark:text-gray-100 placeholder-gray-400 font-mono"
+                                />
+                                {notificationPrefs?.telegramChatId && (
+                                    <span className="text-xs text-emerald-600 dark:text-emerald-400 font-medium">Сохранён</span>
+                                )}
+                            </div>
+                            {safeChannels.telegram === false && (
+                                <div className="mt-3 text-xs text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-800/40 rounded-xl px-3 py-2">
+                                    Включите канал <strong>Telegram</strong> выше, чтобы уведомления доходили.
+                                </div>
+                            )}
                         </div>
 
                         <div className="lg:col-span-2 bg-white dark:bg-[#252525] border border-gray-200 dark:border-[#333] rounded-2xl p-4 sm:p-6">

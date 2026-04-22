@@ -20,6 +20,7 @@ import {
   Link2,
   Factory,
   Palette,
+  Send,
 } from 'lucide-react';
 import {
   Input,
@@ -47,6 +48,7 @@ import { ArchiveView, ARCHIVE_TAB_OPTIONS, type ArchiveTabId } from './settings/
 import { FinanceSetupSettings } from './settings/FinanceSetupSettings';
 import { IntegrationsRoadmapSettings } from './settings/IntegrationsRoadmapSettings';
 import { BrandingSettings } from './settings/BrandingSettings';
+import { TelegramBotSettings } from './settings/TelegramBotSettings';
 import { TasksSetupSettings } from './settings/TasksSetupSettings';
 import { hasPermission } from '../utils/permissions';
 import { RouteFallback } from './ui/RouteFallback';
@@ -177,6 +179,7 @@ const SettingsView: React.FC<SettingsViewProps> = ({
       if (profIdx >= 0) {
         t.splice(profIdx + 1, 0, { id: 'branding', label: 'Компания', icon: <Palette size={14} /> });
       }
+      t.push({ id: 'telegram-bot', label: 'Telegram Bot', icon: <Send size={14} /> });
       t.push({ id: 'integrations-roadmap', label: 'Интеграции (план)', icon: <Link2 size={14} /> });
       t.push({ id: 'admin', label: 'Админ-панель', icon: <ShieldCheck size={14} /> });
     }
@@ -532,6 +535,9 @@ const SettingsView: React.FC<SettingsViewProps> = ({
                   onDeleteRule={onDeleteAutomationRule!}
                   onUpdatePrefs={onUpdateNotificationPrefs}
                 />
+              )}
+              {activeTab === 'telegram-bot' && currentUser && hasPermission(currentUser, 'admin.system') && (
+                <TelegramBotSettings />
               )}
               {activeTab === 'integrations-roadmap' && currentUser && hasPermission(currentUser, 'admin.system') && (
                 <div className="bg-white dark:bg-[#252525] border border-gray-200 dark:border-[#333] rounded-2xl p-4 md:p-6">

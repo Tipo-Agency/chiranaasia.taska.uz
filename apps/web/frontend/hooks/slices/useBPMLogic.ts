@@ -14,8 +14,10 @@ export const useBPMLogic = (showNotification: (msg: string) => void) => {
           ? orgPositions.map(p => p.id === normalized.id ? normalized : p)
           : [...orgPositions, normalized];
       setOrgPositions(updated);
-      api.bpm.updatePositions(updated);
-      showNotification('Должность сохранена');
+      void api.bpm
+        .updatePositions(updated)
+        .then(() => showNotification('Должность сохранена'))
+        .catch(() => showNotification('Ошибка сохранения должности. Повторите или проверьте сеть.'));
   };
 
   const deletePosition = (id: string) => {
@@ -24,8 +26,10 @@ export const useBPMLogic = (showNotification: (msg: string) => void) => {
           p.id === id ? { ...p, isArchived: true, updatedAt: now } : p
       );
       setOrgPositions(updated);
-      api.bpm.updatePositions(updated);
-      showNotification('Должность в архиве');
+      void api.bpm
+        .updatePositions(updated)
+        .then(() => showNotification('Должность в архиве'))
+        .catch(() => showNotification('Не удалось удалить должность. Повторите или проверьте сеть.'));
   };
 
   // Processes

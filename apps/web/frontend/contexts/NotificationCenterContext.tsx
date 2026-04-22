@@ -243,11 +243,15 @@ export function NotificationCenterProvider({
 
   const markAllRead = useCallback(async () => {
     if (!userId) return;
-    const unread = notifications.filter((n) => !n.isRead);
-    await Promise.all(unread.map((n) => api.notifications.markRead(n.id, true).catch(() => {})));
-    setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })));
-    setUnreadCount(0);
-  }, [userId, notifications]);
+    try {
+      const list = (await api.notifications.list(userId, true, 200)) as SystemNotificationItem[];
+      await Promise.all((list || []).map((n) => api.notifications.markRead(n.id, true).catch(() => {})));
+    } catch {
+      const unread = notifications.filter((n) => !n.isRead);
+      await Promise.all(unread.map((n) => api.notifications.markRead(n.id, true).catch(() => {})));
+    }
+    await refresh();
+  }, [userId, notifications, refresh]);
 
   const markOneRead = useCallback(async (id: string, isRead = true) => {
     await api.notifications.markRead(id, isRead).catch(() => {});

@@ -91,6 +91,7 @@ export const PayrollView = forwardRef<PayrollViewHandle, PayrollViewProps>(funct
 
   const deptList = useMemo(() => Array.from(deptById.values()) as Department[], [deptById]);
 
+  const [copyFeedback, setCopyFeedback] = useState<string | null>(null);
   const [subTab, setSubTab] = useState<PayrollSubTab>('calc');
   const [internalPeriod, setInternalPeriod] = useState(initialPeriod);
   useEffect(() => {
@@ -194,7 +195,8 @@ export const PayrollView = forwardRef<PayrollViewHandle, PayrollViewProps>(funct
       };
     });
     persistMonth(next);
-    alert(`Скопировано из ${prev}`);
+    setCopyFeedback(`Скопировано табель и начисления из ${prev} в текущий месяц (${period}).`);
+    window.setTimeout(() => setCopyFeedback(null), 6000);
   }, [period, staff, persistMonth]);
 
   useImperativeHandle(ref, () => ({ copyFromPrevMonth }), [copyFromPrevMonth]);
@@ -534,7 +536,14 @@ export const PayrollView = forwardRef<PayrollViewHandle, PayrollViewProps>(funct
         >
           {tabNav}
         </nav>
-        <div className="flex-1 min-w-0 space-y-3 w-full">{tablesBlock}</div>
+        <div className="flex-1 min-w-0 space-y-3 w-full">
+          {copyFeedback && (
+            <div className="rounded-lg border border-emerald-200 dark:border-emerald-900/50 bg-emerald-50/90 dark:bg-emerald-950/30 px-3 py-2 text-sm text-emerald-900 dark:text-emerald-100">
+              {copyFeedback}
+            </div>
+          )}
+          {tablesBlock}
+        </div>
       </div>
     );
   }
@@ -561,6 +570,11 @@ export const PayrollView = forwardRef<PayrollViewHandle, PayrollViewProps>(funct
             </button>
           </div>
         </div>
+        {copyFeedback && (
+          <div className="mt-3 rounded-lg border border-emerald-200 dark:border-emerald-900/50 bg-emerald-50/90 dark:bg-emerald-950/30 px-3 py-2 text-sm text-emerald-900 dark:text-emerald-100">
+            {copyFeedback}
+          </div>
+        )}
         <div className="mt-3">
           <ModuleSegmentedControl<PayrollSubTab>
             size="sm"

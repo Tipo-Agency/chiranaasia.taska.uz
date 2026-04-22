@@ -131,7 +131,7 @@ export const AppSelect: React.FC<AppSelectProps> = ({
         />
       </button>
       {isOpen && !disabled && (
-        <div className="absolute z-[220] top-full left-0 mt-1 w-full min-w-[12rem] rounded-lg border border-gray-200 dark:border-[#333] bg-white dark:bg-[#252525] shadow-xl overflow-hidden flex flex-col">
+        <div className="absolute z-[400] top-full left-0 mt-1 w-full min-w-[12rem] rounded-lg border border-gray-200 dark:border-[#333] bg-white dark:bg-[#252525] shadow-xl overflow-hidden flex flex-col">
           {searchable && (
             <div className="shrink-0 p-2 border-b border-gray-100 dark:border-[#333]">
               <div className="relative">

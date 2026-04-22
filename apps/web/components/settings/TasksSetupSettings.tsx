@@ -226,7 +226,7 @@ export const TasksSetupSettings: React.FC<TasksSetupSettingsProps> = ({
       {/* Status modal */}
       {statusModalOpen && (
         <div
-          className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-[80] animate-in fade-in duration-200"
+          className="fixed inset-0 min-h-[100dvh] w-full bg-black/40 backdrop-blur-sm flex items-center justify-center z-[80] animate-in fade-in duration-200"
           onClick={(e) => {
             if (e.target === e.currentTarget) setStatusModalOpen(false);
           }}
@@ -260,7 +260,7 @@ export const TasksSetupSettings: React.FC<TasksSetupSettingsProps> = ({
                     const active = statusColor === value;
                     return (
                       <button
-                        key={preset.label + idx}
+                        key={`st-palette-${idx}`}
                         type="button"
                         onClick={() => setStatusColor(value)}
                         className={`flex items-center gap-2 px-2 py-2 rounded-lg border text-sm transition-colors ${
@@ -303,7 +303,7 @@ export const TasksSetupSettings: React.FC<TasksSetupSettingsProps> = ({
       {/* Priority modal */}
       {priorityModalOpen && (
         <div
-          className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-[80] animate-in fade-in duration-200"
+          className="fixed inset-0 min-h-[100dvh] w-full bg-black/40 backdrop-blur-sm flex items-center justify-center z-[80] animate-in fade-in duration-200"
           onClick={(e) => {
             if (e.target === e.currentTarget) setPriorityModalOpen(false);
           }}
@@ -337,7 +337,7 @@ export const TasksSetupSettings: React.FC<TasksSetupSettingsProps> = ({
                     const active = priorityColor === value;
                     return (
                       <button
-                        key={`pr-${preset.label}-${idx}`}
+                        key={`pr-palette-${idx}`}
                         type="button"
                         onClick={() => setPriorityColor(value)}
                         className={`flex items-center gap-2 px-2 py-2 rounded-lg border text-sm transition-colors ${

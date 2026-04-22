@@ -1,4 +1,4 @@
-import React, { useRef } from 'react';
+import React, { useRef, useState } from 'react';
 import { Plus, Trash2, FileIcon, X } from 'lucide-react';
 import type { NomenclatureAttachment, NomenclatureAttribute } from '../../types/inventory';
 import { uploadInventoryItemAttachment } from '../../services/localStorageService';
@@ -34,6 +34,8 @@ export function NomenclatureExtendedFields({
   setAlertMessage,
 }: NomenclatureExtendedFieldsProps) {
   const fileRef = useRef<HTMLInputElement>(null);
+  /** Сырая строка вариантов для select — иначе запятая в процессе ввода «съедается» при split на каждый рендер. */
+  const [selectOptionsDraft, setSelectOptionsDraft] = useState<Record<string, string>>({});
 
   const addAttribute = () => {
     setAttributes((prev) => [
@@ -145,8 +147,13 @@ export function NomenclatureExtendedFields({
                 <span className="text-[10px] text-gray-500">Ед.</span>
                 <input
                   value={attr.unit || ''}
-                  onChange={(e) => updateAttr(attr.id, { unit: e.target.value })}
-                  placeholder="кг"
+                  onChange={(e) => {
+                    const v = e.target.value.replace(/[^\p{L}\p{N}./\s\-₽€%²³]/gu, '');
+                    updateAttr(attr.id, { unit: v.slice(0, 16) });
+                  }}
+                  placeholder="кг, шт"
+                  maxLength={16}
+                  title="Единица измерения: буквы и цифры, например кг, шт, м²"
                   className="rounded-lg border border-gray-200 dark:border-[#444] px-2 py-1.5 text-xs bg-white dark:bg-[#252525]"
                 />
               </label>
@@ -169,15 +176,30 @@ export function NomenclatureExtendedFields({
                   <label className="flex flex-col gap-1 min-w-[140px] flex-1">
                     <span className="text-[10px] text-gray-500">Варианты (через запятую)</span>
                     <input
-                      value={(attr.options || []).join(', ')}
-                      onChange={(e) =>
-                        updateAttr(attr.id, {
-                          options: e.target.value
-                            .split(',')
-                            .map((s) => s.trim())
-                            .filter(Boolean),
-                        })
+                      value={
+                        selectOptionsDraft[attr.id] !== undefined
+                          ? selectOptionsDraft[attr.id]!
+                          : (attr.options || []).join(', ')
                       }
+                      onChange={(e) =>
+                        setSelectOptionsDraft((prev) => ({ ...prev, [attr.id]: e.target.value }))
+                      }
+                      onBlur={() => {
+                        const raw =
+                          selectOptionsDraft[attr.id] !== undefined
+                            ? selectOptionsDraft[attr.id]!
+                            : (attr.options || []).join(', ');
+                        const options = raw
+                          .split(',')
+                          .map((s) => s.trim())
+                          .filter(Boolean);
+                        updateAttr(attr.id, { options });
+                        setSelectOptionsDraft((prev) => {
+                          const n = { ...prev };
+                          delete n[attr.id];
+                          return n;
+                        });
+                      }}
                       placeholder="S, M, L, XL"
                       className="rounded-lg border border-gray-200 dark:border-[#444] px-2 py-1.5 text-xs bg-white dark:bg-[#252525]"
                     />
@@ -236,27 +258,59 @@ export function NomenclatureExtendedFields({
           className="hidden"
           onChange={onFiles}
         />
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap gap-3">
           {attachments.map((att) => (
-            <div
-              key={att.id}
-              className="relative group w-20 h-20 rounded-lg border border-gray-200 dark:border-[#333] overflow-hidden bg-gray-100 dark:bg-[#1a1a1a]"
-            >
-              {isImageFile(att.url, att.type) ? (
-                <img src={att.url} alt="" className="w-full h-full object-cover" />
-              ) : (
-                <div className="w-full h-full flex items-center justify-center">
-                  <FileIcon size={28} className="text-gray-400" />
-                </div>
-              )}
-              <button
-                type="button"
-                onClick={() => removeAtt(att.id)}
-                className="absolute top-0.5 right-0.5 p-0.5 rounded bg-black/50 text-white opacity-0 group-hover:opacity-100 transition-opacity"
-                title="Убрать файл"
+            <div key={att.id} className="flex flex-col gap-1 w-24">
+              <div
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => {
+                  if (e.key !== 'Enter' && e.key !== ' ') return;
+                  e.preventDefault();
+                  const u = (att.url || '').trim();
+                  if (!u) return;
+                  if (u.startsWith('http') || u.startsWith('blob:')) {
+                    window.open(u, '_blank', 'noopener,noreferrer');
+                  } else {
+                    const path = u.startsWith('/') ? u : `/${u}`;
+                    window.open(`${window.location.origin}${path}`, '_blank', 'noopener,noreferrer');
+                  }
+                }}
+                onClick={() => {
+                  const u = (att.url || '').trim();
+                  if (!u) return;
+                  if (u.startsWith('http') || u.startsWith('blob:')) {
+                    window.open(u, '_blank', 'noopener,noreferrer');
+                  } else {
+                    const path = u.startsWith('/') ? u : `/${u}`;
+                    window.open(`${window.location.origin}${path}`, '_blank', 'noopener,noreferrer');
+                  }
+                }}
+                className="relative group w-full h-20 rounded-lg border border-gray-200 dark:border-[#333] overflow-hidden bg-gray-100 dark:bg-[#1a1a1a] text-left cursor-pointer"
+                title="Открыть"
               >
-                <X size={12} />
-              </button>
+                {isImageFile(att.url, att.type) ? (
+                  <img src={att.url} alt="" className="w-full h-full object-cover" />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center">
+                    <FileIcon size={28} className="text-gray-400" />
+                  </div>
+                )}
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    removeAtt(att.id);
+                  }}
+                  className="absolute top-0.5 right-0.5 p-0.5 rounded bg-black/50 text-white opacity-0 group-hover:opacity-100 transition-opacity z-10"
+                  title="Убрать файл"
+                >
+                  <X size={12} />
+                </button>
+              </div>
+              <span className="text-[10px] text-gray-500 dark:text-gray-400 truncate w-full" title={att.name}>
+                {att.name || 'Файл'}
+              </span>
             </div>
           ))}
         </div>

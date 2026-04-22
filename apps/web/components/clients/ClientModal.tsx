@@ -178,9 +178,18 @@ export const ClientModal: React.FC<ClientModalProps> = ({
                     <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 mb-1">Телефон</label>
                     <input 
                       value={clientPhone} 
-                      onChange={e => setClientPhone(e.target.value)} 
+                      onChange={(e) => {
+                        const v = e.target.value;
+                        if (v === '') { setClientPhone(''); return; }
+                        const t = v.replace(/[^\d+()\s\-]/g, '');
+                        setClientPhone(t.slice(0, 20));
+                      }} 
+                      inputMode="tel"
+                      autoComplete="tel"
+                      placeholder="+998 …"
                       className="w-full border border-gray-300 dark:border-gray-600 rounded px-3 py-2 text-sm bg-white dark:bg-[#333] text-gray-900 dark:text-gray-100"
                     />
+                    <p className="text-[10px] text-gray-400 dark:text-gray-500 mt-1">Только цифры, +, скобки и дефисы</p>
                   </div>
                   <div>
                     <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 mb-1">Email</label>

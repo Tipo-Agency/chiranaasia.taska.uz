@@ -33,7 +33,7 @@ from app.models.user import User
 from app.schemas.auth_api import PermissionsCatalogResponse, RoleApiRow
 from app.schemas.auth_bodies import LoginRequest, LogoutRequest, RefreshRequest
 from app.schemas.auth_session import AuthSessionResponse
-from app.schemas.auth_users import AuthUserOut, UserBulkItem
+from app.schemas.auth_users import AuthUserOut, UserBulkItem, UserSelfPatchBody
 from app.schemas.common_responses import IdOkResponse, OkResponse
 from app.services.audit_log import log_mutation
 from app.services.auth_refresh import (
@@ -203,6 +203,77 @@ async def auth_logout(
 
 @router.get("/me", response_model=AuthUserOut)
 async def get_me(current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    role = await db.get(Role, current_user.role_id) if current_user.role_id else None
+    return row_to_user(current_user, role, include_permissions=True, include_calendar_export=True)
+
+
+@router.patch("/me", response_model=AuthUserOut)
+async def patch_me(
+    body: UserSelfPatchBody,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Обновление своего профиля (без права access.users). Роль и архив менять нельзя."""
+    data = body.model_dump(exclude_unset=True)
+    if not data:
+        role = await db.get(Role, current_user.role_id) if current_user.role_id else None
+        return row_to_user(current_user, role, include_permissions=True, include_calendar_export=True)
+
+    if "login" in data and data["login"] is not None:
+        new_login = (str(data["login"]).strip() or None)
+        if new_login:
+            dup = await db.execute(
+                select(User).where(
+                    func.lower(User.login) == func.lower(new_login),
+                    User.id != current_user.id,
+                )
+            )
+            if dup.scalar_one_or_none():
+                raise HTTPException(status_code=400, detail="Логин уже занят")
+        current_user.login = new_login
+
+    if "name" in data and data["name"] is not None:
+        current_user.name = str(data["name"]).strip() or current_user.name
+    if "email" in data:
+        current_user.email = (str(data["email"]).strip() if data["email"] else None) or None
+    if "phone" in data:
+        current_user.phone = (str(data["phone"]).strip() if data["phone"] else None) or None
+    if "telegram" in data:
+        current_user.telegram = (str(data["telegram"]).strip() if data["telegram"] else None) or None
+    if "avatar" in data:
+        current_user.avatar = data["avatar"] if data["avatar"] else None
+
+    raw_password = data.get("password") if "password" in data else None
+    if raw_password is not None:
+        pwd_plain = str(raw_password).strip()
+        if pwd_plain:
+            assert_new_password_policy(pwd_plain)
+            await revoke_all_refresh_for_user(db, current_user.id)
+            current_user.token_version = int(current_user.token_version or 0) + 1
+            current_user.password_hash = get_password_hash(pwd_plain)
+            current_user.must_change_password = False
+
+    await db.flush()
+    await log_entity_mutation(
+        db,
+        event_type="user.self_updated",
+        entity_type="user",
+        entity_id=current_user.id,
+        source="auth-router",
+        payload={"login": current_user.login, "name": current_user.name},
+    )
+    await log_mutation(
+        db,
+        "update",
+        "user",
+        current_user.id,
+        actor_id=current_user.id,
+        source="auth-router",
+        request_id=_request_id(request),
+        payload={"self_service": True, "name": current_user.name},
+    )
+
     role = await db.get(Role, current_user.role_id) if current_user.role_id else None
     return row_to_user(current_user, role, include_permissions=True, include_calendar_export=True)
 

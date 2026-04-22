@@ -144,6 +144,8 @@ function detectIndexes(header: unknown[]) {
       'описание',
       'description',
       'details',
+      'деталиплатежа',
+      'детали',
       'комментарий',
     ]),
     amount: findCol(['amount', 'сумма', 'sum']),
@@ -167,7 +169,7 @@ function detectIndexes(header: unknown[]) {
   };
 }
 
-/** Строка с «Дата документа» + обороты дебет/кредит (типичная выписка АПП Узбекистана). */
+/** Строка с «Дата документа» + обороты дебет/кредит (типичная выписка АПП Узбекистана / Капиталбанк). */
 function findTableHeaderRowIndex(rows: unknown[][]): number {
   for (let r = 0; r < Math.min(rows.length, 80); r++) {
     const cells = rows[r] || [];
@@ -178,6 +180,19 @@ function findTableHeaderRowIndex(rows: unknown[][]): number {
     if (hasDocDate && hasDebit && hasCredit) return r;
   }
   return 0;
+}
+
+/** TENGE bank: колонки «Дата», «Дебет», «Кредит», «Детали платежа». */
+function findTengeTableHeaderRowIndex(rows: unknown[][]): number {
+  for (let r = 0; r < Math.min(rows.length, 120); r++) {
+    const cells = rows[r] || [];
+    const normalized = cells.map(normalizeHeader);
+    const hasDate = normalized.some((h) => h === 'дата' || h.includes('датаоперации'));
+    const hasDebit = normalized.some((h) => h === 'дебет');
+    const hasCredit = normalized.some((h) => h === 'кредит');
+    if (hasDate && hasDebit && hasCredit) return r;
+  }
+  return -1;
 }
 
 function extractUzMeta(rows: unknown[][], headerRow: number): { name?: string; period?: string } {
@@ -204,6 +219,37 @@ function extractUzMeta(rows: unknown[][], headerRow: number): { name?: string; p
   return { name, period };
 }
 
+function extractTengeMeta(rows: unknown[][], headerRow: number): { name?: string; period?: string } {
+  let name: string | undefined;
+  const flat = rows.slice(0, headerRow).flat();
+  for (const cell of flat) {
+    const s = String(cell ?? '').trim();
+    if (!s) continue;
+    if (/выписка\s+по\s+счету/i.test(s)) {
+      name = s.length > 120 ? `${s.slice(0, 117)}…` : s;
+      break;
+    }
+  }
+  if (!name) {
+    for (const cell of flat) {
+      const s = String(cell ?? '').trim();
+      if (s && /выписка|tenge|chirana/i.test(s)) {
+        name = s.length > 120 ? `${s.slice(0, 117)}…` : s;
+        break;
+      }
+    }
+  }
+  const joined = flat.map((c) => String(c ?? '')).join(' ');
+  const periodRe = joined.match(/за\s*период\s*с\s*(\d{1,2})[./](\d{1,2})[./](\d{4})/i);
+  let period: string | undefined;
+  if (periodRe) {
+    const y = periodRe[3];
+    const mo = periodRe[2].padStart(2, '0');
+    period = `${y}-${mo}`;
+  }
+  return { name, period };
+}
+
 function lineId(i: number): string {
   return `ln-${Date.now()}-${i}-${Math.random().toString(36).slice(2, 10)}`;
 }
@@ -218,30 +264,31 @@ function isStatementSummaryRow(description: string, row: unknown[]): boolean {
   ) {
     return true;
   }
+  if (/обороты\s*(дебет|кредит)/i.test(d) || /остаток\s+на\s+(начало|конец)\s*периода/i.test(d)) {
+    return true;
+  }
+  const firstCell = String(row[0] ?? '')
+    .trim()
+    .toLowerCase();
+  if (firstCell && /^(оборот|остаток|итого|всего)\b|обороты\s/.test(firstCell)) return true;
   const nonEmpty = row.filter((c) => c !== '' && c != null).length;
   if (nonEmpty <= 2 && /итого|всего|остаток|сальдо/i.test(d)) return true;
   return false;
 }
 
-export async function parseBankStatementFile(file: ArrayBuffer | File): Promise<ParsedStatement> {
-  const data = file instanceof File ? await file.arrayBuffer() : file;
-  const name = file instanceof File ? file.name.toLowerCase() : '';
+export type ParseBankStatementOptions = {
+  /** kapital: АПП / Капиталбанк; tenge: выгрузка TENGE bank (сайт) */
+  bankCode?: 'kapital' | 'tenge';
+};
 
-  let rows: unknown[][];
-  if (name.endsWith('.csv')) {
-    rows = csvBufferToRows(data);
-  } else {
-    rows = await xlsxBufferToRows(data);
-  }
-
-  if (!rows.length) return { lines: [] };
-
-  const headerRowIdx = findTableHeaderRowIndex(rows);
+function parseFromDetectedHeader(
+  rows: unknown[][],
+  headerRowIdx: number,
+  meta: { name?: string; period?: string },
+  fileLabel: string
+): ParsedStatement {
   const header = rows[headerRowIdx] || [];
   const idx = detectIndexes(header);
-  const meta = headerRowIdx > 0 ? extractUzMeta(rows, headerRowIdx) : {};
-  const sheetName = 'Выписка';
-
   const dataRows = rows.slice(headerRowIdx + 1);
   const lines: BankStatementLineApi[] = [];
 
@@ -313,10 +360,42 @@ export async function parseBankStatementFile(file: ArrayBuffer | File): Promise<
 
   const periodFromLines = lines[0]?.lineDate?.slice(0, 7);
   return {
-    name: meta.name || sheetName || 'Выписка',
+    name: meta.name || fileLabel || 'Выписка',
     period: meta.period || periodFromLines,
     lines,
   };
+}
+
+export async function parseBankStatementFile(
+  file: ArrayBuffer | File,
+  options?: ParseBankStatementOptions
+): Promise<ParsedStatement> {
+  const data = file instanceof File ? await file.arrayBuffer() : file;
+  const name = file instanceof File ? file.name.toLowerCase() : '';
+  const fileLabel = file instanceof File ? file.name : 'Выписка';
+
+  let rows: unknown[][];
+  if (name.endsWith('.csv')) {
+    rows = csvBufferToRows(data);
+  } else {
+    rows = await xlsxBufferToRows(data);
+  }
+
+  if (!rows.length) return { lines: [] };
+
+  const bank = options?.bankCode === 'tenge' ? 'tenge' : 'kapital';
+  if (bank === 'tenge') {
+    const tengeHeader = findTengeTableHeaderRowIndex(rows);
+    if (tengeHeader < 0) {
+      return { name: fileLabel, lines: [] };
+    }
+    const tengeMeta = extractTengeMeta(rows, tengeHeader);
+    return parseFromDetectedHeader(rows, tengeHeader, tengeMeta, fileLabel);
+  }
+
+  const headerRowIdx = findTableHeaderRowIndex(rows);
+  const uzMeta = headerRowIdx > 0 ? extractUzMeta(rows, headerRowIdx) : {};
+  return parseFromDetectedHeader(rows, headerRowIdx, uzMeta, fileLabel);
 }
 
 /** Одинаковые строки из разных загрузок выписок (пересекающиеся периоды) — учитываем один раз. */

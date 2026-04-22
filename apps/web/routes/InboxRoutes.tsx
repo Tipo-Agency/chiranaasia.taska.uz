@@ -7,7 +7,6 @@ export function InboxRoutesView(props: AppRouterProps) {
   return (
     <InboxPage
       activities={props.activities}
-      users={props.users}
       currentUser={props.currentUser}
       tasks={props.allTasks}
       deals={props.deals}
