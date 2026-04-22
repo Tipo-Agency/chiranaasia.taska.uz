@@ -11,10 +11,14 @@ import {
   Meeting,
   SalesFunnel,
   type CrmHubTab,
+  type PurchaseRequest,
+  type Department,
+  type FinanceCategory,
 } from '../../types';
 import type { AppActions } from '../../frontend/hooks/useAppLogic';
 import { hasPermission } from '../../utils/permissions';
 import { CRMModule } from './CRMModule';
+import { CrmHubRequestsPanel } from './CrmHubRequestsPanel';
 import { useAppToolbar } from '../../contexts/AppToolbarContext';
 import { MODULE_ACCENTS, MODULE_TOOLBAR_TAB_IDLE } from '../ui/moduleAccent';
 
@@ -34,6 +38,9 @@ interface CRMHubModuleProps {
   projects?: Project[];
   tasks?: Task[];
   meetings?: Meeting[];
+  purchaseRequests?: PurchaseRequest[];
+  departments?: Department[];
+  financeCategories?: FinanceCategory[];
   actions: AppActions;
 }
 
@@ -52,6 +59,9 @@ export const CRMHubModule: React.FC<CRMHubModuleProps> = ({
   projects,
   tasks = [],
   meetings = [],
+  purchaseRequests = [],
+  departments = [],
+  financeCategories = [],
   actions,
 }) => {
   const { setLeading } = useAppToolbar();
@@ -60,7 +70,10 @@ export const CRMHubModule: React.FC<CRMHubModuleProps> = ({
 
   const options = useMemo(() => {
     const o: { value: CrmHubTab; label: string }[] = [];
-    if (canFunnel) o.push({ value: 'funnel', label: 'Воронка' });
+    if (canFunnel) {
+      o.push({ value: 'funnel', label: 'Воронка' });
+      o.push({ value: 'requests', label: 'Заявки' });
+    }
     if (canClients) {
       o.push({ value: 'clients', label: 'Клиенты' });
       o.push({ value: 'contracts', label: 'Договоры и продажи' });
@@ -160,6 +173,15 @@ export const CRMHubModule: React.FC<CRMHubModuleProps> = ({
     <div className="h-full min-h-0 flex flex-col bg-white dark:bg-[#191919]">
       <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
         {effectiveTab === 'funnel' && canFunnel && <CRMModule view="sales-funnel" {...sharedCrm} />}
+        {effectiveTab === 'requests' && canFunnel && (
+          <CrmHubRequestsPanel
+            purchaseRequests={purchaseRequests}
+            users={users}
+            financeCategories={financeCategories}
+            departments={departments}
+            onOpenFinance={() => actions.setCurrentView('finance')}
+          />
+        )}
         {effectiveTab === 'clients' && canClients && (
           <CRMModule view="crm-clients" embedInCrmHub crmClientsSection="clients" {...sharedCrm} />
         )}

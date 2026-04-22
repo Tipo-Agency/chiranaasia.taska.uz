@@ -24,7 +24,6 @@ import {
   Globe,
   UserPlus,
   Bot,
-  Edit2,
   TrendingUp,
   CheckSquare,
   CheckCircle2,
@@ -169,7 +168,6 @@ const SalesFunnelView: React.FC<SalesFunnelViewProps> = ({
 }) => {
   const { setModule } = useAppToolbar();
   const [funnelMenuOpen, setFunnelMenuOpen] = useState(false);
-  const [viewMode, setViewMode] = useState<'kanban' | 'list'>('kanban');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingDeal, setEditingDeal] = useState<Deal | null>(null);
   const [dealAttachments, setDealAttachments] = useState<DealAttachment[]>([]);
@@ -430,8 +428,6 @@ const SalesFunnelView: React.FC<SalesFunnelViewProps> = ({
       setModule(null);
       return;
     }
-    const tabActive = MODULE_ACCENTS.violet.navIconActive;
-    const idle = 'text-gray-500 dark:text-gray-400';
     setModule(
       <div className={APP_TOOLBAR_MODULE_CLUSTER}>
         <div className="relative min-w-0 shrink-0">
@@ -520,31 +516,10 @@ const SalesFunnelView: React.FC<SalesFunnelViewProps> = ({
             },
           ]}
         />
-        <div className="flex items-center gap-0.5 shrink-0" role="tablist" aria-label="Вид воронки">
-            {(
-              [
-                { id: 'kanban' as const, label: 'Канбан' },
-                { id: 'list' as const, label: 'Список' },
-              ] as const
-            ).map((t) => (
-              <button
-                key={t.id}
-                type="button"
-                role="tab"
-                aria-selected={viewMode === t.id}
-                onClick={() => setViewMode(t.id)}
-                className={`px-2 py-1 rounded-lg text-[11px] sm:text-xs font-medium whitespace-nowrap shrink-0 transition-colors ${
-                  viewMode === t.id ? tabActive : `${idle} hover:bg-gray-100 dark:hover:bg-[#252525]`
-                }`}
-              >
-                {t.label}
-              </button>
-            ))}
-          </div>
       </div>
     );
     return () => setModule(null);
-  }, [salesFunnels.length, viewMode, selectedFunnelId, activeFunnels, funnelMenuOpen, setModule]);
+  }, [salesFunnels.length, selectedFunnelId, activeFunnels, funnelMenuOpen, setModule]);
   
   const handleOpenEdit = (d: Deal) => { 
     setEditingDeal(d); 
@@ -1048,60 +1023,6 @@ const SalesFunnelView: React.FC<SalesFunnelViewProps> = ({
       }
   };
 
-  const renderList = () => (
-      <div className="bg-white dark:bg-[#1e1e1e] border border-gray-200 dark:border-[#333] rounded-xl overflow-hidden shadow-sm h-full flex flex-col">
-          <div className="overflow-y-auto flex-1 custom-scrollbar">
-            <table className="w-full text-left text-sm">
-                <thead className="bg-gray-50 dark:bg-[#252525] border-b border-gray-200 dark:border-[#333] sticky top-0 z-10">
-                    <tr>
-                        <th className="px-4 py-3 font-semibold text-gray-600 dark:text-gray-400">Сделка</th>
-                        <th className="px-4 py-3 font-semibold text-gray-600 dark:text-gray-400">Сумма (UZS)</th>
-                        <th className="px-4 py-3 font-semibold text-gray-600 dark:text-gray-400">Вид услуг</th>
-                        <th className="px-4 py-3 font-semibold text-gray-600 dark:text-gray-400">Этап</th>
-                        <th className="px-4 py-3 font-semibold text-gray-600 dark:text-gray-400">Источник</th>
-                        <th className="px-4 py-3 font-semibold text-gray-600 dark:text-gray-400">Ответственный</th>
-                        <th className="px-4 py-3 w-10"></th>
-                    </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-100 dark:divide-[#333]">
-                    {filteredDeals.map((deal) => {
-                        const assignee = users.find(u => u.id === deal.assigneeId);
-                        const dealFunnel = deal.funnelId ? salesFunnels.find(f => f.id === deal.funnelId) : null;
-                        const dealStage = dealFunnel?.stages.find(s => s.id === deal.stage);
-                        const stageLabel =
-                          deal.stage === 'won'
-                            ? 'Выиграна'
-                            : deal.stage === 'lost'
-                              ? 'Отказ'
-                              : dealStage?.label || STAGES.find(s => s.id === deal.stage)?.label || deal.stage;
-                        const dealProject = projects.find(p => p.id === deal.projectId);
-                        return (
-                            <tr key={deal.id} onClick={() => handleOpenEdit(deal)} className="hover:bg-gray-50 dark:hover:bg-[#2a2a2a] cursor-pointer group transition-colors">
-                                <td className="px-4 py-3 font-medium text-gray-800 dark:text-gray-200">{deal.title}</td>
-                                <td className="px-4 py-3 font-bold text-gray-900 dark:text-white">{(deal.amount || 0).toLocaleString()}</td>
-                                <td className="px-4 py-3">
-                                    {dealProject ? (
-                                        <div className="flex items-center gap-1.5">
-                                            <DynamicIcon name={dealProject.icon} className={`${dealProject.color} w-4 h-4`} />
-                                            <span className="text-xs text-gray-600 dark:text-gray-400">{dealProject.name}</span>
-                                        </div>
-                                    ) : (
-                                        <span className="text-xs text-gray-400">—</span>
-                                    )}
-                                </td>
-                                <td className="px-4 py-3"><span className="px-2 py-1 rounded text-xs bg-gray-100 dark:bg-[#333] border border-gray-200 dark:border-[#444] text-gray-600 dark:text-gray-300">{stageLabel}</span></td>
-                                <td className="px-4 py-3 flex items-center gap-2">{getSourceIcon(deal.source || 'manual')} <span className="text-xs text-gray-500 capitalize">{deal.source}</span></td>
-                                <td className="px-4 py-3 text-xs text-gray-600 dark:text-gray-400">{assignee?.name}</td>
-                                <td className="px-4 py-3 text-right"><button onClick={(e) => { e.stopPropagation(); handleOpenEdit(deal); }} className="text-gray-400 hover:text-blue-500 opacity-0 group-hover:opacity-100"><Edit2 size={14}/></button></td>
-                            </tr>
-                        );
-                    })}
-                </tbody>
-            </table>
-          </div>
-      </div>
-  );
-
   // Если воронок нет, показываем экран приглашения
   if (salesFunnels.length === 0) {
     return (
@@ -1126,13 +1047,8 @@ const SalesFunnelView: React.FC<SalesFunnelViewProps> = ({
     <ModulePageShell className="flex-1 min-h-0 flex flex-col overflow-hidden">
       <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
         <div
-          className={`${MODULE_PAGE_GUTTER} ${MODULE_PAGE_TOP_PAD} h-full min-h-0 flex flex-col ${
-            viewMode === 'kanban'
-              ? 'overflow-hidden pb-0'
-              : 'pb-24 md:pb-32 overflow-y-auto overflow-x-hidden custom-scrollbar'
-          }`}
+          className={`${MODULE_PAGE_GUTTER} ${MODULE_PAGE_TOP_PAD} h-full min-h-0 flex flex-col overflow-hidden pb-0`}
         >
-          {viewMode === 'kanban' ? (
               <div className="flex-1 min-h-0 relative flex flex-col">
                   <div className={`flex flex-1 min-h-0 overflow-x-auto gap-3 md:gap-4 ${draggedDealId ? 'pb-28 md:pb-32' : 'pb-4'}`}>
                       {kanbanStages.map(s => (
@@ -1242,9 +1158,6 @@ const SalesFunnelView: React.FC<SalesFunnelViewProps> = ({
                   </div>
                   )}
               </div>
-          ) : (
-            renderList()
-          )}
         </div>
       </div>
       {isModalOpen && (

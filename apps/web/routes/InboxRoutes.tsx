@@ -11,6 +11,7 @@ export function InboxRoutesView(props: AppRouterProps) {
       tasks={props.allTasks}
       deals={props.deals}
       purchaseRequests={props.purchaseRequests}
+      users={props.users}
       onMarkAllRead={actions.markAllRead}
     />
   );

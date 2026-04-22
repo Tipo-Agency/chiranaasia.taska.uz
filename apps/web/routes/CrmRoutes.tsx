@@ -25,6 +25,9 @@ export function CrmRoutesView(props: AppRouterProps) {
         projects={props.projects}
         tasks={props.allTasks}
         meetings={props.meetings}
+        purchaseRequests={props.purchaseRequests}
+        departments={props.departments}
+        financeCategories={props.financeCategories}
         actions={actions}
       />
     </Suspense>

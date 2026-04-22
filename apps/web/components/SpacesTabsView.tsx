@@ -29,7 +29,6 @@ interface SpacesTabsViewProps {
   onDeleteTable: (id: string) => void;
   onCreateTable: (type: SpaceType) => void;
 }
-type ViewMode = 'grid' | 'list';
 
 const getTypeLabel = (type: SpaceType): string => {
   switch(type) {
@@ -61,7 +60,6 @@ export const SpacesTabsView: React.FC<SpacesTabsViewProps> = ({
 }) => {
   const { setLeading, setModule } = useAppToolbar();
   const [activeTab, setActiveTab] = useState<SpaceType>(initialTab || 'content-plan');
-  const [viewMode, setViewMode] = useState<ViewMode>('grid');
 
   // Синхронизируем activeTab с initialTab при изменении
   useEffect(() => {
@@ -82,7 +80,6 @@ export const SpacesTabsView: React.FC<SpacesTabsViewProps> = ({
   useLayoutEffect(() => {
     const idle = 'text-gray-600 dark:text-gray-400';
     const chipFor = (spaceType: SpaceType) => MODULE_ACCENTS[accentForSpaceType(spaceType)].navIconActive;
-    const chipActive = chipFor(activeTab);
     const types: { id: SpaceType; label: string }[] = [
       { id: 'content-plan', label: 'Контент' },
       { id: 'backlog', label: 'Идеи' },
@@ -112,28 +109,6 @@ export const SpacesTabsView: React.FC<SpacesTabsViewProps> = ({
     );
     setModule(
       <div className={APP_TOOLBAR_MODULE_CLUSTER}>
-        <div className="flex items-center rounded-lg border border-gray-200 dark:border-[#333] p-0.5 gap-0.5 shrink-0">
-          <button
-            type="button"
-            aria-pressed={viewMode === 'grid'}
-            onClick={() => setViewMode('grid')}
-            className={`px-2 py-0.5 rounded-md text-[11px] font-medium transition-colors ${
-              viewMode === 'grid' ? chipActive : `${idle} hover:bg-gray-100 dark:hover:bg-[#252525]`
-            }`}
-          >
-            Плитка
-          </button>
-          <button
-            type="button"
-            aria-pressed={viewMode === 'list'}
-            onClick={() => setViewMode('list')}
-            className={`px-2 py-0.5 rounded-md text-[11px] font-medium transition-colors ${
-              viewMode === 'list' ? chipActive : `${idle} hover:bg-gray-100 dark:hover:bg-[#252525]`
-            }`}
-          >
-            Список
-          </button>
-        </div>
         {hasPermission(currentUser, 'settings.general') && (
           <ModuleCreateIconButton
             accent={accentForSpaceType(activeTab)}
@@ -154,7 +129,7 @@ export const SpacesTabsView: React.FC<SpacesTabsViewProps> = ({
       setLeading(null);
       setModule(null);
     };
-  }, [activeTab, viewMode, currentSpaces.length, currentUser, onCreateTable, setLeading, setModule]);
+  }, [activeTab, currentSpaces.length, currentUser, onCreateTable, setLeading, setModule]);
 
   return (
     <ModulePageShell>
@@ -178,9 +153,9 @@ export const SpacesTabsView: React.FC<SpacesTabsViewProps> = ({
                 />
               )}
             </div>
-          ) : viewMode === 'grid' ? (
+          ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {currentSpaces.map(table => (
+              {currentSpaces.map((table) => (
                 <div
                   key={table.id}
                   onClick={() => onSelectTable(table.id)}
@@ -192,10 +167,10 @@ export const SpacesTabsView: React.FC<SpacesTabsViewProps> = ({
                 >
                   <div className="flex items-start justify-between mb-3">
                     <div className="flex items-center gap-3">
-                      <DynamicIcon 
-                        name={table.icon || (activeTab === 'content-plan' ? 'Instagram' : activeTab === 'backlog' ? 'Archive' : 'Layers')} 
-                        className={table.color || 'text-gray-500'} 
-                        size={24} 
+                      <DynamicIcon
+                        name={table.icon || (activeTab === 'content-plan' ? 'Instagram' : activeTab === 'backlog' ? 'Archive' : 'Layers')}
+                        className={table.color || 'text-gray-500'}
+                        size={24}
                       />
                       <div>
                         <h3 className="font-semibold text-gray-900 dark:text-white">{table.name}</h3>
@@ -206,63 +181,21 @@ export const SpacesTabsView: React.FC<SpacesTabsViewProps> = ({
                     </div>
                     {hasPermission(currentUser, 'settings.general') && (
                       <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <button 
-                          onClick={(e) => { e.stopPropagation(); onEditTable(table); }}
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onEditTable(table);
+                          }}
                           className="text-gray-400 hover:text-blue-500 p-1 rounded hover:bg-blue-50 dark:hover:bg-blue-900/30"
                         >
                           <Edit2 size={14} />
                         </button>
                         {!table.isSystem && (
-                          <button 
-                            onClick={(e) => { e.stopPropagation(); onDeleteTable(table.id); }}
-                            className="text-gray-400 hover:text-red-500 p-1 rounded hover:bg-red-50 dark:hover:bg-red-900/30"
-                          >
-                            <Trash2 size={14} />
-                          </button>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="space-y-2">
-              {currentSpaces.map(table => (
-                <div
-                  key={table.id}
-                  onClick={() => onSelectTable(table.id)}
-                  className={`bg-white dark:bg-[#252525] border border-gray-200 dark:border-[#333] rounded-lg p-4 hover:shadow-md transition-all cursor-pointer group ${
-                    activeTableId === table.id && currentView === 'table'
-                      ? 'ring-2 ring-blue-500 border-blue-500'
-                      : ''
-                  }`}
-                >
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <DynamicIcon 
-                        name={table.icon || (activeTab === 'content-plan' ? 'Instagram' : activeTab === 'backlog' ? 'Archive' : 'Layers')} 
-                        className={table.color || 'text-gray-500'} 
-                        size={20} 
-                      />
-                      <div>
-                        <h3 className="font-semibold text-gray-900 dark:text-white">{table.name}</h3>
-                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-                          {getTypeLabel(activeTab)}
-                        </p>
-                      </div>
-                    </div>
-                    {hasPermission(currentUser, 'settings.general') && (
-                      <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <button 
-                          onClick={(e) => { e.stopPropagation(); onEditTable(table); }}
-                          className="text-gray-400 hover:text-blue-500 p-1 rounded hover:bg-blue-50 dark:hover:bg-blue-900/30"
-                        >
-                          <Edit2 size={14} />
-                        </button>
-                        {!table.isSystem && (
-                          <button 
-                            onClick={(e) => { e.stopPropagation(); onDeleteTable(table.id); }}
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onDeleteTable(table.id);
+                            }}
                             className="text-gray-400 hover:text-red-500 p-1 rounded hover:bg-red-50 dark:hover:bg-red-900/30"
                           >
                             <Trash2 size={14} />

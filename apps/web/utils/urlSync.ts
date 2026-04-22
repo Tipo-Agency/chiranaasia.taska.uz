@@ -109,6 +109,7 @@ export function buildLocation(opts: {
   if (currentView === 'sales-funnel') {
     let path = VIEW_PATHS['sales-funnel'];
     if (crmHubTab === 'clients') path += '?crm=clients';
+    else if (crmHubTab === 'requests') path += '?crm=requests';
     else if (crmHubTab === 'contracts') path += '?crm=contracts';
     else if (crmHubTab === 'receivables') path += '?crm=receivables';
     return path;
@@ -212,6 +213,7 @@ export function parseLocation(pathname: string, search: string): UrlStateSlice |
   if (out.view === 'sales-funnel') {
     const crm = q.get('crm');
     if (crm === 'clients') out.crmHubTab = 'clients';
+    else if (crm === 'requests') out.crmHubTab = 'requests';
     else if (crm === 'contracts') out.crmHubTab = 'contracts';
     else if (crm === 'receivables') out.crmHubTab = 'receivables';
     else if (crm === 'chats' || crm === 'rejected') out.crmHubTab = 'funnel';

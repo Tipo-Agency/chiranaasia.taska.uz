@@ -3,15 +3,13 @@ import React, { useState, useEffect, useMemo, useLayoutEffect, useCallback } fro
 import { BusinessProcess, ProcessStep, ProcessStepBranch, OrgPosition, User, Task, ProcessInstance, TableCollection, EmployeeInfo } from '../types';
 import { getStepsForInstance } from '../utils/bpmDealFunnel';
 import { resolveAssigneesForOrgPosition } from '../utils/orgPositionAssignee';
-import { Network, Plus, Edit2, Trash2, ChevronRight, User as UserIcon, Building2, Save, X, ArrowDown, Play, CheckCircle2, Clock, FileText, ArrowLeft, Calendar, Users, Layers3 } from 'lucide-react';
+import { Network, Plus, Edit2, Trash2, ChevronRight, User as UserIcon, Building2, Save, X, ArrowDown, Play, CheckCircle2, Clock, FileText, ArrowLeft, Users, Layers3 } from 'lucide-react';
 import { EntitySearchSelect } from './ui/EntitySearchSelect';
-import { ProcessCard } from './features/processes/ProcessCard';
 import {
   Button,
   ModuleCreateDropdown,
   ModuleFilterIconButton,
   ModulePageShell,
-  ModuleSegmentedControl,
   MODULE_PAGE_GUTTER,
   MODULE_PAGE_TOP_PAD,
   SystemAlertDialog,
@@ -51,7 +49,6 @@ const BusinessProcessesView: React.FC<BusinessProcessesViewProps> = ({
   const [selectedProcessId, setSelectedProcessId] = useState<string | null>(null);
   /** Шаблоны = описания процессов; В работе = active + paused; Завершённые = completed */
   const [activeTab, setActiveTab] = useState<'templates' | 'running' | 'completed'>('templates');
-  const [viewMode, setViewMode] = useState<'grid' | 'list'>('list');
   const [startPickerOpen, setStartPickerOpen] = useState(false);
   const [bpmListFilterOpen, setBpmListFilterOpen] = useState(false);
   const [bpmSearchQuery, setBpmSearchQuery] = useState('');
@@ -498,27 +495,6 @@ const BusinessProcessesView: React.FC<BusinessProcessesViewProps> = ({
             },
           ]}
         />
-        <div className="flex items-center gap-0.5 shrink-0" role="tablist" aria-label="Вид списка">
-          {(
-            [
-              { id: 'grid' as const, label: 'Плитка' },
-              { id: 'list' as const, label: 'Список' },
-            ] as const
-          ).map((t) => (
-            <button
-              key={t.id}
-              type="button"
-              role="tab"
-              aria-selected={viewMode === t.id}
-              onClick={() => setViewMode(t.id)}
-              className={`px-2 py-1 rounded-lg text-[11px] sm:text-xs font-medium whitespace-nowrap shrink-0 transition-colors ${
-                viewMode === t.id ? tabActive : idle
-              }`}
-            >
-              {t.label}
-            </button>
-          ))}
-        </div>
       </div>
     );
     return () => {
@@ -528,7 +504,6 @@ const BusinessProcessesView: React.FC<BusinessProcessesViewProps> = ({
   }, [
     isProcessListView,
     activeTab,
-    viewMode,
     bpmListFilterOpen,
     bpmSearchQuery,
     handleOpenCreate,
@@ -1501,24 +1476,6 @@ const BusinessProcessesView: React.FC<BusinessProcessesViewProps> = ({
             <div className="bg-white dark:bg-[#252525] border border-gray-200 dark:border-[#333] rounded-xl p-8 text-center text-sm text-gray-500 dark:text-gray-400">
               Ничего не найдено по запросу.
             </div>
-          ) : viewMode === 'grid' ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-2 gap-4">
-              {filteredUserTemplates.map(process => {
-                const instances = getProcessInstances(process.id);
-                return (
-                  <ProcessCard
-                    key={process.id}
-                    process={process}
-                    instances={instances}
-                    onClick={() => setSelectedProcessId(process.id)}
-                    onEdit={(e) => {
-                      e.stopPropagation();
-                      handleOpenEdit(process);
-                    }}
-                  />
-                );
-              })}
-            </div>
           ) : (
             renderTemplatesTable()
           )
@@ -1556,93 +1513,6 @@ const BusinessProcessesView: React.FC<BusinessProcessesViewProps> = ({
                       </p>
                     </>
                   )}
-                </div>
-              ) : viewMode === 'grid' ? (
-                <div className="space-y-3">
-                  {filteredTabInstanceList.map(({ process, instance, tasks }) => {
-                    const currentStep = getStepsForInstance(process, instance).find((s) => s.id === instance.currentStepId);
-                    const completedTasks = tasks.filter(t => t.status === 'Выполнено' || t.status === 'Done').length;
-                    const totalTasks = tasks.length;
-                    
-                    return (
-                      <div
-                        key={instance.id}
-                        onClick={() => setSelectedInstanceId(instance.id)}
-                        className="bg-white dark:bg-[#252525] border border-gray-200 dark:border-[#333] rounded-xl p-5 hover:shadow-md hover:border-indigo-300 dark:hover:border-indigo-600 transition-all cursor-pointer group"
-                      >
-                        <div className="flex items-start justify-between mb-3">
-                          <div className="flex-1">
-                            <div className="flex items-center gap-2 mb-1">
-                              <h3 className="font-bold text-gray-900 dark:text-white text-base group-hover:text-indigo-600 dark:group-hover:text-indigo-400">
-                                {process.title}
-                              </h3>
-                              <span className="text-xs text-gray-500 dark:text-gray-400">
-                                v{instance.processVersion || process.version || 1}
-                              </span>
-                              {renderStatusPill(instance.status)}
-                            </div>
-                            {currentStep && instance.status !== 'completed' && (
-                              <p className="text-sm text-gray-600 dark:text-gray-400">
-                                Текущий шаг: {currentStep.title}
-                              </p>
-                            )}
-                          </div>
-                          <span className="flex items-center gap-1 text-indigo-600 dark:text-indigo-400 text-sm font-medium flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
-                            Открыть <ChevronRight size={18} />
-                          </span>
-                        </div>
-                        
-                        <div className="flex items-center gap-4 text-xs text-gray-500 dark:text-gray-400">
-                          <div className="flex items-center gap-1">
-                            <Calendar size={14} />
-                            <span>Запущен {new Date(instance.startedAt).toLocaleString('ru-RU')}</span>
-                          </div>
-                          {instance.completedAt && (
-                            <div className="flex items-center gap-1">
-                              <CheckCircle2 size={14} />
-                              <span>Завершён {new Date(instance.completedAt).toLocaleString('ru-RU')}</span>
-                            </div>
-                          )}
-                          {totalTasks > 0 && (
-                            <div className="flex items-center gap-1">
-                              <FileText size={14} />
-                              <span>{completedTasks}/{totalTasks} задач выполнено</span>
-                            </div>
-                          )}
-                        </div>
-                        
-                          {tasks.length > 0 && (
-                          <div className="mt-3 pt-3 border-t border-gray-100 dark:border-[#333]">
-                            <div className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2">Задачи:</div>
-                            <div className="space-y-1.5">
-                              {tasks.slice(0, 3).map(task => (
-                                <div
-                                  key={task.id}
-                                  className="flex items-center justify-between p-2 bg-gray-50 dark:bg-[#2a2a2a] rounded-lg"
-                                >
-                                  <span className="text-sm text-gray-700 dark:text-gray-300 truncate flex-1">
-                                    {task.title}
-                                  </span>
-                                  <span className={`text-xs px-2 py-0.5 rounded flex-shrink-0 ml-2 ${
-                                    task.status === 'Выполнено' || task.status === 'Done'
-                                      ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
-                                      : 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300'
-                                  }`}>
-                                    {task.status}
-                                  </span>
-                                </div>
-                              ))}
-                              {tasks.length > 3 && (
-                                <div className="text-xs text-gray-500 dark:text-gray-400 text-center py-1">
-                                  и ещё {tasks.length - 3} задач
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
                 </div>
               ) : (
                 renderInstancesTable(filteredTabInstanceList)
