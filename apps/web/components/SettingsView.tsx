@@ -110,6 +110,8 @@ interface SettingsViewProps {
   docs?: Doc[];
   contentPosts?: ContentPost[];
   onClose: () => void;
+  /** Выход (после сброса пароля себе сессия на сервере уже недействительна). */
+  onLogout?: () => void;
   onUpdateNotificationPrefs: (prefs: NotificationPreferences) => void;
   onSaveAutomationRule?: (rule: AutomationRule) => void;
   onDeleteAutomationRule?: (id: string) => void;
@@ -161,7 +163,7 @@ const SettingsView: React.FC<SettingsViewProps> = ({
   salesFunnels = [], onSaveSalesFunnel, onDeleteSalesFunnel,
   productionPipelines = [], onSaveProductionPipeline, onDeleteProductionPipeline,
   employeeInfos = [], deals = [], clients = [], contracts = [], meetings = [], businessProcesses = [], orgPositions = [],
-  notificationPrefs, onClose: _onClose
+  notificationPrefs, onClose: _onClose, onLogout
 }) => {
   const { setLeading, setModule } = useAppToolbar();
   const settingsTabs = useMemo(() => {
@@ -448,7 +450,16 @@ const SettingsView: React.FC<SettingsViewProps> = ({
             </div>
           ) : (
             <>
-              {activeTab === 'profile' && currentUser && <ProfileSettings activeTab="profile" currentUser={currentUser} users={users} onUpdateProfile={onUpdateProfile!} onUpdateUsers={onUpdateUsers} />}
+              {activeTab === 'profile' && currentUser && (
+                <ProfileSettings
+                  activeTab="profile"
+                  currentUser={currentUser}
+                  users={users}
+                  onUpdateProfile={onUpdateProfile!}
+                  onUpdateUsers={onUpdateUsers}
+                  onLogout={onLogout}
+                />
+              )}
               {activeTab === 'branding' && currentUser && hasPermission(currentUser, 'admin.system') && (
                 <div className="bg-white dark:bg-[#252525] border border-gray-200 dark:border-[#333] rounded-2xl p-4 md:p-6 max-w-2xl">
                   <BrandingSettings />
@@ -459,6 +470,7 @@ const SettingsView: React.FC<SettingsViewProps> = ({
                   currentUser={currentUser}
                   users={users}
                   onUpdateUsers={onUpdateUsers}
+                  onLogout={onLogout}
                   openNewUserSignal={openNewUserSignal}
                 />
               )}

@@ -27,11 +27,20 @@ interface ProfileSettingsProps {
   users: User[];
   onUpdateProfile: (user: User) => void;
   onUpdateUsers: (users: User[]) => void;
+  /** Если сбросили пароль себе — выйти на экран входа после алерта. */
+  onLogout?: () => void;
   activeTab: string;
   // onFillMockData удален
 }
 
-export const ProfileSettings: React.FC<ProfileSettingsProps> = ({ currentUser, users, onUpdateProfile, onUpdateUsers, activeTab }) => {
+export const ProfileSettings: React.FC<ProfileSettingsProps> = ({
+  currentUser,
+  users,
+  onUpdateProfile,
+  onUpdateUsers,
+  onLogout,
+  activeTab,
+}) => {
   // Profile State
   const [profileName, setProfileName] = useState(currentUser.name);
   const [profileEmail, setProfileEmail] = useState(currentUser.email || '');
@@ -73,13 +82,19 @@ export const ProfileSettings: React.FC<ProfileSettingsProps> = ({ currentUser, u
   const [mailBody, setMailBody] = useState('');
   const [mailSendBusy, setMailSendBusy] = useState(false);
   const avatarInputRef = useRef<HTMLInputElement>(null);
+  const logoutAfterAlertCloseRef = useRef(false);
 
   // System dialogs state
   const [alertState, setAlertState] = useState<{ open: boolean; title: string; message: string }>({ open: false, title: '', message: '' });
   const [confirmState, setConfirmState] = useState<{ open: boolean; title: string; message: string; onConfirm?: () => void; danger?: boolean }>({ open: false, title: '', message: '' });
 
   const showAlert = (title: string, message: string) => setAlertState({ open: true, title, message });
-  const closeAlert = () => setAlertState((s) => ({ ...s, open: false }));
+  const closeAlert = () => {
+    const doLogout = logoutAfterAlertCloseRef.current;
+    logoutAfterAlertCloseRef.current = false;
+    setAlertState((s) => ({ ...s, open: false }));
+    if (doLogout) onLogout?.();
+  };
   const showConfirm = (title: string, message: string, onConfirm: () => void, danger = false) =>
     setConfirmState({ open: true, title, message, onConfirm, danger });
   const closeConfirm = () => setConfirmState((s) => ({ ...s, open: false }));
@@ -284,7 +299,9 @@ export const ProfileSettings: React.FC<ProfileSettingsProps> = ({ currentUser, u
   const handleResetPassword = (id: string) => {
     showConfirm(
       'Сбросить пароль',
-      'Сгенерировать временный пароль? Пользователь должен сменить его при входе.',
+      id === currentUser.id
+        ? 'Будет временный пароль. Все ваши сессии завершатся — это нормально. После «Понятно» — выход на экран входа.'
+        : 'Будет временный пароль; у пользователя сбросятся все сессии. Нужна смена пароля при входе.',
       () => {
         void (async () => {
           const temp = generateTempUserPassword();
@@ -318,10 +335,18 @@ export const ProfileSettings: React.FC<ProfileSettingsProps> = ({ currentUser, u
             } catch {
               /* ignore */
             }
-            showAlert(
-              'Пароль сброшен',
-              `Временный пароль (скопирован в буфер): ${temp}. Пользователь должен сменить его при входе.`
-            );
+            if (id === currentUser.id) {
+              logoutAfterAlertCloseRef.current = true;
+              showAlert(
+                'Пароль сброшен',
+                `Временный пароль (в буфере): ${temp}. Нажмите «Понятно», чтобы перейти ко входу.`
+              );
+            } else {
+              showAlert(
+                'Пароль сброшен',
+                `Временный пароль (скопирован в буфер): ${temp}. Сообщите пользователю — у него сброшена сессия.`
+              );
+            }
           } catch {
             showAlert('Ошибка', 'Не удалось сбросить пароль. Проверьте права access.users и сеть.');
           }

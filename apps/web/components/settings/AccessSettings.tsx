@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import type { AppRole, User } from '../../types';
 import { Role as LegacyRole } from '../../types';
 import { api } from '../../backend/api';
@@ -20,6 +20,8 @@ interface AccessSettingsProps {
   currentUser: User;
   users: User[];
   onUpdateUsers: (users: User[]) => void;
+  /** После сброса пароля у себя — выйти на экран входа (сессия на сервере уже сброшена). */
+  onLogout?: () => void;
   /** Сигнал от кнопки "+" в верхней панели для открытия формы создания */
   openNewUserSignal?: number;
 }
@@ -32,6 +34,7 @@ export const AccessSettings: React.FC<AccessSettingsProps> = ({
   currentUser,
   users,
   onUpdateUsers,
+  onLogout,
   openNewUserSignal = 0,
 }) => {
   const canUsers = hasPermission(currentUser, 'access.users');
@@ -67,9 +70,15 @@ export const AccessSettings: React.FC<AccessSettingsProps> = ({
   // System dialogs state
   const [alertState, setAlertState] = useState<{ open: boolean; title: string; message: string }>({ open: false, title: '', message: '' });
   const [confirmState, setConfirmState] = useState<{ open: boolean; title: string; message: string; onConfirm?: () => void; danger?: boolean }>({ open: false, title: '', message: '' });
+  const logoutAfterAlertCloseRef = useRef(false);
 
   const showAlert = (title: string, message: string) => setAlertState({ open: true, title, message });
-  const closeAlert = () => setAlertState((s) => ({ ...s, open: false }));
+  const closeAlert = () => {
+    const doLogout = logoutAfterAlertCloseRef.current;
+    logoutAfterAlertCloseRef.current = false;
+    setAlertState((s) => ({ ...s, open: false }));
+    if (doLogout) onLogout?.();
+  };
   const showConfirm = (title: string, message: string, onConfirm: () => void, danger = false) =>
     setConfirmState({ open: true, title, message, onConfirm, danger });
   const closeConfirm = () => setConfirmState((s) => ({ ...s, open: false }));
@@ -137,12 +146,25 @@ export const AccessSettings: React.FC<AccessSettingsProps> = ({
   const handleResetPassword = (id: string) => {
     showConfirm(
       'Сбросить пароль',
-      'Сгенерировать временный пароль? Пользователь должен сменить его при входе.',
+      id === currentUser.id
+        ? 'Будет сгенерирован временный пароль. Текущая сессия (все ваши входы) завершатся — это нормально. После сброса войдите с новым паролём.'
+        : 'Будет сгенерирован временный пароль; у пользователя завершатся все активные сессии. Ему нужно войти с новым паролём.',
       () => {
         const temp = generateTempUserPassword();
         onUpdateUsers(users.map((u) => (u.id === id ? { ...u, password: temp, mustChangePassword: true } : u)));
         void navigator.clipboard.writeText(temp).catch(() => {});
-        showAlert('Пароль сброшен', `Временный пароль (скопирован в буфер): ${temp}. Пользователь должен сменить его при входе.`);
+        if (id === currentUser.id) {
+          logoutAfterAlertCloseRef.current = true;
+          showAlert(
+            'Пароль сброшен',
+            `Временный пароль (в буфере): ${temp}. Нажмите «Понятно», чтобы перейти ко входу.`
+          );
+        } else {
+          showAlert(
+            'Пароль сброшен',
+            `Временный пароль (скопирован в буфер): ${temp}. Сообщите его пользователю — у него сброшена сессия.`
+          );
+        }
       }
     );
   };

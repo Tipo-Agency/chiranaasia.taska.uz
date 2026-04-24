@@ -36,6 +36,7 @@ export function AdminRoutesView(props: AppRouterProps) {
         businessProcesses={props.businessProcesses}
         orgPositions={props.orgPositions}
         onUpdateUsers={actions.updateUsers}
+        onLogout={actions.logout}
         onUpdateProjects={actions.updateProjects}
         onUpdateStatuses={actions.updateStatuses}
         onUpdatePriorities={actions.updatePriorities}
