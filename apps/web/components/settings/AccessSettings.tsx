@@ -6,6 +6,7 @@ import { hasPermission } from '../../utils/permissions';
 import { Button, Input, StandardModal, SystemAlertDialog, SystemConfirmDialog } from '../ui';
 import { KeyRound, Trash2, Shield, ChevronRight, ArrowLeft } from 'lucide-react';
 import { UserAvatar } from '../features/common/UserAvatar';
+import { generateTempUserPassword } from '../../utils/tempUserPassword';
 
 type PermCatalog = {
   groups: Array<{ id: string; label: string; items: Array<{ key: string; label: string }> }>;
@@ -138,10 +139,7 @@ export const AccessSettings: React.FC<AccessSettingsProps> = ({
       'Сбросить пароль',
       'Сгенерировать временный пароль? Пользователь должен сменить его при входе.',
       () => {
-        const bytes = new Uint8Array(10);
-        crypto.getRandomValues(bytes);
-        const hex = Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
-        const temp = `Tmp${hex}a1`;
+        const temp = generateTempUserPassword();
         onUpdateUsers(users.map((u) => (u.id === id ? { ...u, password: temp, mustChangePassword: true } : u)));
         void navigator.clipboard.writeText(temp).catch(() => {});
         showAlert('Пароль сброшен', `Временный пароль (скопирован в буфер): ${temp}. Пользователь должен сменить его при входе.`);

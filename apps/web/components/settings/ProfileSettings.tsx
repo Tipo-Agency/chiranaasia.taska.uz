@@ -8,6 +8,7 @@ import { getDefaultAvatarForId } from '../../constants/avatars';
 import { api } from '../../backend/api';
 import { ensureAuthCsrfCookie } from '../../services/apiClient';
 import { getChatDefaultTab, setChatDefaultTab, type ChatMainTab } from '../../utils/chatPreference';
+import { generateTempUserPassword } from '../../utils/tempUserPassword';
 
 const MAIL_OAUTH_ERROR_MESSAGES: Record<string, string> = {
   missing_code: 'Google не вернул код авторизации. Попробуйте ещё раз.',
@@ -206,8 +207,9 @@ export const ProfileSettings: React.FC<ProfileSettingsProps> = ({ currentUser, u
   const handleSaveProfile = async (e: React.FormEvent) => {
       e.preventDefault();
 
+      const { password: _dropPwd, ...userWithoutPwd } = currentUser;
       const updates: User = {
-          ...currentUser,
+          ...userWithoutPwd,
           name: profileName,
           login: profileLogin,
           email: profileEmail,
@@ -241,8 +243,9 @@ export const ProfileSettings: React.FC<ProfileSettingsProps> = ({ currentUser, u
       try {
           const result = await uploadAvatar(file, currentUser.id);
           setProfileAvatar(result.url);
+          const { password: _dropPwd, ...userWithoutPwd } = currentUser;
           const updates: User = {
-              ...currentUser,
+              ...userWithoutPwd,
               avatar: result.url
           };
           onUpdateProfile(updates);
@@ -284,10 +287,7 @@ export const ProfileSettings: React.FC<ProfileSettingsProps> = ({ currentUser, u
       'Сгенерировать временный пароль? Пользователь должен сменить его при входе.',
       () => {
         void (async () => {
-          const bytes = new Uint8Array(10);
-          crypto.getRandomValues(bytes);
-          const hex = Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
-          const temp = `Tmp${hex}a1`;
+          const temp = generateTempUserPassword();
           try {
             const payload = users.map((u) => {
               const row: Record<string, unknown> = {
@@ -970,6 +970,7 @@ export const ProfileSettings: React.FC<ProfileSettingsProps> = ({ currentUser, u
                 }
               >
                 <div className="space-y-3">
+                  <p className="text-xs text-gray-500 dark:text-gray-400">Минимум 6 символов.</p>
                   <Input label="Новый пароль" type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} />
                   <Input
                     label="Повторите пароль"
