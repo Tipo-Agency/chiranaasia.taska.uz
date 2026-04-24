@@ -1,6 +1,7 @@
 """BPM models: OrgPosition, BusinessProcess, шаги, экземпляры процессов (bp_instances)."""
 import uuid
 
+import sqlalchemy as sa
 from sqlalchemy import Boolean, Column, ForeignKey, Integer, String, text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import relationship
@@ -35,7 +36,7 @@ class BusinessProcess(Base):
     version = Column(String(10), default="1")
     title = Column(String(255), nullable=False)
     description = Column(String(500), nullable=True)
-    is_archived = Column(String(10), default="false")  # JSON compat
+    is_archived = Column(Boolean, nullable=False, server_default=sa.text("false"))
     created_at = Column(String(50), nullable=True)
     updated_at = Column(String(50), nullable=True)
 

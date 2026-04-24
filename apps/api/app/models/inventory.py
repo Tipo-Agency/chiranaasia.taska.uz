@@ -1,6 +1,7 @@
 """Inventory models."""
 import uuid
 
+import sqlalchemy as sa
 from sqlalchemy import Column, String, Text
 from sqlalchemy.dialects.postgresql import JSONB
 
@@ -18,8 +19,8 @@ class Warehouse(Base):
     name = Column(String(255), nullable=False)
     department_id = Column(String(36), nullable=True)
     location = Column(String(255), nullable=True)
-    is_default = Column(String(10), default="false")
-    is_archived = Column(String(10), default="false")
+    is_default = Column(sa.Boolean, nullable=False, server_default=sa.text("false"))
+    is_archived = Column(sa.Boolean, nullable=False, server_default=sa.text("false"))
 
 
 class InventoryItem(Base):
@@ -36,7 +37,7 @@ class InventoryItem(Base):
     barcode = Column(String(100), nullable=True)
     manufacturer = Column(String(255), nullable=True)
     consumption_hint = Column(Text, nullable=True)
-    is_archived = Column(String(10), default="false")
+    is_archived = Column(sa.Boolean, nullable=False, server_default=sa.text("false"))
 
 
 class StockMovement(Base):

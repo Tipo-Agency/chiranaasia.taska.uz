@@ -12,6 +12,8 @@ interface NewDealsSectionProps {
   clients: Client[];
   users: User[];
   onViewAll: () => void;
+  /** Открыть карточку конкретной сделки (опционально) */
+  onDealClick?: (deal: Deal) => void;
   maxItems?: number;
 }
 

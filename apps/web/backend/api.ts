@@ -41,6 +41,8 @@ import {
   integrationsTelegramEndpoint,
   integrationsTelegramPersonalEndpoint,
   integrationsRoadmapEndpoint,
+  mailIntegrationEndpoint,
+  mailUserEndpoint,
   orgEndpoint,
   publicContentPlanEndpoint,
   telegramBotEndpoint,
@@ -92,6 +94,8 @@ export const api = {
   integrationsTelegram: integrationsTelegramEndpoint,
   integrationsTelegramPersonal: integrationsTelegramPersonalEndpoint,
   integrationsRoadmap: integrationsRoadmapEndpoint,
+  mailIntegration: mailIntegrationEndpoint,
+  mail: mailUserEndpoint,
 
   publicContentPlan: publicContentPlanEndpoint,
 

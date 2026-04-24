@@ -63,6 +63,8 @@ export function normalizeProductionOrder(raw: unknown): ProductionRouteOrder | n
     title: String(r.title || ''),
     notes: (r.notes as string) || null,
     status: String(r.status || 'open'),
+    dealId: (r.dealId as string) || null,
+    purchaseRequestId: (r.purchaseRequestId as string) || null,
     createdAt: String(r.createdAt || ''),
     updatedAt: (r.updatedAt as string) || null,
     isArchived: Boolean(r.isArchived),

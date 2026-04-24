@@ -191,7 +191,7 @@ def row_to_process(row: BusinessProcess) -> BusinessProcessRead:
         description=row.description,
         steps=steps,
         instances=instances,
-        isArchived=str(row.is_archived).lower() == "true" if row.is_archived else False,
+        isArchived=bool(row.is_archived),
         createdAt=row.created_at,
         updatedAt=row.updated_at,
     )
@@ -266,7 +266,10 @@ async def _replace_steps(db: AsyncSession, bp_id: str, steps_list: list[BpmStepB
             label = (br.label or "")[:255]
             nxt = _str_id(br.nextStepId)
             if not nxt:
-                continue
+                raise HTTPException(
+                    status_code=422,
+                    detail=f"Ветка '{label or brid}' шага '{title}' не имеет целевого шага (nextStepId обязателен)",
+                )
             db.add(
                 BusinessProcessStepBranch(
                     id=brid,
@@ -364,7 +367,7 @@ async def update_processes(processes: list[BusinessProcessBulkItem], db: AsyncSe
             if "description" in fs:
                 existing.description = p.description
             if "isArchived" in fs:
-                existing.is_archived = "true" if p.isArchived else "false"
+                existing.is_archived = bool(p.isArchived)
             if "createdAt" in fs:
                 existing.created_at = p.createdAt
             if "updatedAt" in fs:
@@ -375,7 +378,7 @@ async def update_processes(processes: list[BusinessProcessBulkItem], db: AsyncSe
                 version=str(p.version) if p.version is not None else "1",
                 title=p.title or "",
                 description=p.description,
-                is_archived="true" if p.isArchived else "false",
+                is_archived=bool(p.isArchived),
                 created_at=p.createdAt,
                 updated_at=p.updatedAt,
             ))

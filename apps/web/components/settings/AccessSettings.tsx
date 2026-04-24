@@ -3,7 +3,7 @@ import type { AppRole, User } from '../../types';
 import { Role as LegacyRole } from '../../types';
 import { api } from '../../backend/api';
 import { hasPermission } from '../../utils/permissions';
-import { Button, Input, StandardModal } from '../ui';
+import { Button, Input, StandardModal, SystemAlertDialog, SystemConfirmDialog } from '../ui';
 import { KeyRound, Trash2, Shield, ChevronRight, ArrowLeft } from 'lucide-react';
 import { UserAvatar } from '../features/common/UserAvatar';
 
@@ -63,6 +63,16 @@ export const AccessSettings: React.FC<AccessSettingsProps> = ({
     telegram: '',
   });
 
+  // System dialogs state
+  const [alertState, setAlertState] = useState<{ open: boolean; title: string; message: string }>({ open: false, title: '', message: '' });
+  const [confirmState, setConfirmState] = useState<{ open: boolean; title: string; message: string; onConfirm?: () => void; danger?: boolean }>({ open: false, title: '', message: '' });
+
+  const showAlert = (title: string, message: string) => setAlertState({ open: true, title, message });
+  const closeAlert = () => setAlertState((s) => ({ ...s, open: false }));
+  const showConfirm = (title: string, message: string, onConfirm: () => void, danger = false) =>
+    setConfirmState({ open: true, title, message, onConfirm, danger });
+  const closeConfirm = () => setConfirmState((s) => ({ ...s, open: false }));
+
   useEffect(() => {
     let alive = true;
     (async () => {
@@ -73,8 +83,8 @@ export const AccessSettings: React.FC<AccessSettingsProps> = ({
           canRoles ? api.users.getPermissionsCatalog() : Promise.resolve(null),
         ]);
         if (!alive) return;
-        setRoleList(((roles || []) as any) as AppRole[]);
-        if (catalog) setPermCatalog(catalog as any);
+        setRoleList((roles || []) as AppRole[]);
+        if (catalog) setPermCatalog(catalog);
       } catch {
         // ignore
       }
@@ -124,27 +134,43 @@ export const AccessSettings: React.FC<AccessSettingsProps> = ({
   }, [openNewUserSignal, canUsers]);
 
   const handleResetPassword = (id: string) => {
-    if (!confirm('Сбросить пароль на «123»?')) return;
-    onUpdateUsers(users.map((u) => (u.id === id ? { ...u, password: '123', mustChangePassword: true } : u)));
-    alert('Пароль сброшен.');
+    showConfirm(
+      'Сбросить пароль',
+      'Сгенерировать временный пароль? Пользователь должен сменить его при входе.',
+      () => {
+        const bytes = new Uint8Array(10);
+        crypto.getRandomValues(bytes);
+        const hex = Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
+        const temp = `Tmp${hex}a1`;
+        onUpdateUsers(users.map((u) => (u.id === id ? { ...u, password: temp, mustChangePassword: true } : u)));
+        void navigator.clipboard.writeText(temp).catch(() => {});
+        showAlert('Пароль сброшен', `Временный пароль (скопирован в буфер): ${temp}. Пользователь должен сменить его при входе.`);
+      }
+    );
   };
 
   const handleArchiveUser = (id: string) => {
     if (id === currentUser.id) {
-      alert('Нельзя архивировать текущего пользователя');
+      showAlert('Ошибка', 'Нельзя архивировать текущего пользователя');
       return;
     }
-    if (!confirm('Архивировать пользователя?')) return;
-    const now = new Date().toISOString();
-    onUpdateUsers(users.map((u) => (u.id === id ? { ...u, isArchived: true, updatedAt: now } : u)));
-    setPanel(null);
+    showConfirm(
+      'Архивировать пользователя',
+      'Пользователь будет скрыт из системы.',
+      () => {
+        const now = new Date().toISOString();
+        onUpdateUsers(users.map((u) => (u.id === id ? { ...u, isArchived: true, updatedAt: now } : u)));
+        setPanel(null);
+      },
+      true
+    );
   };
 
   const handleAddUser = (e: React.FormEvent) => {
     e.preventDefault();
     const name = newUserName.trim();
     const login = newUserLogin.trim();
-    const password = newUserPassword.trim() || '123';
+    const password = newUserPassword.trim();
     if (!name || !login) return;
 
     const meta = roleList.find((r) => r.id === newUserRoleId);
@@ -152,14 +178,14 @@ export const AccessSettings: React.FC<AccessSettingsProps> = ({
       id: `u-${Date.now()}`,
       name,
       login,
-      password,
+      ...(password ? { password } : {}),
       roleId: newUserRoleId || meta?.id,
       roleName: meta?.name,
       roleSlug: meta?.slug,
       role: normalizeLegacyRole(meta),
       mustChangePassword: true,
       updatedAt: new Date().toISOString(),
-    } as any;
+    };
 
     onUpdateUsers([...(users || []), newUser]);
     setNewUserName('');
@@ -172,7 +198,7 @@ export const AccessSettings: React.FC<AccessSettingsProps> = ({
     if (!selectedUser) return;
     const name = profileDraft.name.trim();
     if (!name) {
-      alert('Укажите имя');
+      showAlert('Ошибка', 'Укажите имя');
       return;
     }
     onUpdateUsers(
@@ -199,28 +225,36 @@ export const AccessSettings: React.FC<AccessSettingsProps> = ({
     try {
       await api.users.createRole({ name, permissions: [] });
       setNewRoleName('');
-      const list = (await api.users.getRoles()) as any;
-      setRoleList(list as AppRole[]);
-      alert('Роль создана. Откройте её и настройте доступы.');
+      const list = (await api.users.getRoles()) as AppRole[];
+      setRoleList(list);
+      showAlert('Роль создана', 'Откройте её и настройте доступы.');
     } catch (e: unknown) {
-      alert(e instanceof Error ? e.message : 'Не удалось создать роль');
+      showAlert('Ошибка', e instanceof Error ? e.message : 'Не удалось создать роль');
     } finally {
       setBusy(false);
     }
   };
 
-  const handleDeleteRole = async (id: string) => {
-    if (!confirm('Удалить роль? Только если на роль никто не назначен.')) return;
-    setBusy(true);
-    try {
-      await api.users.deleteRole(id);
-      const list = (await api.users.getRoles()) as any;
-      setRoleList(list as AppRole[]);
-    } catch (e: unknown) {
-      alert(e instanceof Error ? e.message : 'Не удалось удалить роль');
-    } finally {
-      setBusy(false);
-    }
+  const handleDeleteRole = (id: string) => {
+    showConfirm(
+      'Удалить роль',
+      'Удалить роль? Только если на роль никто не назначен.',
+      () => {
+        void (async () => {
+          setBusy(true);
+          try {
+            await api.users.deleteRole(id);
+            const list = (await api.users.getRoles()) as AppRole[];
+            setRoleList(list);
+          } catch (e: unknown) {
+            showAlert('Ошибка', e instanceof Error ? e.message : 'Не удалось удалить роль');
+          } finally {
+            setBusy(false);
+          }
+        })();
+      },
+      true
+    );
   };
 
   const handleSaveRolePerms = async () => {
@@ -228,12 +262,12 @@ export const AccessSettings: React.FC<AccessSettingsProps> = ({
     setBusy(true);
     try {
       await api.users.patchRole(editingRole.id, { permissions: editRolePerms });
-      const list = (await api.users.getRoles()) as any;
-      setRoleList(list as AppRole[]);
+      const list = (await api.users.getRoles()) as AppRole[];
+      setRoleList(list);
       setEditingRole(null);
-      alert('Права роли обновлены.');
+      showAlert('Сохранено', 'Права роли обновлены.');
     } catch (e: unknown) {
-      alert(e instanceof Error ? e.message : 'Не удалось сохранить');
+      showAlert('Ошибка', e instanceof Error ? e.message : 'Не удалось сохранить');
     } finally {
       setBusy(false);
     }
@@ -275,7 +309,7 @@ export const AccessSettings: React.FC<AccessSettingsProps> = ({
                 <Shield size={16} /> Права доступа
               </Button>
               {!r.isSystem && (
-                <Button variant="secondary" onClick={() => void handleDeleteRole(r.id)} disabled={busy}>
+                <Button variant="secondary" onClick={() => handleDeleteRole(r.id)} disabled={busy}>
                   Удалить
                 </Button>
               )}
@@ -332,16 +366,43 @@ export const AccessSettings: React.FC<AccessSettingsProps> = ({
     </div>
   ) : null;
 
+  const dialogs = (
+    <>
+      <SystemAlertDialog
+        open={alertState.open}
+        title={alertState.title}
+        message={alertState.message}
+        onClose={closeAlert}
+      />
+      <SystemConfirmDialog
+        open={confirmState.open}
+        title={confirmState.title}
+        message={confirmState.message}
+        onCancel={closeConfirm}
+        onConfirm={() => { closeConfirm(); confirmState.onConfirm?.(); }}
+        danger={confirmState.danger}
+      />
+    </>
+  );
+
   if (!canUsers && !canRoles) {
     return (
-      <div className="bg-white dark:bg-[#252525] border border-gray-200 dark:border-[#333] rounded-2xl p-6 text-sm text-gray-600 dark:text-gray-300">
-        Нет доступа к настройкам пользователей/ролей.
-      </div>
+      <>
+        <div className="bg-white dark:bg-[#252525] border border-gray-200 dark:border-[#333] rounded-2xl p-6 text-sm text-gray-600 dark:text-gray-300">
+          Нет доступа к настройкам пользователей/ролей.
+        </div>
+        {dialogs}
+      </>
     );
   }
 
   if (!canUsers && canRoles) {
-    return <div className="space-y-4">{rolesBlock}</div>;
+    return (
+      <>
+        <div className="space-y-4">{rolesBlock}</div>
+        {dialogs}
+      </>
+    );
   }
 
   const listColumn = (
@@ -435,7 +496,7 @@ export const AccessSettings: React.FC<AccessSettingsProps> = ({
               value={newUserPassword}
               onChange={(e) => setNewUserPassword(e.target.value)}
               label="Пароль (опц.)"
-              placeholder="123"
+              placeholder="Оставьте пустым для входа без пароля"
               type="password"
             />
             <div className="flex flex-col gap-1">
@@ -539,7 +600,7 @@ export const AccessSettings: React.FC<AccessSettingsProps> = ({
             <div className="text-xs font-bold text-gray-400 uppercase tracking-wide">Пароль</div>
             <div className="flex flex-wrap items-center gap-3">
               <Button type="button" variant="secondary" onClick={() => handleResetPassword(selectedUser.id)}>
-                <KeyRound size={16} /> Сбросить на «123»
+                <KeyRound size={16} /> Сбросить пароль
               </Button>
               <label className="inline-flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300 cursor-pointer">
                 <input
@@ -567,13 +628,16 @@ export const AccessSettings: React.FC<AccessSettingsProps> = ({
   );
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col items-stretch gap-4 md:flex-row">
-      <div
-        className={`${panel ? 'hidden md:flex' : 'flex'} h-full min-h-0 flex-1 flex-col md:h-full md:flex-none`}
-      >
-        {listColumn}
+    <>
+      <div className="flex min-h-0 flex-1 flex-col items-stretch gap-4 md:flex-row">
+        <div
+          className={`${panel ? 'hidden md:flex' : 'flex'} h-full min-h-0 flex-1 flex-col md:h-full md:flex-none`}
+        >
+          {listColumn}
+        </div>
+        {detailColumn}
       </div>
-      {detailColumn}
-    </div>
+      {dialogs}
+    </>
   );
 };

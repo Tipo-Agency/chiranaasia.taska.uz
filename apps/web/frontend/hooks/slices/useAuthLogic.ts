@@ -34,7 +34,7 @@ export const useAuthLogic = (showNotification: (msg: string) => void) => {
               }
           }
       }
-  }, [users, currentUser]);
+  }, [users]);
 
   useEffect(() => {
     void ensureAuthCsrfCookie();
@@ -124,7 +124,7 @@ export const useAuthLogic = (showNotification: (msg: string) => void) => {
         const u = usersWithTimestamp.find(curr => curr.id === currentUser.id);
         // Если текущий пользователь был архивирован или удален, выходим
         if (u && !u.isArchived) {
-          setCurrentUser(withAvatarFallback(u as User));
+          setCurrentUser(withAvatarFallback(u));
         } else {
           setCurrentUser(null);
           storageService.clearActiveUserId();

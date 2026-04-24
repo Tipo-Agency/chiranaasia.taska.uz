@@ -4,7 +4,7 @@ import { Task, Project, StatusOption, PriorityOption, User, TaskComment, TaskAtt
 import { DEFAULT_NOTIFICATION_PREFS } from '../../../constants';
 import { api } from '../../../backend/api';
 import { uploadTaskAttachment } from '../../../services/localStorageService';
-import { getTodayLocalDate, getDateDaysFromNow } from '../../../utils/dateUtils';
+import { getTodayLocalDate } from '../../../utils/dateUtils';
 import { notifyTaskCreated, notifyTaskStatusChanged, NotificationContext } from '../../../services/notificationService';
 import { shouldSyncEditingTaskFromFresh } from '../../../utils/taskSyncUtils';
 import { sendTelegramNotification } from '../../../services/telegramService';
@@ -28,9 +28,9 @@ export const useTaskLogic = (showNotification: (msg: string) => void, currentUse
       }
   }, [tasks, isTaskModalOpen, editingTask?.id]);
 
-  const updateProjects = (p: Project[]) => { setProjects(p); api.projects.updateAll(p).catch(() => showNotification('Ошибка сохранения проектов')); };
-  const updateStatuses = (s: StatusOption[]) => { setStatuses(s); api.statuses.updateAll(s).catch(() => showNotification('Ошибка сохранения статусов')); };
-  const updatePriorities = (p: PriorityOption[]) => { setPriorities(p); api.priorities.updateAll(p).catch(() => showNotification('Ошибка сохранения приоритетов')); };
+  const updateProjects = (p: Project[]) => { setProjects(p); void api.projects.updateAll(p).catch(() => showNotification('Ошибка сохранения проектов')); };
+  const updateStatuses = (s: StatusOption[]) => { setStatuses(s); void api.statuses.updateAll(s).catch(() => showNotification('Ошибка сохранения статусов')); };
+  const updatePriorities = (p: PriorityOption[]) => { setPriorities(p); void api.priorities.updateAll(p).catch(() => showNotification('Ошибка сохранения приоритетов')); };
 
   const quickCreateProject = (name: string) => {
       const newProject: Project = { id: `p-${Date.now()}`, name, isArchived: false };
@@ -141,7 +141,7 @@ export const useTaskLogic = (showNotification: (msg: string) => void, currentUse
                 createdAt: taskData.createdAt || new Date().toISOString(),
                 createdByUserId: taskData.createdByUserId,
                 linkedFeatureId: taskData.linkedFeatureId,
-                linkedIdeaId: (taskData as any).linkedIdeaId,
+                linkedIdeaId: taskData.linkedIdeaId,
             };
             if (newTask.source && currentUser) {
               const systemMessage = `Создана задача из контент-плана "${newTask.source}"`;
@@ -203,9 +203,9 @@ export const useTaskLogic = (showNotification: (msg: string) => void, currentUse
             updatedAt: now,
             createdByUserId: taskData.createdByUserId || currentUser?.id, // Если не указан, используем текущего пользователя
             linkedFeatureId: taskData.linkedFeatureId,
-            linkedIdeaId: (taskData as any).linkedIdeaId,
+            linkedIdeaId: taskData.linkedIdeaId,
         };
-        
+
         // Если задача создана из контент-плана — системное сообщение в начало (не затирая комментарии к вложениям)
         if (newTask.source && currentUser) {
             const systemMessage = `Создана задача из контент-плана "${newTask.source}"`;
@@ -234,7 +234,7 @@ export const useTaskLogic = (showNotification: (msg: string) => void, currentUse
         }
     }
     setTasks(updatedTasks);
-    api.tasks.updateAll(updatedTasks).catch(() => showNotification('Не удалось сохранить задачу. Проверьте подключение.'));
+    void api.tasks.updateAll(updatedTasks).catch(() => showNotification('Не удалось сохранить задачу. Проверьте подключение.'));
     setIsTaskModalOpen(false);
   };
 
@@ -256,7 +256,7 @@ export const useTaskLogic = (showNotification: (msg: string) => void, currentUse
           return t;
       });
       setTasks(updatedTasks);
-      api.tasks.updateAll(updatedTasks).catch(() => showNotification('Ошибка сохранения комментария'));
+      void api.tasks.updateAll(updatedTasks).catch(() => showNotification('Ошибка сохранения комментария'));
       if (editingTask && editingTask.id === taskId) {
           setEditingTask({ ...editingTask, comments: [...(editingTask.comments || []), comment] });
       }
@@ -320,7 +320,7 @@ export const useTaskLogic = (showNotification: (msg: string) => void, currentUse
               };
             });
             setTasks(tasksFinal);
-            api.tasks.updateAll(tasksFinal).catch(() => showNotification('Ошибка сохранения задачи'));
+            void api.tasks.updateAll(tasksFinal).catch(() => showNotification('Ошибка сохранения задачи'));
           }
 
           setEditingTask((prev) => {
@@ -375,7 +375,7 @@ export const useTaskLogic = (showNotification: (msg: string) => void, currentUse
           };
         });
         setTasks(tasksFinal);
-        api.tasks.updateAll(tasksFinal).catch(() => showNotification('Ошибка сохранения задачи'));
+        void api.tasks.updateAll(tasksFinal).catch(() => showNotification('Ошибка сохранения задачи'));
       }
 
       setEditingTask((prev) => {
@@ -401,7 +401,7 @@ export const useTaskLogic = (showNotification: (msg: string) => void, currentUse
         return { ...t, attachments, comments };
       });
       setTasks(tasksFinal);
-      api.tasks.updateAll(tasksFinal).catch(() => showNotification('Ошибка сохранения задачи'));
+      void api.tasks.updateAll(tasksFinal).catch(() => showNotification('Ошибка сохранения задачи'));
     }
     setEditingTask((prev) => {
       if (!prev || prev.id !== taskId) return prev;
@@ -413,10 +413,10 @@ export const useTaskLogic = (showNotification: (msg: string) => void, currentUse
   const deleteTask = (taskId: string) => {
       const prev = tasks.find((t) => t.id === taskId);
       const body: Record<string, unknown> = { is_archived: true };
-      if (prev?.version != null && Number.isFinite(prev.version)) body.version = prev.version;
+      if (prev?.version != null) body.version = prev.version;
       const updated = tasks.map(t => t.id === taskId ? { ...t, isArchived: true } : t);
       setTasks(updated);
-      api.tasks.patch(taskId, body).catch(() => showNotification('Ошибка сохранения задачи'));
+      void api.tasks.patch(taskId, body).catch(() => showNotification('Ошибка архивирования задачи'));
       setIsTaskModalOpen(false);
       showNotification('Задача в архиве');
   };
@@ -424,17 +424,17 @@ export const useTaskLogic = (showNotification: (msg: string) => void, currentUse
   const restoreTask = (taskId: string) => {
       const prev = tasks.find((t) => t.id === taskId);
       const body: Record<string, unknown> = { is_archived: false };
-      if (prev?.version != null && Number.isFinite(prev.version)) body.version = prev.version;
+      if (prev?.version != null) body.version = prev.version;
       const updated = tasks.map(t => t.id === taskId ? { ...t, isArchived: false } : t);
       setTasks(updated);
-      api.tasks.patch(taskId, body).catch(() => showNotification('Ошибка сохранения задачи'));
+      void api.tasks.patch(taskId, body).catch(() => showNotification('Ошибка восстановления задачи'));
       showNotification('Задача восстановлена');
   };
 
   const permanentDeleteTask = (taskId: string) => {
       const updated = tasks.filter(t => t.id !== taskId);
       setTasks(updated);
-      api.tasks.remove(taskId).catch(() => showNotification('Ошибка сохранения задачи'));
+      void api.tasks.remove(taskId).catch(() => showNotification('Ошибка удаления задачи'));
       showNotification('Задача удалена навсегда');
   };
 

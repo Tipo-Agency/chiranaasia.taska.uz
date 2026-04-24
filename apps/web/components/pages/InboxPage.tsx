@@ -292,7 +292,7 @@ export const InboxPage: React.FC<InboxPageProps> = ({
     setInboxMsgs((prev) =>
       prev.map((m) => (unreadIds.includes(m.id) ? { ...m, isRead: true, read: true } : m))
     );
-  }, [selectedId]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [selectedId]);
 
   // ── Send reply ─────────────────────────────────────────────────────────────
   const handleSend = useCallback(async () => {

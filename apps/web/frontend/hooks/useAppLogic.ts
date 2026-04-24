@@ -1318,19 +1318,14 @@ export const useAppLogic = () => {
       savePosition: bpmSlice.actions.savePosition, deletePosition: bpmSlice.actions.deletePosition, saveProcess: bpmSlice.actions.saveProcess, deleteProcess: bpmSlice.actions.deleteProcess, completeProcessStepWithBranch,
       saveSalesFunnel: async (funnel: SalesFunnel) => {
           try {
-              // Проверяем, существует ли воронка с таким id
-              const existingFunnels = (await api.funnels.getAll()) as SalesFunnel[];
-              const exists = existingFunnels.some(f => f.id === funnel.id);
-              
+              // Используем локальное состояние — без лишнего GET-запроса
+              const exists = salesFunnels.some((f) => f.id === funnel.id);
               if (exists) {
-                  // Обновляем существующую воронку
                   await api.funnels.update(funnel.id, funnel);
               } else {
-                  // Создаем новую воронку (без id)
-                  const { id, ...funnelWithoutId } = funnel;
+                  const { id: _id, ...funnelWithoutId } = funnel;
                   await api.funnels.create(funnelWithoutId);
               }
-              // После сохранения перезагружаем данные из локального хранилища
               const funnels = (await api.funnels.getAll()) as SalesFunnel[];
               setSalesFunnels(funnels);
               showNotification('Воронка сохранена');
@@ -1386,27 +1381,30 @@ export const useAppLogic = () => {
       },
       deleteProductionPipeline: async (id: string) => {
         try {
-          const pipesRaw = await api.production.getPipelines();
-          const found = (Array.isArray(pipesRaw) ? pipesRaw : [])
-            .map(normalizeProductionPipeline)
-            .find((x) => x?.id === id);
+          // Use local state — no need for an extra GET before archiving
+          const found = productionPipelines.find((x) => x.id === id);
           if (!found) return;
           await api.production.putPipelines([pipelineToBulk({ ...found, isArchived: true })]);
-          const next = await api.production.getPipelines();
-          setProductionPipelines(
-            (Array.isArray(next) ? next : [])
-              .map(normalizeProductionPipeline)
-              .filter((x): x is ProductionRoutePipeline => x != null && !x.isArchived)
-          );
+          // Optimistic update — remove from local list immediately
+          setProductionPipelines((prev) => prev.filter((x) => x.id !== id));
           showNotification('Маршрут в архиве');
         } catch (error) {
           console.error(error);
           showNotification('Ошибка архивации маршрута');
         }
       },
-      createProductionRouteOrder: async (pipelineId: string, title: string) => {
+      createProductionRouteOrder: async (
+        pipelineId: string,
+        title: string,
+        context?: { dealId?: string; purchaseRequestId?: string }
+      ) => {
         try {
-          await api.production.createOrder({ pipelineId, title });
+          await api.production.createOrder({
+            pipelineId,
+            title,
+            dealId: context?.dealId?.trim() ? context.dealId : null,
+            purchaseRequestId: context?.purchaseRequestId?.trim() ? context.purchaseRequestId : null,
+          });
           const ords = await api.production.getOrders();
           setProductionBoardOrders(
             (Array.isArray(ords) ? ords : [])
@@ -1570,13 +1568,11 @@ export const useAppLogic = () => {
       },
       restoreSalesFunnel: async (funnelId: string) => {
           try {
-              const allFunnels = (await api.funnels.getAll()) as SalesFunnel[];
-              const funnel = allFunnels.find(f => f.id === funnelId);
-              if (!funnel) return;
               const now = new Date().toISOString();
-              const updated = allFunnels.map(f => f.id === funnelId ? { ...f, isArchived: false, updatedAt: now } : f);
-              await Promise.all(updated.map(f => api.funnels.update(f.id, f)));
-              setSalesFunnels(updated);
+              await api.funnels.update(funnelId, { isArchived: false, updatedAt: now });
+              setSalesFunnels((prev) =>
+                  prev.map((f) => (f.id === funnelId ? { ...f, isArchived: false, updatedAt: now } : f))
+              );
               showNotification('Воронка восстановлена');
           } catch (error) {
               console.error('Ошибка восстановления воронки:', error);

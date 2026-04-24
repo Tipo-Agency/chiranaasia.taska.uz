@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { SalesFunnel, FunnelStage, FunnelSourceConfig, User, NotificationPreferences } from '../../types';
 import { Plus, Edit2, Trash2, GripVertical, Settings, Instagram, MessageSquare, Star, Globe, Bell, ArrowLeft } from 'lucide-react';
 import { EntitySearchSelect } from '../ui/EntitySearchSelect';
+import { SystemAlertDialog, SystemConfirmDialog } from '../ui';
 import { api } from '../../backend/api';
 
 interface SalesFunnelsSettingsProps {
@@ -79,6 +80,13 @@ const SalesFunnelsSettings: React.FC<SalesFunnelsSettingsProps> = ({ funnels, us
     const [ownerUserId, setOwnerUserId] = useState('');
     const lastCreateRequestRef = useRef<number>(createRequested || 0);
 
+    // Диалоги вместо browser alert/confirm
+    const [alertState, setAlertState] = useState<{ open: boolean; title: string; message: string }>({ open: false, title: '', message: '' });
+    const [confirmState, setConfirmState] = useState<{ open: boolean; title: string; message: string; onConfirm?: () => void }>({ open: false, title: '', message: '' });
+
+    const showAlert = (title: string, message: string) => setAlertState({ open: true, title, message });
+    const closeAlert = () => setAlertState((s) => ({ ...s, open: false }));
+
     const handleOpenCreate = () => {
         setEditingFunnel(null);
         setFunnelName('');
@@ -154,12 +162,12 @@ const SalesFunnelsSettings: React.FC<SalesFunnelsSettingsProps> = ({ funnels, us
                 setTelegramUseWebhook(false);
                 setTelegramWebhookRegistered(false);
             }
-            if ((funnel.sources as any).site) {
-                const site = (funnel.sources as any).site || {};
+            if (funnel.sources?.site) {
+                const site = funnel.sources.site;
                 setSiteEnabled(Boolean(site.enabled));
-                setSiteDefaultStageId(String(site.defaultStageId || ''));
-                setSiteDefaultAssigneeId(String(site.defaultAssigneeId || ''));
-                setSiteKeyLast4(String(site.keyLast4 || ''));
+                setSiteDefaultStageId(site.defaultStageId || '');
+                setSiteDefaultAssigneeId(site.defaultAssigneeId || '');
+                setSiteKeyLast4(site.keyLast4 || '');
             } else {
                 setSiteEnabled(false);
                 setSiteDefaultStageId('');
@@ -222,7 +230,7 @@ const SalesFunnelsSettings: React.FC<SalesFunnelsSettingsProps> = ({ funnels, us
 
     const handleDeleteStage = (index: number) => {
         if (stages.length <= 1) {
-            alert('Воронка должна содержать хотя бы один этап');
+            showAlert('Этапы воронки', 'Воронка должна содержать хотя бы один этап.');
             return;
         }
         setStages(stages.filter((_, i) => i !== index));
@@ -242,7 +250,7 @@ const SalesFunnelsSettings: React.FC<SalesFunnelsSettingsProps> = ({ funnels, us
         e.preventDefault();
         if (!funnelName.trim()) return;
         if (stages.length === 0) {
-            alert('Добавьте хотя бы один этап');
+            showAlert('Этапы воронки', 'Добавьте хотя бы один этап.');
             return;
         }
 
@@ -251,7 +259,7 @@ const SalesFunnelsSettings: React.FC<SalesFunnelsSettingsProps> = ({ funnels, us
         
         if (instagramEnabled) {
             if (!instagramAccountId.trim() || !instagramAccessToken.trim() || !instagramPageId.trim()) {
-                alert('Для подключения Instagram заполните все поля: Account ID, Access Token, Page ID');
+                showAlert('Instagram', 'Для подключения Instagram заполните все поля: Account ID, Access Token, Page ID.');
                 return;
             }
             sources.instagram = {
@@ -265,7 +273,7 @@ const SalesFunnelsSettings: React.FC<SalesFunnelsSettingsProps> = ({ funnels, us
         
         if (telegramEnabled) {
             if (!telegramBotToken.trim()) {
-                alert('Для подключения Telegram введите токен бота');
+                showAlert('Telegram', 'Для подключения Telegram введите токен бота.');
                 return;
             }
             sources.telegram = {
@@ -283,7 +291,7 @@ const SalesFunnelsSettings: React.FC<SalesFunnelsSettingsProps> = ({ funnels, us
                 defaultStageId: (siteDefaultStageId || '').trim() || undefined,
                 defaultAssigneeId: (siteDefaultAssigneeId || '').trim() || undefined,
                 keyLast4: (siteKeyLast4 || '').trim() || undefined,
-            } as any;
+            };
         }
 
         const hasNotif = notifTitle.trim() || notifChat.trim() || notifTg.trim();
@@ -336,11 +344,11 @@ const SalesFunnelsSettings: React.FC<SalesFunnelsSettingsProps> = ({ funnels, us
     const handleRegisterTelegramWebhook = async () => {
         const fid = editingFunnel?.id;
         if (!fid) {
-            alert('Сначала сохраните воронку, затем откройте её снова и подключите webhook.');
+            showAlert('Telegram Webhook', 'Сначала сохраните воронку, затем откройте её снова и подключите webhook.');
             return;
         }
         if (!telegramBotToken.trim()) {
-            alert('Введите токен бота и сохраните воронку.');
+            showAlert('Telegram Webhook', 'Введите токен бота и сохраните воронку.');
             return;
         }
         try {
@@ -349,13 +357,11 @@ const SalesFunnelsSettings: React.FC<SalesFunnelsSettingsProps> = ({ funnels, us
                 setTelegramWebhookRegistered(true);
                 setTelegramUseWebhook(true);
                 if (res.webhookUrl) setTelegramWebhookUrl(String(res.webhookUrl));
-                alert('Webhook подключён: Telegram шлёт лиды сразу на сервер (без опроса getUpdates).');
+                showAlert('Telegram Webhook', 'Webhook подключён: Telegram шлёт лиды сразу на сервер (без опроса getUpdates).');
             }
-        } catch (e: any) {
-            alert(
-                e?.message ||
-                    'Не удалось зарегистрировать webhook. На сервере нужен PUBLIC_BASE_URL (https://…) и доступен HTTPS.'
-            );
+        } catch (e: unknown) {
+            const msg = e instanceof Error ? e.message : undefined;
+            showAlert('Telegram Webhook', msg || 'Не удалось зарегистрировать webhook. На сервере нужен PUBLIC_BASE_URL (https://…) и доступен HTTPS.');
         }
     };
 
@@ -366,18 +372,19 @@ const SalesFunnelsSettings: React.FC<SalesFunnelsSettingsProps> = ({ funnels, us
             await api.integrationsTelegram.unregisterWebhook({ funnelId: fid });
             setTelegramWebhookRegistered(false);
             setTelegramUseWebhook(false);
-            void api.integrationsTelegram.webhookStatus(fid).then((res: any) => {
-                if (res && res.ok) setTelegramWebhookUrl(String(res.webhookUrl || ''));
+            void api.integrationsTelegram.webhookStatus(fid).then((res: Record<string, unknown>) => {
+                if (res?.ok) setTelegramWebhookUrl(String(res.webhookUrl || ''));
             });
-            alert('Webhook отключён. Снова используется фоновый polling getUpdates.');
-        } catch (e: any) {
-            alert(e?.message || 'Не удалось отключить webhook');
+            showAlert('Telegram Webhook', 'Webhook отключён. Снова используется фоновый polling getUpdates.');
+        } catch (e: unknown) {
+            const msg = e instanceof Error ? e.message : undefined;
+            showAlert('Telegram Webhook', msg || 'Не удалось отключить webhook.');
         }
     };
 
     const handleRotateSiteKey = async () => {
         if (!editingFunnel?.id) {
-            alert('Сначала сохраните воронку, затем можно сгенерировать ключ для сайта.');
+            showAlert('API-ключ для сайта', 'Сначала сохраните воронку, затем можно сгенерировать ключ для сайта.');
             return;
         }
         try {
@@ -387,8 +394,9 @@ const SalesFunnelsSettings: React.FC<SalesFunnelsSettingsProps> = ({ funnels, us
                 setSiteKeyLast4(res.keyLast4 || '');
                 setSiteEnabled(true);
             }
-        } catch (e: any) {
-            alert(e?.message || 'Не удалось сгенерировать ключ');
+        } catch (e: unknown) {
+            const msg = e instanceof Error ? e.message : undefined;
+            showAlert('API-ключ для сайта', msg || 'Не удалось сгенерировать ключ.');
         }
     };
 
@@ -436,7 +444,12 @@ const SalesFunnelsSettings: React.FC<SalesFunnelsSettingsProps> = ({ funnels, us
                                                 </button>
                                                 <button
                                                     type="button"
-                                                    onClick={() => { if(confirm(`Удалить воронку "${funnel.name}"?`)) onDelete(funnel.id) }}
+                                                    onClick={() => setConfirmState({
+                                                        open: true,
+                                                        title: 'Удалить воронку',
+                                                        message: `Удалить воронку «${funnel.name}»? Это действие нельзя отменить.`,
+                                                        onConfirm: () => onDelete(funnel.id),
+                                                    })}
                                                     className="p-2 text-gray-400 hover:text-red-600 dark:hover:text-red-400 transition-colors"
                                                     title="Удалить"
                                                 >
@@ -1056,6 +1069,23 @@ const SalesFunnelsSettings: React.FC<SalesFunnelsSettingsProps> = ({ funnels, us
                     </form>
                 </div>
             )}
+
+            <SystemAlertDialog
+                open={alertState.open}
+                title={alertState.title}
+                message={alertState.message}
+                onClose={closeAlert}
+            />
+            <SystemConfirmDialog
+                open={confirmState.open}
+                title={confirmState.title}
+                message={confirmState.message}
+                onConfirm={() => {
+                    confirmState.onConfirm?.();
+                    setConfirmState((s) => ({ ...s, open: false }));
+                }}
+                onCancel={() => setConfirmState((s) => ({ ...s, open: false }))}
+            />
         </div>
     );
 };

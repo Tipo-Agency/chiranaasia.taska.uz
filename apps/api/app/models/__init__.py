@@ -46,12 +46,14 @@ from app.models.system_log import SystemLog
 from app.models.task import Project, Task
 from app.models.telegram_integration import TelegramIntegrationState
 from app.models.user import User
+from app.models.user_mail_oauth import UserMailOAuthAccount
 from app.models.weekly_plan import Protocol, WeeklyPlan
 
 __all__ = [
     "Base",
     "DeadLetterQueue",
     "User",
+    "UserMailOAuthAccount",
     "Role",
     "Task",
     "Project",

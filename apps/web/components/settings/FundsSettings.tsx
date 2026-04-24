@@ -121,10 +121,10 @@ const FundsSettings: React.FC<FundsSettingsProps> = ({ funds, onSave, onDelete }
               <div>
                 <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 mb-1">Порядок</label>
                 <input
-                  type="number"
-                  min={0}
-                  value={fundOrder}
-                  onChange={e => setFundOrder(parseInt(e.target.value, 10) || 0)}
+                  type="text"
+                  inputMode="numeric"
+                  value={String(fundOrder)}
+                  onChange={e => setFundOrder(parseInt(e.target.value.replace(/\D/g, ''), 10) || 0)}
                   className="w-full px-3 py-2 border border-gray-200 dark:border-[#333] rounded-lg bg-white dark:bg-[#252525] text-gray-800 dark:text-white text-sm"
                 />
               </div>

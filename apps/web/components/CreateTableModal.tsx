@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { X, CheckSquare, FileText, Users, Instagram, Archive, Layers } from 'lucide-react';
 import { DynamicIcon } from './AppIcons';
 import { ICON_OPTIONS, COLOR_OPTIONS, swatchHexForTableColorToken } from '../constants';
@@ -17,7 +17,7 @@ const CreateTableModal: React.FC<CreateTableModalProps> = ({ onClose, onCreate, 
   const [color, setColor] = useState('text-blue-500');
   
   // Обновляем тип при изменении initialType
-  React.useEffect(() => {
+  useEffect(() => {
     if (initialType) {
       setType(initialType);
     }

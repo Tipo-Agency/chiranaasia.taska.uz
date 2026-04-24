@@ -78,9 +78,10 @@ export function ProductionPlanningPanel({
             className="h-10 rounded-lg border border-gray-200 dark:border-[#333] bg-white dark:bg-[#1a1a1a] px-3 text-sm"
           />
           <input
-            type="number"
-            value={plannedMinutes}
-            onChange={(e) => setPlannedMinutes(Number(e.target.value || 0))}
+            type="text"
+            inputMode="numeric"
+            value={String(plannedMinutes)}
+            onChange={(e) => setPlannedMinutes(Number(e.target.value.replace(/\D/g, '') || 0))}
             placeholder="План, мин"
             className="h-10 rounded-lg border border-gray-200 dark:border-[#333] bg-white dark:bg-[#1a1a1a] px-3 text-sm"
           />
@@ -140,17 +141,19 @@ export function ProductionPlanningPanel({
                     </td>
                     <td className="px-4 py-3 text-right">
                       <input
-                        type="number"
+                        type="text"
+                        inputMode="numeric"
                         value={String(op.plannedMinutes)}
-                        onChange={(e) => onUpdateOperation(op.id, { plannedMinutes: Number(e.target.value || 0) })}
+                        onChange={(e) => onUpdateOperation(op.id, { plannedMinutes: Number(e.target.value.replace(/\D/g, '') || 0) })}
                         className="w-24 ml-auto block h-8 text-right rounded-lg border border-gray-200 dark:border-[#333] bg-white dark:bg-[#1a1a1a] px-2 text-xs"
                       />
                     </td>
                     <td className="px-4 py-3 text-right">
                       <input
-                        type="number"
+                        type="text"
+                        inputMode="numeric"
                         value={String(op.spentMinutes)}
-                        onChange={(e) => onUpdateOperation(op.id, { spentMinutes: Number(e.target.value || 0) })}
+                        onChange={(e) => onUpdateOperation(op.id, { spentMinutes: Number(e.target.value.replace(/\D/g, '') || 0) })}
                         className="w-24 ml-auto block h-8 text-right rounded-lg border border-gray-200 dark:border-[#333] bg-white dark:bg-[#1a1a1a] px-2 text-xs"
                       />
                     </td>
@@ -213,9 +216,10 @@ export function ProductionPlanningPanel({
             ))}
           </select>
           <input
-            type="number"
-            value={logMinutes}
-            onChange={(e) => setLogMinutes(Number(e.target.value || 0))}
+            type="text"
+            inputMode="numeric"
+            value={String(logMinutes)}
+            onChange={(e) => setLogMinutes(Number(e.target.value.replace(/\D/g, '') || 0))}
             placeholder="Минуты"
             className="h-10 rounded-lg border border-gray-200 dark:border-[#333] bg-white dark:bg-[#1a1a1a] px-3 text-sm"
           />

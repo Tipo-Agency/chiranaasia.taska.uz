@@ -1,5 +1,5 @@
 """Tables router."""
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -8,6 +8,7 @@ from app.core.mappers import row_to_table
 from app.db import get_db
 from app.models.content import ContentPost, ShootPlan
 from app.models.settings import TableCollection
+from app.models.user import User
 from app.schemas.common_responses import OkResponse
 from app.schemas.settings import TableItem, TableRead
 from app.schemas.tables_public import (
@@ -16,7 +17,12 @@ from app.schemas.tables_public import (
     PublicShootPlanRead,
     PublicTableRead,
 )
+from app.services.audit_log import log_mutation
 from app.services.domain_events import log_entity_mutation
+
+
+def _request_id(request: Request) -> str | None:
+    return getattr(request.state, "request_id", None)
 
 # Публичный маршрут — отдельный роутер без Depends (иначе глобальный deps сломает анонимный доступ).
 public_router = APIRouter(prefix="/tables", tags=["tables"])
@@ -97,7 +103,12 @@ async def get_tables(
 
 
 @router.put("", response_model=OkResponse)
-async def update_tables(tables: list[TableItem], db: AsyncSession = Depends(get_db)):
+async def update_tables(
+    request: Request,
+    tables: list[TableItem],
+    db: AsyncSession = Depends(get_db),
+    actor: User = Depends(get_current_user),
+):
     for t in tables:
         tid = t.id
         existing = await db.get(TableCollection, tid)
@@ -123,13 +134,26 @@ async def update_tables(tables: list[TableItem], db: AsyncSession = Depends(get_
             ))
         await db.flush()
         row = await db.get(TableCollection, tid)
+        display_name = (row.name if row else t.name) or ""
+        display_type = (row.type if row else t.type) or ""
         await log_entity_mutation(
             db,
             event_type="table.created" if is_new else "table.updated",
             entity_type="table",
             entity_id=tid,
             source="tables-router",
-            payload={"name": row.name if row else t.name, "type": row.type if row else t.type},
+            actor_id=actor.id,
+            payload={"name": display_name, "type": display_type},
+        )
+        await log_mutation(
+            db,
+            "create" if is_new else "update",
+            "table",
+            tid,
+            actor_id=actor.id,
+            source="tables-router",
+            request_id=_request_id(request),
+            payload={"name": display_name, "type": display_type},
         )
     await db.commit()
     return {"ok": True}

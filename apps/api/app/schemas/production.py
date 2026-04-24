@@ -108,6 +108,8 @@ class ProductionOrderRead(BaseModel):
     title: str
     notes: str | None = None
     status: str
+    dealId: str | None = None
+    purchaseRequestId: str | None = None
     createdAt: str
     updatedAt: str | None = None
     isArchived: bool = False
@@ -120,6 +122,8 @@ class ProductionOrderCreate(BaseModel):
     pipelineId: str = Field(..., min_length=1, max_length=36)
     title: str = Field(..., min_length=1, max_length=500)
     notes: str | None = None
+    dealId: str | None = Field(default=None, max_length=36)
+    purchaseRequestId: str | None = Field(default=None, max_length=36)
 
 
 class ProductionOrderPatch(BaseModel):
@@ -129,6 +133,8 @@ class ProductionOrderPatch(BaseModel):
     title: str | None = Field(default=None, min_length=1, max_length=500)
     notes: str | None = None
     status: str | None = Field(default=None, max_length=30)
+    dealId: str | None = Field(default=None, max_length=36)
+    purchaseRequestId: str | None = Field(default=None, max_length=36)
     isArchived: bool | None = None
 
 

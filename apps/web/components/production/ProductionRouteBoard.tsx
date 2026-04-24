@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ProductionRouteOrder, ProductionRoutePipeline, ProductionRouteStage, User } from '../../types';
 import { GitBranch, RefreshCw } from 'lucide-react';
 
@@ -39,6 +39,11 @@ export function ProductionRouteBoard({
 }) {
   const [pipelineId, setPipelineId] = useState<string>(() => pipelines[0]?.id || '');
   const [busy, setBusy] = useState(false);
+  // Keep a stable ref so the polling interval doesn't restart on every parent re-render
+  const onRefreshRef = useRef(onRefresh);
+  useEffect(() => {
+    onRefreshRef.current = onRefresh;
+  }, [onRefresh]);
   const [newTitle, setNewTitle] = useState('');
   const [resolveOpen, setResolveOpen] = useState<{
     handoffId: string;
@@ -58,7 +63,7 @@ export function ProductionRouteBoard({
     const tick = async () => {
       if (cancelled) return;
       try {
-        await onRefresh();
+        await onRefreshRef.current();
       } catch {
         /* ignore */
       }
@@ -68,7 +73,7 @@ export function ProductionRouteBoard({
       cancelled = true;
       window.clearInterval(id);
     };
-  }, [onRefresh, pollMs]);
+  }, [pollMs]); // only recreate interval when poll interval changes, not on every onRefresh identity change
 
   const pipeline = useMemo(() => pipelines.find((p) => p.id === pipelineId), [pipelines, pipelineId]);
   const stages = useMemo(() => sortedStages(pipeline), [pipeline]);

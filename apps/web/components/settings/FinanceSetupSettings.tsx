@@ -224,9 +224,10 @@ export const FinanceSetupSettings: React.FC<{
           <Input label="Название" value={catName} onChange={(e) => setCatName(e.target.value)} />
           <Input
             label="Порядок"
-            type="number"
+            type="text"
+            inputMode="numeric"
             value={String(catOrder)}
-            onChange={(e) => setCatOrder(parseInt(e.target.value, 10) || 0)}
+            onChange={(e) => setCatOrder(parseInt(e.target.value.replace(/\D/g, ''), 10) || 0)}
           />
           <div>
             <div className="text-xs font-bold text-gray-500 dark:text-gray-400 mb-1 uppercase">Тип в плане</div>

@@ -11,10 +11,40 @@ import {
   FinancialPlanning,
   Bdr,
   IncomeReport,
+  type Task,
+  type ProductionRoutePipeline,
+  type ProductionRouteOrder,
 } from '../types';
 import type { SavePurchaseRequestOptions } from '../frontend/hooks/slices/useFinanceLogic';
 import { hasPermission } from '../utils/permissions';
-import { Plus, X, Edit2, Trash2, PieChart, TrendingUp, DollarSign, Check, AlertCircle, Calendar, Settings, ArrowLeft, ArrowRight, Save, FileText, Clock, CheckCircle2, ChevronDown, Upload, Archive, RotateCcw, Printer } from 'lucide-react';
+import {
+  Plus,
+  X,
+  Edit2,
+  Trash2,
+  PieChart,
+  TrendingUp,
+  DollarSign,
+  Check,
+  AlertCircle,
+  Calendar,
+  Settings,
+  ArrowLeft,
+  ArrowRight,
+  Save,
+  FileText,
+  Clock,
+  CheckCircle2,
+  ChevronDown,
+  Upload,
+  Archive,
+  RotateCcw,
+  Printer,
+  Package,
+  MessageSquare,
+  CheckSquare,
+  ChevronRight,
+} from 'lucide-react';
 import {
   Button,
   ModulePageShell,
@@ -103,6 +133,17 @@ interface FinanceViewProps {
   onDeleteFinancialPlanning?: (id: string) => void;
   onRefreshPurchaseRequests?: () => void | Promise<void>;
   onRefreshIncomeReports?: () => void | Promise<void>;
+  /** Задачи по заявке (entityType purchase_request, tableId = id заявки) */
+  tasks?: Task[];
+  productionPipelines?: ProductionRoutePipeline[];
+  productionOrders?: ProductionRouteOrder[];
+  onCreateProductionOrder?: (
+    pipelineId: string,
+    title: string,
+    context?: { dealId?: string; purchaseRequestId?: string }
+  ) => Promise<void>;
+  onOpenProduction?: () => void;
+  onOpenTask?: (task: Task) => void;
 }
 
 function activeDepartmentsList(departments: Department[]): Department[] {
@@ -126,6 +167,12 @@ const FinanceView: React.FC<FinanceViewProps> = ({
     onSaveFinancialPlanDocument, onDeleteFinancialPlanDocument, onSaveFinancialPlanning, onDeleteFinancialPlanning,
     onRefreshPurchaseRequests,
     onRefreshIncomeReports,
+    tasks = [],
+    productionPipelines = [],
+    productionOrders = [],
+    onCreateProductionOrder,
+    onOpenProduction,
+    onOpenTask,
 }) => {
   const { setLeading, setModule } = useAppToolbar();
   const [activeTab, setActiveTab] = useState<'planning' | 'requests' | 'plan' | 'statements' | 'bdr'>('planning');
@@ -191,6 +238,10 @@ const FinanceView: React.FC<FinanceViewProps> = ({
   const [reqAttachments, setReqAttachments] = useState<NonNullable<PurchaseRequest['attachments']>>([]);
   const [createRequestId, setCreateRequestId] = useState('');
   const reqAttachInputRef = useRef<HTMLInputElement>(null);
+  const [requestModalTab, setRequestModalTab] = useState<'details' | 'chat' | 'tasks' | 'meetings' | 'order'>('details');
+  const [prOrderFormOpen, setPrOrderFormOpen] = useState(false);
+  const [prNewOrderTitle, setPrNewOrderTitle] = useState('');
+  const [prNewOrderPipelineId, setPrNewOrderPipelineId] = useState('');
 
   const getDefaultRangeForMonth = useCallback((yyyyMm: string) => {
     const trimmed = (yyyyMm || '').trim();
@@ -738,11 +789,27 @@ const FinanceView: React.FC<FinanceViewProps> = ({
     });
   }, [requests, requestStatusFilter, requestDepartmentFilter, requestCategoryFilter, financeArchiveScope]);
 
+  const currentRequestModalId = editingRequest?.id || createRequestId || '';
+
+  const purchaseRequestTasks = useMemo(() => {
+    if (!currentRequestModalId) return [];
+    return tasks.filter(
+      (t) => t.entityType === 'purchase_request' && t.tableId === currentRequestModalId
+    );
+  }, [tasks, currentRequestModalId]);
+
+  const purchaseRequestOrders = useMemo(() => {
+    if (!currentRequestModalId) return [];
+    return productionOrders.filter((o) => o.purchaseRequestId === currentRequestModalId);
+  }, [productionOrders, currentRequestModalId]);
+
   // --- Handlers ---
 
   const handleOpenRequestCreate = () => {
       setFinanceArchiveScope('active');
       setEditingRequest(null);
+      setRequestModalTab('details');
+      setPrOrderFormOpen(false);
       const nid = `pr-${Date.now()}`;
       setCreateRequestId(nid);
       setReqAmount('');
@@ -760,6 +827,8 @@ const FinanceView: React.FC<FinanceViewProps> = ({
   
   const handleOpenRequestEdit = (req: PurchaseRequest) => {
       setEditingRequest(req);
+      setRequestModalTab('details');
+      setPrOrderFormOpen(false);
       setCreateRequestId(req.id);
       setReqAmount(String(req.amount ?? '').replace(/\s/g, ''));
       setReqTitle(req.title || '');
@@ -3161,17 +3230,44 @@ const FinanceView: React.FC<FinanceViewProps> = ({
        {/* Request Modal */}
        {isRequestModalOpen && (
         <div className="fixed inset-0 bg-black/35 backdrop-blur-sm flex items-end md:items-center justify-center z-[220] animate-in fade-in duration-200" onClick={(e) => { if(e.target === e.currentTarget) setIsRequestModalOpen(false) }}>
-            <div className="bg-white dark:bg-[#252525] rounded-t-2xl md:rounded-xl shadow-2xl w-full max-w-2xl max-h-[95vh] md:max-h-[90vh] overflow-hidden border border-gray-200 dark:border-[#333] flex flex-col">
+            <div className="bg-white dark:bg-[#252525] rounded-t-2xl md:rounded-xl shadow-2xl w-full max-w-3xl max-h-[95vh] md:max-h-[90vh] overflow-hidden border border-gray-200 dark:border-[#333] flex flex-col min-h-0">
                 <div className="p-4 border-b border-gray-100 dark:border-[#333] flex justify-between items-center bg-white dark:bg-[#252525] shrink-0">
                     <h3 className="font-bold text-gray-800 dark:text-white">Заявка на приобретение</h3>
-                    <button onClick={() => setIsRequestModalOpen(false)} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 p-1 rounded-full hover:bg-gray-100 dark:hover:bg-[#333]"><X size={18} /></button>
+                    <button type="button" onClick={() => setIsRequestModalOpen(false)} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 p-1 rounded-full hover:bg-gray-100 dark:hover:bg-[#333]"><X size={18} /></button>
                 </div>
                 {(() => {
                   const reqLocked = Boolean(
                     editingRequest && (editingRequest.status === 'approved' || editingRequest.status === 'paid')
                   );
+                  const tabBtn = (id: typeof requestModalTab, label: string, icon: React.ReactNode) => (
+                    <button
+                      key={id}
+                      type="button"
+                      role="tab"
+                      aria-selected={requestModalTab === id}
+                      onClick={() => setRequestModalTab(id)}
+                      className={`flex-1 min-w-0 flex items-center justify-center gap-1 px-1.5 py-1.5 rounded-lg text-[11px] sm:text-xs font-medium transition-colors ${
+                        requestModalTab === id
+                          ? 'bg-black text-white dark:bg-white dark:text-black'
+                          : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-[#333]'
+                      }`}
+                    >
+                      <span className="shrink-0">{icon}</span>
+                      <span className="truncate">{label}</span>
+                    </button>
+                  );
                   return (
-                <form onSubmit={handleRequestSubmit} className="p-6 space-y-4 overflow-y-auto flex-1 min-h-0 custom-scrollbar">
+                    <>
+                      <div className="flex border-b border-gray-100 dark:border-[#333] px-2 py-2 gap-1 bg-white dark:bg-[#252525] shrink-0 overflow-x-auto" role="tablist" aria-label="Заявка">
+                        {tabBtn('details', 'Данные', <FileText size={14} />)}
+                        {tabBtn('chat', 'Чат', <MessageSquare size={14} />)}
+                        {tabBtn('tasks', 'Задачи', <CheckSquare size={14} />)}
+                        {tabBtn('meetings', 'Встречи', <Calendar size={14} />)}
+                        {tabBtn('order', 'Заказ', <Package size={14} />)}
+                      </div>
+                      <div className="flex-1 min-h-0 overflow-y-auto custom-scrollbar">
+                        {requestModalTab === 'details' && (
+                <form onSubmit={handleRequestSubmit} className="p-6 space-y-4">
                     {reqLocked && (
                       <p className="text-xs text-amber-800 dark:text-amber-200 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900/40 rounded-lg px-3 py-2">
                         Заявка одобрена или оплачена: сумму и описание менять нельзя. Ниже — реквизиты для сверки с банковской выпиской (ИНН, счёт, вложения).
@@ -3298,6 +3394,173 @@ const FinanceView: React.FC<FinanceViewProps> = ({
                         )}
                     </div>
                 </form>
+                        )}
+                        {requestModalTab === 'chat' && (
+                          <div className="p-6 space-y-3">
+                            <p className="text-xs text-gray-500 dark:text-gray-400">
+                              Текст обоснования и обсуждение — на вкладке «Данные» (поле описания). Здесь дублируется для просмотра.
+                            </p>
+                            <textarea
+                              readOnly
+                              value={reqDesc}
+                              className="w-full min-h-[160px] border border-gray-200 dark:border-[#444] rounded-lg px-3 py-2 text-sm bg-gray-50 dark:bg-[#1a1a1a] text-gray-800 dark:text-gray-200"
+                            />
+                          </div>
+                        )}
+                        {requestModalTab === 'tasks' && (
+                          <div className="p-6 space-y-2">
+                            {purchaseRequestTasks.length === 0 ? (
+                              <p className="text-sm text-gray-500 dark:text-gray-400">Нет задач, привязанных к этой заявке (entity: заявка на приобретение).</p>
+                            ) : (
+                              <ul className="space-y-2">
+                                {purchaseRequestTasks.map((t) => (
+                                  <li key={t.id}>
+                                    <button
+                                      type="button"
+                                      onClick={() => onOpenTask?.(t)}
+                                      className="w-full text-left p-3 rounded-lg border border-gray-200 dark:border-[#444] hover:bg-gray-50 dark:hover:bg-[#333] text-sm text-gray-900 dark:text-gray-100"
+                                    >
+                                      <span className="font-medium">{t.title}</span>
+                                    </button>
+                                  </li>
+                                ))}
+                              </ul>
+                            )}
+                          </div>
+                        )}
+                        {requestModalTab === 'meetings' && (
+                          <div className="p-6 space-y-2">
+                            <p className="text-sm text-gray-500 dark:text-gray-400">
+                              Планирование встреч в календаре привязано к сделкам CRM. Для заявки на приобретение список встреч здесь не ведётся.
+                            </p>
+                          </div>
+                        )}
+                        {requestModalTab === 'order' && (
+                          <div className="p-6 space-y-4">
+                            <div className="flex flex-wrap items-center justify-between gap-2">
+                              <h4 className="font-bold text-gray-800 dark:text-white flex items-center gap-2 text-sm">
+                                <Package size={18} /> Производственный заказ
+                              </h4>
+                              {onOpenProduction && purchaseRequestOrders.length > 0 && (
+                                <Button type="button" variant="secondary" size="sm" onClick={() => onOpenProduction()}>
+                                  Открыть производство
+                                </Button>
+                              )}
+                            </div>
+                            {!currentRequestModalId ? (
+                              <p className="text-sm text-gray-500">Сохраните заявку, чтобы привязать заказ.</p>
+                            ) : purchaseRequestOrders.length > 0 ? (
+                              <div className="space-y-2">
+                                {purchaseRequestOrders.map((order) => {
+                                  const pipeline = productionPipelines.find((p) => p.id === order.pipelineId);
+                                  const stage = pipeline?.stages.find((s) => s.id === order.currentStageId);
+                                  return (
+                                    <div
+                                      key={order.id}
+                                      className="p-3 bg-white dark:bg-[#333] border border-gray-200 dark:border-[#444] rounded-lg"
+                                    >
+                                      <div className="flex items-start justify-between gap-2">
+                                        <div className="font-medium text-sm text-gray-800 dark:text-gray-200">{order.title}</div>
+                                        <span
+                                          className={`shrink-0 text-[10px] px-2 py-0.5 rounded-full font-medium ${
+                                            order.status === 'done'
+                                              ? 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300'
+                                              : 'bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300'
+                                          }`}
+                                        >
+                                          {order.status === 'done' ? 'Готово' : 'В работе'}
+                                        </span>
+                                      </div>
+                                      {(pipeline || stage) && (
+                                        <div className="flex items-center gap-1 mt-1.5 text-[11px] text-gray-500 dark:text-gray-400">
+                                          {pipeline && <span>{pipeline.name}</span>}
+                                          {pipeline && stage && <ChevronRight size={10} />}
+                                          {stage && <span>{stage.label}</span>}
+                                        </div>
+                                      )}
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            ) : (
+                              <p className="text-sm text-gray-500 dark:text-gray-400 text-center py-4">Нет заказа по этой заявке</p>
+                            )}
+                            {onCreateProductionOrder && productionPipelines.filter((p) => !p.isArchived).length > 0 && currentRequestModalId && (
+                              <>
+                                {!prOrderFormOpen ? (
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      const first = productionPipelines.find((p) => !p.isArchived);
+                                      setPrNewOrderPipelineId(first?.id ?? '');
+                                      setPrNewOrderTitle('');
+                                      setPrOrderFormOpen(true);
+                                    }}
+                                    className="w-full p-3 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg hover:border-emerald-500 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 transition-colors flex items-center justify-center text-emerald-600 dark:text-emerald-400"
+                                  >
+                                    <Plus size={22} strokeWidth={2.5} />
+                                  </button>
+                                ) : (
+                                  <div className="p-3 border border-gray-200 dark:border-[#444] rounded-lg bg-white dark:bg-[#333] space-y-3">
+                                    <div className="text-xs font-semibold uppercase text-gray-500 dark:text-gray-400">Новый заказ</div>
+                                    <input
+                                      value={prNewOrderTitle}
+                                      onChange={(e) => setPrNewOrderTitle(e.target.value)}
+                                      placeholder="Название заказа"
+                                      className="w-full h-8 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-[#252525] px-2.5 text-sm text-gray-900 dark:text-gray-100 outline-none focus:ring-2 focus:ring-emerald-500/30"
+                                    />
+                                    <select
+                                      value={prNewOrderPipelineId}
+                                      onChange={(e) => setPrNewOrderPipelineId(e.target.value)}
+                                      className="w-full h-8 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-[#252525] px-2.5 text-sm text-gray-900 dark:text-gray-100 outline-none"
+                                    >
+                                      {productionPipelines
+                                        .filter((p) => !p.isArchived)
+                                        .map((p) => (
+                                          <option key={p.id} value={p.id}>
+                                            {p.name}
+                                          </option>
+                                        ))}
+                                    </select>
+                                    <div className="flex justify-end gap-2">
+                                      <button
+                                        type="button"
+                                        onClick={() => setPrOrderFormOpen(false)}
+                                        className="px-3 py-1.5 rounded-md border border-gray-200 dark:border-[#444] text-xs text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-[#2c2c2c]"
+                                      >
+                                        Отмена
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={async () => {
+                                          const t = prNewOrderTitle.trim();
+                                          if (!t) {
+                                            setAlertText('Укажите название заказа.');
+                                            return;
+                                          }
+                                          if (!prNewOrderPipelineId) {
+                                            setAlertText('Выберите производственный маршрут.');
+                                            return;
+                                          }
+                                          await onCreateProductionOrder(prNewOrderPipelineId, t, {
+                                            purchaseRequestId: currentRequestModalId,
+                                          });
+                                          setPrOrderFormOpen(false);
+                                          setPrNewOrderTitle('');
+                                        }}
+                                        className="px-3 py-1.5 rounded-md text-xs text-white bg-emerald-600 hover:bg-emerald-700"
+                                      >
+                                        Создать заказ
+                                      </button>
+                                    </div>
+                                  </div>
+                                )}
+                              </>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    </>
                   );
                 })()}
             </div>

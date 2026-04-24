@@ -217,13 +217,18 @@ export function useProductionStore() {
       ...payload,
     };
     const nextLogs = [row, ...shiftLogs];
-    persist(orders, operations, nextLogs);
-    if (payload.operationId) {
-      const target = operations.find((x) => x.id === payload.operationId);
-      if (target) {
-        updateOperation(target.id, { spentMinutes: (target.spentMinutes || 0) + (payload.minutes || 0) });
-      }
-    }
+    // Build updated operations inline so both logs and operation time are persisted atomically.
+    // Calling updateOperation separately would call persist(orders, operations, shiftLogs) with
+    // the OLD shiftLogs, overwriting the new log entry we just added.
+    const now = new Date().toISOString();
+    const nextOperations = payload.operationId
+      ? operations.map((o) =>
+          o.id === payload.operationId
+            ? { ...o, spentMinutes: (o.spentMinutes || 0) + (payload.minutes || 0), updatedAt: now }
+            : o
+        )
+      : operations;
+    persist(orders, nextOperations, nextLogs);
     return row;
   };
 

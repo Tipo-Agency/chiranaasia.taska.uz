@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Plus, Trash2, GripVertical, ArrowLeft } from 'lucide-react';
 import type { ProductionRoutePipeline, ProductionRouteStage, User } from '../../types';
+import { SystemAlertDialog, SystemConfirmDialog } from '../ui';
 
 const STAGE_COLORS = [
   'bg-slate-200 dark:bg-slate-700',
@@ -40,6 +41,46 @@ const ProductionRoutesSettings: React.FC<ProductionRoutesSettingsProps> = ({
   const [stages, setStages] = useState<ProductionRouteStage[]>([]);
   const lastCreateRef = useRef(0);
 
+  const [alertState, setAlertState] = useState<{ open: boolean; title: string; message: string }>({
+    open: false,
+    title: '',
+    message: '',
+  });
+  const [confirmState, setConfirmState] = useState<{
+    open: boolean;
+    title: string;
+    message: string;
+    onConfirm?: () => void;
+    danger?: boolean;
+  }>({ open: false, title: '', message: '' });
+  const showAlert = (title: string, message: string) => setAlertState({ open: true, title, message });
+  const closeAlert = () => setAlertState((s) => ({ ...s, open: false }));
+  const showConfirm = (title: string, message: string, onConfirm: () => void, danger = false) =>
+    setConfirmState({ open: true, title, message, onConfirm, danger });
+  const closeConfirm = () => setConfirmState((s) => ({ ...s, open: false }));
+
+  const dialogs = (
+    <>
+      <SystemAlertDialog
+        open={alertState.open}
+        title={alertState.title}
+        message={alertState.message}
+        onClose={closeAlert}
+      />
+      <SystemConfirmDialog
+        open={confirmState.open}
+        title={confirmState.title}
+        message={confirmState.message}
+        onCancel={closeConfirm}
+        onConfirm={() => {
+          closeConfirm();
+          confirmState.onConfirm?.();
+        }}
+        danger={confirmState.danger}
+      />
+    </>
+  );
+
   const activeList = useMemo(() => pipelines.filter((p) => !p.isArchived), [pipelines]);
 
   useEffect(() => {
@@ -76,7 +117,7 @@ const ProductionRoutesSettings: React.FC<ProductionRoutesSettingsProps> = ({
     if (!editing) return;
     if (!name.trim()) return;
     if (stages.length === 0) {
-      alert('Добавьте хотя бы один этап');
+      showAlert('Ошибка', 'Добавьте хотя бы один этап');
       return;
     }
     onSave({
@@ -90,6 +131,8 @@ const ProductionRoutesSettings: React.FC<ProductionRoutesSettingsProps> = ({
 
   if (editorOpen && editing) {
     return (
+      <>
+      {dialogs}
       <div className="space-y-4">
         <button
           type="button"
@@ -197,11 +240,12 @@ const ProductionRoutesSettings: React.FC<ProductionRoutesSettingsProps> = ({
                 <button
                   type="button"
                   onClick={() => {
-                    if (confirm('Убрать маршрут в архив?')) {
-                      onDelete(editing.id);
+                    const id = editing.id;
+                    showConfirm('Архивировать маршрут', 'Убрать маршрут в архив?', () => {
+                      onDelete(id);
                       setEditorOpen(false);
                       setEditing(null);
-                    }
+                    }, true);
                   }}
                   className="px-4 py-2 rounded-xl border border-red-300 text-red-700 text-sm"
                 >
@@ -212,10 +256,13 @@ const ProductionRoutesSettings: React.FC<ProductionRoutesSettingsProps> = ({
           </form>
         </div>
       </div>
+      </>
     );
   }
 
   return (
+    <>
+    {dialogs}
     <div className="space-y-3">
       <p className="text-sm text-gray-600 dark:text-gray-400">
         <strong className="text-gray-900 dark:text-white">Производственный маршрут</strong> — этапы идут слева направо. Между этапами
@@ -243,6 +290,7 @@ const ProductionRoutesSettings: React.FC<ProductionRoutesSettingsProps> = ({
         ))}
       </div>
     </div>
+    </>
   );
 };
 

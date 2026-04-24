@@ -812,6 +812,7 @@ const InventoryView: React.FC<InventoryViewProps> = ({
                           {isDraft && onUpdateRevision && (
                             <div className="flex items-center gap-2">
                               <button
+                                type="button"
                                 className="text-xs text-gray-600 dark:text-gray-400 hover:underline"
                                 onClick={() => setEditingRevisionId(isEditing ? null : rev.id)}
                               >
@@ -859,11 +860,12 @@ const InventoryView: React.FC<InventoryViewProps> = ({
                                       <td className="text-right text-gray-500 dark:text-gray-400">{line.quantitySystem}</td>
                                       <td className="text-right">
                                         <input
-                                          type="number"
+                                          type="text"
+                                          inputMode="decimal"
                                           value={line.quantityFact}
                                           onChange={e => {
                                             const next = [...rev.lines];
-                                            next[idx] = { ...line, quantityFact: Number(e.target.value) || 0 };
+                                            next[idx] = { ...line, quantityFact: Number(e.target.value.replace(',', '.')) || 0 };
                                             onUpdateRevision({ ...rev, lines: next });
                                           }}
                                           className="w-20 text-right border border-gray-200 dark:border-[#333] rounded px-1 py-0.5 bg-white dark:bg-[#252525]"

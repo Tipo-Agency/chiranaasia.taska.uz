@@ -7,76 +7,62 @@ export const useBPMLogic = (showNotification: (msg: string) => void) => {
   const [orgPositions, setOrgPositions] = useState<OrgPosition[]>([]);
   const [businessProcesses, setBusinessProcesses] = useState<BusinessProcess[]>([]);
 
-  // Positions
+  // ── Positions ────────────────────────────────────────────────────────────
+
   const savePosition = (pos: OrgPosition) => {
-      const normalized: OrgPosition = { ...pos, isArchived: pos.isArchived ?? false };
-      const updated = orgPositions.find(p => p.id === normalized.id)
-          ? orgPositions.map(p => p.id === normalized.id ? normalized : p)
-          : [...orgPositions, normalized];
-      setOrgPositions(updated);
-      void api.bpm
-        .updatePositions(updated)
-        .then(() => showNotification('Должность сохранена'))
-        .catch(() => showNotification('Ошибка сохранения должности. Повторите или проверьте сеть.'));
+    const normalized: OrgPosition = { ...pos, isArchived: pos.isArchived ?? false };
+    const updated = orgPositions.find((p) => p.id === normalized.id)
+      ? orgPositions.map((p) => (p.id === normalized.id ? normalized : p))
+      : [...orgPositions, normalized];
+    setOrgPositions(updated);
+    void api.bpm
+      .updatePositions(updated)
+      .catch(() => showNotification('Ошибка сохранения должности. Повторите или проверьте сеть.'));
   };
 
   const deletePosition = (id: string) => {
-      const now = new Date().toISOString();
-      const updated = orgPositions.map((p) =>
-          p.id === id ? { ...p, isArchived: true, updatedAt: now } : p
-      );
-      setOrgPositions(updated);
-      void api.bpm
-        .updatePositions(updated)
-        .then(() => showNotification('Должность в архиве'))
-        .catch(() => showNotification('Не удалось удалить должность. Повторите или проверьте сеть.'));
+    const now = new Date().toISOString();
+    const updated = orgPositions.map((p) =>
+      p.id === id ? { ...p, isArchived: true, updatedAt: now } : p
+    );
+    setOrgPositions(updated);
+    void api.bpm
+      .updatePositions(updated)
+      .catch(() => showNotification('Не удалось архивировать должность. Повторите или проверьте сеть.'));
   };
 
-  // Processes
+  // ── Processes ────────────────────────────────────────────────────────────
+
   const saveProcess = (proc: BusinessProcess) => {
-      // Проверяем, существует ли процесс с таким id
-      const existingProcess = businessProcesses.find(p => p.id === proc.id);
-      
-      if (existingProcess) {
-          // Если версия изменилась, сохраняем старую версию и добавляем новую
-          if (existingProcess.version !== proc.version) {
-              // Оставляем старую версию в массиве и добавляем новую
-              const updated = [...businessProcesses, proc];
-              setBusinessProcesses(updated);
-              api.bpm.updateProcesses(updated);
-              showNotification('Процесс сохранен (новая версия)');
-          } else {
-              // Версия не изменилась - обновляем существующий процесс
-              const updated = businessProcesses.map(p => p.id === proc.id && p.version === proc.version ? proc : p);
-              setBusinessProcesses(updated);
-              api.bpm.updateProcesses(updated);
-              showNotification('Процесс сохранен');
-          }
-      } else {
-          // Новый процесс
-          const updated = [...businessProcesses, proc];
-          setBusinessProcesses(updated);
-          api.bpm.updateProcesses(updated);
-          showNotification('Процесс сохранен');
-      }
+    // One entry per ID — always replace, never append duplicates.
+    const updated = businessProcesses.find((p) => p.id === proc.id)
+      ? businessProcesses.map((p) => (p.id === proc.id ? proc : p))
+      : [...businessProcesses, proc];
+    setBusinessProcesses(updated);
+    void api.bpm
+      .updateProcesses(updated)
+      .catch(() => showNotification('Ошибка сохранения процесса. Повторите или проверьте сеть.'));
   };
 
   const deleteProcess = (id: string) => {
-      const now = new Date().toISOString();
-      const updated = businessProcesses.map((p) =>
-          p.id === id ? { ...p, isArchived: true, updatedAt: now } : p
-      );
-      setBusinessProcesses(updated);
-      api.bpm.updateProcesses(updated);
-      showNotification('Процесс в архиве');
+    const now = new Date().toISOString();
+    const updated = businessProcesses.map((p) =>
+      p.id === id ? { ...p, isArchived: true, updatedAt: now } : p
+    );
+    setBusinessProcesses(updated);
+    void api.bpm
+      .updateProcesses(updated)
+      .catch(() => showNotification('Не удалось архивировать процесс. Повторите или проверьте сеть.'));
   };
 
   return {
     state: { orgPositions, businessProcesses },
     setters: { setOrgPositions, setBusinessProcesses },
-    actions: { 
-        savePosition, deletePosition,
-        saveProcess, deleteProcess
-    }
+    actions: {
+      savePosition,
+      deletePosition,
+      saveProcess,
+      deleteProcess,
+    },
   };
 };

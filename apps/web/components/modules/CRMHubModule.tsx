@@ -14,6 +14,8 @@ import {
   type PurchaseRequest,
   type Department,
   type FinanceCategory,
+  type ProductionRoutePipeline,
+  type ProductionRouteOrder,
 } from '../../types';
 import type { AppActions } from '../../frontend/hooks/useAppLogic';
 import { hasPermission } from '../../utils/permissions';
@@ -41,6 +43,8 @@ interface CRMHubModuleProps {
   purchaseRequests?: PurchaseRequest[];
   departments?: Department[];
   financeCategories?: FinanceCategory[];
+  productionPipelines?: ProductionRoutePipeline[];
+  productionOrders?: ProductionRouteOrder[];
   actions: AppActions;
 }
 
@@ -62,6 +66,8 @@ export const CRMHubModule: React.FC<CRMHubModuleProps> = ({
   purchaseRequests = [],
   departments = [],
   financeCategories = [],
+  productionPipelines = [],
+  productionOrders = [],
   actions,
 }) => {
   const { setLeading } = useAppToolbar();
@@ -153,6 +159,8 @@ export const CRMHubModule: React.FC<CRMHubModuleProps> = ({
     accountsReceivable,
     users,
     salesFunnels,
+    productionPipelines,
+    productionOrders,
     projects,
     tasks,
     meetings,

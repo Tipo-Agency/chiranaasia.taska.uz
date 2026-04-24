@@ -162,9 +162,15 @@ export const ClientChatsPage: React.FC<ClientChatsPageProps> = ({
   currentUser,
   salesFunnels = [],
   onSaveDeal,
+  onOpenInFunnel,
   layout = 'page',
 }) => {
   const [channelFilter, setChannelFilter] = useState<ChannelFilter>('all');
+  // Стабильный ref чтобы не было stale closure в async useEffect-ах
+  const onSaveDealRef = useRef(onSaveDeal);
+  useEffect(() => {
+    onSaveDealRef.current = onSaveDeal;
+  }, [onSaveDeal]);
 
   const threads = useMemo(() => {
     return deals
@@ -233,7 +239,7 @@ export const ClientChatsPage: React.FC<ClientChatsPageProps> = ({
     void api.integrationsTelegramPersonal
       .syncMessages(active.id)
       .then((up) => {
-        if (!cancelled) onSaveDeal(up as Deal);
+        if (!cancelled) onSaveDealRef.current(up as Deal);
       })
       .catch(() => {});
     return () => {
@@ -492,6 +498,16 @@ export const ClientChatsPage: React.FC<ClientChatsPageProps> = ({
                     {funnelNameForDeal(active, salesFunnels) ? ` · ${funnelNameForDeal(active, salesFunnels)}` : ''}
                   </div>
                 </div>
+                {onOpenInFunnel && (
+                  <button
+                    type="button"
+                    onClick={() => onOpenInFunnel(active)}
+                    className="shrink-0 rounded-lg border border-violet-200 bg-violet-50 px-2 py-1 text-[11px] font-medium text-violet-700 hover:bg-violet-100 dark:border-violet-700/50 dark:bg-violet-900/20 dark:text-violet-300 dark:hover:bg-violet-900/40"
+                    title="Открыть карточку сделки в воронке"
+                  >
+                    В воронку →
+                  </button>
+                )}
               </div>
 
               <div

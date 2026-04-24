@@ -32,6 +32,7 @@ from app.schemas.production import (
     ProductionPipelineBulkItem,
     ProductionPipelineRead,
 )
+from app.services.audit_log import log_mutation
 from app.services.domain_events import log_entity_mutation
 from app.services.production_route_payload import pipeline_display_name, validate_and_normalize_production_stages
 
@@ -42,6 +43,10 @@ require_production_access = require_any_permission(
     FULL_ACCESS,
     detail="production_access_required",
 )
+
+
+def _request_id(request: Request) -> str | None:
+    return getattr(request.state, "request_id", None)
 
 
 def _now_iso() -> str:
@@ -72,7 +77,7 @@ def _stage_index(stages: list[dict[str, Any]], stage_id: str) -> int:
 
 def _row_to_pipeline(row: ProductionPipeline) -> ProductionPipelineRead:
     name = row.name or ""
-    archived = str(row.is_archived or "").lower() == "true"
+    archived = bool(row.is_archived)
     return ProductionPipelineRead(
         id=row.id,
         name=name,
@@ -121,6 +126,8 @@ def _row_to_order(row: ProductionOrder, pending: ProductionHandoff | None) -> Pr
         title=row.title or "",
         notes=row.notes,
         status=row.status or "open",
+        dealId=row.deal_id,
+        purchaseRequestId=row.purchase_request_id,
         createdAt=row.created_at,
         updatedAt=row.updated_at,
         isArchived=bool(row.is_archived),
@@ -136,7 +143,12 @@ async def list_pipelines(request: Request, db: AsyncSession = Depends(get_db)):
 
 
 @router.put("/pipelines", response_model=OkResponse, dependencies=[Depends(require_production_access)])
-async def put_pipelines(items: list[ProductionPipelineBulkItem], db: AsyncSession = Depends(get_db)):
+async def put_pipelines(
+    items: list[ProductionPipelineBulkItem],
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    actor: User = Depends(get_current_user),
+):
     for it in items:
         pid = it.id.strip()
         if not pid:
@@ -160,7 +172,7 @@ async def put_pipelines(items: list[ProductionPipelineBulkItem], db: AsyncSessio
             else:
                 existing.updated_at = now
             if "isArchived" in fs:
-                existing.is_archived = "true" if it.isArchived else "false"
+                existing.is_archived = bool(it.isArchived)
         else:
             stages_raw = it.stages if it.stages is not None else []
             db.add(
@@ -171,16 +183,28 @@ async def put_pipelines(items: list[ProductionPipelineBulkItem], db: AsyncSessio
                     stages=validate_and_normalize_production_stages([s.model_dump(mode="python") for s in stages_raw]),
                     created_at=it.createdAt or now,
                     updated_at=it.updatedAt or now,
-                    is_archived="true" if it.isArchived else "false",
+                    is_archived=bool(it.isArchived),
                 )
             )
         await db.flush()
+        event_type = "production_pipeline.created" if is_new else "production_pipeline.updated"
         await log_entity_mutation(
             db,
-            event_type="production_pipeline.created" if is_new else "production_pipeline.updated",
+            event_type=event_type,
             entity_type="production_pipeline",
             entity_id=pid,
             source="production-router",
+            actor_id=actor.id,
+            payload={"name": display_name},
+        )
+        await log_mutation(
+            db,
+            "create" if is_new else "update",
+            "production_pipeline",
+            pid,
+            actor_id=actor.id,
+            source="production-router",
+            request_id=_request_id(request),
             payload={"name": display_name},
         )
     await db.commit()
@@ -192,24 +216,39 @@ async def list_orders(
     request: Request,
     db: AsyncSession = Depends(get_db),
     pipeline_id: str | None = Query(default=None, alias="pipelineId"),
+    deal_id: str | None = Query(default=None, alias="dealId"),
+    purchase_request_id: str | None = Query(default=None, alias="purchaseRequestId"),
 ):
     stmt = select(ProductionOrder).where(ProductionOrder.is_archived.is_(False))
     if pipeline_id and pipeline_id.strip():
         stmt = stmt.where(ProductionOrder.pipeline_id == pipeline_id.strip()[:36])
+    if deal_id and deal_id.strip():
+        stmt = stmt.where(ProductionOrder.deal_id == deal_id.strip()[:36])
+    if purchase_request_id and purchase_request_id.strip():
+        stmt = stmt.where(ProductionOrder.purchase_request_id == purchase_request_id.strip()[:36])
     stmt = stmt.order_by(ProductionOrder.created_at.desc())
     res = await db.execute(stmt)
     rows = list(res.scalars().all())
-    out: list[ProductionOrderRead] = []
-    for row in rows:
-        pend = await _pending_handoff(db, row.id)
-        out.append(_row_to_order(row, pend))
+    # Batch-load all pending handoffs in one query — avoids N+1
+    order_ids = [r.id for r in rows]
+    pending_by_order: dict[str, ProductionHandoff] = {}
+    if order_ids:
+        res_h = await db.execute(
+            select(ProductionHandoff).where(
+                ProductionHandoff.order_id.in_(order_ids),
+                ProductionHandoff.status == "pending_accept",
+            )
+        )
+        for h in res_h.scalars().all():
+            pending_by_order[h.order_id] = h
+    out = [_row_to_order(row, pending_by_order.get(row.id)) for row in rows]
     return json_304_or_response(request, data=out, max_age=15)
 
 
 @router.post("/orders", response_model=ProductionOrderRead, dependencies=[Depends(require_production_access)])
 async def create_order(body: ProductionOrderCreate, db: AsyncSession = Depends(get_db), user: User = Depends(get_current_user)):
     pl = await db.get(ProductionPipeline, body.pipelineId.strip()[:36])
-    if not pl or str(pl.is_archived or "").lower() == "true":
+    if not pl or bool(pl.is_archived):
         raise HTTPException(status_code=404, detail="production_pipeline_not_found")
     sid = _first_stage_id(pl)
     now = _now_iso()
@@ -222,6 +261,10 @@ async def create_order(body: ProductionOrderCreate, db: AsyncSession = Depends(g
         title=body.title.strip()[:500],
         notes=body.notes,
         status="open",
+        deal_id=body.dealId.strip()[:36] if body.dealId and body.dealId.strip() else None,
+        purchase_request_id=body.purchaseRequestId.strip()[:36]
+        if body.purchaseRequestId and body.purchaseRequestId.strip()
+        else None,
         created_at=now,
         updated_at=now,
         is_archived=False,
@@ -265,6 +308,12 @@ async def patch_order(
         row.notes = body.notes
     if "status" in fs and body.status is not None:
         row.status = str(body.status).strip()[:30] or row.status
+    if "dealId" in fs:
+        row.deal_id = body.dealId.strip()[:36] if body.dealId and body.dealId.strip() else None
+    if "purchaseRequestId" in fs:
+        row.purchase_request_id = (
+            body.purchaseRequestId.strip()[:36] if body.purchaseRequestId and body.purchaseRequestId.strip() else None
+        )
     if "isArchived" in fs and body.isArchived is not None:
         row.is_archived = bool(body.isArchived)
     row.updated_at = _now_iso()

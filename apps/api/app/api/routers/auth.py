@@ -309,7 +309,8 @@ async def list_roles(
 @router.post("/roles", response_model=IdOkResponse)
 async def create_role(
     body: RoleCreateBody,
-    _: User = Depends(require_permission("access.roles")),
+    request: Request,
+    actor: User = Depends(require_permission("access.roles")),
     db: AsyncSession = Depends(get_db),
 ):
     slug = (body.slug or _slugify(body.name)).strip().lower()
@@ -329,6 +330,25 @@ async def create_role(
         permissions=perms,
     )
     db.add(role)
+    await db.flush()
+    await log_entity_mutation(
+        db,
+        event_type="role.created",
+        entity_type="role",
+        entity_id=rid,
+        source="auth-router",
+        payload={"name": body.name.strip(), "slug": slug},
+    )
+    await log_mutation(
+        db,
+        "create",
+        "role",
+        rid,
+        actor_id=actor.id,
+        source="auth-router",
+        request_id=_request_id(request),
+        payload={"name": body.name.strip(), "slug": slug},
+    )
     await db.commit()
     return {"id": rid, "ok": True}
 
@@ -337,7 +357,8 @@ async def create_role(
 async def patch_role(
     role_id: str,
     body: RolePatchBody,
-    _: User = Depends(require_permission("access.roles")),
+    request: Request,
+    actor: User = Depends(require_permission("access.roles")),
     db: AsyncSession = Depends(get_db),
 ):
     role = await db.get(Role, role_id)
@@ -352,6 +373,25 @@ async def patch_role(
     if body.permissions is not None:
         allowed = set(all_permission_keys())
         role.permissions = [p for p in body.permissions if p in allowed]
+    await db.flush()
+    await log_entity_mutation(
+        db,
+        event_type="role.patched",
+        entity_type="role",
+        entity_id=role_id,
+        source="auth-router",
+        payload={"name": role.name, "permissions_count": len(role.permissions or [])},
+    )
+    await log_mutation(
+        db,
+        "update",
+        "role",
+        role_id,
+        actor_id=actor.id,
+        source="auth-router",
+        request_id=_request_id(request),
+        payload={"name": role.name, "permissions": role.permissions},
+    )
     await db.commit()
     return {"ok": True}
 
@@ -359,7 +399,8 @@ async def patch_role(
 @router.delete("/roles/{role_id}", response_model=OkResponse)
 async def delete_role(
     role_id: str,
-    _: User = Depends(require_permission("access.roles")),
+    request: Request,
+    actor: User = Depends(require_permission("access.roles")),
     db: AsyncSession = Depends(get_db),
 ):
     role = await db.get(Role, role_id)
@@ -370,7 +411,27 @@ async def delete_role(
     n = await count_users_with_role(db, role_id)
     if n > 0:
         raise HTTPException(status_code=400, detail="На роль назначены пользователи")
+    role_name = role.name
     await db.delete(role)
+    await db.flush()
+    await log_entity_mutation(
+        db,
+        event_type="role.deleted",
+        entity_type="role",
+        entity_id=role_id,
+        source="auth-router",
+        payload={"name": role_name},
+    )
+    await log_mutation(
+        db,
+        "delete",
+        "role",
+        role_id,
+        actor_id=actor.id,
+        source="auth-router",
+        request_id=_request_id(request),
+        payload={"name": role_name},
+    )
     await db.commit()
     return {"ok": True}
 

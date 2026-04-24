@@ -1,6 +1,7 @@
 """Производственные маршруты (горизонтальная воронка): пайплайн → заказы → передачи между этапами."""
 import uuid
 
+import sqlalchemy as sa
 from sqlalchemy import Boolean, Column, ForeignKey, Integer, String, Text, text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import relationship
@@ -21,7 +22,7 @@ class ProductionPipeline(Base):
     stages = Column(JSONB, nullable=False, server_default=text("'[]'::jsonb"))
     created_at = Column(String(50), nullable=True)
     updated_at = Column(String(50), nullable=True)
-    is_archived = Column(String(10), nullable=False, server_default=text("'false'"))
+    is_archived = Column(Boolean, nullable=False, server_default=sa.text("false"))
 
     orders = relationship("ProductionOrder", back_populates="pipeline")
 
@@ -36,6 +37,8 @@ class ProductionOrder(Base):
     title = Column(String(500), nullable=False)
     notes = Column(Text, nullable=True)
     status = Column(String(30), nullable=False, server_default=text("'open'"))
+    deal_id = Column(String(36), nullable=True, index=True)
+    purchase_request_id = Column(String(36), nullable=True, index=True)
     created_at = Column(String(50), nullable=False)
     updated_at = Column(String(50), nullable=True)
     is_archived = Column(Boolean, nullable=False, server_default=text("false"))

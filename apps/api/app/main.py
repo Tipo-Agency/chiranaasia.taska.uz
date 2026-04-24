@@ -35,8 +35,10 @@ from app.api.routers import (
     integrations_meta,
     integrations_roadmap,
     integrations_site,
+    integrations_mail,
     integrations_telegram,
     integrations_telegram_personal,
+    mail_user,
     inventory,
     meetings,
     messages,
@@ -259,6 +261,8 @@ app.include_router(meta_webhook.router)
 app.include_router(integrations_meta.router, prefix=settings.API_PREFIX)
 app.include_router(integrations_roadmap.router, prefix=settings.API_PREFIX)
 app.include_router(integrations_site.router, prefix=settings.API_PREFIX)
+app.include_router(integrations_mail.router, prefix=settings.API_PREFIX)
+app.include_router(mail_user.router, prefix=settings.API_PREFIX)
 app.include_router(integrations_telegram.router, prefix=settings.API_PREFIX)
 app.include_router(integrations_telegram_personal.router, prefix=settings.API_PREFIX)
 

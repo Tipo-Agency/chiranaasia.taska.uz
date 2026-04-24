@@ -120,9 +120,22 @@ export const MiniMessenger: React.FC<MiniMessengerProps> = ({
         api.messages.getOutbox(currentUser.id),
       ]);
 
-      const mapped: ChatMessageLocal[] = [...(inbox as any[]), ...(outbox as any[])]
+      /** Форма сообщения как приходит из API — все поля unknown до маппинга */
+      interface RawChatMessage {
+        id?: unknown;
+        senderId?: unknown;
+        recipientId?: unknown;
+        text?: unknown;
+        createdAt?: unknown;
+        read?: unknown;
+      }
+
+      const mapped: ChatMessageLocal[] = [
+        ...(inbox as RawChatMessage[]),
+        ...(outbox as RawChatMessage[]),
+      ]
         .filter(Boolean)
-        .map((m: any) => {
+        .map((m) => {
           const toId = m.recipientId == null ? TO_ALL_ID : String(m.recipientId);
           const rawSender = String(m.senderId || '');
           // API кладёт системные уведомления как sender "system", лента «Система» — __system__

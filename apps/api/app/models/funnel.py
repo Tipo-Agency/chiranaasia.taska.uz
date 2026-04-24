@@ -1,7 +1,8 @@
 """SalesFunnel model."""
 import uuid
 
-from sqlalchemy import Column, String
+import sqlalchemy as sa
+from sqlalchemy import Boolean, Column, String
 from sqlalchemy.dialects.postgresql import JSONB
 
 from app.db import Base
@@ -24,4 +25,4 @@ class SalesFunnel(Base):
     notification_templates = Column(JSONB, default=dict)
     created_at = Column(String(50), nullable=True)
     updated_at = Column(String(50), nullable=True)
-    is_archived = Column(String(10), default="false")
+    is_archived = Column(Boolean, nullable=False, server_default=sa.text("false"))

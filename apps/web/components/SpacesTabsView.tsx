@@ -156,10 +156,11 @@ export const SpacesTabsView: React.FC<SpacesTabsViewProps> = ({
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {currentSpaces.map((table) => (
-                <div
+                <button
                   key={table.id}
+                  type="button"
                   onClick={() => onSelectTable(table.id)}
-                  className={`bg-white dark:bg-[#252525] border border-gray-200 dark:border-[#333] rounded-lg p-4 hover:shadow-lg transition-all cursor-pointer group ${
+                  className={`w-full text-left bg-white dark:bg-[#252525] border border-gray-200 dark:border-[#333] rounded-lg p-4 hover:shadow-lg transition-all cursor-pointer group ${
                     activeTableId === table.id && currentView === 'table'
                       ? 'ring-2 ring-blue-500 border-blue-500'
                       : ''
@@ -182,6 +183,7 @@ export const SpacesTabsView: React.FC<SpacesTabsViewProps> = ({
                     {hasPermission(currentUser, 'settings.general') && (
                       <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                         <button
+                          type="button"
                           onClick={(e) => {
                             e.stopPropagation();
                             onEditTable(table);
@@ -192,6 +194,7 @@ export const SpacesTabsView: React.FC<SpacesTabsViewProps> = ({
                         </button>
                         {!table.isSystem && (
                           <button
+                            type="button"
                             onClick={(e) => {
                               e.stopPropagation();
                               onDeleteTable(table.id);
@@ -204,7 +207,7 @@ export const SpacesTabsView: React.FC<SpacesTabsViewProps> = ({
                       </div>
                     )}
                   </div>
-                </div>
+                </button>
               ))}
             </div>
           )}

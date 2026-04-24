@@ -44,7 +44,7 @@ export const SpaceSettings: React.FC<SpaceSettingsProps> = ({
   const [newPageName, setNewPageName] = useState('');
   const [newPageIcon, setNewPageIcon] = useState('');
   const [newPageColor, setNewPageColor] = useState('');
-  const [newPageType, setNewPageType] = useState('tasks');
+  const [newPageType, setNewPageType] = useState<'tasks' | 'docs' | 'meetings' | 'content-plan' | 'backlog' | 'functionality'>('tasks');
   const [newPageIsPublic, setNewPageIsPublic] = useState(false);
 
   const activeProjects = useMemo(() => projects.filter((p) => !p.isArchived), [projects]);
@@ -103,7 +103,7 @@ export const SpaceSettings: React.FC<SpaceSettingsProps> = ({
               name: newPageName,
               icon: newPageIcon,
               color: newPageColor,
-              type: newPageType as any,
+              type: newPageType,
               isPublic: newPageType === 'content-plan' ? newPageIsPublic : false,
           });
           setEditingId(null);

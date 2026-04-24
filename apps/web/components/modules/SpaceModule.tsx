@@ -109,6 +109,84 @@ export const SpaceModule: React.FC<SpaceModuleProps> = ({
     );
   }
 
+  // Обработчики вынесены перед switch — const внутри case (без {}) вызывают
+  // "Lexical declarations in case clause" и потенциально недоступны в других ветках.
+  const handleTakeToWork = (idea: Task) => {
+    // Идемпотентность: если задача уже создана — просто открываем её.
+    const existing = tasks.find((t) => t.entityType === 'task' && t.linkedIdeaId === idea.id && !t.isArchived);
+    if (existing) {
+      actions.openTaskModal(existing);
+      return;
+    }
+
+    const workStatus =
+      statuses.find(s => ['В работе', 'В работе ✅', 'В процессе', 'In progress', 'In Progress'].includes(s.name))?.name ||
+      statuses.find(s => !['Выполнено', 'Done', 'Завершено'].includes(s.name))?.name ||
+      statuses[0]?.name ||
+      'Новая';
+
+    const newTask: Partial<Task> = {
+      entityType: 'task',
+      tableId: '',
+      title: idea.title,
+      description: idea.description,
+      projectId: idea.projectId,
+      status: workStatus,
+      priority: idea.priority || 'Средний',
+      assigneeId: idea.assigneeId,
+      assigneeIds: idea.assigneeIds,
+      startDate: idea.startDate || new Date().toISOString().split('T')[0],
+      endDate: idea.endDate || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+      source: 'Идеи',
+      linkedIdeaId: idea.id,
+      attachments: idea.attachments,
+      createdAt: new Date().toISOString(),
+    };
+
+    actions.saveTask(newTask);
+    // Идея уходит из списка — архивируем
+    actions.saveTask({ id: idea.id, status: workStatus, isArchived: true });
+  };
+
+  const handleTakeFeatureToWork = (feature: Task) => {
+    // Идемпотентность: если задача уже создана — просто открываем её.
+    const existing = tasks.find((t) => t.entityType === 'task' && t.linkedFeatureId === feature.id && !t.isArchived);
+    if (existing) {
+      actions.openTaskModal(existing);
+      return;
+    }
+
+    const workStatus =
+      statuses.find(s => ['В работе', 'В работе ✅', 'В процессе', 'In progress', 'In Progress'].includes(s.name))?.name ||
+      statuses.find(s => !['Выполнено', 'Done', 'Завершено'].includes(s.name))?.name ||
+      statuses[0]?.name ||
+      'Новая';
+
+    // Функция остаётся с entityType: 'feature', создаём новую задачу
+    const newTask: Partial<Task> = {
+      entityType: 'task',
+      tableId: '',
+      title: feature.title,
+      description: feature.description,
+      projectId: feature.projectId,
+      category: feature.category,
+      status: workStatus,
+      priority: feature.priority,
+      assigneeId: feature.assigneeId,
+      assigneeIds: feature.assigneeIds,
+      startDate: feature.startDate || new Date().toISOString().split('T')[0],
+      endDate: feature.endDate || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+      source: 'Функционал',
+      linkedFeatureId: feature.id,
+      attachments: feature.attachments,
+      createdAt: new Date().toISOString(),
+    };
+
+    actions.saveTask(newTask);
+    // Обновляем статус функции (чтобы было видно, что взяли в работу)
+    actions.saveTask({ id: feature.id, status: workStatus });
+  };
+
   switch (activeTable.type) {
     case 'tasks':
         return (
@@ -248,44 +326,6 @@ export const SpaceModule: React.FC<SpaceModuleProps> = ({
         );
 
     case 'backlog':
-        // Функция для переноса идеи из беклога в работу
-        const handleTakeToWork = (idea: Task) => {
-            // Идемпотентность: если задача уже создана — просто открываем её.
-            const existing = tasks.find((t) => t.entityType === 'task' && t.linkedIdeaId === idea.id && !t.isArchived);
-            if (existing) {
-                actions.openTaskModal(existing);
-                return;
-            }
-
-            const workStatus =
-                statuses.find(s => ['В работе', 'В работе ✅', 'В процессе', 'In progress', 'In Progress'].includes(s.name))?.name ||
-                statuses.find(s => !['Выполнено', 'Done', 'Завершено'].includes(s.name))?.name ||
-                statuses[0]?.name ||
-                'Новая';
-            
-            const newTask: Partial<Task> = {
-                entityType: 'task',
-                tableId: '', // Для обычных задач tableId не используется
-                title: idea.title,
-                description: idea.description,
-                projectId: idea.projectId,
-                status: workStatus,
-                priority: idea.priority || 'Средний',
-                assigneeId: idea.assigneeId,
-                assigneeIds: idea.assigneeIds,
-                startDate: idea.startDate || new Date().toISOString().split('T')[0],
-                endDate: idea.endDate || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-                source: 'Идеи',
-                linkedIdeaId: idea.id,
-                attachments: idea.attachments,
-                createdAt: new Date().toISOString()
-            };
-            
-            actions.saveTask(newTask);
-            // Идея должна исчезнуть из списка идей
-            actions.saveTask({ id: idea.id, status: workStatus, isArchived: true });
-        };
-
         return (
             <div className="h-full flex flex-col min-h-0">
                 <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden">
@@ -321,47 +361,6 @@ export const SpaceModule: React.FC<SpaceModuleProps> = ({
         );
     
     case 'functionality':
-        // Функция для переноса функции из функционала в работу
-        const handleTakeFeatureToWork = (feature: Task) => {
-            // Идемпотентность: если задача уже создана — просто открываем её.
-            const existing = tasks.find((t) => t.entityType === 'task' && t.linkedFeatureId === feature.id && !t.isArchived);
-            if (existing) {
-                actions.openTaskModal(existing);
-                return;
-            }
-
-            const workStatus =
-                statuses.find(s => ['В работе', 'В работе ✅', 'В процессе', 'In progress', 'In Progress'].includes(s.name))?.name ||
-                statuses.find(s => !['Выполнено', 'Done', 'Завершено'].includes(s.name))?.name ||
-                statuses[0]?.name ||
-                'Новая';
-
-            // Функция НЕ удаляется, остается с entityType: 'feature'
-            // Создаем новую задачу на основе функции
-            const newTask: Partial<Task> = {
-                entityType: 'task',
-                tableId: '', // Для обычных задач tableId не используется
-                title: feature.title,
-                description: feature.description,
-                projectId: feature.projectId,
-                category: feature.category,
-                status: workStatus,
-                priority: feature.priority,
-                assigneeId: feature.assigneeId,
-                assigneeIds: feature.assigneeIds,
-                startDate: feature.startDate || new Date().toISOString().split('T')[0],
-                endDate: feature.endDate || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-                source: 'Функционал',
-                linkedFeatureId: feature.id, // Связываем задачу с функцией
-                attachments: feature.attachments,
-                createdAt: new Date().toISOString()
-            };
-            
-            actions.saveTask(newTask);
-            // Обновляем статус функции (чтобы было видно, что взяли в работу)
-            actions.saveTask({ id: feature.id, status: workStatus });
-        };
-
         return (
             <div className="h-full flex flex-col min-h-0">
                 <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden">

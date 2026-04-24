@@ -1,5 +1,5 @@
 """Inventory router."""
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -18,6 +18,7 @@ from app.schemas.inventory import (
     WarehouseItem,
     WarehouseRead,
 )
+from app.services.audit_log import log_mutation
 from app.services.domain_events import log_entity_mutation
 from app.services.past_entity_edit_guard import (
     guard_inventory_dated_mutation,
@@ -28,19 +29,8 @@ from app.services.past_entity_edit_guard import (
 router = APIRouter(prefix="/inventory", tags=["inventory"], dependencies=[Depends(get_current_user)])
 
 
-def _bool(val):
-    return str(val).lower() in ("true", "1", "yes") if val else False
-
-
-def row_to_warehouse(row):
-    return {
-        "id": row.id,
-        "name": row.name,
-        "departmentId": row.department_id,
-        "location": row.location,
-        "isDefault": _bool(row.is_default),
-        "isArchived": _bool(row.is_archived),
-    }
+def _request_id(request: Request) -> str | None:
+    return getattr(request.state, "request_id", None)
 
 
 def _json_list(col):
@@ -49,7 +39,18 @@ def _json_list(col):
     return col if isinstance(col, list) else []
 
 
-def row_to_item(row):
+def row_to_warehouse(row: Warehouse) -> dict:
+    return {
+        "id": row.id,
+        "name": row.name,
+        "departmentId": row.department_id,
+        "location": row.location,
+        "isDefault": bool(row.is_default),
+        "isArchived": bool(row.is_archived),
+    }
+
+
+def row_to_item(row: InventoryItem) -> dict:
     return {
         "id": row.id,
         "sku": row.sku,
@@ -62,11 +63,11 @@ def row_to_item(row):
         "barcode": getattr(row, "barcode", None),
         "manufacturer": getattr(row, "manufacturer", None),
         "consumptionHint": getattr(row, "consumption_hint", None),
-        "isArchived": _bool(row.is_archived),
+        "isArchived": bool(row.is_archived),
     }
 
 
-def row_to_movement(row):
+def row_to_movement(row: StockMovement) -> dict:
     return {
         "id": row.id,
         "type": row.type,
@@ -79,7 +80,7 @@ def row_to_movement(row):
     }
 
 
-def row_to_revision(row):
+def row_to_revision(row: InventoryRevision) -> dict:
     return {
         "id": row.id,
         "number": row.number,
@@ -100,7 +101,12 @@ async def get_warehouses(db: AsyncSession = Depends(get_db)):
 
 
 @router.put("/warehouses", response_model=OkResponse)
-async def update_warehouses(warehouses: list[WarehouseItem], db: AsyncSession = Depends(get_db)):
+async def update_warehouses(
+    request: Request,
+    warehouses: list[WarehouseItem],
+    db: AsyncSession = Depends(get_db),
+    actor: User = Depends(get_current_user),
+):
     for w in warehouses:
         wid = w.id
         if not wid:
@@ -111,16 +117,16 @@ async def update_warehouses(warehouses: list[WarehouseItem], db: AsyncSession = 
             existing.name = w.name or existing.name
             existing.department_id = w.departmentId
             existing.location = w.location
-            existing.is_default = "true" if w.isDefault else "false"
-            existing.is_archived = "true" if w.isArchived else "false"
+            existing.is_default = bool(w.isDefault)
+            existing.is_archived = bool(w.isArchived)
         else:
             db.add(Warehouse(
                 id=wid,
                 name=w.name or "",
                 department_id=w.departmentId,
                 location=w.location,
-                is_default="true" if w.isDefault else "false",
-                is_archived="true" if w.isArchived else "false",
+                is_default=bool(w.isDefault),
+                is_archived=bool(w.isArchived),
             ))
         await db.flush()
         await log_entity_mutation(
@@ -129,8 +135,18 @@ async def update_warehouses(warehouses: list[WarehouseItem], db: AsyncSession = 
             entity_type="warehouse",
             entity_id=wid,
             source="inventory-router",
+            actor_id=actor.id,
             payload={"name": w.name},
-            actor_id=w.updatedByUserId,
+        )
+        await log_mutation(
+            db,
+            "create" if is_new else "update",
+            "warehouse",
+            wid,
+            actor_id=actor.id,
+            source="inventory-router",
+            request_id=_request_id(request),
+            payload={"name": w.name},
         )
     await db.commit()
     return {"ok": True}
@@ -143,7 +159,12 @@ async def get_items(db: AsyncSession = Depends(get_db)):
 
 
 @router.put("/items", response_model=OkResponse)
-async def update_items(items: list[InventoryItemSchema], db: AsyncSession = Depends(get_db)):
+async def update_items(
+    request: Request,
+    items: list[InventoryItemSchema],
+    db: AsyncSession = Depends(get_db),
+    actor: User = Depends(get_current_user),
+):
     for i in items:
         iid = i.id
         if not iid:
@@ -163,7 +184,7 @@ async def update_items(items: list[InventoryItemSchema], db: AsyncSession = Depe
             existing.barcode = i.barcode
             existing.manufacturer = i.manufacturer
             existing.consumption_hint = i.consumptionHint
-            existing.is_archived = "true" if i.isArchived else "false"
+            existing.is_archived = bool(i.isArchived)
         else:
             db.add(InventoryItem(
                 id=iid,
@@ -177,7 +198,7 @@ async def update_items(items: list[InventoryItemSchema], db: AsyncSession = Depe
                 barcode=i.barcode,
                 manufacturer=i.manufacturer,
                 consumption_hint=i.consumptionHint,
-                is_archived="true" if i.isArchived else "false",
+                is_archived=bool(i.isArchived),
             ))
         await db.flush()
         await log_entity_mutation(
@@ -186,8 +207,18 @@ async def update_items(items: list[InventoryItemSchema], db: AsyncSession = Depe
             entity_type="inventory_item",
             entity_id=iid,
             source="inventory-router",
+            actor_id=actor.id,
             payload={"sku": i.sku, "name": i.name},
-            actor_id=i.updatedByUserId,
+        )
+        await log_mutation(
+            db,
+            "create" if is_new else "update",
+            "inventory_item",
+            iid,
+            actor_id=actor.id,
+            source="inventory-router",
+            request_id=_request_id(request),
+            payload={"sku": i.sku, "name": i.name},
         )
     await db.commit()
     return {"ok": True}
@@ -201,6 +232,7 @@ async def get_movements(db: AsyncSession = Depends(get_db)):
 
 @router.put("/movements", response_model=OkResponse)
 async def update_movements(
+    request: Request,
     movements: list[StockMovementItem],
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
@@ -245,8 +277,18 @@ async def update_movements(
             entity_type="stock_movement",
             entity_id=mid,
             source="inventory-router",
+            actor_id=current_user.id,
             payload={"type": m.type, "date": m.date},
-            actor_id=m.createdByUserId or None,
+        )
+        await log_mutation(
+            db,
+            "create" if is_new else "update",
+            "stock_movement",
+            mid,
+            actor_id=current_user.id,
+            source="inventory-router",
+            request_id=_request_id(request),
+            payload={"type": m.type, "date": m.date},
         )
     await db.commit()
     return {"ok": True}
@@ -260,6 +302,7 @@ async def get_revisions(db: AsyncSession = Depends(get_db)):
 
 @router.put("/revisions", response_model=OkResponse)
 async def update_revisions(
+    request: Request,
     revisions: list[InventoryRevisionItem],
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
@@ -306,8 +349,18 @@ async def update_revisions(
             entity_type="inventory_revision",
             entity_id=rid,
             source="inventory-router",
+            actor_id=current_user.id,
             payload={"number": r.number, "status": r.status},
-            actor_id=r.createdByUserId or None,
+        )
+        await log_mutation(
+            db,
+            "create" if is_new else "update",
+            "inventory_revision",
+            rid,
+            actor_id=current_user.id,
+            source="inventory-router",
+            request_id=_request_id(request),
+            payload={"number": r.number, "status": r.status},
         )
     await db.commit()
     return {"ok": True}

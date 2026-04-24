@@ -12,6 +12,8 @@ import {
   SalesFunnel,
   Meeting,
   NotificationPreferences,
+  type ProductionRoutePipeline,
+  type ProductionRouteOrder,
 } from '../types';
 import {
   Plus,
@@ -45,6 +47,8 @@ import {
   File as FileIcon,
   Download,
   Image as ImageIcon,
+  Package,
+  ChevronRight,
 } from 'lucide-react';
 // Клиентский Telegram/Instagram — при необходимости подключать через api/telegramService.
 import { DynamicIcon } from './AppIcons';
@@ -93,6 +97,8 @@ interface SalesFunnelViewProps {
   tasks?: Task[];
   meetings?: Meeting[];
   salesFunnels?: SalesFunnel[];
+  productionPipelines?: ProductionRoutePipeline[];
+  productionOrders?: ProductionRouteOrder[];
   /** Фильтр карточек по строке поиска в шапке (только сделки воронки). */
   headerSearchQuery?: string;
   onSaveDeal: (deal: Deal) => void;
@@ -103,6 +109,11 @@ interface SalesFunnelViewProps {
   onSaveMeeting?: (meeting: Meeting) => void;
   onDeleteMeeting?: (meetingId: string) => void;
   onUpdateMeetingSummary?: (meetingId: string, summary: string) => void;
+  onCreateProductionOrder?: (
+    pipelineId: string,
+    title: string,
+    context?: { dealId?: string; purchaseRequestId?: string }
+  ) => Promise<void>;
   autoOpenCreateModal?: boolean; // Автоматически открыть модалку создания
 }
 
@@ -154,6 +165,8 @@ const SalesFunnelView: React.FC<SalesFunnelViewProps> = ({
   tasks = [],
   meetings = [],
   salesFunnels = [],
+  productionPipelines = [],
+  productionOrders = [],
   currentUser,
   headerSearchQuery = '',
   onSaveDeal,
@@ -164,6 +177,7 @@ const SalesFunnelView: React.FC<SalesFunnelViewProps> = ({
   onSaveMeeting,
   onDeleteMeeting,
   onUpdateMeetingSummary,
+  onCreateProductionOrder,
   autoOpenCreateModal = false,
 }) => {
   const { setModule } = useAppToolbar();
@@ -172,7 +186,10 @@ const SalesFunnelView: React.FC<SalesFunnelViewProps> = ({
   const [editingDeal, setEditingDeal] = useState<Deal | null>(null);
   const [dealAttachments, setDealAttachments] = useState<DealAttachment[]>([]);
   const dealFileInputRef = useRef<HTMLInputElement>(null);
-  const [modalTab, setModalTab] = useState<'chat' | 'tasks' | 'meetings'>('chat');
+  const [modalTab, setModalTab] = useState<'chat' | 'tasks' | 'meetings' | 'orders'>('chat');
+  const [showCreateOrderForm, setShowCreateOrderForm] = useState(false);
+  const [newOrderTitle, setNewOrderTitle] = useState('');
+  const [newOrderPipelineId, setNewOrderPipelineId] = useState('');
 
   const [title, setTitle] = useState('');
   const [clientName, setClientName] = useState(''); // Просто название клиента, без создания
@@ -1654,6 +1671,13 @@ const SalesFunnelView: React.FC<SalesFunnelViewProps> = ({
                           >
                               Встречи
                           </button>
+                          <button
+                              type="button"
+                              onClick={() => setModalTab('orders')}
+                              className={`flex-1 px-2 py-1.5 rounded-lg text-xs font-medium transition-colors ${modalTab === 'orders' ? 'bg-black text-white dark:bg-white dark:text-black' : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-[#333]'}`}
+                          >
+                              Заказы
+                          </button>
                       </div>
                       <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
                           {modalTab === 'chat' ? (
@@ -1984,6 +2008,135 @@ const SalesFunnelView: React.FC<SalesFunnelViewProps> = ({
                                             </div>
                                           </div>
                                         )}
+                                      </>
+                                  )}
+                              </div>
+                          ) : modalTab === 'orders' ? (
+                              <div className="flex-1 p-4 md:p-6 overflow-y-auto flex flex-col gap-3">
+                                  <div className="flex items-center justify-between mb-1">
+                                      <h4 className="font-bold text-gray-800 dark:text-white flex items-center gap-2">
+                                          <Package size={18} /> Заказы по сделке
+                                      </h4>
+                                      {editingDeal && productionOrders.filter((o) => o.dealId === editingDeal.id).length > 0 && (
+                                          <span className="text-xs text-gray-500 dark:text-gray-400">
+                                              {productionOrders.filter((o) => o.dealId === editingDeal.id).length}
+                                          </span>
+                                      )}
+                                  </div>
+
+                                  {/* Список заказов по сделке */}
+                                  {editingDeal && productionOrders.filter((o) => o.dealId === editingDeal.id).length > 0 ? (
+                                      <div className="space-y-2">
+                                          {productionOrders
+                                              .filter((o) => o.dealId === editingDeal.id)
+                                              .map((order) => {
+                                                  const pipeline = productionPipelines.find((p) => p.id === order.pipelineId);
+                                                  const stage = pipeline?.stages.find((s) => s.id === order.currentStageId);
+                                                  return (
+                                                      <div
+                                                          key={order.id}
+                                                          className="p-3 bg-white dark:bg-[#333] border border-gray-200 dark:border-[#444] rounded-lg"
+                                                      >
+                                                          <div className="flex items-start justify-between gap-2">
+                                                              <div className="font-medium text-sm text-gray-800 dark:text-gray-200">{order.title}</div>
+                                                              <span className={`shrink-0 text-[10px] px-2 py-0.5 rounded-full font-medium ${
+                                                                  order.status === 'done'
+                                                                      ? 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300'
+                                                                      : 'bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300'
+                                                              }`}>
+                                                                  {order.status === 'done' ? 'Готово' : 'В работе'}
+                                                              </span>
+                                                          </div>
+                                                          {(pipeline || stage) && (
+                                                              <div className="flex items-center gap-1 mt-1.5 text-[11px] text-gray-500 dark:text-gray-400">
+                                                                  {pipeline && <span>{pipeline.name}</span>}
+                                                                  {pipeline && stage && <ChevronRight size={10} />}
+                                                                  {stage && <span>{stage.label}</span>}
+                                                              </div>
+                                                          )}
+                                                      </div>
+                                                  );
+                                              })}
+                                      </div>
+                                  ) : (
+                                      <div className="text-center py-6 text-gray-400 dark:text-gray-500 text-sm">
+                                          Нет заказов по этой сделке
+                                      </div>
+                                  )}
+
+                                  {/* Форма создания заказа */}
+                                  {onCreateProductionOrder && productionPipelines.filter((p) => !p.isArchived).length > 0 && (
+                                      <>
+                                          {!showCreateOrderForm ? (
+                                              <button
+                                                  type="button"
+                                                  title="Создать заказ"
+                                                  aria-label="Создать заказ"
+                                                  onClick={() => {
+                                                      const firstPipeline = productionPipelines.find((p) => !p.isArchived);
+                                                      setNewOrderPipelineId(firstPipeline?.id ?? '');
+                                                      setNewOrderTitle('');
+                                                      setShowCreateOrderForm(true);
+                                                  }}
+                                                  className="w-full p-3 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg hover:border-emerald-500 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 transition-colors flex items-center justify-center text-emerald-600 dark:text-emerald-400"
+                                              >
+                                                  <Plus size={22} strokeWidth={2.5} />
+                                              </button>
+                                          ) : (
+                                              <div className="p-3 border border-gray-200 dark:border-[#444] rounded-lg bg-white dark:bg-[#333] space-y-3">
+                                                  <div className="text-xs font-semibold uppercase text-gray-500 dark:text-gray-400">Новый заказ</div>
+                                                  <input
+                                                      value={newOrderTitle}
+                                                      onChange={(e) => setNewOrderTitle(e.target.value)}
+                                                      placeholder="Название заказа"
+                                                      className="w-full h-8 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-[#252525] px-2.5 text-sm text-gray-900 dark:text-gray-100 outline-none focus:ring-2 focus:ring-emerald-500/30"
+                                                  />
+                                                  <select
+                                                      value={newOrderPipelineId}
+                                                      onChange={(e) => setNewOrderPipelineId(e.target.value)}
+                                                      className="w-full h-8 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-[#252525] px-2.5 text-sm text-gray-900 dark:text-gray-100 outline-none"
+                                                  >
+                                                      {productionPipelines
+                                                          .filter((p) => !p.isArchived)
+                                                          .map((p) => (
+                                                              <option key={p.id} value={p.id}>
+                                                                  {p.name}
+                                                              </option>
+                                                          ))}
+                                                  </select>
+                                                  <div className="flex justify-end gap-2">
+                                                      <button
+                                                          type="button"
+                                                          onClick={() => setShowCreateOrderForm(false)}
+                                                          className="px-3 py-1.5 rounded-md border border-gray-200 dark:border-[#444] text-xs text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-[#2c2c2c]"
+                                                      >
+                                                          Отмена
+                                                      </button>
+                                                      <button
+                                                          type="button"
+                                                          onClick={async () => {
+                                                              const t = newOrderTitle.trim();
+                                                              if (!t) {
+                                                                  setAlertState({ open: true, title: 'Введите название', message: 'Укажите название заказа.' });
+                                                                  return;
+                                                              }
+                                                              if (!newOrderPipelineId) {
+                                                                  setAlertState({ open: true, title: 'Выберите маршрут', message: 'Выберите производственный маршрут для заказа.' });
+                                                                  return;
+                                                              }
+                                                              await onCreateProductionOrder(newOrderPipelineId, t, {
+                                                                dealId: editingDeal?.id,
+                                                              });
+                                                              setShowCreateOrderForm(false);
+                                                              setNewOrderTitle('');
+                                                          }}
+                                                          className="px-3 py-1.5 rounded-md text-xs text-white bg-emerald-600 hover:bg-emerald-700"
+                                                      >
+                                                          Создать заказ
+                                                      </button>
+                                                  </div>
+                                              </div>
+                                          )}
                                       </>
                                   )}
                               </div>

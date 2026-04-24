@@ -21,6 +21,9 @@ export function FinanceRoutesView(props: AppRouterProps) {
         financialPlannings={props.financialPlannings}
         incomeReports={props.incomeReports}
         bdr={props.bdr}
+        tasks={props.allTasks}
+        productionPipelines={props.productionPipelines}
+        productionBoardOrders={props.productionBoardOrders}
         actions={actions}
       />
     </Suspense>

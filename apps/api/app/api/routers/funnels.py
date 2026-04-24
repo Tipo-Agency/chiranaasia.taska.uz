@@ -158,7 +158,7 @@ def row_to_funnel(row: SalesFunnel) -> FunnelRead:
         notificationTemplates=templates,
         createdAt=row.created_at,
         updatedAt=row.updated_at,
-        isArchived=str(row.is_archived).lower() == "true" if row.is_archived else False,
+        isArchived=bool(row.is_archived),
     )
 
 
@@ -197,7 +197,7 @@ async def update_funnels(funnels: list[FunnelBulkItem], db: AsyncSession = Depen
             if "updatedAt" in fs:
                 existing.updated_at = f.updatedAt
             if "isArchived" in fs:
-                existing.is_archived = "true" if f.isArchived else "false"
+                existing.is_archived = bool(f.isArchived)
         else:
             stages_in = validate_and_normalize_stages(_stages_to_validate(f.stages))
             src_in = f.sources or {}
@@ -212,7 +212,7 @@ async def update_funnels(funnels: list[FunnelBulkItem], db: AsyncSession = Depen
                     notification_templates=f.notificationTemplates or {},
                     created_at=f.createdAt,
                     updated_at=f.updatedAt,
-                    is_archived="true" if f.isArchived else "false",
+                    is_archived=bool(f.isArchived),
                 )
             )
         await db.flush()
@@ -246,7 +246,7 @@ async def create_funnel(funnel: FunnelCreateBody, db: AsyncSession = Depends(get
             notification_templates=funnel.notificationTemplates or {},
             created_at=now,
             updated_at=now,
-            is_archived="false",
+            is_archived=False,
         )
     )
     await db.flush()
@@ -296,7 +296,7 @@ async def update_funnel(funnel_id: str, updates: FunnelPatchBody, db: AsyncSessi
     if "notificationTemplates" in fs:
         f.notification_templates = updates.notificationTemplates or {}
     if "isArchived" in fs:
-        f.is_archived = "true" if updates.isArchived else "false"
+        f.is_archived = bool(updates.isArchived)
     f.updated_at = datetime.utcnow().isoformat()
     await db.flush()
     await log_entity_mutation(
@@ -316,7 +316,7 @@ async def update_funnel(funnel_id: str, updates: FunnelPatchBody, db: AsyncSessi
 async def delete_funnel(funnel_id: str, db: AsyncSession = Depends(get_db)):
     f = await db.get(SalesFunnel, funnel_id)
     if f:
-        f.is_archived = "true"
+        f.is_archived = True
         await db.flush()
         await log_entity_mutation(
             db,

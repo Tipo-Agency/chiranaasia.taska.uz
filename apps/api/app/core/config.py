@@ -137,6 +137,13 @@ class Settings(BaseSettings):
     TELEGRAM_API_ID: int = 0
     TELEGRAM_API_HASH: str = ""
 
+    # Публичный base URL **бэкенда** (для Google OAuth redirect_uri). Пусто — PUBLIC_BASE_URL, иначе http://127.0.0.1:8000
+    API_PUBLIC_BASE_URL: str = ""
+    GOOGLE_OAUTH_CLIENT_ID: str = ""
+    GOOGLE_OAUTH_CLIENT_SECRET: str = ""
+    # Путь на фронте после успешного OAuth (первый origin из CORS)
+    MAIL_OAUTH_FRONTEND_PATH: str = "/settings?tab=profile&mail_connected=1"
+
     # S3-совместимое хранилище медиа (вложения сделок). Пусто — медиа в S3 не пишем (только legacy tgMessageId / без вложений).
     S3_BUCKET: str = ""
     S3_REGION: str = "us-east-1"

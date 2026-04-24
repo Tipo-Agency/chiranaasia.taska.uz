@@ -48,9 +48,10 @@ export function ProductionOrdersPanel({
             className="h-10 rounded-lg border border-gray-200 dark:border-[#333] bg-white dark:bg-[#1a1a1a] px-3 text-sm md:col-span-2"
           />
           <input
-            type="number"
-            value={plannedQty}
-            onChange={(e) => setPlannedQty(Number(e.target.value || 0))}
+            type="text"
+            inputMode="numeric"
+            value={String(plannedQty)}
+            onChange={(e) => setPlannedQty(Number(e.target.value.replace(/\D/g, '') || 0))}
             placeholder="План. количество"
             className="h-10 rounded-lg border border-gray-200 dark:border-[#333] bg-white dark:bg-[#1a1a1a] px-3 text-sm"
           />
@@ -161,17 +162,19 @@ export function ProductionOrdersPanel({
                   <td className="px-4 py-3 text-right">{o.plannedQty.toLocaleString('ru-RU')}</td>
                   <td className="px-4 py-3 text-right">
                     <input
-                      type="number"
+                      type="text"
+                      inputMode="numeric"
                       value={String(o.producedQty)}
-                      onChange={(e) => onUpdateOrder(o.id, { producedQty: Number(e.target.value || 0) })}
+                      onChange={(e) => onUpdateOrder(o.id, { producedQty: Number(e.target.value.replace(/\D/g, '') || 0) })}
                       className="w-24 ml-auto block h-8 text-right rounded-lg border border-gray-200 dark:border-[#333] bg-white dark:bg-[#1a1a1a] px-2 text-xs"
                     />
                   </td>
                   <td className="px-4 py-3 text-right">
                     <input
-                      type="number"
+                      type="text"
+                      inputMode="numeric"
                       value={String(o.defectQty)}
-                      onChange={(e) => onUpdateOrder(o.id, { defectQty: Number(e.target.value || 0) })}
+                      onChange={(e) => onUpdateOrder(o.id, { defectQty: Number(e.target.value.replace(/\D/g, '') || 0) })}
                       className="w-20 ml-auto block h-8 text-right rounded-lg border border-gray-200 dark:border-[#333] bg-white dark:bg-[#1a1a1a] px-2 text-xs"
                     />
                   </td>

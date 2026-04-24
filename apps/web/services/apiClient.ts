@@ -1732,12 +1732,21 @@ export const funnelsEndpoint = {
 export const productionEndpoint = {
   getPipelines: () => get<unknown[]>('/production/pipelines'),
   putPipelines: (items: unknown[]) => put<{ ok: boolean }>('/production/pipelines', items),
-  getOrders: (pipelineId?: string) => {
-    const q = pipelineId ? `?pipelineId=${encodeURIComponent(pipelineId)}` : '';
+  getOrders: (params?: { pipelineId?: string; dealId?: string; purchaseRequestId?: string }) => {
+    const qs = new URLSearchParams();
+    if (params?.pipelineId) qs.set('pipelineId', params.pipelineId);
+    if (params?.dealId) qs.set('dealId', params.dealId);
+    if (params?.purchaseRequestId) qs.set('purchaseRequestId', params.purchaseRequestId);
+    const q = qs.toString() ? `?${qs.toString()}` : '';
     return get<unknown[]>(`/production/orders${q}`);
   },
-  createOrder: (body: { pipelineId: string; title: string; notes?: string | null }) =>
-    post<unknown>('/production/orders', body),
+  createOrder: (body: {
+    pipelineId: string;
+    title: string;
+    notes?: string | null;
+    dealId?: string | null;
+    purchaseRequestId?: string | null;
+  }) => post<unknown>('/production/orders', body),
   patchOrder: (id: string, body: unknown, init?: { headers?: Record<string, string> }) =>
     patch<unknown>(`/production/orders/${encodeURIComponent(id)}`, body, init),
   handOver: (orderId: string, body: { notes?: string | null } = {}) =>
@@ -1756,4 +1765,35 @@ export const publicContentPlanEndpoint = {
     get<{ table: unknown | null; posts: unknown[]; shootPlans?: unknown[] }>(
       `/tables/public/content-plan/${encodeURIComponent(tableId)}`
     ),
+};
+
+/** OAuth Gmail + операции с ящиком (только для текущего пользователя). */
+export const mailIntegrationEndpoint = {
+  status: () =>
+    get<{
+      configured: boolean;
+      connected: boolean;
+      provider?: string | null;
+      accountEmail?: string | null;
+    }>('/integrations/mail/status'),
+  googleAuthorize: () => get<{ url: string }>('/integrations/mail/google/authorize'),
+  disconnect: () => del<{ ok: boolean }>('/integrations/mail/connection'),
+};
+
+export const mailUserEndpoint = {
+  messages: (limit?: number) => {
+    const q = limit != null ? `?limit=${encodeURIComponent(String(limit))}` : '';
+    return get<
+      Array<{
+        id: string;
+        threadId?: string;
+        subject?: string;
+        from?: string;
+        date?: string;
+        snippet?: string;
+      }>
+    >(`/mail/messages${q}`);
+  },
+  send: (body: { to: string; subject?: string; body?: string }) =>
+    post<{ id?: string; threadId?: string }>('/mail/send', body),
 };

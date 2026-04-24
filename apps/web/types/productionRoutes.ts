@@ -45,6 +45,10 @@ export interface ProductionRouteOrder {
   title: string;
   notes?: string | null;
   status: string;
+  /** ID заявки (сделки), к которой прикреплён заказ */
+  dealId?: string | null;
+  /** ID заявки на приобретение (finance) */
+  purchaseRequestId?: string | null;
   createdAt: string;
   updatedAt?: string | null;
   isArchived?: boolean;

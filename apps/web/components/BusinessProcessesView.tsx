@@ -13,6 +13,7 @@ import {
   MODULE_PAGE_GUTTER,
   MODULE_PAGE_TOP_PAD,
   SystemAlertDialog,
+  SystemConfirmDialog,
   APP_TOOLBAR_MODULE_CLUSTER,
   MODULE_ACCENTS,
   MODULE_TOOLBAR_TAB_IDLE,
@@ -64,6 +65,7 @@ const BusinessProcessesView: React.FC<BusinessProcessesViewProps> = ({
   const [description, setDescription] = useState('');
   const [steps, setSteps] = useState<ProcessStep[]>([]);
   const [alertText, setAlertText] = useState<string | null>(null);
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
 
   const tasksTableId = useMemo(() => tables.find((t) => t.type === 'tasks')?.id || '', [tables]);
 
@@ -79,10 +81,8 @@ const BusinessProcessesView: React.FC<BusinessProcessesViewProps> = ({
     return Array.from(processMap.values());
   }, [processes]);
 
-  const userTemplates = useMemo(
-    () => uniqueProcesses.filter((p) => !p.systemKey),
-    [uniqueProcesses]
-  );
+  // All non-archived process templates (systemKey never exists in data — removed dead filter)
+  const userTemplates = uniqueProcesses;
 
   const selectedProcess = uniqueProcesses.find(p => p.id === selectedProcessId);
 
@@ -200,8 +200,10 @@ const BusinessProcessesView: React.FC<BusinessProcessesViewProps> = ({
           createdAt = editingProcess.createdAt || now;
       }
       
+      // Generate ID once — reused in the setTimeout to avoid different Date.now() values
+      const procId = editingProcess ? editingProcess.id : `bp-${Date.now()}`;
       onSaveProcess({
-          id: editingProcess ? editingProcess.id : `bp-${Date.now()}`,
+          id: procId,
           version,
           title,
           description,
@@ -213,21 +215,19 @@ const BusinessProcessesView: React.FC<BusinessProcessesViewProps> = ({
       });
       setIsModalOpen(false);
       if (!editingProcess) {
-          // Если создали новый процесс, открываем его
-          const newProcessId = `bp-${Date.now()}`;
-          setTimeout(() => {
-              const savedProcess = processes.find(p => p.id === newProcessId) || processes[processes.length - 1];
-              if (savedProcess) setSelectedProcessId(savedProcess.id);
-          }, 100);
+          setTimeout(() => setSelectedProcessId(procId), 50);
       }
   };
 
   const handleDelete = () => {
-      if(editingProcess && confirm('Удалить процесс?')) {
-          onDeleteProcess(editingProcess.id);
-          setIsModalOpen(false);
-          if (selectedProcessId === editingProcess.id) setSelectedProcessId(null);
-      }
+      if (editingProcess) setDeleteConfirmId(editingProcess.id);
+  };
+
+  const confirmDelete = (id: string) => {
+      onDeleteProcess(id);
+      setDeleteConfirmId(null);
+      setIsModalOpen(false);
+      if (selectedProcessId === id) setSelectedProcessId(null);
   };
 
   const getAssigneeName = (step: ProcessStep) => {
@@ -373,16 +373,20 @@ const BusinessProcessesView: React.FC<BusinessProcessesViewProps> = ({
       }
   };
 
-  // Получаем все экземпляры всех процессов (нужно для вкладок)
-  const allInstances: { process: BusinessProcess; instance: ProcessInstance; tasks: Task[] }[] = processes
-    .filter(p => !p.isArchived) // Исключаем архивные процессы
-    .flatMap(proc => 
-      (proc.instances || []).map(instance => ({
-        process: proc,
-        instance,
-        tasks: tasks.filter(t => t.processInstanceId === instance.id)
-      }))
-    );
+  // Все экземпляры всех неархивных процессов
+  const allInstances = useMemo(
+    () =>
+      processes
+        .filter((p) => !p.isArchived)
+        .flatMap((proc) =>
+          (proc.instances || []).map((instance) => ({
+            process: proc,
+            instance,
+            tasks: tasks.filter((t) => t.processInstanceId === instance.id),
+          }))
+        ),
+    [processes, tasks]
+  );
 
   const runningInstances = useMemo(
     () => allInstances.filter(({ instance }) => instance.status === 'active' || instance.status === 'paused'),
@@ -1243,6 +1247,15 @@ const BusinessProcessesView: React.FC<BusinessProcessesViewProps> = ({
                 message={alertText || ''}
                 onClose={() => setAlertText(null)}
               />
+              <SystemConfirmDialog
+                open={!!deleteConfirmId}
+                title="Удалить процесс?"
+                message="Процесс будет перемещён в архив. Активные экземпляры не пострадают."
+                confirmText="Удалить"
+                danger
+                onConfirm={() => deleteConfirmId && confirmDelete(deleteConfirmId)}
+                onCancel={() => setDeleteConfirmId(null)}
+              />
           </div>
       );
   }
@@ -1699,6 +1712,15 @@ const BusinessProcessesView: React.FC<BusinessProcessesViewProps> = ({
         title="Бизнес-процессы"
         message={alertText || ''}
         onClose={() => setAlertText(null)}
+      />
+      <SystemConfirmDialog
+        open={!!deleteConfirmId}
+        title="Удалить процесс?"
+        message="Процесс будет перемещён в архив. Активные экземпляры не пострадают."
+        confirmText="Удалить"
+        danger
+        onConfirm={() => deleteConfirmId && confirmDelete(deleteConfirmId)}
+        onCancel={() => setDeleteConfirmId(null)}
       />
     </ModulePageShell>
   );

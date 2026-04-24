@@ -88,17 +88,18 @@ export const SpacesListView: React.FC<SpacesListViewProps> = ({
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {spacesOfType.map(table => (
-                <div
+                <button
                   key={table.id}
+                  type="button"
                   onClick={() => onSelectTable(table.id)}
-                  className="bg-white dark:bg-[#252525] border border-gray-200 dark:border-[#333] rounded-lg p-4 hover:shadow-lg transition-all cursor-pointer group"
+                  className="w-full text-left bg-white dark:bg-[#252525] border border-gray-200 dark:border-[#333] rounded-lg p-4 hover:shadow-lg transition-all cursor-pointer group"
                 >
                   <div className="flex items-start justify-between mb-3">
                     <div className="flex items-center gap-3">
-                      <DynamicIcon 
-                        name={table.icon || getTypeIcon(type)} 
-                        className={table.color || getTypeColor(type)} 
-                        size={24} 
+                      <DynamicIcon
+                        name={table.icon || getTypeIcon(type)}
+                        className={table.color || getTypeColor(type)}
+                        size={24}
                       />
                       <div>
                         <h3 className="font-semibold text-gray-900 dark:text-white">{table.name}</h3>
@@ -109,14 +110,16 @@ export const SpacesListView: React.FC<SpacesListViewProps> = ({
                     </div>
                     {hasPermission(currentUser, 'settings.general') && (
                       <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <button 
+                        <button
+                          type="button"
                           onClick={(e) => { e.stopPropagation(); onEditTable(table); }}
                           className="text-gray-400 hover:text-blue-500 p-1 rounded hover:bg-blue-50 dark:hover:bg-blue-900/30"
                         >
                           <Edit2 size={14} />
                         </button>
                         {!table.isSystem && (
-                          <button 
+                          <button
+                            type="button"
                             onClick={(e) => { e.stopPropagation(); onDeleteTable(table.id); }}
                             className="text-gray-400 hover:text-red-500 p-1 rounded hover:bg-red-50 dark:hover:bg-red-900/30"
                           >
@@ -126,7 +129,7 @@ export const SpacesListView: React.FC<SpacesListViewProps> = ({
                       </div>
                     )}
                   </div>
-                </div>
+                </button>
               ))}
             </div>
           )}

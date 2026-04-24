@@ -567,7 +567,7 @@ export const AutomationSettings: React.FC<AutomationSettingsProps> = ({
                                         </div>
                                         <EntitySearchSelect
                                             value={autoTarget}
-                                            onChange={(val) => setAutoTarget(val as any)}
+                                            onChange={(val) => setAutoTarget(val as 'assignee' | 'creator' | 'manager' | 'admin' | 'specific')}
                                             options={[
                                                 { value: 'assignee', label: 'Исполнитель', searchText: 'исполнитель assignee' },
                                                 { value: 'creator', label: 'Создатель', searchText: 'создатель creator' },
@@ -587,7 +587,7 @@ export const AutomationSettings: React.FC<AutomationSettingsProps> = ({
                                         </div>
                                         <EntitySearchSelect
                                             value={autoApprovalType}
-                                            onChange={(val) => setAutoApprovalType(val as any)}
+                                            onChange={(val) => setAutoApprovalType(val as 'purchase_request' | 'process_step' | 'document' | 'deal')}
                                             options={[
                                                 { value: 'purchase_request', label: 'Заявка на приобретение', searchText: 'заявка приобретение purchase' },
                                                 { value: 'process_step', label: 'Этап бизнес‑процесса', searchText: 'этап bpm процесс process_step' },

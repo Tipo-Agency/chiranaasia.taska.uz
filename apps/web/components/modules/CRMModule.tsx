@@ -1,5 +1,6 @@
 import React from 'react';
 import { Deal, Client, Contract, User, Project, Task, OneTimeDeal, AccountsReceivable, Meeting, SalesFunnel } from '../../types';
+import type { ProductionRoutePipeline, ProductionRouteOrder } from '../../types';
 import type { AppActions } from '../../frontend/hooks/useAppLogic';
 import SalesFunnelView from '../SalesFunnelView';
 import ClientsView from '../ClientsView';
@@ -20,6 +21,8 @@ interface CRMModuleProps {
   tasks?: Task[];
   meetings?: Meeting[];
   salesFunnels?: SalesFunnel[];
+  productionPipelines?: ProductionRoutePipeline[];
+  productionOrders?: ProductionRouteOrder[];
   currentUser?: User | null;
   actions: AppActions;
   autoOpenCreateModal?: boolean;
@@ -38,6 +41,8 @@ export const CRMModule: React.FC<CRMModuleProps> = ({
   accountsReceivable = [],
   users,
   salesFunnels = [],
+  productionPipelines = [],
+  productionOrders = [],
   projects,
   tasks,
   meetings = [],
@@ -49,17 +54,19 @@ export const CRMModule: React.FC<CRMModuleProps> = ({
   if (view === 'sales-funnel') {
       return (
         <div className="h-full min-h-0 flex flex-col">
-          <SalesFunnelView 
-            deals={deals} 
-            clients={clients} 
+          <SalesFunnelView
+            deals={deals}
+            clients={clients}
             users={users}
             projects={projects}
             tasks={tasks}
             meetings={meetings}
             salesFunnels={salesFunnels}
+            productionPipelines={productionPipelines}
+            productionOrders={productionOrders}
             currentUser={currentUser}
             headerSearchQuery={headerSearchQuery}
-            onSaveDeal={actions.saveDeal} 
+            onSaveDeal={actions.saveDeal}
             onDeleteDeal={actions.deleteDeal}
             onCreateTask={actions.openTaskModal ? (task) => actions.openTaskModal(task) : undefined}
             onCreateClient={actions.saveClient}
@@ -67,6 +74,7 @@ export const CRMModule: React.FC<CRMModuleProps> = ({
             onSaveMeeting={actions.saveMeeting}
             onDeleteMeeting={actions.deleteMeeting}
             onUpdateMeetingSummary={actions.updateMeetingSummary}
+            onCreateProductionOrder={actions.createProductionRouteOrder}
             autoOpenCreateModal={autoOpenCreateModal}
           />
         </div>
