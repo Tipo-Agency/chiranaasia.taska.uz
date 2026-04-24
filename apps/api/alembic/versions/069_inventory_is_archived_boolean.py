@@ -2,7 +2,7 @@
 из String('true'/'false') в Boolean.
 
 Revision ID: 069_inventory_is_archived_boolean
-Revises: 068_production_pipeline_is_archived_boolean
+Revises: 068_pp_is_archived_bool
 """
 from __future__ import annotations
 
@@ -10,7 +10,7 @@ import sqlalchemy as sa
 from alembic import op
 
 revision = "069_inventory_is_archived_boolean"
-down_revision = "068_production_pipeline_is_archived_boolean"
+down_revision = "068_pp_is_archived_bool"
 branch_labels = None
 depends_on = None
 

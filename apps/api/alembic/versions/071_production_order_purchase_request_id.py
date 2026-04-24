@@ -1,6 +1,6 @@
 """Добавить production_orders.purchase_request_id — привязка к заявке на приобретение (finance).
 
-Revision ID: 071_production_order_purchase_request_id
+Revision ID: 071_po_purchase_req_id (имя ≤32: alembic_version.version_num VARCHAR(32))
 Revises: 070_production_order_deal_id
 """
 from __future__ import annotations
@@ -8,7 +8,7 @@ from __future__ import annotations
 import sqlalchemy as sa
 from alembic import op
 
-revision = "071_production_order_purchase_request_id"
+revision = "071_po_purchase_req_id"
 down_revision = "070_production_order_deal_id"
 branch_labels = None
 depends_on = None

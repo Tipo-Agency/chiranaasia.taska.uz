@@ -1,6 +1,6 @@
 """Конвертация production_pipelines.is_archived из String('true'/'false') в Boolean.
 
-Revision ID: 068_production_pipeline_is_archived_boolean
+Revision ID: 068_pp_is_archived_bool (имя ≤32: колонка alembic_version.version_num VARCHAR(32))
 Revises: 067_funnel_is_archived_boolean
 """
 from __future__ import annotations
@@ -8,7 +8,7 @@ from __future__ import annotations
 import sqlalchemy as sa
 from alembic import op
 
-revision = "068_production_pipeline_is_archived_boolean"
+revision = "068_pp_is_archived_bool"
 down_revision = "067_funnel_is_archived_boolean"
 branch_labels = None
 depends_on = None

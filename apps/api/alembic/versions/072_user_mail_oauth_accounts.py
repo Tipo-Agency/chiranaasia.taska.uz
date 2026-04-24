@@ -1,7 +1,7 @@
 """Таблица user_mail_oauth — OAuth2 к почте (Gmail) на пользователя.
 
 Revision ID: 072_user_mail_oauth_accounts
-Revises: 071_production_order_purchase_request_id
+Revises: 071_po_purchase_req_id
 """
 from __future__ import annotations
 
@@ -9,7 +9,7 @@ import sqlalchemy as sa
 from alembic import op
 
 revision = "072_user_mail_oauth_accounts"
-down_revision = "071_production_order_purchase_request_id"
+down_revision = "071_po_purchase_req_id"
 branch_labels = None
 depends_on = None
 
