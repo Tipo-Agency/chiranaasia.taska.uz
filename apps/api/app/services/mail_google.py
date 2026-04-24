@@ -12,8 +12,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import get_settings
 from app.models.user_mail_oauth import UserMailOAuthAccount
-from app.services.http_client import async_http_client
 from app.services.fernet_secrets import decrypt_secret, encrypt_secret
+from app.services.http_client import async_http_client
 
 PROVIDER_GOOGLE = "google"
 
