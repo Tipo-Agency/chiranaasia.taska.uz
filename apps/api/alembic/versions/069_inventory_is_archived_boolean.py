@@ -1,7 +1,7 @@
 """Конвертация warehouses.is_default, warehouses.is_archived, inventory_items.is_archived
 из String('true'/'false') в Boolean.
 
-Revision ID: 069_inventory_is_archived_boolean
+Revision ID: 069_inv_archived_bool (≤31: alembic_version.version_num VARCHAR(32))
 Revises: 068_pp_is_archived_bool
 """
 from __future__ import annotations
@@ -9,7 +9,7 @@ from __future__ import annotations
 import sqlalchemy as sa
 from alembic import op
 
-revision = "069_inventory_is_archived_boolean"
+revision = "069_inv_archived_bool"
 down_revision = "068_pp_is_archived_bool"
 branch_labels = None
 depends_on = None

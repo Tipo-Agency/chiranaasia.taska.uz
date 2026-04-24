@@ -1,7 +1,7 @@
 """Добавить production_orders.deal_id — привязка к заявке (сделке).
 
 Revision ID: 070_production_order_deal_id
-Revises: 069_inventory_is_archived_boolean
+Revises: 069_inv_archived_bool
 """
 from __future__ import annotations
 
@@ -9,7 +9,7 @@ import sqlalchemy as sa
 from alembic import op
 
 revision = "070_production_order_deal_id"
-down_revision = "069_inventory_is_archived_boolean"
+down_revision = "069_inv_archived_bool"
 branch_labels = None
 depends_on = None
 
